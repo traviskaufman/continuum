@@ -165,9 +165,11 @@ var errors = (function(errors, messages, exports){
     construct_arrow_function            : ["Arrow functions cannot be constructed"],
     generator_executing                 : ["'", "$0", "' called on executing generator"],
     generator_closed                    : ["'", "$0", "' called on closed generator"],
-    generator_send_newborn              : ["Sent value into newborn generator"]
+    generator_send_newborn              : ["Sent value into newborn generator"],
+    unnamed_symbol                      : ["Symbol must have a name"]
   },
   ReferenceError: {
+    undefined_symbol               : ["Referenced undefined symbol ", "$0"],
     unknown_label                  : ["Undefined label '", "$0", "'"],
     undefined_method               : ["Object ", "$1", " has no method '", "$0", "'"],
     not_defined                    : ["$0", " is not defined"],
