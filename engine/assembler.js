@@ -957,9 +957,7 @@ var assembler = (function(exports){
 
   function ExportSpecifier(node){}
 
-  function ExportSpecifierSet(node){
-
-  }
+  function ExportSpecifierSet(node){}
 
   function ExportDeclaration(node){
     if (node.declaration) {
@@ -1127,19 +1125,9 @@ var assembler = (function(exports){
     }
   }
 
-  function ImportDeclaration(node){
-    // recurse(node.from);
-    // IMPORT();
-    // each(node.specifiers, function(specifier){
-    //   recurse(specifier);
-    //   GET();
-    //   PUT();
-    // });
-  }
+  function ImportDeclaration(node){}
 
-  function ImportSpecifier(node){
-
-  }
+  function ImportSpecifier(node){}
 
   function Literal(node){
     if (node.value instanceof RegExp) {
@@ -1481,19 +1469,18 @@ var assembler = (function(exports){
 
   var handlers = {};
 
-  utility.iterate([ ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression, AtSymbol,
-    BinaryExpression, BlockStatement, BreakStatement, CallExpression,
-    CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassHeritage,
-    ConditionalExpression, DebuggerStatement, DoWhileStatement, EmptyStatement,
-    ExportDeclaration, ExportSpecifier, ExportSpecifierSet, ExpressionStatement,
-    ForInStatement, ForOfStatement, ForStatement, FunctionDeclaration,
-    FunctionExpression, Glob, Identifier, IfStatement, ImportDeclaration,
-    ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression,
-    MethodDefinition, ModuleDeclaration, NativeIdentifier, NewExpression, ObjectExpression,
-    ObjectPattern, Path, Program, Property, ReturnStatement, SequenceExpression, SwitchStatement,
-    SymbolDeclaration, SymbolDeclarator, TaggedTemplateExpression, TemplateElement, TemplateLiteral,
-    ThisExpression, ThrowStatement, TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration,
-    VariableDeclarator, WhileStatement, WithStatement, YieldExpression], function(handler){
+  utility.iterate([ ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
+    AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
+    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression,
+    DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
+    ExportSpecifierSet, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement,
+    FunctionDeclaration, FunctionExpression, Glob, Identifier, IfStatement, ImportDeclaration,
+    ImportSpecifier, LabeledStatement, Literal, LogicalExpression, MemberExpression, MethodDefinition,
+    ModuleDeclaration, NativeIdentifier, NewExpression, ObjectExpression, ObjectPattern, Path, Program,
+    Property, ReturnStatement, SequenceExpression, SwitchStatement, SymbolDeclaration, SymbolDeclarator,
+    TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement,
+    TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator,
+    WhileStatement, WithStatement, YieldExpression], function(handler){
       handlers[utility.fname(handler)] = handler;
     });
 
@@ -1581,22 +1568,22 @@ var assembler = (function(exports){
         this.queue(code);
 
         while (this.pending.length) {
-          var lastCode = this.code;
-          this.code = this.pending.pop();
-          this.code.filename = this.filename;
+        var lastCode = this.code;
+        this.code = this.pending.pop();
+        this.code.filename = this.filename;
           if (lastCode) {
             this.code.derive(lastCode);
           }
-          recurse(this.code.body);
-          if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
+        recurse(this.code.body);
+        if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
             COMPLETE();
           } else {
-            if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
-              GET();
-            } else {
-              UNDEFINED();
-            }
-            RETURN();
+        if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
+          GET();
+        } else {
+          UNDEFINED();
+        }
+        RETURN();
           }
         }
 
