@@ -1073,25 +1073,38 @@ var utility = (function(exports){
       },
       function __iterator__(type){
         return new PropertyListIterator(this, type);
-      },
-      function inspect(){
-        var out = create(null);
-        function Token(value){
-          this.value = value;
-        }
-        Token.prototype.inspect = function(){
-          return this.value;
-        };
-        this.forEach(function(property){
-          var attrs = (property[2] & 0x01 ? 'E' : '_') +
-                      (property[2] & 0x02 ? 'C' : '_') +
-                      (property[2] & 0x04 ? 'W' :
-                       property[2] & 0x08 ? 'A' : '_');
-          out[property[0]] = new Token(attrs + ' ' + (isObject(property[1]) ? property[1].NativeBrand : property[1]));
-        });
-        return require('util').inspect(out);
       }
     ]);
+
+    if (require('util')) {
+      void function(){
+        var insp = require('util').inspect;
+
+        function Token(value){
+          this.value = value + '';
+        }
+
+        Token.prototype.inspect = function(){ return this.value };
+
+        define(PropertyList.prototype, function inspect(){
+          var out = create(null);
+
+          this.forEach(function(prop){
+            var key = typeof prop[0] === STRING ? prop[0] : '_@_'+insp(prop[0]);
+
+            var attrs = (prop[2] & 0x01 ? 'E' : '_') +
+                        (prop[2] & 0x02 ? 'C' : '_') +
+                        (prop[2] & 0x04 ? 'W' :
+                         prop[2] & 0x08 ? 'A' : '_');
+
+            out[key] = new Token(attrs + ' ' + (isObject(prop[1]) ? prop[1].NativeBrand : prop[1]));
+          });
+
+          return insp(out).replace(/'_@_@(\w+)'/g, '@$1');
+        });
+      }();
+    }
+
 
     return PropertyList;
   })();
