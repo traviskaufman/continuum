@@ -5,7 +5,8 @@ var debug = (function(exports){
       inherit = utility.inherit,
       create = utility.create,
       each = utility.each,
-      define = utility.define;
+      define = utility.define,
+      assign = utility.assign;
 
   var constants = require('./constants'),
       ENUMERABLE = constants.ATTRIBUTES.ENUMERABLE,
@@ -103,23 +104,25 @@ var debug = (function(exports){
     type: 'number'
   });
 
-  function MirrorAccessor(holder, accessor, key){
-    this.holder = holder;
-    this.accessor = accessor;
-    this.key = key;
-    realm().enterMutationContext();
-    this.subject = accessor.Get.Call(holder, key);
-    if (this.subject.__introspected) {
-      this.introspected = this.subject.__introspected;
-    } else {
-      this.introspected = introspect(this.subject);
-    }
-    this.kind = this.introspected.kind;
-    this.type = this.introspected.type;
-    realm().exitMutationContext();
-  }
 
-  void function(){
+  var MirrorAccessor = (function(){
+    function MirrorAccessor(holder, accessor, key){
+      this.holder = holder;
+      this.accessor = accessor;
+      this.key = key;
+      realm().enterMutationContext();
+      this.subject = accessor.Get.Call(holder, key);
+      if (this.subject && this.subject.__introspected) {
+        this.introspected = this.subject.__introspected;
+      } else {
+        this.introspected = introspect(this.subject);
+      }
+      this.kind = this.introspected.kind;
+      this.type = this.introspected.type;
+      realm().exitMutationContext();
+    }
+
+
     inherit(MirrorAccessor, Mirror, {
       accessor: true
     }, [
@@ -142,19 +145,22 @@ var debug = (function(exports){
         }
       }
     ]);
-  }();
+
+    return MirrorAccessor;
+  })();
 
   var proto = Math.random().toString(36).slice(2);
 
 
-  function MirrorObject(subject){
-    subject.__introspected = this;
-    this.subject = subject;
-    this.props = subject.properties;
-    this.accessors = create(null);
-  }
 
-  void function(){
+  var MirrorObject = (function(){
+    function MirrorObject(subject){
+      subject.__introspected = this;
+      this.subject = subject;
+      this.props = subject.properties;
+      this.accessors = create(null);
+    }
+
     inherit(MirrorObject, Mirror, {
       kind: 'Object',
       type: 'object',
@@ -365,7 +371,11 @@ var debug = (function(exports){
         return keys.sort();
       }
     ]);
-  }();
+
+    return MirrorObject;
+  })();
+
+
 
   function MirrorArguments(subject){
     MirrorObject.call(this, subject);
@@ -373,14 +383,15 @@ var debug = (function(exports){
 
   inherit(MirrorArguments, MirrorObject, {
     kind: 'Arguments'
-  }, []);
+  });
 
 
-  function MirrorArray(subject){
-    MirrorObject.call(this, subject);
-  }
+  var MirrorArray = (function(){
 
-  void function(){
+    function MirrorArray(subject){
+      MirrorObject.call(this, subject);
+    }
+
     inherit(MirrorArray, MirrorObject, {
       kind: 'Array'
     }, [
@@ -410,14 +421,15 @@ var debug = (function(exports){
         return indexes.concat(keys.sort());
       }
     ]);
-  }();
 
+    return MirrorArray;
+  })();
 
-  function MirrorBoolean(subject){
-    MirrorObject.call(this, subject);
-  }
+  var MirrorBoolean = (function(){
+    function MirrorBoolean(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  void function(){
     inherit(MirrorBoolean, MirrorObject, {
       kind: 'Boolean'
     }, [
@@ -425,13 +437,18 @@ var debug = (function(exports){
         return 'Boolean('+this.subject.PrimitiveValue+')';
       }
     ]);
-  }();
 
-  function MirrorDate(subject){
-    MirrorObject.call(this, subject);
-  }
+    return MirrorBoolean;
+  })();
 
-  void function(){
+
+
+
+  var MirrorDate = (function(){
+    function MirrorDate(subject){
+      MirrorObject.call(this, subject);
+    }
+
     inherit(MirrorDate, MirrorObject, {
       kind: 'Date'
     }, [
@@ -445,27 +462,33 @@ var debug = (function(exports){
         }
       }
     ]);
-  }();
+
+    return MirrorDate;
+  })();
 
 
-  function MirrorError(subject){
-    MirrorObject.call(this, subject);
-  }
-
-  inherit(MirrorError, MirrorObject, {
-    kind: 'Error'
-  }, [
-  ]);
-
-  function MirrorThrown(subject){
-    if (utility.isObject(subject)) {
-      MirrorError.call(this, subject);
-    } else {
-      return introspect(subject);
+  var MirrorError = (function(){
+    function MirrorError(subject){
+      MirrorObject.call(this, subject);
     }
-  }
 
-  void function(){
+    inherit(MirrorError, MirrorObject, {
+      kind: 'Error'
+    });
+
+    return MirrorError;
+  })();
+
+
+  var MirrorThrown = (function(){
+    function MirrorThrown(subject){
+      if (utility.isObject(subject)) {
+        MirrorError.call(this, subject);
+      } else {
+        return introspect(subject);
+      }
+    }
+
     inherit(MirrorThrown, MirrorError, {
       kind: 'Thrown'
     }, [
@@ -488,14 +511,16 @@ var debug = (function(exports){
         return this.subject.context;
       }
     ]);
-  }();
+
+    return MirrorThrown;
+  })();
 
 
-  function MirrorFunction(subject){
-    MirrorObject.call(this, subject);
-  }
+  var MirrorFunction = (function(){
+    function MirrorFunction(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  void function(){
     inherit(MirrorFunction, MirrorObject, {
       type: 'function',
       kind: 'Function',
@@ -538,13 +563,17 @@ var debug = (function(exports){
         return introspect(this.subject.Scope);
       }
     ]);
-  }();
 
-  function MirrorGlobal(subject){
-    MirrorObject.call(this, subject);
-  }
+    return MirrorFunction;
+  })();
 
-  void function(){
+
+
+  var MirrorGlobal = (function(){
+    function MirrorGlobal(subject){
+      MirrorObject.call(this, subject);
+    }
+
     inherit(MirrorGlobal, MirrorObject, {
       kind: 'Global'
     }, [
@@ -552,33 +581,36 @@ var debug = (function(exports){
         return introspect(this.subject.env);
       }
     ]);
-  }();
+
+    return MirrorGlobal;
+  })();
 
 
+  var MirrorJSON = (function(){
+    function MirrorJSON(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  function MirrorJSON(subject){
-    MirrorObject.call(this, subject);
-  }
+    inherit(MirrorJSON, MirrorObject, {
+      kind: 'JSON'
+    });
 
-  inherit(MirrorJSON, MirrorObject, {
-    kind: 'JSON'
-  }, []);
+    return MirrorJSON;
+  })();
 
-  function MirrorMap(subject){
-    MirrorObject.call(this, subject);
-  }
 
-  inherit(MirrorMap, MirrorObject, {
-    kind: 'Map'
-  }, []);
+  var MirrorMath = (function(){
+    function MirrorMath(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  function MirrorMath(subject){
-    MirrorObject.call(this, subject);
-  }
+    inherit(MirrorMath, MirrorObject, {
+      kind: 'Math'
+    });
 
-  inherit(MirrorMath, MirrorObject, {
-    kind: 'Math'
-  }, []);
+    return MirrorMath;
+  })();
+
 
   var MirrorModule = (function(){
     function MirrorModule(subject){
@@ -636,11 +668,12 @@ var debug = (function(exports){
     return MirrorNumber;
   })();
 
-  function MirrorRegExp(subject){
-    MirrorObject.call(this, subject);
-  }
 
-  void function(){
+  var MirrorRegExp = (function(){
+    function MirrorRegExp(subject){
+      MirrorObject.call(this, subject);
+    }
+
     inherit(MirrorRegExp, MirrorObject, {
       kind: 'RegExp'
     }, [
@@ -648,27 +681,17 @@ var debug = (function(exports){
         return this.subject.PrimitiveValue+'';
       }
     ]);
-  }();
 
-
-  var MirrorSet = (function(){
-    function MirrorSet(subject){
-      MirrorObject.call(this, subject);
-    }
-
-    inherit(MirrorSet, MirrorObject, {
-      kind: 'Set'
-    });
-
-    return MirrorSet;
+    return MirrorRegExp;
   })();
 
 
-  function MirrorString(subject){
-    MirrorObject.call(this, subject);
-  }
 
-  void function(){
+  var MirrorString = (function(){
+    function MirrorString(subject){
+      MirrorObject.call(this, subject);
+    }
+
     inherit(MirrorString, MirrorObject,{
       kind: 'String'
     }, [
@@ -704,9 +727,7 @@ var debug = (function(exports){
         return 'String('+utility.quotes(this.subject.PrimitiveValue)+')';
       }
     ]);
-  }();
-
-
+  })();
 
 
   var MirrorSymbol = (function(){
@@ -726,13 +747,85 @@ var debug = (function(exports){
   })();
 
 
-  function MirrorWeakMap(subject){
-    MirrorObject.call(this, subject);
-  }
 
-  inherit(MirrorWeakMap, MirrorObject, {
-    kind: 'WeakMap'
-  }, []);
+  var MirrorCollection = (function(){
+    function CollectionIterator(data){
+      this.guard = this.current = data.guard;
+      this.index = 0;
+    }
+
+    define(CollectionIterator.prototype, [
+      function next(){
+        if (!this.current || this.current.next === this.guard) {
+          this.guard = this.current = null;
+          throw StopIteration;
+        }
+        this.index++;
+        return this.current = this.current.next;
+      }
+    ]);
+
+    function MirrorCollection(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorCollection, MirrorObject, [
+      function count(){
+        return this.data.size;
+      },
+      function __iterator__(){
+        return new CollectionIterator(this.data);
+      }
+    ]);
+
+    return MirrorCollection;
+  })();
+
+
+  var MirrorSet = (function(){
+    function MirrorSet(subject){
+      MirrorCollection.call(this, subject);
+      this.data = this.subject.SetData.MapData;
+    }
+
+    inherit(MirrorSet, MirrorCollection, {
+      kind: 'Set'
+    }, [
+    ]);
+
+    return MirrorSet;
+  })();
+
+  var MirrorMap = (function(){
+    function MirrorMap(subject){
+      MirrorCollection.call(this, subject);
+      this.data = this.subject.MapData;
+    }
+
+    inherit(MirrorMap, MirrorCollection, {
+      kind: 'Map'
+    }, [
+    ]);
+
+    return MirrorMap;
+  })();
+
+
+  var MirrorWeakMap = (function(){
+    function MirrorWeakMap(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorWeakMap, MirrorObject, {
+      kind: 'WeakMap'
+    });
+
+    return MirrorWeakMap;
+  })();
+
+
+
+
 
 
   var MirrorProxy = (function(){
@@ -884,8 +977,10 @@ var debug = (function(exports){
           key = key === '__proto__' ? proto : key;
           props[key] = [key, null, 7]
         });
-
         return props;
+      },
+      function isClass(){
+        return !!this.subject.Class;
       },
       function list(hidden, own){
         own = true;
@@ -975,6 +1070,9 @@ var debug = (function(exports){
 
     return MirrorGlobalScope;
   })();
+
+
+
 
   var brands = {
     Arguments: MirrorArguments,
@@ -1073,230 +1171,88 @@ var debug = (function(exports){
   }
 
 
+  var Renderer = (function(){
 
-  function Renderer(handlers){
-    if (handlers) {
-      for (var k in this) {
-        if (k in handlers) {
-          this[k] = handlers[k];
+    function alwaysLabel(mirror){
+      return mirror.label();
+    }
+
+
+    function Renderer(handlers){
+      if (handlers) {
+        for (var k in this) {
+          if (k in handlers) {
+            this[k] = handlers[k];
+          }
         }
       }
     }
-  }
 
-  var alwaysLabel = function(mirror){
-    return mirror.label();
-  };
-
-  Renderer.prototype = {
-    Unknown: alwaysLabel,
-    BooleanValue: alwaysLabel,
-    StringValue: function(mirror){
-      return utility.quotes(mirror.subject);
-    },
-    NumberValue: function(mirror){
-      var label = mirror.label();
-      return label === 'number' ? mirror.subject : label;
-    },
-    UndefinedValue: alwaysLabel,
-    NullValue: alwaysLabel,
-    Thrown: function(mirror){
-      return mirror.getError();
-    },
-    Accessor: alwaysLabel,
-    Arguments: alwaysLabel,
-    Array: alwaysLabel,
-    Boolean: alwaysLabel,
-    Date: alwaysLabel,
-    Error: function(mirror){
-      return mirror.getValue('name') + ': ' + mirror.getValue('message');
-    },
-    Function: alwaysLabel,
-    Global: alwaysLabel,
-    JSON: alwaysLabel,
-    Map: alwaysLabel,
-    Math: alwaysLabel,
-    Module: alwaysLabel,
-    Object: alwaysLabel,
-    Number: alwaysLabel,
-    RegExp: alwaysLabel,
-    Scope: alwaysLabel,
-    Set: alwaysLabel,
-    Symbol: alwaysLabel,
-    String: alwaysLabel,
-    WeakMap: alwaysLabel
-  };
-
-  void function(){
     define(Renderer.prototype, [
       function render(subject){
         var mirror = introspect(subject);
         return this[mirror.kind](mirror);
       }
     ]);
-  }();
+
+    assign(Renderer.prototype, {
+      Unknown: alwaysLabel,
+      BooleanValue: alwaysLabel,
+      StringValue: function(mirror){
+        return utility.quotes(mirror.subject);
+      },
+      NumberValue: function(mirror){
+        var label = mirror.label();
+        return label === 'number' ? mirror.subject : label;
+      },
+      UndefinedValue: alwaysLabel,
+      NullValue: alwaysLabel,
+      Thrown: function(mirror){
+        return mirror.getError();
+      },
+      Accessor: alwaysLabel,
+      Arguments: alwaysLabel,
+      Array: alwaysLabel,
+      Boolean: alwaysLabel,
+      Date: alwaysLabel,
+      Error: function(mirror){
+        return mirror.getValue('name') + ': ' + mirror.getValue('message');
+      },
+      Function: alwaysLabel,
+      Global: alwaysLabel,
+      JSON: alwaysLabel,
+      Map: alwaysLabel,
+      Math: alwaysLabel,
+      Module: alwaysLabel,
+      Object: alwaysLabel,
+      Number: alwaysLabel,
+      RegExp: alwaysLabel,
+      Scope: alwaysLabel,
+      Set: alwaysLabel,
+      Symbol: alwaysLabel,
+      String: alwaysLabel,
+      WeakMap: alwaysLabel
+    });
+
+    return Renderer;
+  })();
 
 
   var renderer = new Renderer;
 
-  function render(o){
-    return renderer.render(o);
-  }
-
-  function createRenderer(handlers){
-    return new Renderer(handlers);
-  }
-
-  function isMirror(o){
-    return o instanceof Mirror;
-  }
-
-  void function(){
-    return;
-    if (typeof Proxy !== 'object' || typeof require !== 'function') return;
-
-    var util = require('util'),
-        wrappers = new WeakMap,
-        $Object = require('./runtime').builtins.$Object;
-
-    void function(){
-      define($Object.prototype, function inspect(fn){
-        if (fn && typeof fn === 'function') {
-          return fn(wrap(this));
-        } else {
-          return util.inspect(wrap(this), true, 2, false);
-        }
-      });
-    }();
-
-
-    exports.wrap = wrap;
-
-    function wrap(target){
-      if (isObject(target)) {
-        if (target instanceof $Object) {
-          target = introspect(target);
-        }
-        if (target instanceof MirrorObject) {
-          if (!target.proxy) {
-            if (target.type === 'function') {
-              var handler = new RenderHandler(target);
-              target.proxy = Proxy.createFunction(handler,
-                function(){ return handler.apply(this, [].slice.call(arguments)) },
-                function(){ return handler.construct([].slice.call(arguments)) }
-              );
-            } else {
-              target.proxy = Proxy.create(new RenderHandler(target));
-            }
-            wrappers.set(target.proxy, target.subject);
-          }
-        } else if (target instanceof Mirror) {
-          return Mirror.subject;
-        }
-        return target.proxy;
-      }
-      return target;
-    }
-
-    function unwrap(target){
-      if (!isObject(target) || target instanceof $Object) {
-        return target;
-      }
-      if (wrappers.has(target)) {
-        return wrappers.get(target);
-      }
-      return target;
-    }
-
-
-    function RenderHandler(mirror){
-      this.mirror = mirror;
-    }
-
-    RenderHandler.prototype = {
-      getOwnPropertyNames: function(){
-        return this.mirror.list(false, true);
-      },
-      getPropertyNames: function(){
-        return this.mirror.list(false, true);
-      },
-      enumerate: function(){
-        return this.mirror.list(false, true);
-      },
-      keys: function(){
-        return this.mirror.list(false, true);
-      },
-      getOwnPropertyDescriptor: function(key){
-        var desc = this.mirror.getOwnDescriptor(key);
-        if (desc) {
-          desc.configurable = true;
-          if (isObject(desc.value)) {
-            desc.value = wrap(desc.value);
-          } else {
-            if (isObject(desc.get)) {
-              desc.get = wrap(desc.get);
-            }
-            if (isObject(desc.set)) {
-              desc.set = wrap(desc.set);
-            }
-          }
-        }
-        return desc;
-      },
-      get: function(rcvr, key){
-        if (key === 'inspect') return;
-        if (key === 'toString') {
-          var mirror = this.mirror;
-          return function toString(){
-            return '[object '+ mirror.subject.NativeBrand.name+']';
-          };
-        }
-        var result = this.mirror.get(key);
-        if (!isObject(result.subject)) {
-          return result.subject;
-        } else {
-          return wrap(result);
-        }
-
-      },
-      set: function(receiver, key, value){
-        this.mirror.set(key, unwrap(value));
-        return true;
-      },
-      defineProperty: function(key, desc){
-        if ('value' in desc) {
-          desc.value = unwrap(desc.value);
-        } else {
-          if ('get' in desc) {
-            desc.get = unwrap(desc.get);
-          }
-          if ('set' in desc) {
-            desc.set = unwrap(desc.set);
-          }
-        }
-        this.mirror.defineProperty(key, desc);
-      },
-      has: function(key){
-        return this.mirror.has(key);
-      },
-      hasOwn: function(key){
-        return this.mirror.hasOwn(key);
-      },
-      apply: function(receiver, args){
-        return wrap(this.mirror.apply(unwrap(receiver), args.map(unwrap)));
-      },
-      construct: function(args){
-        return wrap(this.mirror.construct(args.map(unwrap)));
-      }
-    };
-  }();
-
-
-  exports.createRenderer = createRenderer;
-  exports.basicRenderer = render;
-  exports.introspect = introspect;
-  exports.isMirror = isMirror;
-  exports.Renderer = Renderer;
+  define(exports, [
+    function basicRender(o){
+      return renderer.render(o);
+    },
+    function createRenderer(handlers){
+      return new Renderer(handlers);
+    },
+    function isMirror(o){
+      return o instanceof Mirror;
+    },
+    introspect,
+    Renderer
+  ]);
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
