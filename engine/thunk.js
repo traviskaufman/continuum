@@ -94,7 +94,7 @@ var thunk = (function(exports){
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, IFEQ, IFNE, INC, INDEX, ITERATE, JUMP, LET,
       LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, POP,
-      POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, RUN, SAVE, SPREAD,
+      POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
       SPREAD_ARG, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
       THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
 
@@ -110,12 +110,7 @@ var thunk = (function(exports){
         return v[1];
       }
 
-      v = context.getSymbol(v[1]);
-      if (v && v.Abrupt) {
-        error = v;
-        return unwind;
-      }
-      return v;
+      return context.getSymbol(v[1]);
     }
 
     function unwind(){
@@ -630,8 +625,13 @@ var thunk = (function(exports){
     }
 
     function REFSYMBOL(){
-      var symbol = code.lookup(ops[ip][0]);
-      stack[sp++] = context.getSymbolReference(symbol);
+      var key = getKey(ops[ip][0]);
+      if (key && key.Abrupt) {
+        error = key;
+        return unwind;
+      }
+
+      stack[sp++] = key;
       return cmds[++ip];
     }
 
@@ -664,10 +664,6 @@ var thunk = (function(exports){
       }
 
       return cmds[++ip];
-    }
-
-    function RUN(){
-      throw 'wtf'
     }
 
     function SAVE(){
