@@ -7634,57 +7634,64 @@ exports.assembler = (function(exports){
   })();
 
 
-  function ClassDefinition(node){
-    var self = this;
-    this.name = node.id ? node.id.name : null;
-    this.methods = [];
-    this.symbols = [];
+  var ClassDefinition = (function(){
+    function ClassDefinition(node){
+      var self = this;
+      this.name = node.id ? node.id.name : null;
+      this.methods = [];
+      this.symbols = [];
 
-    each(node.body.body, function(node){
-      if (node.type === 'SymbolDefinition') {
+      each(node.body.body, function(node){
+        if (node.type === 'SymbolDefinition') {
+          self.defineSymbols(node);
+        } else {
+          self.defineMethod(node);
+        }
+      });
+
+      if (node.superClass) {
+        recurse(node.superClass);
+        GET();
+        this.superClass = node.superClass.name;
+      }
+    }
+
+    define(ClassDefinition.prototype, [
+      function defineSymbols(node){
         var symbols = {
           Init: create(null),
           Names: [],
           Private: node.kind === 'private'
         };
-        self.symbols.push(symbols);
+        this.symbols.push(symbols);
 
-        each(node.declarations, function(item){
-          symbols.init[item.id.name] = item.init;
-          symbols.Names.push(item.id.name);
+        each(node.declarations, function(decl){
+          symbols.init[decl.id.name] = decl.init;
+          symbols.Names.push(decl.id.name);
         });
-      } else {
-        var method = node;
-        var code = new Code(method.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.Strict);
-        if (self.name) {
-          code.name = self.name + '#' + method.key.name;
-        } else {
-          code.name = method.key.name;
-        }
-        context.pending.push(code);
+      },
+      function defineMethod(node){
+        var code = new Code(node.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.Strict),
+            name = code.name = node.key.name;
 
-        if (method.kind === '') {
-          method.kind = 'method';
-        }
+        context.queue(code);
+        code.displayName = this.name ? this.name+'#'+name : name;
+        node.kind = node.kind || 'method';
 
-        if (method.key.name === 'constructor') {
-          self.ctor = code;
+        if (name === 'constructor') {
+          this.ctor = code;
         } else {
-          self.methods.push({
-            kind: method.kind,
+          this.methods.push({
+            kind: node.kind,
             code: code,
-            name: method.key.name
+            name: name
           });
         }
       }
-    });
+    ]);
 
-    if (node.superClass) {
-      recurse(node.superClass);
-      GET();
-      this.superClass = node.superClass.name;
-    }
-  }
+    return ClassDefinition;
+  })();
 
   var Unwinder = (function(){
     function Unwinder(type, begin, end){
@@ -9966,7 +9973,7 @@ exports.thunk = (function(exports){
           if (!error.value.hasLocation) {
             error.value.hasLocation = true;
             error.value.setCode(loc, code.source);
-            error.value.setOrigin(code.filename, code.name);
+            error.value.setOrigin(code.filename, code.displayName || code.name);
           }
 
           if (stacktrace) {
@@ -11222,9 +11229,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       writable = true;
     }
     if (install) {
-      prototype.properties.set('constructor', func, writable ? _CW : ___);
+      prototype.define('constructor', func, writable ? _CW : ___);
     }
-    func.properties.set('prototype', prototype, writable ? __W : ___);
+    func.define('prototype', prototype, writable ? __W : ___);
   }
 
   // ## IsArrayIndex
@@ -11411,9 +11418,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             return ThrowException('global invalid define');
           }
         }
-        if (decl.type === 'FunctionDeclaration') {
-          env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.Strict);
-        }
+
+        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.Strict);
       }
     }
 
@@ -11789,14 +11795,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     define(LinkedItem.prototype, [
-      function setNext(item){
-        this.next = item;
-        item.previous = this;
-      },
-      function setPrevious(item){
-        this.previous = item;
-        item.next = this;
-      },
       function unlink(){
         this.next.previous = this.previous;
         this.previous.next = this.next;
@@ -11808,19 +11806,35 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     function MapData(){
       this.id = uid++ + '';
-      this.size = 0;
-      this.strings = create(null);
-      this.numbers = create(null);
-      this.others = create(null);
       this.guard = create(LinkedItem.prototype);
-      this.guard.next = this.guard.previous = this.guard;
       this.guard.key = {};
-      this.lastLookup = this.guard;
+      this.reset();
     }
 
     MapData.sigil = create(null);
 
     define(MapData.prototype, [
+      function reset(){
+        this.size = 0;
+        this.strings = create(null);
+        this.numbers = create(null);
+        this.others = create(null);
+        this.lastLookup = this.guard.next = this.guard.previous = this.guard;
+      },
+      function clear(){
+        var next, item = this.guard.next;
+
+        while (item !== this.guard) {
+          next = item.next;
+          if (item.key !== null && typeof item.key === OBJECT) {
+            delete item.key.storage[this.id];
+          }
+          item.next = item.previous = item.data = item.key = null;
+          item = next;
+        }
+
+        this.reset();
+      },
       function add(key){
         this.size++;
         return new LinkedItem(key, this.guard);
@@ -12051,12 +12065,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       return ThrowException('spread_non_object');
     }
 
-    var value, iterator = spread.Iterate();
+    var len = ToUint32(spread.Get('length'));
 
-    while (!(value = Invoke('next', iterator, [])) && !IsStopIteration(value)) {
+    for (var i = offset; i < len; i++) {
+      var valie = spread.Get(i);
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
+
       array.define(offset++, value, ECW);
     }
 
@@ -12081,6 +12097,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       site.define(i+'', template[i].cooked, E__);
       raw.define(i+'', template[i].raw, E__);
     }
+
     site.define('length', count, ___);
     raw.define('length', count, ___);
     site.define('raw', raw, ___);
@@ -14180,10 +14197,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $NativeObject = (function(){
-    function $NativeObject(){}
+  var $ExoticObject = (function(){
+    function $ExoticObject(){}
 
-    inherit($NativeObject, $Object, {
+    inherit($ExoticObject, $Object, {
       Native: true,
     }, [
       function has(key){},
@@ -14199,7 +14216,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function setExtensible(value){},
     ]);
 
-    return $NativeObject;
+    return $ExoticObject;
   })();
 
 
@@ -14370,7 +14387,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Function: $Function,
       Map     : $Map,
       Number  : $Number,
-      //Proxy   : $Proxy,
       RegExp  : $RegExp,
       Set     : $Set,
       String  : $String,
@@ -14387,6 +14403,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Map     : $Map,
       $Number  : $Number,
       $Object  : $Object,
+      $Proxy   : $Proxy,
       $RegExp  : $RegExp,
       $Set     : $Set,
       $Symbol  : $Symbol,
@@ -14520,18 +14537,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         len = array.length;
 
     for (var i=0; i < len; i++) {
-      $array.properties.set(i, array[i], ECW);
+      $array.define(i+'', array[i], ECW);
     }
-    $array.properties.set('length', array.length, __W);
+    $array.define('length', array.length, __W);
     return $array;
   }
 
   function toInternalArray($array){
     var array = [],
-        len = $array.properties.get('length');
+        len = $array.get('length');
 
     for (var i=0; i < len; i++) {
-      array[i] = $array.properties.get(i);
+      array[i] = $array.get(i+'');
     }
     return array;
   }
@@ -14634,8 +14651,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
       thrower.call = function(){ return ThrowException('strict_poison_pill') };
-      thrower.properties.set('length', 0, ___);
-      thrower.properties.set('name', 'ThrowTypeError', ___);
+      thrower.define('length', 0, ___);
+      thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
       thrower.Strict = true;
@@ -14673,7 +14690,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
                 }
               }
             });
-            target.properties.set(key, func, 6);
+            target.define(key, func, _CW);
           }
         });
       }
@@ -14873,14 +14890,17 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         FunctionCreate: function(args){
           args = toInternalArray(args);
           var body = args.pop();
+
           var script = new Script({
             scope: SCOPE.GLOBAL,
             natives: false,
             source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
           });
+
           if (script.error) {
             return script.error;
           }
+
           var ctx = new ExecutionContext(context, new DeclarativeEnvironmentRecord(realm.globalEnv), realm, script.bytecode);
           ExecutionContext.push(ctx);
           var func = script.thunk.run(ctx);
@@ -17016,7 +17036,7 @@ exports.index = (function(exports){
 
 
 
-exports.modules["@array"] = "import iterator from '@iter';\nsymbol @iterator = iterator;\n\nexport function Array(...values){\n  if (values.length === 1 && typeof values[0] === 'number') {\n    var out = [];\n    out.length = values[0];\n    return out;\n  } else {\n    return values;\n  }\n}\n\n$__setupConstructor(Array, $__ArrayProto);\n\n\nexport function isArray(array){\n  return $__GetNativeBrand(array) === 'Array';\n}\n\nexport function from(iterable){\n  var out = [];\n  iterable = $__ToObject(iterable);\n\n  for (var i = 0, len = iterable.length >>> 0; i < len; i++) {\n    if (i in iterable) {\n      out[i] = iterable[i];\n    }\n  }\n\n  return out;\n}\n\n$__defineMethods(Array, [isArray, from]);\n\n\n{\n$__defineProps(Array.prototype, {\n  every(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && !$__CallFunction(callback, context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  },\n  filter(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [],\n        count = 0;\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.filter']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array) {\n        var element = array[i];\n        if ($__CallFunction(callback, context, [element, i, array])) {\n          result[count++] = element;\n        }\n      }\n    }\n\n    return result;\n  },\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        $__CallFunction(callback, context, [array[i], i, this]);\n      }\n    }\n  },\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    fromIndex = $__ToInteger(fromIndex);\n    if (fromIndex > len) {\n      return -1;\n    }\n\n    for (var i=fromIndex; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  },\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  },\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  },\n  keys(){\n    return new ArrayIterator(this, 'key');\n  },\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    fromIndex = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (fromIndex >= len) {\n      fromIndex = len - 1;\n    } else if (fromIndex < 0) {\n      fromIndex += fromIndex;\n    }\n\n    for (var i=fromIndex; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  },\n  map(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = $__CallFunction(callback, context, [array[i], i, this]);\n      }\n    }\n    return result;\n  },\n  pop(){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  },\n  push(...values){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        valuesLen = values.length;\n\n    for (var i=0; i < valuesLen; i++) {\n      array[len++] = values[i];\n    }\n    return len;\n  },\n  reduce(callback, initial){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = $__CallFunction(callback, this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  },\n  reduceRight(callback, initial){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = $__CallFunction(callback, this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  },\n  slice(start, end){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  },\n  some(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && $__CallFunction(callback, context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  },\n  toString(){\n    return joinArray(this, ',');\n  },\n  values(){\n    return new ArrayIterator(this, 'value');\n  },\n  @iterator(){\n    return new ArrayIterator(this, 'value');\n  }\n});\n\n$__setLength(Array.prototype, {\n  every: 1,\n  filter: 1,\n  forEach: 1,\n  indexOf: 1,\n  lastIndexOf: 1,\n  map: 1,\n  reduce: 1,\n  reduceRight: 1,\n  some: 1,\n  reduce: 1\n});\n\nfunction joinArray(array, separator){\n  array = $__ToObject(array);\n\n  var result = '',\n      len = $__ToUint32(array.length);\n\n  if (len === 0) {\n    return result;\n  }\n\n  if (typeof separator !== 'string') {\n    separator = $__ToString(separator);\n  }\n\n  for (var i=0; i < len; i++) {\n    if (i) result += separator;\n    result += $__ToString(array[i]);\n  }\n\n  return result;\n}\n\n\n\nlet ARRAY = 'IteratedObject',\n    INDEX  = 'ArrayIteratorNextIndex',\n    KIND  = 'ArrayIterationKind';\n\n\nlet K = 0x01,\n    V = 0x02,\n    S = 0x04;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator {\n  constructor(array, kind){\n    array = $__ToObject(array);\n    $__SetInternal(this, ARRAY, array);\n    $__SetInternal(this, INDEX, 0);\n    $__SetInternal(this, KIND, kinds[kind]);\n    this.next = () => next.call(this);\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, ARRAY) || !$__HasInternal(this, INDEX) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n    var array = $__GetInternal(this, ARRAY),\n        index = $__GetInternal(this, INDEX),\n        kind = $__GetInternal(this, KIND),\n        len = $__ToUint32(array.length),\n        key = $__ToString(index);\n\n    if (kind & S) {\n      var found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n    if (index >= len) {\n      $__SetInternal(this, INDEX, Infinity);\n      throw $__StopIteration;\n    }\n    $__SetInternal(this, INDEX, index + 1);\n\n    if (kind & V) {\n      var value = array[key];\n      if (kind & K) {\n        return [key, value];\n      }\n      return value;\n    }\n    return key;\n  }\n\n  @iterator(){\n    return this;\n  }\n}\n\n$__hideEverything(ArrayIterator);\n\nlet next = ArrayIterator.prototype.next;\n}\n";
+exports.modules["@array"] = "import Iterator from '@iter';\nimport iterator from '@iter';\nsymbol @iterator = iterator;\n\nexport function Array(...values){\n  if (values.length === 1 && typeof values[0] === 'number') {\n    var out = [];\n    out.length = values[0];\n    return out;\n  } else {\n    return values;\n  }\n}\n\n$__setupConstructor(Array, $__ArrayProto);\n\n\nexport function isArray(array){\n  return $__GetNativeBrand(array) === 'Array';\n}\n\nexport function from(iterable){\n  var out = [];\n  iterable = $__ToObject(iterable);\n\n  for (var i = 0, len = iterable.length >>> 0; i < len; i++) {\n    if (i in iterable) {\n      out[i] = iterable[i];\n    }\n  }\n\n  return out;\n}\n\n$__defineMethods(Array, [isArray, from]);\n\n\n{\n$__defineProps(Array.prototype, {\n  every(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && !$__CallFunction(callback, context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  },\n  filter(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [],\n        count = 0;\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.filter']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array) {\n        var element = array[i];\n        if ($__CallFunction(callback, context, [element, i, array])) {\n          result[count++] = element;\n        }\n      }\n    }\n\n    return result;\n  },\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        $__CallFunction(callback, context, [array[i], i, this]);\n      }\n    }\n  },\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    fromIndex = $__ToInteger(fromIndex);\n    if (fromIndex > len) {\n      return -1;\n    }\n\n    for (var i=fromIndex; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  },\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  },\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  },\n  keys(){\n    return new ArrayIterator(this, 'key');\n  },\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    fromIndex = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (fromIndex >= len) {\n      fromIndex = len - 1;\n    } else if (fromIndex < 0) {\n      fromIndex += fromIndex;\n    }\n\n    for (var i=fromIndex; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  },\n  map(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = $__CallFunction(callback, context, [array[i], i, this]);\n      }\n    }\n    return result;\n  },\n  pop(){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  },\n  push(...values){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        valuesLen = values.length;\n\n    for (var i=0; i < valuesLen; i++) {\n      array[len++] = values[i];\n    }\n    return len;\n  },\n  reduce(callback, initial){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = $__CallFunction(callback, this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  },\n  reduceRight(callback, initial){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = $__CallFunction(callback, this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  },\n  slice(start, end){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  },\n  some(callback, context){\n    var array = $__ToObject(this),\n        len = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && $__CallFunction(callback, context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  },\n  toString(){\n    return joinArray(this, ',');\n  },\n  values(){\n    return new ArrayIterator(this, 'value');\n  },\n  @iterator(){\n    return new ArrayIterator(this, 'value');\n  }\n});\n\n$__setLength(Array.prototype, {\n  every: 1,\n  filter: 1,\n  forEach: 1,\n  indexOf: 1,\n  lastIndexOf: 1,\n  map: 1,\n  reduce: 1,\n  reduceRight: 1,\n  some: 1,\n  reduce: 1\n});\n\nfunction joinArray(array, separator){\n  array = $__ToObject(array);\n\n  var result = '',\n      len = $__ToUint32(array.length);\n\n  if (len === 0) {\n    return result;\n  }\n\n  if (typeof separator !== 'string') {\n    separator = $__ToString(separator);\n  }\n\n  for (var i=0; i < len; i++) {\n    if (i) result += separator;\n    result += $__ToString(array[i]);\n  }\n\n  return result;\n}\n\n\n\nlet ARRAY = 'IteratedObject',\n    INDEX  = 'ArrayIteratorNextIndex',\n    KIND  = 'ArrayIterationKind';\n\n\nlet K = 0x01,\n    V = 0x02,\n    S = 0x04;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  constructor(array, kind){\n    array = $__ToObject(array);\n    $__SetInternal(this, ARRAY, array);\n    $__SetInternal(this, INDEX, 0);\n    $__SetInternal(this, KIND, kinds[kind]);\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, ARRAY) || !$__HasInternal(this, INDEX) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n    var array = $__GetInternal(this, ARRAY),\n        index = $__GetInternal(this, INDEX),\n        kind = $__GetInternal(this, KIND),\n        len = $__ToUint32(array.length),\n        key = $__ToString(index);\n\n    if (kind & S) {\n      var found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n    if (index >= len) {\n      $__SetInternal(this, INDEX, Infinity);\n      throw $__StopIteration;\n    }\n    $__SetInternal(this, INDEX, index + 1);\n\n    if (kind & V) {\n      var value = array[key];\n      if (kind & K) {\n        return [key, value];\n      }\n      return value;\n    }\n    return key;\n  }\n}\n\n$__hideEverything(ArrayIterator);\n}\n";
 
 exports.modules["@boolean"] = "export function Boolean(value){\n  value = $__ToBoolean(value);\n  if ($__IsConstructCall()) {\n    return $__BooleanCreate(value);\n  } else {\n    return value;\n  }\n}\n\n$__setupConstructor(Boolean, $__BooleanProto);\n\n$__defineProps(Boolean.prototype, {\n  toString(){\n    if ($__GetNativeBrand(this) === 'Boolean') {\n      return $__GetPrimitiveValue(this) ? 'true' : 'false';\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.toString']);\n    }\n  },\n  valueOf(){\n    if ($__GetNativeBrand(this) === 'Boolean') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);\n    }\n  }\n});\n";
 
@@ -17034,7 +17054,7 @@ exports.modules["@iter"] = "import hasOwn from '@reflect';\n\nsymbol @iterator;\
 
 exports.modules["@json"] = "export let JSON = {};\n\n$__SetNativeBrand(JSON, 'NativeJSON');\n\nlet ReplacerFunction,\n    PropertyList,\n    stack,\n    indent,\n    gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  var stepback = indent,\n      partial = [],\n      brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if ($__GetNativeBrand(value) === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || $__Enumerate(value, false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  if (!partial.length) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0]+brackets[1];\n  } else if (!gap) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0]+partial.join(',')+brackets[1];\n  } else {\n    var final = '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback;\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0]+final+brackets[1];\n  }\n}\n\n\nfunction Str(key, holder){\n  var v = holder[key];\n  if ($__Type(v) === 'Object') {\n    var toJSON = v.toJSON;\n    if (typeof toJSON === 'function') {\n      v = $__CallFunction(toJSON, v, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    v = $__CallFunction(ReplacerFunction, holder, [key, v]);\n  }\n\n  if ($__Type(v) === 'Object') {\n    var brand = $__GetNativeBrand(v);\n    if (brand === 'Number') {\n      v = $__ToNumber(v);\n    } else if (brand === 'String') {\n      v = $__ToString(v);\n    } else if (brand === 'Boolean') {\n      v = $__GetPrimitiveValue(v);\n    }\n  }\n\n\n  if (v === null) {\n    return 'null';\n  } else if (v === true) {\n    return 'true';\n  } else if (v === false) {\n    return 'false';\n  }\n\n  var type = typeof v;\n  if (type === 'string') {\n    return $__Quote(v);\n  } else if (type === 'number') {\n    return v !== v || v === Infinity || v === -Infinity ? 'null' : '' + v;\n  } else if (type === 'object') {\n    return J(v);\n  }\n\n}\n\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if ($__GetNativeBrand(replacer) === 'Array') {\n      let props = new Set;\n\n      for (let v of replacer) {\n        var item,\n            type = $__Type(v);\n\n        if (type === 'String') {\n          item = v;\n        } else if (type === 'Number') {\n          item = v + '';\n        } else if (type === 'Object') {\n          let brand = $__GetNativeBrand(v);\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(v);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = $__GetPrimitiveValue(space);\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\n$__defineMethods(JSON, [stringify]);\n";
 
-exports.modules["@map"] = "import iterator from '@iter';\nsymbol @iterator = iterator;\n\n\nexport function Map(iterable){\n  var map;\n  if ($__IsConstructCall()) {\n    map = this;\n  } else {\n    if (this == null || this === $__MapProto) {\n      map = $__ObjectCreate($__MapProto) ;\n    } else {\n      map = $__ToObject(this);\n    }\n  }\n\n  if ($__HasInternal(map, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map'])\n  }\n\n  $__MapInitialization(map, iterable);\n  return map;\n}\n\n\n$__setupConstructor(Map, $__MapProto);\n{\n$__defineProps(Map.prototype, {\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  },\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  },\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  },\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  },\n  delete: function(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  },\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator(this, 'key+value');\n  },\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator(this, 'key');\n  },\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator(this, 'value');\n  },\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n});\n\n$__set(Map.prototype.delete, 'name', 'delete');\n\n$__DefineOwnProperty(Map.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get: function(){\n    if (this === $__MapProto) {\n      return 0;\n    }\n    return $__MapSize(this);\n  },\n  set: void 0\n});\n\nlet MAP = 'Map',\n    KEY  = 'MapNextKey',\n    KIND  = 'MapIterationKind';\n\n\nlet K = 0x01,\n    V = 0x02;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3\n};\n\n\nfunction MapIterator(map, kind){\n  map = $__ToObject(map);\n  $__SetInternal(this, MAP, map);\n  $__SetInternal(this, KEY,  $__MapSigil());\n  $__SetInternal(this, KIND, kinds[kind]);\n  this.next = () => next.call(this);\n}\n\n$__defineProps(MapIterator.prototype, {\n  next(){\n\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, MAP) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n    var map = $__GetInternal(this, MAP),\n        key = $__GetInternal(this, KEY),\n        kind = $__GetInternal(this, KIND);\n\n    var item = $__MapNext(map, key);\n    $__SetInternal(this, KEY, item[0]);\n\n    if (kind & V) {\n      if (kind & K) {\n        return item;\n      }\n      return item[1];\n    }\n    return item[0];\n  },\n  @iterator(){\n    return this;\n  }\n});\n\nlet next = MapIterator.prototype.next;\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n}\n";
+exports.modules["@map"] = "import Iterator from '@iter';\nimport iterator from '@iter';\nsymbol @iterator = iterator;\n\n\nexport function Map(iterable){\n  var map;\n  if ($__IsConstructCall()) {\n    map = this;\n  } else {\n    if (this == null || this === $__MapProto) {\n      map = $__ObjectCreate($__MapProto) ;\n    } else {\n      map = $__ToObject(this);\n    }\n  }\n\n  if ($__HasInternal(map, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map'])\n  }\n\n  $__MapInitialization(map, iterable);\n  return map;\n}\n\n\n$__setupConstructor(Map, $__MapProto);\n{\n$__defineProps(Map.prototype, {\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  },\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  },\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  },\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  },\n  delete: function(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  },\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator(this, 'key+value');\n  },\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator(this, 'key');\n  },\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator(this, 'value');\n  },\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n});\n\n$__set(Map.prototype.delete, 'name', 'delete');\n\n$__DefineOwnProperty(Map.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get: function(){\n    if (this === $__MapProto) {\n      return 0;\n    }\n    return $__MapSize(this);\n  },\n  set: void 0\n});\n\nlet MAP = 'Map',\n    KEY  = 'MapNextKey',\n    KIND  = 'MapIterationKind';\n\nlet K = 0x01,\n    V = 0x02;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3\n};\n\nclass MapIterator extends Iterator {\n  constructor(map, kind){\n    map = $__ToObject(map);\n    $__SetInternal(this, MAP, map);\n    $__SetInternal(this, KEY,  $__MapSigil());\n    $__SetInternal(this, KIND, kinds[kind]);\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, MAP) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var map = $__GetInternal(this, MAP),\n        key = $__GetInternal(this, KEY),\n        kind = $__GetInternal(this, KIND);\n\n    var item = $__MapNext(map, key);\n    $__SetInternal(this, KEY, item[0]);\n\n    if (kind & V) {\n      if (kind & K) {\n        return item;\n      }\n      return item[1];\n    }\n    return item[0];\n  }\n}\n\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n}\n";
 
 exports.modules["@math"] = "export let Math = $__MathCreate();\n\n\nconst E       = 2.718281828459045,\n      LN10    = 2.302585092994046,\n      LN2     = 0.6931471805599453,\n      LOG10E  = 0.4342944819032518,\n      LOG2E   = 1.4426950408889634,\n      PI      = 3.141592653589793,\n      SQRT1_2 = 0.7071067811865476,\n      SQRT2   = 1.4142135623730951;\n\n\nlet abs    = $__abs,\n    acos   = $__acos,\n    acosh  = $__acosh,\n    asinh  = $__asinh,\n    asin   = $__asin,\n    atan   = $__atan,\n    atanh  = $__atanh,\n    atan2  = $__atan2,\n    ceil   = $__ceil,\n    cos    = $__cos,\n    cosh   = $__cosh,\n    exp    = $__exp,\n    expm1  = $__expm1,\n    floor  = $__floor,\n    hypot  = $__hypot,\n    log    = $__log,\n    log2   = $__log2,\n    log10  = $__log10,\n    log1p  = $__log1p,\n    max    = $__max,\n    min    = $__min,\n    pow    = $__pow,\n    random = $__random,\n    round  = $__round,\n    sign   = $__sign,\n    sinh   = $__sinh,\n    sin    = $__sin,\n    sqrt   = $__sqrt,\n    tan    = $__tan,\n    tanh   = $__tanh,\n    trunc  = $__trunc;\n\nexport E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2;\n\nexport abs, acos, acosh, asinh, asin, atan, atanh,\n       atan2, ceil, cos, cosh, exp, expm1, floor, hypot,\n       log, log2, log10, log1p, max, min, pow, rando,\n       round, sign, sinh, sin, sqrt,tan, tanh, trunc;\n";
 
@@ -17046,7 +17066,7 @@ exports.modules["@reflect"] = "\nexport function Proxy(target, handler){\n  ensu
 
 exports.modules["@regexp"] = "export function RegExp(pattern, flags){\n  if ($__IsConstructCall()) {\n    if (pattern === undefined) {\n      pattern = '';\n    } else if (typeof pattern === 'string') {\n    } else if (typeof pattern === 'object' && $__GetNativeBrand(pattern) === 'RegExp') {\n      if (flags !== undefined) {\n        throw $__Exception('regexp_flags', []);\n      }\n    } else {\n      pattern = $__ToString(pattern);\n    }\n    return $__RegExpCreate(pattern, flags);\n  } else {\n    if (flags === undefined && pattern) {\n      if (typeof pattern === 'object' && $__GetNativeBrand(pattern) === 'RegExp') {\n        return pattern;\n      }\n    }\n    return $__RegExpCreate(pattern, flags);\n  }\n}\n\n$__setupConstructor(RegExp, $__RegExpProto);\n$__wrapRegExpMethods(RegExp.prototype);\n\n$__defineProps(RegExp.prototype, {\n  toString(){\n    if ($__GetNativeBrand(this) === 'RegExp') {\n      return $__RegExpToString(this);\n    } else {\n      throw $__Exception('not_generic', ['RegExp.prototype.toString']);\n    }\n  }\n});\n";
 
-exports.modules["@set"] = "import Map from '@map';\nimport iterator from '@iter';\nsymbol @iterator = iterator;\n\n\nexport function Set(iterable){\n  var set;\n  if ($__IsConstructCall()) {\n    set = this;\n  } else {\n    if (this == null || this === $__SetProto) {\n      set = $__ObjectCreate($__SetProto) ;\n    } else {\n      set = $__ToObject(this);\n    }\n  }\n  if ($__HasInternal(set, 'SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    $__SetInternal(set, 'SetData', new Map(iterable.values()));\n  } else {\n    $__SetInternal(set, 'SetData', new Map);\n  }\n  return set;\n}\n\n\n$__setupConstructor(Set, $__SetProto);\n{\n$__defineProps(Set.prototype, {\n  clear(){\n    return $__MapClear(ensureSet(this));\n  },\n  add(key){\n    return $__MapSet(ensureSet(this), key, key);\n  },\n  has(key){\n    return $__MapHas(ensureSet(this), key);\n  },\n  delete: function(key){\n    return $__MapDelete(ensureSet(this), key);\n  },\n  items(){\n    return new SetIterator(this, 'key+value');\n  },\n  keys(){\n    return new SetIterator(this, 'key');\n  },\n  values(){\n    return new SetIterator(this, 'value');\n  },\n  @iterator(){\n    return new SetIterator(this, 'value');\n  }\n});\n\n$__define(Set.prototype.delete, 'name', 'delete', 0);\n\n$__DefineOwnProperty(Set.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get: function size(){\n    if (this === $__SetProto) {\n      return 0;\n    }\n    return $__MapSize(ensureSet(this));\n  },\n  set: void 0\n});\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = $__GetInternal(o, 'SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\nlet SET = 'Set',\n    KEY  = 'SetNextKey',\n    KIND  = 'SetIterationKind';\n\nlet K = 0x01,\n    V = 0x02,\n    KV = 0x03;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3\n};\n\n\nfunction SetIterator(set, kind){\n  set = $__ToObject(set);\n  $__SetInternal(this, SET, ensureSet(set));\n  $__SetInternal(this, KEY,  $__MapSigil());\n  $__SetInternal(this, KIND, kinds[kind]);\n  this.next = () => next.call(this);\n}\n\n$__defineProps(SetIterator.prototype, {\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, SET) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n    var data = $__GetInternal(this, SET),\n        key = $__GetInternal(this, KEY),\n        kind = $__GetInternal(this, KIND);\n\n    var item = $__MapNext(data, key);\n    $__SetInternal(this, KEY, item[0]);\n    return kind === KV ? [item[1], item[1]] : item[1];\n  },\n  @iterator(){\n    return this;\n  }\n});\n\nlet next = SetIterator.prototype.next;\n}\n";
+exports.modules["@set"] = "import Map from '@map';\nimport Iterator from '@iter';\nimport iterator from '@iter';\nsymbol @iterator = iterator;\n\n\nexport function Set(iterable){\n  var set;\n  if ($__IsConstructCall()) {\n    set = this;\n  } else {\n    if (this == null || this === $__SetProto) {\n      set = $__ObjectCreate($__SetProto) ;\n    } else {\n      set = $__ToObject(this);\n    }\n  }\n  if ($__HasInternal(set, 'SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    $__SetInternal(set, 'SetData', new Map(iterable.values()));\n  } else {\n    $__SetInternal(set, 'SetData', new Map);\n  }\n  return set;\n}\n\n\n$__setupConstructor(Set, $__SetProto);\n{\n$__defineProps(Set.prototype, {\n  clear(){\n    return $__MapClear(ensureSet(this));\n  },\n  add(key){\n    return $__MapSet(ensureSet(this), key, key);\n  },\n  has(key){\n    return $__MapHas(ensureSet(this), key);\n  },\n  delete: function(key){\n    return $__MapDelete(ensureSet(this), key);\n  },\n  items(){\n    return new SetIterator(this, 'key+value');\n  },\n  keys(){\n    return new SetIterator(this, 'key');\n  },\n  values(){\n    return new SetIterator(this, 'value');\n  },\n  @iterator(){\n    return new SetIterator(this, 'value');\n  }\n});\n\n$__define(Set.prototype.delete, 'name', 'delete', 0);\n\n$__DefineOwnProperty(Set.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get: function size(){\n    if (this === $__SetProto) {\n      return 0;\n    }\n    return $__MapSize(ensureSet(this));\n  },\n  set: void 0\n});\n\nlet SET = 'Set',\n    KEY  = 'SetNextKey',\n    KIND  = 'SetIterationKind';\n\nlet K = 0x01,\n    V = 0x02,\n    KV = 0x03;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3\n};\n\n\nclass SetIterator extends Iterator {\n  constructor(set, kind){\n    set = $__ToObject(set);\n    $__SetInternal(this, SET, ensureSet(set));\n    $__SetInternal(this, KEY,  $__MapSigil());\n    $__SetInternal(this, KIND, kinds[kind]);\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, SET) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n\n    var data = $__GetInternal(this, SET),\n        key = $__GetInternal(this, KEY),\n        kind = $__GetInternal(this, KIND);\n\n    var item = $__MapNext(data, key);\n    $__SetInternal(this, KEY, item[0]);\n    return kind === KV ? [item[1], item[1]] : item[1];\n  }\n}\n\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = $__GetInternal(o, 'SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\n\n$__hideEverything(SetIterator);\n}\n";
 
 exports.modules["@std"] = "// standard constants\nconst NaN       = +'NaN';\nconst Infinity  = 1 / 0;\nconst undefined = void 0;\n\n// standard functions\nimport { decodeURI,\n         decodeURIComponent,\n         encodeURI,\n         encodeURIComponent,\n         eval,\n         isFinite,\n         isNaN,\n         parseFloat,\n         parseInt } from '@globals';\n\n\nimport { clearInterval,\n         clearTimeout,\n         setInterval,\n         setTimeout } from '@timers';\n\n// standard types\nimport Array    from '@array';\nimport Boolean  from '@boolean';\nimport Date     from '@date';\nimport Function from '@function';\nimport Map      from '@map';\nimport Number   from '@number';\nimport Object   from '@object';\nimport Proxy    from '@reflect';\nimport RegExp   from '@regexp';\nimport Set      from '@set';\nimport String   from '@string';\nimport WeakMap  from '@weakmap';\n\n\n\n// standard errors\nimport { Error,\n         EvalError,\n         RangeError,\n         ReferenceError,\n         SyntaxError,\n         TypeError,\n         URIError } from '@error';\n\n\n// standard pseudo-modules\nimport JSON from '@json';\nimport Math from '@math';\n\nimport Symbol from '@symbol';\n//import Iterator from '@iter';\n\nlet StopIteration = $__StopIteration\n\n\nexport Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,\n       Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,\n       decodeURI, decodeURIComponent, encodeURI, encodeURIComponent, eval, isFinite, isNaN,\n       parseFloat, parseInt, clearInterval, clearTimeout, setInterval, setTimeout,\n       StopIteration, JSON, Math, NaN, Infinity, undefined;\n\n\n";
 
