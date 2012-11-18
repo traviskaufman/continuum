@@ -4014,8 +4014,19 @@ var runtime = (function(GLOBAL, exports, undefined){
           callback.Call(undefined, [result]);
         },
 
-        EvaluateModule: function(source, global, name, errback, callback){
-          realm.evaluateModule(source, global, name, wrapFunction(errback), wrapFunction(callback));
+        EvaluateModule: function(source, global, name, callback, errback){
+          if (!callback && !errback) {
+            var result, thrown;
+
+            realm.evaluateModule(source, global, name,
+              function(module){ result = module },
+              function(error){ result = error; thrown = true; }
+            );
+
+            return thrown ? new AbruptCompletion('throw', result) : result;
+          } else {
+            realm.evaluateModule(source, global, name, wrapFunction(callback), wrapFunction(errback));
+          }
         },
         eval: function(code){
           if (typeof code !== 'string') {
@@ -4459,7 +4470,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     })();
 
 
-    var moduleInitScript = new Script({
+    var initGlobals = new Script({
       scope: SCOPE.GLOBAL,
       natives: true,
       filename: 'module-init.js',
@@ -4470,27 +4481,19 @@ var runtime = (function(GLOBAL, exports, undefined){
               '}'
     });
 
-    var mutationScopeScript = new Script('void 0');
+    var mutationScopeInit = new Script('void 0');
 
-    var emptyClassScript = new Script({
-      scope: SCOPE.GLOBAL,
-      natives: true,
-      filename: 'class-init.js',
-      source: '$__EmptyClass = function constructor(...args){ super(...args) }'
-    });
-
-    function initialize(realm, ƒ, Ω){
+    function initialize(realm, Ω, ƒ){
       if (realm.initialized) Ω();
       realm.state = 'initializing';
       realm.initialized = true;
-      realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeScript.bytecode);
-      realm.evaluate(emptyClassScript, true);
-      resolveModule(require('../modules')['@system'], realm.global, '@system', ƒ, function(){
-        realm.evaluateAsync(moduleInitScript, function(){
+      realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
+      resolveModule(require('../modules')['@system'], realm.global, '@system', function(){
+        realm.evaluateAsync(initGlobals, function(){
           realm.state = 'idle';
           Ω();
-        });
-      });
+        }, ƒ);
+      }, ƒ);
     }
 
     function prepareToRun(bytecode, scope){
@@ -4558,7 +4561,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       return toggle;
     }
 
-    function resolveImports(code, ƒ, Ω){
+    function resolveImports(code, Ω, ƒ){
       var modules = create(null);
       if (code.imports && code.imports.length) {
         var load = intrinsics.System.Get('load'),
@@ -4630,7 +4633,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
 
-    function runScript(script, realm, ƒ, Ω){
+    function runScript(script, realm, Ω, ƒ){
       var scope = realm.globalEnv,
           ctx = new ExecutionContext(context, scope, realm, script.bytecode);
 
@@ -4647,7 +4650,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return ƒ(status);
       }
 
-      resolveImports(script.bytecode, ƒ, function(modules){
+      resolveImports(script.bytecode, function(modules){
         each(script.bytecode.imports, function(imported){
           var module = modules[imported.origin];
 
@@ -4656,7 +4659,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           } else if (imported.specifiers) {
             iterate(imported.specifiers, function(path, name){
               if (name === '*') {
-                module.properties.forEach(function(prop){
+                module.each(function(prop){
                   scope.SetMutableBinding(prop[0], module.Get(prop[0]));
                 });
               } else {
@@ -4677,10 +4680,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         var result = run(realm, script.thunk, script.bytecode);
         context === ctx && ExecutionContext.pop();
         Ω(result);
-      });
+      }, ƒ);
     }
 
-    function resolveModule(source, global, name, ƒ, Ω){
+    function resolveModule(source, global, name, Ω, ƒ){
       var script = new Script({
         name: name,
         natives: true,
@@ -4694,9 +4697,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       var sandbox = createSandbox(global);
 
-      runScript(script, sandbox, ƒ, function(){
+      runScript(script, sandbox, function(){
         Ω(new $Module(sandbox.globalEnv, script.bytecode.ExportedNames));
-      });
+      }, ƒ);
     }
 
 
@@ -4706,6 +4709,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Emitter.call(this);
       realms.push(this);
       this.active = false;
+      this.quiet = false;
       this.scripts = [];
       this.templates = {};
       this.state = 'bootstrapping';
@@ -4735,19 +4739,18 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       this.state = 'initializing';
 
-      function errback(error){
-        self.state = 'error';
-        callback && callback(error);
-        self.emit('error', error);
-      }
-
-      initialize(this, errback, function(){
+      initialize(this, function(){
         deactivate(self);
         self.scripts = [];
         self.state = 'idle';
         callback && callback(self);
         self.emit('ready');
+      }, function(error){
+        self.state = 'error';
+        callback && callback(error);
+        self.emit('throw', error);
       });
+
       hide(this, 'mutationScope');
       hide(this, 'initialized');
       hide(this, 'quiet');
@@ -4760,7 +4763,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function exitMutationContext(){
         mutationContext(this, false);
       },
-      function evaluateModule(source, global, name, errback, callback){
+      function evaluateModule(source, global, name, callback, errback){
         if (typeof errback !== FUNCTION) {
           if (typeof name === FUNCTION) {
             errback = name;
@@ -4773,25 +4776,24 @@ var runtime = (function(GLOBAL, exports, undefined){
           callback = errback;
           errback = noop;
         }
-        resolveModule(source, global, name, errback, callback);
+        resolveModule(source, global, name, callback, errback);
       },
-      function evaluateAsync(subject, callback){
+      function evaluateAsync(subject, callback, errback){
         var script = new Script(subject),
             self = this;
 
+        callback = callback || errback;
+
         if (script.error) {
           this.emit(script.error.type, script.error);
-          return callback(script.error);
+          errback(script.error);
+        } else {
+          this.scripts.push(script);
+          runScript(script, this, callback, function(error){
+            self.emit('throw', error);
+            errback(error);
+          });
         }
-
-        this.scripts.push(script);
-
-        function errback(error){
-          callback(error);
-          self.emit('error', error);
-        }
-
-        runScript(script, this, errback, callback);
       },
       function evaluate(subject){
         activate(this);

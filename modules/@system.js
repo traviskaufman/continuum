@@ -1,3 +1,5 @@
+$__EmptyClass = function(...args){ super(...args) }
+
 {
   let ___ = 0x00,
       E__ = 0x01,
@@ -131,13 +133,13 @@ class Request {
       translated = '"use strict";'+translated;
     }
 
-    $__EvaluateModule(translated, loader.@global, this.@resolved, msg => this.reject(msg), module => {
+    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {
       $__SetInternal(module, 'loader', loader);
       $__SetInternal(module, 'resolved', this.@resolved);
       $__SetInternal(module, 'mrl', this.@mrl);
       loader.@modules[this.@resolved] = module;
       (this.@callback)(module);
-    });
+    }, msg => this.reject(msg));
   }
 
   redirect(mrl, baseURL){
@@ -164,13 +166,13 @@ private @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;
 export class Loader {
   constructor(parent, options){
     options = options || {};
-    this.linkedTo   = options.linkedTo || null;
+    this.linkedTo   = options.linkedTo  || null;
     this.@translate = options.translate || parent.translate;
-    this.@resolve   = options.resolve || parent.resolve;
-    this.@fetch     = options.fetch || parent.fetch;
-    this.@strict    = options.strict === true;
-    this.@global    = options.global || $__global;
-    this.@baseURL   = options.baseURL || (parent ? parent.@baseURL : '');
+    this.@resolve   = options.resolve   || parent.resolve;
+    this.@fetch     = options.fetch     || parent.fetch;
+    this.@global    = options.global    || $__global;
+    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');
+    this.@strict    = true;//options.strict === true;
     this.@modules   = $__ObjectCreate(null);
   }
 
@@ -198,7 +200,7 @@ export class Loader {
   }
 
   evalAsync(src, callback, errback){
-
+    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);
   }
 
   get(mrl){
@@ -219,8 +221,7 @@ export class Loader {
   }
 
   defineBuiltins(object){
-    var std  = $__StandardLibrary(),
-        desc = { configurable: true,
+    var desc = { configurable: true,
                  enumerable: false,
                  writable: true,
                  value: undefined };
@@ -246,9 +247,6 @@ $__remove(Module, 'prototype');
 
 
 export let System = new Loader(null, {
-  global: $__global,
-  baseURL: '',
-  strict: false,
   fetch(relURL, baseURL, request, resolved) {
     var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;
 
@@ -269,3 +267,10 @@ export let System = new Loader(null, {
 });
 
 $__System = System;
+
+System.@strict = false;
+let std = System.eval(`
+  module std = '@std';
+  export std;
+`).std;
+System.@strict = true;
