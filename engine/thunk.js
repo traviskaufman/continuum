@@ -624,14 +624,10 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function REFSYMBOL(){
-      var key = getKey(ops[ip][0]);
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
 
-      stack[sp++] = key;
+    function REFSYMBOL(){
+      var symbol = code.lookup(ops[ip][0]);
+      stack[sp++] = context.getSymbolReference(symbol);
       return cmds[++ip];
     }
 
