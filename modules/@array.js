@@ -314,16 +314,11 @@ function joinArray(array, separator){
 
 
 
-let ARRAY = 'IteratedObject',
-    INDEX = 'ArrayIteratorNextIndex',
-    KIND  = 'ArrayIterationKind';
-
-
 let K = 0x01,
     V = 0x02,
     S = 0x04;
 
-let kinds = {
+var kinds = {
   'key': 1,
   'value': 2,
   'key+value': 3,
@@ -333,23 +328,28 @@ let kinds = {
 };
 
 class ArrayIterator extends Iterator {
+  private @array, @index, @kind;
+  // @array = IteratedObject
+  // @index = ArrayIteratorNextIndex
+  // @kind  = ArrayIterationKind
+
   constructor(array, kind){
-    array = $__ToObject(array);
-    $__SetInternal(this, ARRAY, array);
-    $__SetInternal(this, INDEX, 0);
-    $__SetInternal(this, KIND, kinds[kind]);
+    this.@array = $__ToObject(array);
+    this.@index = 0;
+    this.@kind = kinds[kind];
   }
 
   next(){
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);
     }
-    if (!$__HasInternal(this, ARRAY) || !$__HasInternal(this, INDEX) || !$__HasInternal(this, KIND)) {
+    if (!(@array in this && @index in this && @kind in this)) {
       throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
     }
-    var array = $__GetInternal(this, ARRAY),
-        index = $__GetInternal(this, INDEX),
-        kind = $__GetInternal(this, KIND),
+
+    var array = this.@array,
+        index = this.@index,
+        kind = this.@kind,
         len = $__ToUint32(array.length),
         key = $__ToString(index);
 
@@ -362,11 +362,13 @@ class ArrayIterator extends Iterator {
         }
       }
     }
+
     if (index >= len) {
-      $__SetInternal(this, INDEX, Infinity);
+      this.@index = Infinity;
       throw $__StopIteration;
     }
-    $__SetInternal(this, INDEX, index + 1);
+
+    this.@index = index + 1;
 
     if (kind & V) {
       var value = array[key];
