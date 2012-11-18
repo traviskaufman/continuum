@@ -128,7 +128,6 @@ var assembler = (function(exports){
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
       RETURN           = new StandardOpCode(0, 'RETURN'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
-      RUN              = new StandardOpCode(0, 'RUN'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
       SPREAD           = new StandardOpCode(1, 'SPREAD'),
       SPREAD_ARG       = new StandardOpCode(0, 'SPREAD_ARG'),
