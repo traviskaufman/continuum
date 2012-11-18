@@ -1619,7 +1619,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
-
   // ###############
   // ### $Object ###
   // ###############
@@ -1672,6 +1671,31 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     define($Object.prototype, [
+      function has(key){
+        return this.properties.has(key);
+      },
+      function remove(key){
+        return this.properties.remove(key);
+      },
+      function describe(key){
+        return this.properties.getProperty(key);
+      },
+      function define(key, value, attrs){
+        return this.properties.set(key, value, attrs);
+      },
+      function get(key){
+        return this.properties.get(key);
+      },
+      function set(key, value){
+        if (this.properties.has(key)) {
+          this.properties.set(key, value);
+        } else {
+          this.properties.set(key, value, ECW);
+        }
+      },
+      function each(callback){
+        this.properties.forEach(callback, this);
+      },
       function GetPrototype(){
         return this.Prototype;
       },
@@ -1699,7 +1723,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return typeof val === OBJECT ? new DataDescriptor(val, 6) : undefined;
         }
 
-        var prop = this.properties.getProperty(key);
+        var prop = this.describe(key);
         if (prop) {
           if (prop[2] & A) {
             var Descriptor = AccessorDescriptor,
@@ -1731,7 +1755,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function GetP(receiver, key){
-        var prop = this.properties.getProperty(key);
+        var prop = this.describe(key);
         if (!prop) {
           var proto = this.GetPrototype();
           if (proto) {
@@ -1750,7 +1774,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function SetP(receiver, key, value) {
-        var prop = this.properties.getProperty(key);
+        var prop = this.describe(key);
         if (prop) {
           if (prop[3]) {
             var setter = prop[3].Set;
@@ -1800,9 +1824,9 @@ var runtime = (function(GLOBAL, exports, undefined){
             return reject('define_disallowed', []);
           } else {
             if (IsGenericDescriptor(desc) || IsDataDescriptor(desc)) {
-              this.properties.set(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+              this.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
             } else {
-              this.properties.set(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | A);
+              this.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | A);
             }
             return true;
           }
@@ -1834,7 +1858,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           CONFIGURABLE in desc || (desc.Configurable = current.Configurable);
           ENUMERABLE in desc || (desc.Enumerable = current.Enumerable);
 
-          var prop = this.properties.getProperty(key);
+          var prop = this.describe(key);
 
           if (IsAccessorDescriptor(desc)) {
             prop[2] = desc.Enumerable | (desc.Configurable << 1) | A;
@@ -1863,10 +1887,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function HasOwnProperty(key){
-        return this.properties.has(key);
+        return this.has(key);
       },
       function HasProperty(key){
-        if (this.properties.has(key)) {
+        if (this.has(key)) {
           return true;
         } else {
           var proto = this.GetPrototype();
@@ -1878,10 +1902,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function Delete(key, strict){
-        if (!this.properties.has(key)) {
+        if (!this.has(key)) {
           return true;
-        } else if (this.properties.hasAttribute(key, C)) {
-          this.properties.remove(key);
+        } else if (this.describe(key)[2] & C) {
+          this.remove(key);
           return true;
         } else if (strict) {
           return ThrowException('strict_delete', []);
@@ -1898,7 +1922,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             len = keys.length;
 
         var iterator = new $Object;
-        setDirect(iterator, 'next', new $NativeFunction({
+        iterator.set('next', new $NativeFunction({
           length: 0,
           name: 'next',
           call: function(){
@@ -1912,18 +1936,30 @@ var runtime = (function(GLOBAL, exports, undefined){
         return iterator;
       },
       function Enumerate(includePrototype, onlyEnumerable){
-        var props = this.properties.filter(function(prop){
-          return !prop[0].Private && (!onlyEnumerable || (prop[2] & E));
-        }, this);
+        var props = [],
+            seen = create(null);
+
+        this.each(function(prop){
+          if (!(prop[0] in seen) && !prop[0].Private && !onlyEnumerable || (prop[2] & E)) {
+            props.push(prop[0]);
+            seen[prop[0]] = true;
+          }
+        });
 
         if (includePrototype) {
           var proto = this.GetPrototype();
           if (proto) {
-            props.merge(proto.Enumerate(includePrototype, onlyEnumerable));
+            var inherited = proto.Enumerate(includePrototype, onlyEnumerable);
+            for (var i=0; i < inherited.length; i++) {
+              if (!(inherited[i] in seen)) {
+                props.push(inherited[i]);
+                seen[inherited[i]] = true;
+              }
+            }
           }
         }
 
-        return props.keys();
+        return props;
       },
       function DefaultValue(hint){
         var order = hint === 'String' ? ['toString', 'valueOf'] : ['valueOf', 'toString'];
@@ -2116,52 +2152,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $Function;
   })();
 
-
-  var $NativeFunction = (function(){
-    function $NativeFunction(options){
-      if (options.proto === undefined) {
-        options.proto = intrinsics.FunctionProto;
-      }
-      $Object.call(this, options.proto);
-
-      this.properties.initialize([
-        'arguments', null, ___,
-        'caller', null, ___,
-        'length', options.length, ___,
-        'name', options.name, ___
-      ]);
-
-      this.call = options.call;
-      if (options.construct) {
-        this.construct = options.construct;
-      }
-
-      this.Realm = realm;
-      hide(this, 'Realm');
-      hide(this, 'call');
-    }
-
-    inherit($NativeFunction, $Function, {
-      Native: true,
-    }, [
-      function Call(receiver, args){
-        var result = this.call.apply(receiver, [].concat(args));
-        return result && result.type === Return ? result.value : result;
-      },
-      function Construct(args){
-        if (this.construct) {
-          var instance = hasDirect(this, 'prototype') ? new $Object(this.properties.get('prototype')) : new $Object;
-          instance.ConstructorName = this.properties.get('name');
-          var result = this.construct.apply(instance, args);
-        } else {
-          var result = this.call.apply(undefined, args);
-        }
-        return result && result.type === Return ? result.value : result;
-      }
-    ]);
-
-    return $NativeFunction;
-  })();
 
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
@@ -2385,7 +2375,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     function $String(value){
       $Object.call(this, intrinsics.StringProto);
       this.PrimitiveValue = value;
-      this.properties.set('length', value.length, ___);
+      this.define('length', value.length, ___);
     }
 
     inherit($String, $Object, {
@@ -2413,7 +2403,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (key.Abrupt) return key; else key = key.value;
         }
         if (typeof key === 'string') {
-          if (key < this.properties.get('length') && key >= 0) {
+          if (key < this.get('length') && key >= 0) {
             return true;
           }
         }
@@ -2541,27 +2531,24 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, intrinsics.ArrayProto);
       if (items instanceof Array) {
         var len = items.length;
-        for (var i=0; i < len; i++)
-          setDirect(this, i, items[i]);
+        for (var i=0; i < len; i++) {
+          this.set(i, items[i]);
+        }
       } else {
         var len = 0;
       }
-      this.properties.set('length', len, _CW);
+      this.set('length', len, _CW);
     }
 
     inherit($Array, $Object, {
       NativeBrand: BRANDS.NativeArray
     }, [
       function DefineOwnProperty(key, desc, strict){
-        function Reject(str) {
-          if (strict) {
-            throw new TypeError(str);
-          }
-          return false;
-        }
-
         var oldLenDesc = this.GetOwnProperty('length'),
-            oldLen = oldLenDesc.Value;
+            oldLen = oldLenDesc.Value,
+            reject = strict ? function(e, a){ return ThrowException(e, a) }
+                            : function(e, a){ return false };
+
 
         if (key === 'length') {
           if (!(VALUE in desc)) {
@@ -2581,7 +2568,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (newLen !== value) {
-            return ThrowException('invalid_array_length');
+            return reject('invalid_array_length');
           }
 
           newLen = newLenDesc.Value;
@@ -2590,7 +2577,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (oldLenDesc.Writable === false) {
-            return Reject();
+            return reject('strict_cannot_assign')
           }
 
           if (!(WRITABLE in newLenDesc) || newLenDesc.Writable) {
@@ -2610,7 +2597,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           while (newLen < oldLen) {
             oldLen = oldLen - 1;
-            var deleted = this.Delete('' + oldLen, false);
+            var deleted = this.Delete(''+oldLen, false);
             if (deleted.Completion) {
               if (deleted.Abrupt) return deleted; else deleted = deleted.value;
             }
@@ -2621,13 +2608,11 @@ var runtime = (function(GLOBAL, exports, undefined){
                 newLenDesc.Writable = false;
               }
               DefineOwn.call(this, 'length', newLenDesc, false);
-              Reject();
+              return reject('strict_delete_property');
             }
           }
           if (!newWritable) {
-            DefineOwn.call(this, 'length', {
-              Writable: false
-            }, false);
+            DefineOwn.call(this, 'length', { Writable: false }, false);
           }
 
           return true;
@@ -2639,7 +2624,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (index >= oldLen && oldLenDesc.Writable === false) {
-            return Reject();
+            return reject('strict_cannot_assign');
           }
 
           success = DefineOwn.call(this, key, desc, false);
@@ -2648,7 +2633,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (success === false) {
-            return Reject();
+            return reject('strict_cannot_assign');
           }
 
           if (index >= oldLen) {
@@ -2783,7 +2768,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       ParameterMap: null,
     }, [
       function Get(key){
-        if (this.isMapped && this.ParameterMap.properties.has(key)) {
+        if (this.isMapped && this.ParameterMap.has(key)) {
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
@@ -2798,7 +2783,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (desc === undefined) {
           return desc;
         }
-        if (this.isMapped && this.ParameterMap.properties.has(key)) {
+        if (this.isMapped && this.ParameterMap.has(key)) {
           desc.Value = this.ParameterMap.Get(key);
         }
         return desc;
@@ -2808,7 +2793,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return ThrowException('strict_lhs_assignment');
         }
 
-        if (this.isMapped && this.ParameterMap.properties.has(key)) {
+        if (this.isMapped && this.ParameterMap.has(key)) {
           if (IsAccessorDescriptor(desc)) {
             this.ParameterMap.Delete(key, false);
           } else {
@@ -2829,7 +2814,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return result;
         }
 
-        if (result && this.isMapped && this.ParameterMap.properties.has(key)) {
+        if (result && this.isMapped && this.ParameterMap.has(key)) {
           this.ParameterMap.Delete(key, false);
         }
 
@@ -2861,11 +2846,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       $Object.call(this, null);
-      this.properties.remove('__proto__');
+      this.remove('__proto__');
       var self = this;
 
       each(names, function(name){
-        self.properties.set(name, new ModuleGetter(new Reference(object, name)), E_A);
+        self.define(name, new ModuleGetter(new Reference(object, name)), E_A);
       });
     }
 
@@ -2881,9 +2866,9 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Error = (function(){
     function $Error(name, type, message){
       $Object.call(this, intrinsics[name+'Proto']);
-      this.properties.set('message', message, ECW);
+      this.define('message', message, ECW);
       if (type !== undefined) {
-        this.properties.set('type', type, _CW);
+        this.define('type', type, _CW);
       }
     }
 
@@ -2892,18 +2877,18 @@ var runtime = (function(GLOBAL, exports, undefined){
     }, [
       function setOrigin(filename, kind){
         if (filename) {
-          setDirect(this, 'filename', filename);
+          this.set('filename', filename);
         }
         if (kind) {
-          setDirect(this, 'kind', kind);
+          this.set('kind', kind);
         }
       },
       function setCode(loc, code){
         var line = code.split('\n')[loc.start.line - 1];
         var pad = new Array(loc.start.column).join('-') + '^';
-        setDirect(this, 'line', loc.start.line);
-        setDirect(this, 'column', loc.start.column);
-        setDirect(this, 'code', line + '\n' + pad);
+        this.set('line', loc.start.line);
+        this.set('column', loc.start.column);
+        this.set('code', line + '\n' + pad);
       }
     ]);
 
@@ -3290,6 +3275,67 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $PrimitiveBase;
   })();
 
+
+
+
+  var $NativeFunction = (function(){
+    function $NativeFunction(options){
+      if (options.proto === undefined) {
+        options.proto = intrinsics.FunctionProto;
+      }
+      $Object.call(this, options.proto);
+
+      this.properties.initialize([
+        'arguments', null, ___,
+        'caller', null, ___,
+        'length', options.length, ___,
+        'name', options.name, ___
+      ]);
+
+      this.call = options.call;
+      if (options.construct) {
+        this.construct = options.construct;
+      }
+
+      this.Realm = realm;
+      hide(this, 'Realm');
+      hide(this, 'call');
+    }
+
+    inherit($NativeFunction, $Function, {
+      Native: true,
+    }, [
+      function Call(receiver, args){
+        var result = this.call.apply(receiver, [].concat(args));
+        return result && result.type === Return ? result.value : result;
+      },
+      function Construct(args){
+        if (this.construct) {
+          var instance = this.has('prototype') ? new $Object(this.get('prototype')) : new $Object;
+          instance.ConstructorName = this.get('name');
+          var result = this.construct.apply(instance, args);
+        } else {
+          var result = this.call.apply(undefined, args);
+        }
+        return result && result.type === Return ? result.value : result;
+      }
+    ]);
+
+    return $NativeFunction;
+  })();
+
+
+  var $NativeObject = (function(){
+
+    function $NativeObject(options){
+    }
+
+    inherit($NativeObject, $Object, {
+      Native: true,
+    }, [
+    ]);
+    return $NativeObject;
+  })();
 
 
   var ExecutionContext = (function(){
