@@ -561,7 +561,21 @@ var debug = (function(exports){
       },
       function getScope(){
         return introspect(this.subject.Scope);
-      }
+      },
+      function isStrict(){
+        return !!this.subject.Strict;
+      },
+      function ownAttrs(props){
+        var strict = this.isStrict();
+        props || (props = create(null));
+        this.props.forEach(function(prop){
+          if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
+            var key = prop[0] === '__proto__' ? proto : prop[0];
+            props[key] = prop;
+          }
+        });
+        return props;
+      },
     ]);
 
     return MirrorFunction;
