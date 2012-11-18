@@ -254,6 +254,7 @@ var assembler = (function(exports){
       this.Strict = strict || (context.code && context.code.strict) || isStrict(this.body);
       if (scope === SCOPE.MODULE) {
         this.ExportedNames = getExports(this.body);
+        this.Strict = true;
       }
       this.params = new Params(node.params, node, node.rest);
       this.ops = [];
