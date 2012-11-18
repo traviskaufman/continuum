@@ -364,9 +364,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       writable = true;
     }
     if (install) {
-      prototype.properties.set('constructor', func, writable ? _CW : ___);
+      prototype.define('constructor', func, writable ? _CW : ___);
     }
-    func.properties.set('prototype', prototype, writable ? __W : ___);
+    func.define('prototype', prototype, writable ? __W : ___);
   }
 
   // ## IsArrayIndex
@@ -553,9 +553,8 @@ var runtime = (function(GLOBAL, exports, undefined){
             return ThrowException('global invalid define');
           }
         }
-        if (decl.type === 'FunctionDeclaration') {
-          env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.Strict);
-        }
+
+        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.Strict);
       }
     }
 
@@ -931,14 +930,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     define(LinkedItem.prototype, [
-      function setNext(item){
-        this.next = item;
-        item.previous = this;
-      },
-      function setPrevious(item){
-        this.previous = item;
-        item.next = this;
-      },
       function unlink(){
         this.next.previous = this.previous;
         this.previous.next = this.next;
@@ -950,19 +941,35 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function MapData(){
       this.id = uid++ + '';
-      this.size = 0;
-      this.strings = create(null);
-      this.numbers = create(null);
-      this.others = create(null);
       this.guard = create(LinkedItem.prototype);
-      this.guard.next = this.guard.previous = this.guard;
       this.guard.key = {};
-      this.lastLookup = this.guard;
+      this.reset();
     }
 
     MapData.sigil = create(null);
 
     define(MapData.prototype, [
+      function reset(){
+        this.size = 0;
+        this.strings = create(null);
+        this.numbers = create(null);
+        this.others = create(null);
+        this.lastLookup = this.guard.next = this.guard.previous = this.guard;
+      },
+      function clear(){
+        var next, item = this.guard.next;
+
+        while (item !== this.guard) {
+          next = item.next;
+          if (item.key !== null && typeof item.key === OBJECT) {
+            delete item.key.storage[this.id];
+          }
+          item.next = item.previous = item.data = item.key = null;
+          item = next;
+        }
+
+        this.reset();
+      },
       function add(key){
         this.size++;
         return new LinkedItem(key, this.guard);
@@ -1193,12 +1200,14 @@ var runtime = (function(GLOBAL, exports, undefined){
       return ThrowException('spread_non_object');
     }
 
-    var value, iterator = spread.Iterate();
+    var len = ToUint32(spread.Get('length'));
 
-    while (!(value = Invoke('next', iterator, [])) && !IsStopIteration(value)) {
+    for (var i = offset; i < len; i++) {
+      var valie = spread.Get(i);
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
+
       array.define(offset++, value, ECW);
     }
 
@@ -1223,6 +1232,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       site.define(i+'', template[i].cooked, E__);
       raw.define(i+'', template[i].raw, E__);
     }
+
     site.define('length', count, ___);
     raw.define('length', count, ___);
     site.define('raw', raw, ___);
@@ -3322,10 +3332,10 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $NativeObject = (function(){
-    function $NativeObject(){}
+  var $ExoticObject = (function(){
+    function $ExoticObject(){}
 
-    inherit($NativeObject, $Object, {
+    inherit($ExoticObject, $Object, {
       Native: true,
     }, [
       function has(key){},
@@ -3341,7 +3351,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function setExtensible(value){},
     ]);
 
-    return $NativeObject;
+    return $ExoticObject;
   })();
 
 
@@ -3512,7 +3522,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       Function: $Function,
       Map     : $Map,
       Number  : $Number,
-      //Proxy   : $Proxy,
       RegExp  : $RegExp,
       Set     : $Set,
       String  : $String,
@@ -3529,6 +3538,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Map     : $Map,
       $Number  : $Number,
       $Object  : $Object,
+      $Proxy   : $Proxy,
       $RegExp  : $RegExp,
       $Set     : $Set,
       $Symbol  : $Symbol,
@@ -3662,18 +3672,18 @@ var runtime = (function(GLOBAL, exports, undefined){
         len = array.length;
 
     for (var i=0; i < len; i++) {
-      $array.properties.set(i, array[i], ECW);
+      $array.define(i+'', array[i], ECW);
     }
-    $array.properties.set('length', array.length, __W);
+    $array.define('length', array.length, __W);
     return $array;
   }
 
   function toInternalArray($array){
     var array = [],
-        len = $array.properties.get('length');
+        len = $array.get('length');
 
     for (var i=0; i < len; i++) {
-      array[i] = $array.properties.get(i);
+      array[i] = $array.get(i+'');
     }
     return array;
   }
@@ -3776,8 +3786,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
       thrower.call = function(){ return ThrowException('strict_poison_pill') };
-      thrower.properties.set('length', 0, ___);
-      thrower.properties.set('name', 'ThrowTypeError', ___);
+      thrower.define('length', 0, ___);
+      thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
       thrower.Strict = true;
@@ -3815,7 +3825,7 @@ var runtime = (function(GLOBAL, exports, undefined){
                 }
               }
             });
-            target.properties.set(key, func, 6);
+            target.define(key, func, _CW);
           }
         });
       }
@@ -4015,14 +4025,17 @@ var runtime = (function(GLOBAL, exports, undefined){
         FunctionCreate: function(args){
           args = toInternalArray(args);
           var body = args.pop();
+
           var script = new Script({
             scope: SCOPE.GLOBAL,
             natives: false,
             source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
           });
+
           if (script.error) {
             return script.error;
           }
+
           var ctx = new ExecutionContext(context, new DeclarativeEnvironmentRecord(realm.globalEnv), realm, script.bytecode);
           ExecutionContext.push(ctx);
           var func = script.thunk.run(ctx);
