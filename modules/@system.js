@@ -18,8 +18,8 @@
   $__defineMethods = function defineMethods(obj, props){
     for (var i=0; i < props.length; i++) {
       $__SetInternal(props[i], 'Native', true);
-      $__defineDirect(obj, props[i].name, props[i], _CW);
-      $__deleteDirect(props[i], 'prototype');
+      $__define(obj, props[i].name, props[i], _CW);
+      $__remove(props[i], 'prototype');
     }
     return obj;
   };
@@ -30,12 +30,12 @@
       var name = keys[i],
           prop = props[name];
 
-      $__defineDirect(obj, name, prop, _CW);
+      $__define(obj, name, prop, _CW);
 
       if (typeof prop === 'function') {
         $__SetInternal(prop, 'Native', true);
-        $__defineDirect(prop, 'name', name, ___);
-        $__deleteDirect(prop, 'prototype');
+        $__define(prop, 'name', name, ___);
+        $__remove(prop, 'prototype');
       }
     }
     return obj;
@@ -45,22 +45,22 @@
     var len = funcs.length;
     for (var i=0; i < len; i++) {
       $__SetInternal(funcs[i], 'Native', true);
-      $__deleteDirect(funcs[i], 'prototype');
+      $__remove(funcs[i], 'prototype');
     }
   };
 
   $__defineConstants = function defineConstants(obj, props){
     var keys = $__Enumerate(props, false, false);
     for (var i=0; i < keys.length; i++) {
-      $__defineDirect(obj, keys[i], props[keys[i]], 0);
+      $__define(obj, keys[i], props[keys[i]], 0);
     }
   };
 
   $__setupConstructor = function setupConstructor(ctor, proto){
-    $__defineDirect(ctor, 'prototype', proto, ___);
-    $__defineDirect(ctor, 'length', 1, ___);
-    $__defineDirect(ctor.prototype, 'constructor', ctor, _CW);
-    $__defineDirect(global, ctor.name, ctor, _CW);
+    $__define(ctor, 'prototype', proto, ___);
+    $__define(ctor, 'length', 1, ___);
+    $__define(ctor.prototype, 'constructor', ctor, _CW);
+    $__define(global, ctor.name, ctor, _CW);
     $__SetInternal(ctor, 'Native', true);
     $__SetInternal(ctor, 'NativeConstructor', true);
   };
@@ -68,12 +68,12 @@
 
   $__setLength = function setLength(f, length){
     if (typeof length === 'string') {
-      $__setDirect(f, 'length', length);
+      $__define(f, 'length', length, ___);
     } else {
       var keys = $__Enumerate(length, false, false);
       for (var i=0; i < keys.length; i++) {
         var key = keys[i];
-        $__setDirect(f[key], 'length', length[key]);
+        $__define(f[key], 'length', length[key], ___);
       }
     }
   };
@@ -83,7 +83,7 @@
         i = keys.length;
 
     while (i--) {
-      $__defineDirect(object[keys[i]], key, values[keys[i]], ___);
+      $__define(object[keys[i]], key, values[keys[i]], ___);
     }
   };
 
@@ -97,7 +97,7 @@
         i = keys.length;
 
     while (i--) {
-      $__updateAttrDirect(o, keys[i], ~E__);
+      $__update(o, keys[i], ~E__);
     }
 
     if (typeof o === 'function') {
@@ -279,7 +279,7 @@ export let Module = function Module(object){
   return $__ToModule($__ToObject(object));
 }
 
-$__deleteDirect(Module, 'prototype');
+$__remove(Module, 'prototype');
 
 
 export let System = new Loader(null, {

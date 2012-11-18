@@ -39,7 +39,7 @@ $__defineProps(WeakMap.prototype, {
   }
 });
 
-$__defineDirect(WeakMap.prototype.delete, 'name', 'delete', 0);
+$__define(WeakMap.prototype.delete, 'name', 'delete', 0);
 
 
 function ensureWeakMap(o, p, name){

@@ -64,7 +64,7 @@ $__defineProps(Map.prototype, {
   }
 });
 
-$__defineDirect(Map.prototype.delete, 'name', 'delete', 0);
+$__set(Map.prototype.delete, 'name', 'delete');
 
 $__DefineOwnProperty(Map.prototype, 'size', {
   configurable: true,

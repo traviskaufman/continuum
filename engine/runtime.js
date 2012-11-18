@@ -133,15 +133,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     var hide = function(){};
   }
 
-
-  function hasDirect(o, key){
-    if (o) {
-      return o.properties.has(key) || hasDirect(o.GetPrototype(), key);
-    } else {
-      return false;
-    }
-  }
-
   function setDirect(o, key, value){
     if (o.properties.has(key)) {
       o.properties.set(key, value);
@@ -163,14 +154,14 @@ var runtime = (function(GLOBAL, exports, undefined){
   function FromPropertyDescriptor(desc){
     var obj = new $Object;
     if (IsDataDescriptor(desc)) {
-      setDirect(obj, 'value', desc.Value);
-      setDirect(obj, 'writable', desc.Writable);
+      obj.set('value', desc.Value);
+      obj.set('writable', desc.Writable);
     } else if (IsAccessorDescriptor(desc))  {
-      setDirect(obj, 'get', desc.Get);
-      setDirect(obj, 'set', desc.Set);
+      obj.set('get', desc.Get);
+      obj.set('set', desc.Set);
     }
-    setDirect(obj, 'enumerable', desc.Enumerable);
-    setDirect(obj, 'configurable', desc.Configurable);
+    obj.set('enumerable', desc.Enumerable);
+    obj.set('configurable', desc.Configurable);
     return obj;
   }
 
@@ -273,7 +264,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (desc === undefined) return;
     var obj = new $Object;
     for (var i=0, v; i < 6; i++) {
-      if (descProps[i] in desc) setDirect(obj, descFields[i], desc[descProps[i]]);
+      if (descProps[i] in desc) obj.set(descFields[i], desc[descProps[i]]);
     }
     return obj;
   }
@@ -720,11 +711,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       scope.InitializeBinding(name, ctor);
     }
 
-    ctor.SetPrototype(superctor);
-    setDirect(ctor, 'name', brand);
+    ctor.setPrototype(superctor);
+    ctor.set('name', brand);
     MakeConstructor(ctor, false, proto);
-    proto.properties.set('constructor', ctor, _CW);
-    ctor.properties.set('prototype', proto, ___);
+    proto.define('constructor', ctor, _CW);
+    ctor.define('prototype', proto, ___);
 
     for (var i=0, method; method = methods[i]; i++) {
       PropertyDefinitionEvaluation(method.kind, proto, method.name, method.code);
@@ -807,14 +798,14 @@ var runtime = (function(GLOBAL, exports, undefined){
       BindingInitialization(arg, value, env);
     }
     if (params.Rest) {
-      var len = args.properties.get('length') - params.length,
+      var len = args.get('length') - params.length,
           array = new $Array(0);
 
       if (len > 0) {
         for (var i=0; i < len; i++) {
-          setDirect(array, i, args.properties.get(params.length + i));
+          array.define(i, args.get(params.length + i));
         }
-        setDirect(array, 'length', len);
+        array.set('length', len);
       }
       BindingInitialization(params.Rest, array, env);
     }
@@ -1208,10 +1199,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
-      array.properties.set(offset++, value, ECW);
+      array.define(offset++, value, ECW);
     }
 
-    array.properties.set('length', offset, _CW);
+    array.define('length', offset, _CW);
     return offset;
   }
 
@@ -1229,14 +1220,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         raw = context.createArray(count);
 
     for (var i=0; i < count; i++) {
-      site.properties.set(i+'', template[i].cooked, E__);
-      raw.properties.set(i+'', template[i].raw, E__);
+      site.define(i+'', template[i].cooked, E__);
+      raw.define(i+'', template[i].raw, E__);
     }
-    site.properties.set('length', count, ___);
-    raw.properties.set('length', count, ___);
-    site.properties.set('raw', raw, ___);
-    site.SetExtensible(false);
-    raw.SetExtensible(false);
+    site.define('length', count, ___);
+    raw.define('length', count, ___);
+    site.define('raw', raw, ___);
+    site.setExtensible(false);
+    raw.setExtensible(false);
     realm.templates[template.id] = site;
     return site;
   }
@@ -1261,10 +1252,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
-      array.properties.set(i, value, ECW);
+      array.define(i, value, ECW);
     }
 
-    array.properties.set('length', i, _CW);
+    array.define('length', i, _CW);
     return array;
   }
 
@@ -1579,7 +1570,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.thisValue;
       },
       function GetSuperBase(){
-        return this.HomeObject ? this.HomeObject.GetPrototype() : undefined;
+        return this.HomeObject ? this.HomeObject.getPrototype() : undefined;
       },
       function GetMethodName() {
         return this.MethodName;
@@ -1627,12 +1618,12 @@ var runtime = (function(GLOBAL, exports, undefined){
     var Proto = {
       Get: {
         Call: function(receiver){
-          return receiver.GetPrototype();
+          return receiver.getPrototype();
         }
       },
       Set: {
         Call: function(receiver, args){
-          return receiver.SetPrototype(args[0]);
+          return receiver.setPrototype(args[0]);
         }
       }
     };
@@ -1693,24 +1684,30 @@ var runtime = (function(GLOBAL, exports, undefined){
           this.properties.set(key, value, ECW);
         }
       },
+      function query(key){
+        return this.properties.getAttribute(key);
+      },
+      function update(key, attr){
+        this.properties.setAttribute(key, attr);
+      },
       function each(callback){
         this.properties.forEach(callback, this);
       },
-      function GetPrototype(){
+      function getPrototype(){
         return this.Prototype;
       },
-      function SetPrototype(value){
-        if (typeof value === 'object' && this.GetExtensible()) {
+      function setPrototype(value){
+        if (typeof value === 'object' && this.getExtensible()) {
           this.Prototype = value;
           return true;
         } else {
           return false;
         }
       },
-      function GetExtensible(){
+      function getExtensible(){
         return this.Extensible;
       },
-      function SetExtensible(v){
+      function setExtensible(v){
         v = !!v;
         if (this.Extensible) {
           this.Extensible = v;
@@ -1740,7 +1737,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (desc) {
           return desc;
         } else {
-          var proto = this.GetPrototype();
+          var proto = this.getPrototype();
           if (proto) {
             return proto.GetProperty(key);
           }
@@ -1757,7 +1754,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function GetP(receiver, key){
         var prop = this.describe(key);
         if (!prop) {
-          var proto = this.GetPrototype();
+          var proto = this.getPrototype();
           if (proto) {
             return proto.GetP(receiver, key);
           }
@@ -1791,7 +1788,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           } else if (prop[2] & W) {
             if (this === receiver) {
               return this.DefineOwnProperty(key, new Value(value), false);
-            } else if (!receiver.GetExtensible()) {
+            } else if (!receiver.getExtensible()) {
               return false;
             } else {
               return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
@@ -1800,9 +1797,9 @@ var runtime = (function(GLOBAL, exports, undefined){
             return false;
           }
         } else {
-          var proto = this.GetPrototype();
+          var proto = this.getPrototype();
           if (!proto) {
-            if (!receiver.GetExtensible()) {
+            if (!receiver.getExtensible()) {
               return false;
             } else {
               return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
@@ -1820,7 +1817,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var current = this.GetOwnProperty(key);
 
         if (current === undefined) {
-          if (!this.GetExtensible()) {
+          if (!this.getExtensible()) {
             return reject('define_disallowed', []);
           } else {
             if (IsGenericDescriptor(desc) || IsDataDescriptor(desc)) {
@@ -1893,7 +1890,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (this.has(key)) {
           return true;
         } else {
-          var proto = this.GetPrototype();
+          var proto = this.getPrototype();
           if (proto) {
             return proto.HasProperty(key);
           } else {
@@ -1925,7 +1922,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         iterator.set('next', new $NativeFunction({
           length: 0,
           name: 'next',
-          call: function(){
+          call: function next(){
             if (index < len) {
               return keys[index++];
             } else {
@@ -1947,7 +1944,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         });
 
         if (includePrototype) {
-          var proto = this.GetPrototype();
+          var proto = this.getPrototype();
           if (proto) {
             var inherited = proto.Enumerate(includePrototype, onlyEnumerable);
             for (var i=0; i < inherited.length; i++) {
@@ -2087,16 +2084,16 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         if (!this.Strict) {
-          this.properties.set('arguments', local.arguments, ___);
-          this.properties.set('caller', caller, ___);
+          this.define('arguments', local.arguments, ___);
+          this.define('caller', caller, ___);
           local.arguments = null;
         }
 
         var result = this.thunk.run(context);
 
         if (!this.Strict) {
-          this.properties.set('arguments', null, ___);
-          this.properties.set('caller', null, ___);
+          this.define('arguments', null, ___);
+          this.define('caller', null, ___);
         }
 
         ExecutionContext.pop();
@@ -2117,7 +2114,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else if (this.Class) {
           instance.Brand = prototype.Brand;
         }
-        instance.ConstructorName = this.properties.get('name');
+        instance.ConstructorName = this.get('name');
 
         var result = this.Call(instance, args, true);
         if (result && result.Completion) {
@@ -2140,7 +2137,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         while (arg) {
-          arg = arg.GetPrototype();
+          arg = arg.getPrototype();
           if (prototype === arg) {
             return true;
           }
@@ -2243,7 +2240,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var $Generator = (function(){
     function setFunction(obj, name, func){
-      setDirect(obj, name, new $NativeFunction({
+      obj.set(name, new $NativeFunction({
         name: name,
         length: func.length,
         call: func
@@ -2924,7 +2921,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var trapResult = trap.Call(handler, [target, key, normalizedDescObj]),
             success = ToBoolean(trapResult),
             targetDesc = target.GetOwnProperty(key),
-            extensible = target.GetExtensible();
+            extensible = target.getExtensible();
 
         if (!extensible && targetDesc === undefined) {
           return ThrowException('proxy_configurability_non_extensible_inconsistent');
@@ -2957,13 +2954,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (targetDesc !== undefined) {
             if (!targetDesc.Configurable) {
               return ThrowException('proxy_configurability_inconsistent');
-            } else if (!target.GetExtensible()) {
+            } else if (!target.getExtensible()) {
               return ThrowException('proxy_configurability_non_extensible_inconsistent');
             }
             return undefined;
           }
         }
-        var extensible = target.GetExtensible();
+        var extensible = target.getExtensible();
         if (!extensible && targetDesc === undefined) {
           return ThrowException('proxy_configurability_non_extensible_inconsistent');
         } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(desc))) {
@@ -2996,13 +2993,13 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($Proxy, $Object, {
       Proxy: true
     }, [
-      function GetPrototype(){
+      function getPrototype(){
         var trap = GetTrap(this.Handler, 'getPrototypeOf');
         if (trap === undefined) {
-          return this.Target.GetPrototype();
+          return this.Target.getPrototype();
         } else {
           var result = trap.Call(this.Handler, [this.Target]),
-              targetProto = this.Target.GetPrototype();
+              targetProto = this.Target.getPrototype();
 
           if (result !== targetProto) {
             return ThrowException('proxy_prototype_inconsistent');
@@ -3011,13 +3008,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         }
       },
-      function GetExtensible(){
+      function getExtensible(){
         var trap = GetTrap(this.Handler, 'isExtensible');
         if (trap === undefined) {
-          return this.Target.GetExtensible();
+          return this.Target.getExtensible();
         }
         var proxyIsExtensible = ToBoolean(trap.Call(this.Handler, [this.Target])),
-            targetIsExtensible  = this.Target.GetExtensible();
+            targetIsExtensible  = this.Target.getExtensible();
 
         if (proxyIsExtensible !== targetIsExtensible) {
           return ThrowException('proxy_extensibility_inconsistent');
@@ -3096,7 +3093,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_hasown_inconsistent');
-          } else if (!this.Target.GetExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_hasown_inconsistent');
           }
         }
@@ -3115,7 +3112,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_has_inconsistent');
-          } else if (!this.Target.GetExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_has_inconsistent');
           }
         }
@@ -3133,7 +3130,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_delete_inconsistent');
-          } else if (!this.Target.GetExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_delete_inconsistent');
           }
           return true;
@@ -3171,7 +3168,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             return ThrowException('trap_returned_duplicate', trap);
           }
           seen[element] = true;
-          if (!includePrototype && !this.Target.GetExtensible() && !this.Target.HasOwnProperty(element)) {
+          if (!includePrototype && !this.Target.getExtensible() && !this.Target.HasOwnProperty(element)) {
             return ThrowException('proxy_'+trap+'_inconsistent');
           }
           array[i] = element;
@@ -3186,7 +3183,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (targetDesc && !targetDesc.Configurable) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
-            if (targetDesc && !this.Target.GetExtensible()) {
+            if (targetDesc && !this.Target.getExtensible()) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
           }
@@ -3326,14 +3323,24 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var $NativeObject = (function(){
-
-    function $NativeObject(options){
-    }
+    function $NativeObject(){}
 
     inherit($NativeObject, $Object, {
       Native: true,
     }, [
+      function has(key){},
+      function remove(key){},
+      function describe(key){},
+      function define(key, value, attrs){},
+      function get(key){},
+      function set(key, value){},
+      function each(callback){},
+      function getPrototype(){},
+      function setPrototype(value){},
+      function getExtensible(){},
+      function setExtensible(value){},
     ]);
+
     return $NativeObject;
   })();
 
@@ -3830,19 +3837,26 @@ var runtime = (function(GLOBAL, exports, undefined){
       var nativeCode = ['function ', '() { [native code] }'];
 
       return {
-        defineDirect: function(o, key, value, attrs){
-          o.properties.set(key, value, attrs);
+        has: function(o, key){
+          return o.has(key);
         },
-        deleteDirect: function(o, key){
-          o.properties.remove(key);
+        remove: function(o, key){
+          o.remove(key);
         },
-        hasOwnDirect: function(o, key){
-          return o.properties.has(key);
+        set: function(o, key, value){
+          return o.set(key, value);
         },
-        hasDirect: hasDirect,
-        setDirect: setDirect,
-        updateAttrDirect: function(obj, key, attr){
-          var prop = obj.properties.getProperty(key);
+        get: function(o, key){
+          return o.get(key);
+        },
+        define: function(o, key, value, attrs){
+          o.define(key, value, attrs);
+        },
+        query: function(o, key){
+          return o.query(key);
+        },
+        update: function(obj, key, attr){
+          var prop = obj.describe(key);
           if (prop) {
             prop[2] &= attr;
             return true;
@@ -4057,7 +4071,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           var code = func.Code;
           if (func.Native || !code) {
-            return nativeCode[0] + func.properties.get('name') + nativeCode[1];
+            return nativeCode[0] + func.get('name') + nativeCode[1];
           } else {
             return code.source.slice(code.range[0], code.range[1]);
           }
@@ -4111,14 +4125,14 @@ var runtime = (function(GLOBAL, exports, undefined){
               return str.replace(trimmer, '');
             };
           })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
-        GetExtensible: function(obj){
-          return obj.GetExtensible();
+        getExtensible: function(obj){
+          return obj.getExtensible();
         },
-        SetExtensible: function(obj, value){
-          return obj.SetExtensible(value);
+        setExtensible: function(obj, value){
+          return obj.setExtensible(value);
         },
-        GetPrototype: function(obj){
-          return obj.GetPrototype();
+        getPrototype: function(obj){
+          return obj.getPrototype();
         },
         DefineOwnProperty: function(obj, key, desc){
           return obj.DefineOwnProperty(key, ToPropertyDescriptor(desc), false);
@@ -4359,10 +4373,10 @@ var runtime = (function(GLOBAL, exports, undefined){
             var math = new $Object;
             math.NativeBrand = BRANDS.NativeMath;
             for (var i=0; i < consts.length; i++) {
-              math.properties.set(consts[i], Math[consts[i]], ___);
+              math.define(consts[i], Math[consts[i]], ___);
             }
             for (var k in funcs) {
-              math.properties.set(k, new $NativeFunction({
+              math.define(k, new $NativeFunction({
                 call: funcs[k],
                 name: k,
                 length: funcs[k].length

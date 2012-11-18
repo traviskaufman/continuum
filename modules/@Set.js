@@ -57,7 +57,7 @@ $__defineProps(Set.prototype, {
   }
 });
 
-$__defineDirect(Set.prototype.delete, 'name', 'delete', 0);
+$__define(Set.prototype.delete, 'name', 'delete', 0);
 
 $__DefineOwnProperty(Set.prototype, 'size', {
   configurable: true,

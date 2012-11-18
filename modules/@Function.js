@@ -3,7 +3,7 @@ export function Function(...args){
 }
 
 $__setupConstructor(Function, $__FunctionProto);
-$__defineDirect(Function.prototype, 'name', '', 0);
+$__define(Function.prototype, 'name', '', 0);
 
 
 export function apply(func, receiver, args){
@@ -45,7 +45,7 @@ $__defineProps(Function.prototype, {
 
 
 function ensureArgs(o, name){
-  if (o == null || typeof o !== 'object' || typeof o.length !== 'number') {
+  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {
     throw $__Exception('apply_wrong_args', []);
   }
 

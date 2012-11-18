@@ -427,7 +427,7 @@ function ensureDescriptor(o){
 
 
 function ensureArgs(o, name){
-  if (o == null || typeof o !== 'object' || typeof $__getDirect(o, 'length') !== 'number') {
+  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {
     throw $__Exception('apply_wrong_args', []);
   }
 
