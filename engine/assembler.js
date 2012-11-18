@@ -283,57 +283,64 @@ var assembler = (function(exports){
   })();
 
 
-  function ClassDefinition(node){
-    var self = this;
-    this.name = node.id ? node.id.name : null;
-    this.methods = [];
-    this.symbols = [];
+  var ClassDefinition = (function(){
+    function ClassDefinition(node){
+      var self = this;
+      this.name = node.id ? node.id.name : null;
+      this.methods = [];
+      this.symbols = [];
 
-    each(node.body.body, function(node){
-      if (node.type === 'SymbolDefinition') {
+      each(node.body.body, function(node){
+        if (node.type === 'SymbolDefinition') {
+          self.defineSymbols(node);
+        } else {
+          self.defineMethod(node);
+        }
+      });
+
+      if (node.superClass) {
+        recurse(node.superClass);
+        GET();
+        this.superClass = node.superClass.name;
+      }
+    }
+
+    define(ClassDefinition.prototype, [
+      function defineSymbols(node){
         var symbols = {
           Init: create(null),
           Names: [],
           Private: node.kind === 'private'
         };
-        self.symbols.push(symbols);
+        this.symbols.push(symbols);
 
-        each(node.declarations, function(item){
-          symbols.init[item.id.name] = item.init;
-          symbols.Names.push(item.id.name);
+        each(node.declarations, function(decl){
+          symbols.init[decl.id.name] = decl.init;
+          symbols.Names.push(decl.id.name);
         });
-      } else {
-        var method = node;
-        var code = new Code(method.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.Strict);
-        if (self.name) {
-          code.name = self.name + '#' + method.key.name;
-        } else {
-          code.name = method.key.name;
-        }
-        context.pending.push(code);
+      },
+      function defineMethod(node){
+        var code = new Code(node.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.Strict),
+            name = code.name = node.key.name;
 
-        if (method.kind === '') {
-          method.kind = 'method';
-        }
+        context.queue(code);
+        code.displayName = this.name ? this.name+'#'+name : name;
+        node.kind = node.kind || 'method';
 
-        if (method.key.name === 'constructor') {
-          self.ctor = code;
+        if (name === 'constructor') {
+          this.ctor = code;
         } else {
-          self.methods.push({
-            kind: method.kind,
+          this.methods.push({
+            kind: node.kind,
             code: code,
-            name: method.key.name
+            name: name
           });
         }
       }
-    });
+    ]);
 
-    if (node.superClass) {
-      recurse(node.superClass);
-      GET();
-      this.superClass = node.superClass.name;
-    }
-  }
+    return ClassDefinition;
+  })();
 
   var Unwinder = (function(){
     function Unwinder(type, begin, end){

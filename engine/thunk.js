@@ -143,7 +143,7 @@ var thunk = (function(exports){
           if (!error.value.hasLocation) {
             error.value.hasLocation = true;
             error.value.setCode(loc, code.source);
-            error.value.setOrigin(code.filename, code.name);
+            error.value.setOrigin(code.filename, code.displayName || code.name);
           }
 
           if (stacktrace) {
