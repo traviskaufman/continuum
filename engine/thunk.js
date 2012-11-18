@@ -501,11 +501,7 @@ var thunk = (function(exports){
     }
 
     function LOG(){
-      console.log({
-        stackPosition: sp,
-        stack: stack,
-        history: history
-      });
+      context.Realm.emit('debug', [sp, stack]);
       return cmds[++ip];
     }
 
@@ -627,7 +623,7 @@ var thunk = (function(exports){
 
     function REFSYMBOL(){
       var symbol = code.lookup(ops[ip][0]);
-      stack[sp++] = context.getSymbolReference(symbol);
+      stack[sp++] = context.getSymbol(symbol);
       return cmds[++ip];
     }
 

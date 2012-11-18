@@ -1649,17 +1649,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (proto === undefined) {
         proto = intrinsics.ObjectProto;
       }
+      this.Realm = realm;
       this.Prototype = proto;
       this.properties = new PropertyList;
-      this.hiddens = create(null);
       this.storage = create(null);
       $Object.tag(this);
       if (proto === null) {
         this.properties.setProperty(['__proto__', null, 6, Proto]);
       }
 
-      this.Realm = realm;
-      hide(this, 'hiddens');
       hide(this, 'storage');
       hide(this, 'Prototype');
       hide(this, 'Realm');
@@ -1918,7 +1916,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function Delete(key, strict){
         if (!this.has(key)) {
           return true;
-        } else if (this.describe(key)[2] & C) {
+        } else if (this.query(key) & C) {
           this.remove(key);
           return true;
         } else if (strict) {
@@ -2029,32 +2027,16 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.MethodName = name;
       }
 
-      var len = params ? params.ExpectedArgumentCount : 0;
-      var nameAttrs = code.name && !code.writableName ? ___ : __W;
-      name = code.name || '';
-
       if (strict) {
-        this.properties.initialize([
-          'arguments', intrinsics.ThrowTypeError, __A,
-          'caller', intrinsics.ThrowTypeError, __A,
-          'length', len, ___,
-          'name', name, nameAttrs
-        ]);
+        this.define('arguments', intrinsics.ThrowTypeError, __A);
+        this.define('caller', intrinsics.ThrowTypeError, __A);
       } else {
-        this.properties.initialize([
-          'arguments', null, ___,
-          'caller', null, ___,
-          'length', len, ___,
-          'name', name, nameAttrs
-        ]);
+        this.define('arguments', null, ___);
+        this.define('caller', null, ___);
       }
 
-      hide(this, 'Realm');
-      hide(this, 'Code');
-      hide(this, 'Scope');
-      hide(this, 'FormalParameters');
-      hide(this, 'Strict');
-      hide(this, 'ThisMode');
+      this.define('length', params ? params.ExpectedArgumentCount : 0, ___);
+      this.define('name', code.name || '', code.name && !code.writableName ? ___ : __W);
     }
 
     inherit($Function, $Object, {
@@ -2173,11 +2155,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.TargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
-      this.properties.initialize([
-        'arguments', intrinsics.ThrowTypeError, __A,
-        'caller', intrinsics.ThrowTypeError, __A,
-        'length', target.properties.get('length'), ___
-      ]);
+      this.define('arguments', intrinsics.ThrowTypeError, __A);
+      this.define('caller', intrinsics.ThrowTypeError, __A);
+      this.define('length', target.properties.get('length'), ___);
     }
 
     inherit($BoundFunction, $Function, {
@@ -2279,10 +2259,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       setFunction(this, 'close',    function(){ return self.Close() });
       setFunction(this, 'send',     function(v){ return self.Send(v) });
       setFunction(this, 'throw',    function(v){ return self.Throw(v) });
-
-      hide(this, 'thunk');
-      hide(this, 'Realm');
-      hide(this, 'Code');
     }
 
     inherit($Generator, $Object, {
@@ -2675,13 +2651,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         $Object.call(this, intrinsics.RegExpProto);
       }
       this.PrimitiveValue = primitive;
-      this.properties.initialize([
-        'global', primitive.global, ___,
-        'ignoreCase', primitive.ignoreCase, ___,
-        'lastIndex', primitive.lastIndex, __W,
-        'multiline', primitive.multiline, ___,
-        'source', primitive.source, ___
-      ]);
+      this.define('global', primitive.global, ___);
+      this.define('ignoreCase', primitive.ignoreCase, ___);
+      this.define('lastIndex', primitive.lastIndex, __W);
+      this.define('multiline', primitive.multiline, ___);
+      this.define('source', primitive.source, ___);
     }
 
     inherit($RegExp, $Object, {
@@ -2727,7 +2701,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Arguments = (function(){
     function $Arguments(length){
       $Object.call(this);
-      this.properties.set('length', length, _CW);
+      this.define('length', length, _CW);
     }
 
     inherit($Arguments, $Object, {
@@ -2743,11 +2717,11 @@ var runtime = (function(GLOBAL, exports, undefined){
     function $StrictArguments(args){
       $Arguments.call(this, args.length);
       for (var i=0; i < args.length; i++) {
-        this.properties.set(i+'', args[i], ECW);
+        this.define(i+'', args[i], ECW);
       }
 
-      this.properties.set('arguments', intrinsics.ThrowTypeError, __A);
-      this.properties.set('caller', intrinsics.ThrowTypeError, __A);
+      this.define('arguments', intrinsics.ThrowTypeError, __A);
+      this.define('caller', intrinsics.ThrowTypeError, __A);
     }
 
     inherit($StrictArguments, $Arguments);
@@ -2766,16 +2740,16 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.isMapped = false;
 
       for (var i=0; i < args.length; i++) {
-        this.properties.set(i+'', args[i], ECW);
+        this.define(i+'', args[i], ECW);
         var name = names[i];
         if (i < names.length && !(name in mapped)) {
           this.isMapped = true;
           mapped[name] = true;
-          this.ParameterMap.properties.set(name, new ArgAccessor(name, env), _CA);
+          this.ParameterMap.define(name, new ArgAccessor(name, env), _CA);
         }
       }
 
-      this.properties.set('callee', func, _CW);
+      this.define('callee', func, _CW);
     }
 
     inherit($MappedArguments, $Arguments, {
@@ -3299,12 +3273,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
       $Object.call(this, options.proto);
 
-      this.properties.initialize([
-        'arguments', null, ___,
-        'caller', null, ___,
-        'length', options.length, ___,
-        'name', options.name, ___
-      ]);
+      this.define('arguments', null, ___);
+      this.define('caller', null, ___);
+      this.define('length', options.length, ___);
+      this.define('name', options.name, ___);
 
       this.call = options.call;
       if (options.construct) {
@@ -3500,14 +3472,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       function getSymbol(name){
         return GetSymbol(this, name) || ThrowException('undefined_symbol', name);
       },
-      function getSymbolReference(name){
-        var symbol = GetSymbol(this, name);
-        if (symbol) {
-          return symbol//IdentifierResolution(this, symbol);
-        } else {
-          return ThrowException('undefined_symbol', name);
-        }
-      },
       function createSymbol(name, isPublic){
         return new $Symbol(name, isPublic);
       },
@@ -3573,8 +3537,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       for (var k in $builtins) {
         var prototype = bindings[k + 'Proto'] = create($builtins[k].prototype);
         $Object.call(prototype, bindings.ObjectProto);
-        if (k in primitives)
+        if (k in primitives) {
           prototype.PrimitiveValue = primitives[k];
+        }
       }
 
       bindings.StopIteration = new $Object(bindings.ObjectProto);
@@ -3583,19 +3548,13 @@ var runtime = (function(GLOBAL, exports, undefined){
       for (var i=0; i < 6; i++) {
         var prototype = bindings[$errors[i] + 'Proto'] = create($Error.prototype);
         $Object.call(prototype, bindings.ErrorProto);
-        prototype.properties.initialize([
-          'name', $errors[i], _CW,
-          'type', undefined, _CW,
-          'arguments', undefined, _CW
-        ]);
+        prototype.define('name', $errors[i], _CW);
       }
 
       bindings.FunctionProto.FormalParameters = [];
-      bindings.ArrayProto.properties.set('length', 0, __W);
-      bindings.ErrorProto.properties.initialize([
-        'name', 'Error', _CW,
-        'message', '', _CW
-      ]);
+      bindings.ArrayProto.define('length', 0, __W);
+      bindings.ErrorProto.define('name', 'Error', _CW);
+      bindings.ErrorProto.define('message', '', _CW);
     }
 
     inherit(Intrinsics, DeclarativeEnvironmentRecord, [
@@ -3636,46 +3595,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     return Intrinsics;
   })();
 
-  function wrapForInside(o){
-    if (o === null) return o;
 
-    var type = typeof o;
-    if (type === FUNCTION) {
-      return new $NativeFunction({
-        length: o._length || o.length,
-        name: o._name || o.name,
-        call: o
-      });
-    }
-
-    if (type === OBJECT) {
-      switch (o.NativeBrand) {
-        case BRANDS.NativeFunction:
-          var func = function(){
-            return o.Call(this, arguments);
-          };
-          func._wraps = o;
-          return func;
-        case BRANDS.NativeObject:
-
-      }
-    }
-    return o;
-  }
-
-
-  function wrapFunction(f){
-    if (f._wrapper) {
-      return f._wrapper;
-    }
-    return f._wrapper = function(){
-      var receiver = this;
-      if (isObject(receiver) && !(receiver instanceof $Object)) {
-        receiver = undefined
-      }
-      return f.Call(receiver, arguments);
-    };
-  }
 
   function fromInternalArray(array){
     var $array = new $Array,
@@ -3807,6 +3727,19 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     var natives = (function(){
+      function wrapFunction(f){
+        if (f._wrapper) {
+          return f._wrapper;
+        }
+        return f._wrapper = function(){
+          var receiver = this;
+          if (isObject(receiver) && !(receiver instanceof $Object)) {
+            receiver = undefined
+          }
+          return f.Call(receiver, arguments);
+        };
+      }
+
       function wrapNatives(source, target){
         each(utility.ownProperties(source), function(key){
           if (typeof source[key] === 'function'
@@ -3936,35 +3869,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         HasInternal: function(object, key){
           if (object) {
             return key in object;
-          }
-        },
-        SetHidden: function(object, key, value){
-          if (object) {
-            object.hiddens[key] = value;
-          }
-        },
-        GetHidden: function(object, key){
-          if (object) {
-            return object.hiddens[key];
-          }
-        },
-        DeleteHidden: function(object, key){
-          if (object) {
-            if (key in object.hiddens) {
-              delete object.hiddens[key];
-              return true;
-            }
-            return false;
-          }
-        },
-        HasHidden: function(object, key){
-          if (object) {
-            return key in object.hiddens;
-          }
-        },
-        EnumerateHidden: function(object){
-          if (object) {
-            return fromInternalArray(ownKeys(object.hiddens));
           }
         },
         Type: function(o){
