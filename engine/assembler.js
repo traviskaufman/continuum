@@ -878,7 +878,7 @@ var assembler = (function(exports){
   function CallExpression(node){
     if (isSuperReference(node.callee)) {
       if (context.code.ScopeType !== SCOPE.FUNCTION) {
-        throwError('illegal_super');
+        context.earlyError(node, 'illegal_super');
       }
       SUPER_CALL();
     } else {
@@ -1147,7 +1147,7 @@ var assembler = (function(exports){
     if (!context.labels){
       context.labels = create(null);
     } else if (label in context.labels) {
-      throwError('duplicate_label');
+      context.earlyError(node, 'duplicate_label');
     }
     context.labels[node.label.name] = true;
     recurse(node.body);
@@ -1167,7 +1167,7 @@ var assembler = (function(exports){
     var isSuper = isSuperReference(node.object);
     if (isSuper){
       if (context.code.ScopeType !== SCOPE.FUNCTION) {
-        throwError('illegal_super_reference');
+        context.earlyError(node, 'illegal_super_reference');
       }
     } else {
       recurse(node.object);
@@ -1211,9 +1211,7 @@ var assembler = (function(exports){
 
   function ObjectPattern(node){}
 
-  function Path(node){
-
-  }
+  function Path(node){}
 
   function Program(node){
     each(node.body, recurse);
@@ -1253,13 +1251,13 @@ var assembler = (function(exports){
   }
 
   function SequenceExpression(node){
-    for (var i=0, item; item = node.expressions[i]; i++) {
+    each(node.expressions, function(item, i, a){
       recurse(item)
       GET();
-      POP();
-    }
-    recurse(item);
-    GET();
+      if (i < a.length - 1) {
+        POP();
+      }
+    });
   }
 
   function SwitchStatement(node){
@@ -1309,6 +1307,7 @@ var assembler = (function(exports){
 
 
   function SymbolDeclaration(node){
+    // TODO early errors for duplicates
     var symbols = node.AtSymbols = [],
         pub = node.kind === 'symbol';
 
@@ -1572,26 +1571,30 @@ var assembler = (function(exports){
         this.queue(code);
 
         while (this.pending.length) {
-          var lastCode = this.code;
-          this.code = this.pending.pop();
-          this.code.filename = this.filename;
-          if (lastCode) {
-            this.code.derive(lastCode);
-          }
-          recurse(this.code.body);
-          if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
-              COMPLETE();
-          } else {
-            if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
-              GET();
-            } else {
-              UNDEFINED();
-            }
-            RETURN();
-          }
+          this.process();
         }
 
         return code;
+      },
+      function process(){
+        var lastCode = this.code;
+        this.code = this.pending.pop();
+        this.code.filename = this.filename;
+        if (lastCode) {
+          this.code.derive(lastCode);
+        }
+        recurse(this.code.body);
+
+        if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
+          COMPLETE();
+        } else {
+          if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
+            GET();
+          } else {
+            UNDEFINED();
+          }
+          RETURN();
+        }
       },
       function queue(code){
         if (this.code) {
@@ -1617,6 +1620,11 @@ var assembler = (function(exports){
           return index;
         }
       },
+      function earlyError(node, error){
+        this.code.errors || (this.code.errors = []);
+        this.code.errors.push(error);
+        // TODO handle this
+      }
     ]);
 
     return Assembler;
