@@ -672,6 +672,8 @@ var assembler = (function(exports){
   function symbol(node){
     if (node.type === 'AtSymbol') {
       return ['@', node.name];
+    } else if (node.type === 'Literal') {
+      return ['', node.value];
     } else {
       return ['', node.name];
     }
@@ -1061,13 +1063,11 @@ var assembler = (function(exports){
         recurse(node.right);
         GET();
         KIND();
-        GET();
-        DUP();
         MEMBER('next');
-        GET();
         update = current();
         DUP();
         DUP();
+        GET();
         ARGS();
         CALL();
         DUP();
