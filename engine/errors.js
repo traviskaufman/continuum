@@ -169,7 +169,7 @@ var errors = (function(errors, messages, exports){
     unnamed_symbol                      : ["Symbol must have a name"]
   },
   ReferenceError: {
-    undefined_symbol               : ["Referenced undefined symbol ", "$0"],
+    undefined_symbol               : ["Referenced undefined symbol @", "$0"],
     unknown_label                  : ["Undefined label '", "$0", "'"],
     undefined_method               : ["Object ", "$1", " has no method '", "$0", "'"],
     not_defined                    : ["$0", " is not defined"],

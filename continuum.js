@@ -7288,7 +7288,7 @@ exports.errors = (function(errors, messages, exports){
     unnamed_symbol                      : ["Symbol must have a name"]
   },
   ReferenceError: {
-    undefined_symbol               : ["Referenced undefined symbol ", "$0"],
+    undefined_symbol               : ["Referenced undefined symbol @", "$0"],
     unknown_label                  : ["Undefined label '", "$0", "'"],
     undefined_method               : ["Object ", "$1", " has no method '", "$0", "'"],
     not_defined                    : ["$0", " is not defined"],
@@ -16493,7 +16493,10 @@ exports.debug = (function(exports){
   var MirrorSet = (function(){
     function MirrorSet(subject){
       MirrorCollection.call(this, subject);
-      this.data = this.subject.SetData.MapData;
+      var map = this.subject.SetData;
+      if (map) {
+        this.data = map.MapData;
+      }
     }
 
     inherit(MirrorSet, MirrorCollection, {

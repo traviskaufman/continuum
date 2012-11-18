@@ -788,7 +788,10 @@ var debug = (function(exports){
   var MirrorSet = (function(){
     function MirrorSet(subject){
       MirrorCollection.call(this, subject);
-      this.data = this.subject.SetData.MapData;
+      var map = this.subject.SetData;
+      if (map) {
+        this.data = map.MapData;
+      }
     }
 
     inherit(MirrorSet, MirrorCollection, {
