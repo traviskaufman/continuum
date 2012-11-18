@@ -1,26 +1,11 @@
-$__EmptyClass = function(...args){ super(...args) }
-
 {
-  let ___ = 0x00,
-      E__ = 0x01,
-      _C_ = 0x02,
-      EC_ = 3,
-      __W = 0x04,
-      E_W = 5,
-      _CW = 6,
-      ECW = 7,
-      __A = 0x08,
-      E_A = 9,
-      _CA = 10,
-      ECA = 11;
-
-  let global = $__global;
-
+  let HIDDEN = 6,
+      FROZEN = 0;
 
   $__defineMethods = function defineMethods(obj, props){
     for (var i=0; i < props.length; i++) {
       $__SetInternal(props[i], 'Native', true);
-      $__define(obj, props[i].name, props[i], _CW);
+      $__define(obj, props[i].name, props[i], HIDDEN);
       $__remove(props[i], 'prototype');
     }
     return obj;
@@ -32,11 +17,11 @@ $__EmptyClass = function(...args){ super(...args) }
       var name = keys[i],
           prop = props[name];
 
-      $__define(obj, name, prop, _CW);
+      $__define(obj, name, prop, HIDDEN);
 
       if (typeof prop === 'function') {
         $__SetInternal(prop, 'Native', true);
-        $__define(prop, 'name', name, ___);
+        $__define(prop, 'name', name, FROZEN);
         $__remove(prop, 'prototype');
       }
     }
@@ -54,15 +39,14 @@ $__EmptyClass = function(...args){ super(...args) }
   $__defineConstants = function defineConstants(obj, props){
     var keys = $__Enumerate(props, false, false);
     for (var i=0; i < keys.length; i++) {
-      $__define(obj, keys[i], props[keys[i]], 0);
+      $__define(obj, keys[i], props[keys[i]], FROZEN);
     }
   };
 
   $__setupConstructor = function setupConstructor(ctor, proto){
-    $__define(ctor, 'prototype', proto, ___);
-    $__define(ctor, 'length', 1, ___);
-    $__define(ctor.prototype, 'constructor', ctor, _CW);
-    $__define(global, ctor.name, ctor, _CW);
+    $__define(ctor, 'prototype', proto, FROZEN);
+    $__define(ctor, 'length', 1, FROZEN);
+    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);
     $__SetInternal(ctor, 'Native', true);
     $__SetInternal(ctor, 'NativeConstructor', true);
   };
@@ -70,12 +54,12 @@ $__EmptyClass = function(...args){ super(...args) }
 
   $__setLength = function setLength(f, length){
     if (typeof length === 'string') {
-      $__define(f, 'length', length, ___);
+      $__set(f, 'length', length);
     } else {
       var keys = $__Enumerate(length, false, false);
       for (var i=0; i < keys.length; i++) {
         var key = keys[i];
-        $__define(f[key], 'length', length[key], ___);
+        $__set(f[key], 'length', length[key]);
       }
     }
   };
@@ -85,12 +69,9 @@ $__EmptyClass = function(...args){ super(...args) }
         i = keys.length;
 
     while (i--) {
-      $__define(object[keys[i]], key, values[keys[i]], ___);
+      $__define(object[keys[i]], key, values[keys[i]], FROZEN);
     }
   };
-
-
-  let hidden = { enumerable: false };
 
   $__hideEverything = function hideEverything(o){
     if (!o || typeof o !== 'object') return o;
@@ -99,7 +80,7 @@ $__EmptyClass = function(...args){ super(...args) }
         i = keys.length;
 
     while (i--) {
-      $__update(o, keys[i], ~E__);
+      $__update(o, keys[i], -1);
     }
 
     if (typeof o === 'function') {
@@ -108,6 +89,9 @@ $__EmptyClass = function(...args){ super(...args) }
 
     return o;
   };
+
+  $__EmptyClass = function(...args){ super(...args) }
+  $__define($__EmptyClass, 'name', '', FROZEN);
 }
 
 
@@ -130,7 +114,7 @@ class Request {
 
     var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);
     if (loader.@strict) {
-      translated = '"use strict";'+translated;
+      translated = '"use strict";\n'+translated;
     }
 
     $__EvaluateModule(translated, loader.@global, this.@resolved, module => {
@@ -167,13 +151,13 @@ export class Loader {
   constructor(parent, options){
     options = options || {};
     this.linkedTo   = options.linkedTo  || null;
+    this.@strict    = true;
+    this.@modules   = $__ObjectCreate(null);
     this.@translate = options.translate || parent.translate;
     this.@resolve   = options.resolve   || parent.resolve;
     this.@fetch     = options.fetch     || parent.fetch;
     this.@global    = options.global    || $__global;
     this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');
-    this.@strict    = true;//options.strict === true;
-    this.@modules   = $__ObjectCreate(null);
   }
 
   get global(){
@@ -236,7 +220,8 @@ export class Loader {
   }
 }
 
-export let Module = function Module(object){
+
+export function Module(object){
   if ($__GetNativeBrand(object) === 'Module') {
     return object;
   }
