@@ -1568,22 +1568,22 @@ var assembler = (function(exports){
         this.queue(code);
 
         while (this.pending.length) {
-        var lastCode = this.code;
-        this.code = this.pending.pop();
-        this.code.filename = this.filename;
+          var lastCode = this.code;
+          this.code = this.pending.pop();
+          this.code.filename = this.filename;
           if (lastCode) {
             this.code.derive(lastCode);
           }
-        recurse(this.code.body);
-        if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
-            COMPLETE();
+          recurse(this.code.body);
+          if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
+              COMPLETE();
           } else {
-        if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
-          GET();
-        } else {
-          UNDEFINED();
-        }
-        RETURN();
+            if (this.code.Type === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
+              GET();
+            } else {
+              UNDEFINED();
+            }
+            RETURN();
           }
         }
 
@@ -1625,4 +1625,3 @@ var assembler = (function(exports){
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
-
