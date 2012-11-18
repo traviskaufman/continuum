@@ -5,6 +5,7 @@ export function Proxy(target, handler){
   return $__ProxyCreate(target, handler);
 }
 
+$__remove(Proxy, 'prototype');
 
 function makeDefiner(desc){
   return (object, key, value) => {
