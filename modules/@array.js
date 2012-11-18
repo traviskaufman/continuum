@@ -315,7 +315,7 @@ function joinArray(array, separator){
 
 
 let ARRAY = 'IteratedObject',
-    INDEX  = 'ArrayIteratorNextIndex',
+    INDEX = 'ArrayIteratorNextIndex',
     KIND  = 'ArrayIterationKind';
 
 
