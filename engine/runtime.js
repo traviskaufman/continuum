@@ -3645,6 +3645,21 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
+    var load = (function(){
+      if (typeof process !== 'undefined') {
+        var fs = require('fs');
+        return function load(source){
+          if (!~source.indexOf('\n') && fs.existsSync(source)) {
+            return { scope: SCOPE.GLOBAL, source: fs.readFileSync(source, 'utf8'), filename: source };
+          } else {
+            return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+          }
+        };
+      }
+      return function load(source){
+        return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+      };
+    })();
 
     function Script(options){
       if (options instanceof Script)
@@ -3657,7 +3672,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (!utility.fname(options)) {
           options = {
             scope: SCOPE.FUNCTION,
-            filename: 'unnamed',
+            filename: '',
             source: '('+options+')()'
           }
         } else {
@@ -3668,10 +3683,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           };
         }
       } else if (typeof options === STRING) {
-        options = {
-          scope: SCOPE.GLOBAL,
-          source: options
-        };
+        options = load(options);
       }
 
       if (options.natives) {
@@ -3703,63 +3715,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return Script;
   })();
-
-
-  function ScriptFile(source){
-    Script.call(this, ScriptFile.load(source));
-  }
-
-  ScriptFile.load = (function(){
-    if (typeof process !== 'undefined') {
-      return function load(source){
-        if (!~source.indexOf('\n') && require('fs').existsSync(source)) {
-          return {
-            source: require('fs').readFileSync(source, 'utf8'),
-            filename: source
-          };
-        } else {
-          return {
-            source: source,
-            filename: ''
-          };
-        }
-      };
-    }
-    return function load(source){
-      // TODO ajax
-      return {
-        source: source,
-        filename: ''
-      };
-    };
-  })();
-
-  utility.inherit(ScriptFile, Script);
-
-
-
-  function activate(target){
-    if (realm !== target) {
-      if (realm) {
-        realm.active = false;
-        realm.emit('deactivate');
-      }
-      realmStack.push(realm);
-      realm = target;
-      global = operators.global = target.global;
-      intrinsics = target.intrinsics;
-      target.active = true;
-      target.emit('activate');
-    }
-  }
-
-  function deactivate(target){
-    if (realm === target && realmStack.length) {
-      target.active = false;
-      realm = realmStack.pop();
-      target.emit('dectivate');
-    }
-  }
 
 
   var Realm = (function(){
@@ -4050,12 +4005,6 @@ var runtime = (function(GLOBAL, exports, undefined){
           return new $String(string);
         },
 
-        DateToNumber: function(object){
-          return +object.PrimitiveValue;
-        },
-        DateToString: function(object){
-          return ''+object.PrimitiveValue;
-        },
         FunctionToString: function(func){
           if (func.Proxy) {
             func = func.Target;
@@ -4070,8 +4019,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         NumberToString: function(object, radix){
           return object.PrimitiveValue.toString(radix);
         },
-        RegExpToString: function(object, radix){
-          return object.PrimitiveValue.toString(radix);
+        RegExpToString: function(object){
+          return ''+object.PrimitiveValue;
+        },
+        DateToNumber: function(object){
+          return +object.PrimitiveValue;
+        },
+        DateToString: function(object){
+          return ''+object.PrimitiveValue;
         },
         CallNative: function(target, name, args){
           if (args) {
@@ -4775,6 +4730,29 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  function activate(target){
+    if (realm !== target) {
+      if (realm) {
+        realm.active = false;
+        realm.emit('deactivate');
+      }
+      realmStack.push(realm);
+      realm = target;
+      global = operators.global = target.global;
+      intrinsics = target.intrinsics;
+      target.active = true;
+      target.emit('activate');
+    }
+  }
+
+  function deactivate(target){
+    if (realm === target && realmStack.length) {
+      target.active = false;
+      realm = realmStack.pop();
+      target.emit('dectivate');
+    }
+  }
+
   var realms = [],
       realmStack = [],
       realm = null,
@@ -4782,17 +4760,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       context = null,
       intrinsics = null;
 
+
+
   exports.Realm = Realm;
   exports.Script = Script;
-  exports.ScriptFile = ScriptFile;
-
-  exports.createRealm = function createRealm(listener){
-    return new Realm(listener);
-  };
-
-  exports.createBytecode = function createBytecode(source){
-    return new ScriptFile(source).bytecode;
-  };
+  exports.$NativeFunction = $NativeFunction;
 
   exports.activeRealm = function activeRealm(){
     if (!realm && realms.length) {
@@ -4803,18 +4775,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   exports.activeContext = function activeContext(){
     return context;
-  };
-
-  exports.createNativeFunction = function createNativeFunction(o){
-    if (typeof options === FUNCTION) {
-      return new $NativeFunction({
-        length: o._length || o.length,
-        name: o._name || o.name,
-        call: o
-      });
-    } else {
-      return new $NativeFunction(o);
-    }
   };
 
   return exports;

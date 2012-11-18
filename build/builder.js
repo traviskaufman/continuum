@@ -63,10 +63,10 @@ Builder.prototype.combine = function combine(){
   return this.source.join('\n\n');
 };
 
-Builder.prototype.writeFile = function writeFile(name){
+Builder.prototype.writeFile = function writeFile(name, minified){
   var src = this.combine();
   write(name+'.js', src);
-  write(name+'.min.js', minify(src));
+  write(name+'.min.js', minified ? minify(src) : src);
 }
 
 
@@ -87,6 +87,7 @@ builder.addFiles([
   '../engine/thunk.js',
   '../engine/runtime.js',
   '../engine/debug.js',
+  '../engine/index.js',
 ], function(name, source){
   return 'exports.'+source.slice(4);
 });
@@ -157,5 +158,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-
 builder.writeFile('../continuum');
+//builder.writeFile('../continuum', true);

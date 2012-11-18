@@ -150,7 +150,7 @@ var assembler = (function(exports){
 
 
 
-  var Code = (function(){
+  var Code = exports.Code = (function(){
     var Directive = (function(){
       function Directive(op, args){
         this.op = op;

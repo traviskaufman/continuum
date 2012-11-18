@@ -1,25 +1,4 @@
-  var continuum = {
-    createBytecode      : exports.runtime.createBytecode,
-    createNativeFunction: exports.runtime.createNativeFunction,
-    createRealm         : exports.runtime.createRealm,
-    createRenderer      : exports.debug.createRenderer,
-    introspect          : exports.debug.introspect,
-    iterate             : exports.utility.iterate,
-    exports : exports
-  };
-
-  exports.utility.define(continuum, {
-    Assembler : exports.assembler.Assembler,
-    Realm     : exports.runtime.Realm,
-    Renderer  : exports.debug.Renderer,
-    Script    : exports.runtime.Script,
-    ScriptFile: exports.runtime.ScriptFile,
-    constants : exports.constants,
-    utility   : exports.utility
-  });
-
-  return continuum;
-
+  return exports.index;
 }).apply(this, function(){
   var exports = {
     builtins: {},
