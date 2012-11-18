@@ -51,7 +51,7 @@ import JSON from '@json';
 import Math from '@math';
 
 import Symbol from '@symbol';
-//import Iterator from '@iter';
+import Iterator from '@iter';
 
 let StopIteration = $__StopIteration
 
