@@ -1,3 +1,4 @@
+import Iterator from '@iter';
 import iterator from '@iter';
 symbol @iterator = iterator;
 
@@ -82,7 +83,6 @@ let MAP = 'Map',
     KEY  = 'MapNextKey',
     KIND  = 'MapIterationKind';
 
-
 let K = 0x01,
     V = 0x02;
 
@@ -92,24 +92,22 @@ let kinds = {
   'key+value': 3
 };
 
+class MapIterator extends Iterator {
+  constructor(map, kind){
+    map = $__ToObject(map);
+    $__SetInternal(this, MAP, map);
+    $__SetInternal(this, KEY,  $__MapSigil());
+    $__SetInternal(this, KIND, kinds[kind]);
+  }
 
-function MapIterator(map, kind){
-  map = $__ToObject(map);
-  $__SetInternal(this, MAP, map);
-  $__SetInternal(this, KEY,  $__MapSigil());
-  $__SetInternal(this, KIND, kinds[kind]);
-  this.next = () => next.call(this);
-}
-
-$__defineProps(MapIterator.prototype, {
   next(){
-
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
     if (!$__HasInternal(this, MAP) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {
       throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
+
     var map = $__GetInternal(this, MAP),
         key = $__GetInternal(this, KEY),
         kind = $__GetInternal(this, KIND);
@@ -124,13 +122,9 @@ $__defineProps(MapIterator.prototype, {
       return item[1];
     }
     return item[0];
-  },
-  @iterator(){
-    return this;
   }
-});
+}
 
-let next = MapIterator.prototype.next;
 
 function ensureMap(o, name){
   if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {

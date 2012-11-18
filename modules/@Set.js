@@ -1,4 +1,5 @@
 import Map from '@map';
+import Iterator from '@iter';
 import iterator from '@iter';
 symbol @iterator = iterator;
 
@@ -71,18 +72,6 @@ $__DefineOwnProperty(Set.prototype, 'size', {
   set: void 0
 });
 
-function ensureSet(o, name){
-  var type = typeof o;
-  if (type === 'object' ? o === null : type !== 'function') {
-    throw $__Exception('called_on_non_object', [name]);
-  }
-  var data = $__GetInternal(o, 'SetData');
-  if (!data) {
-    throw $__Exception('called_on_incompatible_object', [name]);
-  }
-  return data;
-}
-
 let SET = 'Set',
     KEY  = 'SetNextKey',
     KIND  = 'SetIterationKind';
@@ -98,15 +87,14 @@ let kinds = {
 };
 
 
-function SetIterator(set, kind){
-  set = $__ToObject(set);
-  $__SetInternal(this, SET, ensureSet(set));
-  $__SetInternal(this, KEY,  $__MapSigil());
-  $__SetInternal(this, KIND, kinds[kind]);
-  this.next = () => next.call(this);
-}
+class SetIterator extends Iterator {
+  constructor(set, kind){
+    set = $__ToObject(set);
+    $__SetInternal(this, SET, ensureSet(set));
+    $__SetInternal(this, KEY,  $__MapSigil());
+    $__SetInternal(this, KIND, kinds[kind]);
+  }
 
-$__defineProps(SetIterator.prototype, {
   next(){
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);
@@ -114,6 +102,7 @@ $__defineProps(SetIterator.prototype, {
     if (!$__HasInternal(this, SET) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {
       throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
+
     var data = $__GetInternal(this, SET),
         key = $__GetInternal(this, KEY),
         kind = $__GetInternal(this, KIND);
@@ -121,11 +110,22 @@ $__defineProps(SetIterator.prototype, {
     var item = $__MapNext(data, key);
     $__SetInternal(this, KEY, item[0]);
     return kind === KV ? [item[1], item[1]] : item[1];
-  },
-  @iterator(){
-    return this;
   }
-});
+}
 
-let next = SetIterator.prototype.next;
+
+function ensureSet(o, name){
+  var type = typeof o;
+  if (type === 'object' ? o === null : type !== 'function') {
+    throw $__Exception('called_on_non_object', [name]);
+  }
+  var data = $__GetInternal(o, 'SetData');
+  if (!data) {
+    throw $__Exception('called_on_incompatible_object', [name]);
+  }
+  return data;
+}
+
+
+$__hideEverything(SetIterator);
 }

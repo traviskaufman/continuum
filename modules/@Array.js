@@ -1,3 +1,4 @@
+import Iterator from '@iter';
 import iterator from '@iter';
 symbol @iterator = iterator;
 
@@ -331,13 +332,12 @@ let kinds = {
   'sparse:key+value': 7
 };
 
-class ArrayIterator {
+class ArrayIterator extends Iterator {
   constructor(array, kind){
     array = $__ToObject(array);
     $__SetInternal(this, ARRAY, array);
     $__SetInternal(this, INDEX, 0);
     $__SetInternal(this, KIND, kinds[kind]);
-    this.next = () => next.call(this);
   }
 
   next(){
@@ -377,13 +377,7 @@ class ArrayIterator {
     }
     return key;
   }
-
-  @iterator(){
-    return this;
-  }
 }
 
 $__hideEverything(ArrayIterator);
-
-let next = ArrayIterator.prototype.next;
 }
