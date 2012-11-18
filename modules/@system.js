@@ -109,127 +109,92 @@
 }
 
 
-class Storage {
-  constructor(){}
-  set(props){
-    for (var k in props) {
-      this[k] = props[k];
-    }
-  }
-  empty(){
-    for (var k in this) {
-      delete this[k];
-    }
-  }
-}
-
-$__hideEverything(Storage.prototype);
-
-
-let _ = o => {
-  var v = $__GetHidden(o, 'loader-internals');
-  if (!v) {
-    v = new Storage;
-    $__SetHidden(o, 'loader-internals', v);
-  }
-  return v;
-}
 
 
 
 class Request {
+  private @loader, @callback, @errback, @mrl, @resolved;
+
   constructor(loader, mrl, resolved, callback, errback){
-    _(this).set({
-      loader: loader,
-      callback: callback,
-      errback: errback,
-      mrl: mrl,
-      resolved: resolved
-    });
+    this.@loader = loader;
+    this.@mrl = mrl;
+    this.@resolved = resolved;
+    this.@callback = callback;
+    this.@errback = errback;
   }
 
   fulfill(src){
-    var _this = _(this),
-        _loader = _(_this.loader);
+    var loader = this.@loader;
 
-    var translated = (_loader.translate)(src, _this.mrl, _loader.baseURL, _this.resolved);
-    if (_loader.strict) {
+    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);
+    if (loader.@strict) {
       translated = '"use strict";'+translated;
     }
 
-    $__EvaluateModule(translated, _loader.global, _this.resolved, msg => this.reject(msg), module => {
-      var _module = _(module);
-      _module.loader = _this.loader;
-      $__SetInternal(_module, 'resolved', _this.resolved);
-      $__SetInternal(_module, 'mrl', _this.mrl);
-      _loader.modules[_this.resolved] = module;
-      (_this.callback)(module);
-      _this.empty();
+    $__EvaluateModule(translated, loader.@global, this.@resolved, msg => this.reject(msg), module => {
+      $__SetInternal(module, 'loader', loader);
+      $__SetInternal(module, 'resolved', this.@resolved);
+      $__SetInternal(module, 'mrl', this.@mrl);
+      loader.@modules[this.@resolved] = module;
+      (this.@callback)(module);
     });
   }
 
   redirect(mrl, baseURL){
-    var _this = _(this),
-        _loader = _(_this.loader);
+    var loader = this.@loader,
+        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);
 
-    _this.resolved = (_loader.resolve)(mrl, baseURL);
-    _this.mrl = mrl;
+    this.@mrl = mrl;
 
-    var module = _this.loader.get(_this.resolved);
+    var module = loader.get(resolved);
     if (module) {
-      (_this.callback)(module);
+      (this.@callback)(module);
     } else {
-      (_loader.fetch)(mrl, baseURL, this, _this.resolved);
+      (loader.@fetch)(mrl, baseURL, this, resolved);
     }
   }
 
   reject(msg){
-    var _this = _(this);
-    (_this.errback)(msg);
-    _this.empty();
+    (this.@errback)(msg);
   }
 }
 
+private @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;
 
 export class Loader {
   constructor(parent, options){
     options = options || {};
-    this.linkedTo  = options.linkedTo || null;
-    _(this).set({
-      translate: options.translate || parent.translate,
-      resolve  : options.resolve || parent.resolve,
-      fetch    : options.fetch || parent.fetch,
-      strict   : options.strict === true,
-      global   : options.global || $__global,
-      baseURL  : options.baseURL || (parent ? parent.baseURL : ''),
-      modules  : $__ObjectCreate(null)
-    });
+    this.linkedTo   = options.linkedTo || null;
+    this.@translate = options.translate || parent.translate;
+    this.@resolve   = options.resolve || parent.resolve;
+    this.@fetch     = options.fetch || parent.fetch;
+    this.@strict    = options.strict === true;
+    this.@global    = options.global || $__global;
+    this.@baseURL   = options.baseURL || (parent ? parent.@baseURL : '');
+    this.@modules   = $__ObjectCreate(null);
   }
 
   get global(){
-    return _(this).global;
+    return this.@global;
   }
 
   get baseURL(){
-    return _(this).baseURL;
+    return this.@baseURL;
   }
 
   load(mrl, callback, errback){
-    var _this = _(this),
-        key = (_this.resolve)(mrl, _this.baseURL),
-        module = _this.modules[key];
+    var key = (this.@resolve)(mrl, this.@baseURL),
+        module = this.@modules[key];
 
     if (module) {
       callback(module);
     } else {
-      (_this.fetch)(mrl, _this.baseURL, new Request(this, mrl, key, callback, errback), key);
+      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);
     }
   }
 
   eval(src){
-    var _this = _(this);
-    var module = $__EvaluateModule(src, _this.global, _this.baseURL);
-    return module;
+    return $__EvaluateModule(src, this.@global, this.@baseURL);
   }
 
   evalAsync(src, callback, errback){
@@ -237,20 +202,18 @@ export class Loader {
   }
 
   get(mrl){
-    var _this = _(this),
-        canonical = (_this.resolve)(mrl, _this.baseURL);
-    return _this.modules[canonical];
+    var canonical = (this.@resolve)(mrl, this.@baseURL);
+    return this.@modules[canonical];
   }
 
   set(mrl, mod){
-    var _this = _(this),
-        canonical = (_this.resolve)(mrl, _this.baseURL);
+    var canonical = (this.@resolve)(mrl, this.@baseURL);
 
     if (typeof canonical === 'string') {
-      _this.modules[canonical] = mod;
+      this.@modules[canonical] = mod;
     } else {
       for (var k in canonical) {
-        _this.modules[k] = canonical[k];
+        this.@modules[k] = canonical[k];
       }
     }
   }
@@ -262,7 +225,7 @@ export class Loader {
                  writable: true,
                  value: undefined };
 
-    object || (object = _(this).global);
+    object || (object = this.@global);
     for (var k in std) {
       desc.value = std[k];
       $__DefineOwnProperty(object, k, desc);
