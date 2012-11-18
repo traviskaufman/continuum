@@ -288,10 +288,10 @@ var assembler = (function(exports){
       var self = this;
       this.name = node.id ? node.id.name : null;
       this.methods = [];
-      this.symbols = [];
+      this.symbols = [[], []];
 
       each(node.body.body, function(node){
-        if (node.type === 'SymbolDefinition') {
+        if (node.type === 'SymbolDeclaration') {
           self.defineSymbols(node);
         } else {
           self.defineMethod(node);
@@ -307,16 +307,13 @@ var assembler = (function(exports){
 
     define(ClassDefinition.prototype, [
       function defineSymbols(node){
-        var symbols = {
-          Init: create(null),
-          Names: [],
-          Private: node.kind === 'private'
-        };
-        this.symbols.push(symbols);
+        var isPublic = node.kind !== 'private',
+            self = this;
 
         each(node.declarations, function(decl){
-          symbols.init[decl.id.name] = decl.init;
-          symbols.Names.push(decl.id.name);
+          var name = decl.id.name;
+          self.symbols[0].push(name);
+          self.symbols[1].push(isPublic);
         });
       },
       function defineMethod(node){

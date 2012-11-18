@@ -252,7 +252,7 @@ var thunk = (function(exports){
     function CLASS_DECL(){
       var def  = ops[ip][0],
           sup  = def.superClass ? stack[--sp] : undefined,
-          ctor = context.pushClass(def, sup);
+          ctor = context.createClass(def, sup);
 
       if (ctor && ctor.Completion) {
         if (ctor.Abrupt) {
@@ -275,7 +275,7 @@ var thunk = (function(exports){
     function CLASS_EXPR(){
       var def  = ops[ip][0],
           sup  = def.superClass ? stack[--sp] : undefined,
-          ctor = context.pushClass(def, sup);
+          ctor = context.createClass(def, sup);
 
       if (ctor && ctor.Completion) {
         if (ctor.Abrupt) {

@@ -652,7 +652,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   // ## ClassDefinitionEvaluation
 
-  function ClassDefinitionEvaluation(name, superclass, constructor, methods){
+  function ClassDefinitionEvaluation(name, superclass, constructor, methods, symbols){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
@@ -691,12 +691,20 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     var proto = new $Object(superproto),
-        lex = context.LexicalEnvironment,
         brand = name || '';
 
     if (name) {
-      var scope = context.LexicalEnvironment = new DeclarativeEnvironmentRecord(lex);
-      scope.CreateImmutableBinding(name);
+      context.LexicalEnvironment.CreateImmutableBinding(name);
+    }
+
+    for (var i=0; i < symbols[0].length; i++) {
+      var symbol   = symbols[0][i],
+          isPublic = symbols[1][i],
+          result   = context.initializeSymbolBinding(symbol, context.createSymbol(symbol, isPublic));
+
+      if (result && result.Abrupt) {
+        return result;
+      }
     }
 
     constructor || (constructor = intrinsics.EmptyClass.Code);
@@ -707,7 +715,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     if (name) {
-      scope.InitializeBinding(name, ctor);
+      context.initializeBinding(name, ctor);
     }
 
     ctor.setPrototype(superctor);
@@ -723,7 +731,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     ctor.Class = true;
     proto.Brand = new Brand(brand);
     proto.IsClassProto = true;
-    context.LexicalEnvironment = lex;
     return ctor;
   }
 
@@ -3416,9 +3423,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
         return BlockDeclarationInstantiation(decls, this.LexicalEnvironment);
       },
-      function pushClass(def, superclass){
-        return ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods);
-      },
       function pushWith(obj){
         this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
         this.LexicalEnvironment.withEnvironment = true;
@@ -3426,6 +3430,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function defineMethod(kind, obj, key, code){
         return PropertyDefinitionEvaluation(kind, obj, key, code);
+      },
+      function createClass(def, superclass){
+        this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
+        var ctor = ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
+        this.LexicalEnvironment = this.LexicalEnvironment.outer;
+        return ctor;
       },
       function createFunction(name, code){
         var $F = code.generator ? $GeneratorFunction : $Function;
@@ -4557,11 +4567,10 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var callback = {
           Call: function(receiver, args){
-            var result = args[0],
-                internals = result.hiddens['loader-internals'];
+            var result = args[0];
 
             if (result instanceof $Module) {
-              modules[internals.mrl] = result;
+              modules[result.mrl] = result;
             } else {}
 
             if (!--count) {
@@ -4590,8 +4599,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
             runScript({ bytecode: code }, sandbox, errback.Call, function(){
               var module = new $Module(sandbox.globalEnv, code.ExportedNames);
-              var internals = module.hiddens['loader-internals'] = create(null);
-              internals.mrl = code.name;
+              module.mrl = code.name;
               callback.Call(null, [module]);
             });
           } else {
