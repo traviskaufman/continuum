@@ -3727,6 +3727,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     var natives = (function(){
+      var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
+
       function wrapFunction(f){
         if (f._wrapper) {
           return f._wrapper;
@@ -4149,8 +4151,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         },
         Quote: (function(){
-          var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-              escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+          var escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
               meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
 
           function escaper(a) {
@@ -4163,6 +4164,44 @@ var runtime = (function(GLOBAL, exports, undefined){
             return '"'+string.replace(escapable, escaper)+'"';
           };
         })(),
+        JSONParse: function parse(source, reviver){
+          function walk(holder, key){
+            var value = holder.get(key);
+            if (value && typeof value === OBJECT) {
+              value.each(function(prop){
+                if (prop[2] & E) {
+                  v = walk(prop[1], prop[0]);
+                  if (v !== undefined) {
+                    prop[1] = v;
+                  } else {
+                    value.remove(prop[0]);
+                  }
+                }
+              });
+            }
+            return reviver.Call(holder, [key, value]);
+          }
+
+          source = ToString(source);
+          cx.lastIndex = 0;
+
+          if (cx.test(source)) {
+            source = source.replace(cx, function(a){
+              return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+            });
+          }
+
+          var test = source.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                           .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                           .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
+
+          if (/^[\],:{}\s]*$/.test(test)) {
+            var json = realm.evaluate('('+source+')');
+            return IsCallable(reviver) ? walk({ '': json }, '') : json;
+          }
+
+          return ThrowException('invalid_json', source);
+        },
         MathCreate: (function(Math){
           var consts = ['E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'PI', 'SQRT1_2', 'SQRT2'],
               sqrt = Math.sqrt,

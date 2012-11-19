@@ -156,4 +156,8 @@ export function stringify(value, replacer, space){
   return Str('', { '': value });
 }
 
-$__defineMethods(JSON, [stringify]);
+export function parse(source, reviver){
+  return $__JSONParse(source, reviver);
+}
+
+$__defineMethods(JSON, [stringify, parse]);
