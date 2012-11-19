@@ -166,7 +166,8 @@ var errors = (function(errors, messages, exports){
     generator_executing                 : ["'", "$0", "' called on executing generator"],
     generator_closed                    : ["'", "$0", "' called on closed generator"],
     generator_send_newborn              : ["Sent value into newborn generator"],
-    unnamed_symbol                      : ["Symbol must have a name"]
+    unnamed_symbol                      : ["Symbol must have a name"],
+    missing_fundamental_handler         : ["Exotic object missing fundamental handler for '", "$0", "'"]
   },
   ReferenceError: {
     undefined_symbol               : ["Referenced undefined symbol @", "$0"],
