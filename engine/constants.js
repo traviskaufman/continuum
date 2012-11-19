@@ -89,6 +89,7 @@ var constants = (function(exports){
     Empty            : new Symbol('Empty'),
     Resume           : new Symbol('Resume'),
     Return           : new Symbol('Return'),
+    Normal           : new Symbol('Normal'),
     Abrupt           : new Symbol('Abrupt'),
     Native           : new Symbol('Native'),
     Continue         : new Symbol('Continue'),

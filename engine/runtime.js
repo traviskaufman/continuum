@@ -56,6 +56,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Throw         = SYMBOLS.Throw,
       Empty         = SYMBOLS.Empty,
       Return        = SYMBOLS.Return,
+      Normal        = SYMBOLS.Normal,
       Native        = SYMBOLS.Native,
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
@@ -1167,7 +1168,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
   function SpreadArguments(precedingArgs, spread){
-    if (typeof spread !== 'object') {
+    if (typeof spread !== OBJECT) {
       return ThrowException('spread_non_object');
     }
 
@@ -1189,7 +1190,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
   function SpreadInitialization(array, offset, spread){
-    if (typeof spread !== 'object') {
+    if (typeof spread !== OBJECT) {
       return ThrowException('spread_non_object');
     }
 
@@ -1240,7 +1241,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (target == null) {
       return array;
     }
-    if (typeof target !== 'object') {
+    if (typeof target !== OBJECT) {
       return ThrowException('spread_non_object', typeof target);
     }
 
@@ -2237,6 +2238,10 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var $Generator = (function(){
+    var EXECUTING = 'executing',
+        CLOSED    = 'closed',
+        NEWBORN   = 'newborn';
+
     function setFunction(obj, name, func){
       obj.set(name, new $NativeFunction({
         name: name,
@@ -2251,7 +2256,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Scope = scope;
       this.Code = thunk.code;
       this.ExecutionContext = ctx;
-      this.State = 'newborn';
+      this.State = NEWBORN;
       this.thunk = thunk;
 
       var self = this;
@@ -2270,55 +2275,55 @@ var runtime = (function(GLOBAL, exports, undefined){
       State: null,
     }, [
       function Send(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'send');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return ThrowException('generator_closed', 'send');
         }
-        if (this.State === 'newborn') {
+        if (this.State === NEWBORN) {
           if (value !== undefined) {
             return ThrowException('generator_send_newborn');
           }
           this.ExecutionContext.currentGenerator = this;
-          this.State = 'executing';
+          this.State = EXECUTING;
           ExecutionContext.push(this.ExecutionContext);
           return this.thunk.run(this.ExecutionContext);
         }
 
-        this.State = 'executing';
-        return Resume(this.ExecutionContext, 'normal', value);
+        this.State = EXECUTING;
+        return Resume(this.ExecutionContext, Normal, value);
       },
       function Throw(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'throw');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return ThrowException('generator_closed', 'throw');
         }
-        if (this.State === 'newborn') {
-          this.State = 'closed';
+        if (this.State === NEWBORN) {
+          this.State = CLOSED;
           this.Code = null;
-          return new AbruptCompletion('throw', value);
+          return new AbruptCompletion(Throw, value);
         }
 
-        this.State = 'executing';
-        var result = Resume(this.ExecutionContext, 'throw', value);
+        this.State = EXECUTING;
+        return Resume(this.ExecutionContext, Throw, value);
       },
       function Close(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'close');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return;
         }
 
-        if (state === 'newborn') {
-          this.State = 'closed';
+        if (state === NEWBORN) {
+          this.State = CLOSED;
           this.Code = null;
           return;
         }
 
-        this.State = 'executing';
-        var result = Resume(this.ExecutionContext, 'return', value);
-        this.State = 'closed';
+        this.State = EXECUTING;
+        var result = Resume(this.ExecutionContext, Return, value);
+        this.State = CLOSED;
         return result;
       }
     ]);
@@ -2326,7 +2331,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function Resume(ctx, completionType, value){
       ExecutionContext.push(ctx);
-      if (completionType !== 'normal') {
+      if (completionType !== Normal) {
         value = new AbruptCompletion(completionType, value);
       }
       return ctx.currentGenerator.thunk.send(ctx, value);
@@ -2396,7 +2401,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (key && key.Completion) {
           if (key.Abrupt) return key; else key = key.value;
         }
-        if (typeof key === 'string') {
+        if (typeof key === STRING) {
           if (key < this.get('length') && key >= 0) {
             return true;
           }
@@ -2789,10 +2794,10 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (IsAccessorDescriptor(desc)) {
             this.ParameterMap.Delete(key, false);
           } else {
-            if ('Value' in desc) {
+            if (VALUE in desc) {
               this.ParameterMap.Put(key, desc.Value, strict);
             }
-            if ('Writable' in desc) {
+            if (WRITABLE in desc) {
               this.ParameterMap.Delete(key, false);
             }
           }
@@ -3739,7 +3744,7 @@ var runtime = (function(GLOBAL, exports, undefined){
                   try { v = source.constructor(v) }
                   catch (e) { v = new source.constructor }
                 }
-                if (v instanceof source.constructor || typeof v !== 'object') {
+                if (v instanceof source.constructor || typeof v !== OBJECT) {
                   var result =  v[key](a, b, c, d);
                 } else if (v.PrimitiveValue) {
                   var result = v.PrimitiveValue[key](a, b, c, d);
@@ -3917,7 +3922,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         },
         eval: function(code){
-          if (typeof code !== 'string') {
+          if (typeof code !== STRING) {
             return code;
           }
           var script = new Script({
@@ -3967,7 +3972,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return new $Object(proto);
         },
         RegExpCreate: function(pattern, flags){
-          if (typeof pattern === 'object') {
+          if (typeof pattern === OBJECT) {
             pattern = pattern.PrimitiveValue;
           }
           try {
@@ -4109,7 +4114,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return escape(ToString(value));
         },
         SetTimer: function(f, time, repeating){
-          if (typeof f === 'string') {
+          if (typeof f === STRING) {
             f = natives.FunctionCreate(f);
           }
           var id = Math.random() * 1000000 << 10;
@@ -4138,7 +4143,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           function escaper(a) {
             var c = meta[a];
-            return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+            return typeof c === STRING ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
           }
 
           return function(string){
