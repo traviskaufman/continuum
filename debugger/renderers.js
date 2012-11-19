@@ -431,7 +431,7 @@ var FunctionBranch = (function(){
       }
       if (typeof name === 'string') {
         label.append(inline(name, 'FunctionName'));
-      } else {
+      } else if (name) {
         var symbol = introspect(name),
             nameElement = inline(symbol.label(), 'FunctionName');
 
