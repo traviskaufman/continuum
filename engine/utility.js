@@ -1513,12 +1513,5 @@ var utility = (function(exports){
     return Feeder;
   })();
 
-  function inspect(o){
-    o = require('util').inspect(o, null, 4);
-    console.log(o);
-    return o;
-  }
-  exports.inspect = inspect;
-
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
