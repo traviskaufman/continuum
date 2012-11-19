@@ -652,23 +652,19 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   // ## ClassDefinitionEvaluation
 
-  function ClassDefinitionEvaluation(name, superclass, constructor, methods, symbols){
+  function ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
     } else {
       if (superclass && superclass.Completion) {
-        if (superclass.Abrupt) {
-          return superclass;
-        } else {
-          superclass = superclass.value;
-        }
+        if (superclass.Abrupt) return superclass; else superclass = superclass.value;
       }
 
       if (superclass === null) {
         superproto = null;
         superctor = intrinsics.FunctionProto;
-      } else if (typeof superclass !== 'object') {
+      } else if (typeof superclass !== OBJECT) {
         return ThrowException('non_object_superclass');
       } else if (!('Construct' in superclass)) {
         superproto = superclass;
@@ -676,14 +672,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       } else {
         superproto = superclass.Get('prototype');
         if (superproto && superproto.Completion) {
-          if (superproto.Abrupt) {
-            return superproto;
-          } else {
-            superproto = superproto.value;
-          }
+          if (superproto.Abrupt) return superproto; else superproto = superproto.value;
         }
 
-        if (typeof superproto !== 'object') {
+        if (typeof superproto !== OBJECT) {
           return ThrowException('non_object_superproto');
         }
         superctor = superclass;
@@ -692,10 +684,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     var proto = new $Object(superproto),
         brand = name || '';
-
-    if (name) {
-      context.LexicalEnvironment.CreateImmutableBinding(name);
-    }
 
     for (var i=0; i < symbols[0].length; i++) {
       var symbol   = symbols[0][i],
@@ -707,9 +695,16 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    constructor || (constructor = intrinsics.EmptyClass.Code);
 
-    var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructor);
+    if (name) {
+      context.LexicalEnvironment.CreateImmutableBinding(name);
+    }
+
+    if (!constructorCode) {
+      constructorCode = intrinsics.EmptyClass.Code;
+    }
+
+    var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
     if (ctor && ctor.Completion) {
       if (ctor.Abrupt) return ctor; else ctor = ctor.value;
     }
@@ -718,19 +713,19 @@ var runtime = (function(GLOBAL, exports, undefined){
       context.initializeBinding(name, ctor);
     }
 
+    MakeConstructor(ctor, false, proto);
+    ctor.Class = true;
     ctor.setPrototype(superctor);
     ctor.set('name', brand);
-    MakeConstructor(ctor, false, proto);
-    proto.define('constructor', ctor, _CW);
     ctor.define('prototype', proto, ___);
+    proto.define('constructor', ctor, _CW);
+    proto.IsClassProto = true;
+    proto.Brand = new Brand(brand);
 
     for (var i=0, method; method = methods[i]; i++) {
       PropertyDefinitionEvaluation(method.kind, proto, method.name, method.code);
     }
 
-    ctor.Class = true;
-    proto.Brand = new Brand(brand);
-    proto.IsClassProto = true;
     return ctor;
   }
 
@@ -2377,13 +2372,16 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (desc) {
           return desc;
         }
-        if (key < this.PrimitiveValue.length && key >= 0) {
-          return new StringIndice(this.PrimitiveValue[key]);
+
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return new StringIndice(str[key]);
         }
       },
       function Get(key){
-        if (key < this.PrimitiveValue.length && key >= 0) {
-          return this.PrimitiveValue[key];
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return str[key];
         }
         return this.GetP(this, key);
       },
