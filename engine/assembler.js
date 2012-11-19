@@ -844,7 +844,9 @@ var assembler = (function(exports){
 
   function ArrowFunctionExpression(node, name){
     var code = new Code(node, null, FUNCTYPE.ARROW, SCOPE.FUNCTION);
-    code.name = name;
+    if (name) {
+      code.name = name.name || name;
+    }
     context.queue(code);
     FUNCTION(null, code);
     return code;
@@ -1099,7 +1101,7 @@ var assembler = (function(exports){
   function FunctionExpression(node, methodName){
     var code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
     if (methodName) {
-      code.name = methodName;
+      code.name = methodName.name || methodName;
     }
     context.queue(code);
     FUNCTION(intern(node.id ? node.id.name : ''), code);
