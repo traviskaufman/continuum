@@ -1843,7 +1843,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (!current.Configurable) {
-            if (desc.Configurable || desc.Enumerable === !current.Configurable) {
+            if (desc.Configurable || desc.Enumerable === !current.Enumerable) {
               return reject('redefine_disallowed', []);
             } else {
               var currentIsData = IsDataDescriptor(current),
