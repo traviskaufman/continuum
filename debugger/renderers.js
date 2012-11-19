@@ -53,8 +53,10 @@ var Property = (function(){
       if (typeof this.name === 'string') {
         var key = new Key(this.name);
       } else {
-        var key = new Key(introspect(this.name).label());
+        var symbol = introspect(this.name),
+            key = new Key(symbol.label());
         key.addClass('Symbol');
+        key.addClass(symbol.isPrivate() ? 'PrivateSymbol' : 'PublicSymbol');
       }
       key.addClass(this.getAttributes());
       return key;
@@ -430,7 +432,12 @@ var FunctionBranch = (function(){
       if (typeof name === 'string') {
         label.append(inline(name, 'FunctionName'));
       } else {
-        label.append(inline(introspect(name).label(), 'FunctionName')).addClass('Symbol');
+        var symbol = introspect(name),
+            nameElement = inline(symbol.label(), 'FunctionName');
+
+        nameElement.addClass('Symbol');
+        nameElement.addClass(symbol.isPrivate() ? 'PrivateSymbol' : 'PublicSymbol');
+        label.append(nameElement);
       }
       var container = inline('', 'Params');
       for (var i=0; i < params.length; i++) {

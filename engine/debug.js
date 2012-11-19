@@ -336,10 +336,8 @@ var debug = (function(exports){
       function ownAttrs(props){
         props || (props = create(null));
         this.subject.each(function(prop){
-          if (!prop[0].Private) {
-            var key = prop[0] === '__proto__' ? proto : prop[0];
-            props[key] = prop;
-          }
+          var key = prop[0] === '__proto__' ? proto : prop[0];
+          props[key] = prop;
         });
         return props;
       },
@@ -363,8 +361,9 @@ var debug = (function(exports){
                 : this.getterAttrs(true);
 
         for (var k in props) {
-          if (hidden || (props[k][2] & ENUMERABLE)) {
-            keys.push(props[k][0]);
+          var prop = props[k];
+          if (hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
+            keys.push(prop[0]);
           }
         }
 
@@ -411,9 +410,10 @@ var debug = (function(exports){
         indexes.push('length');
 
         for (var k in props) {
-          if (hidden || props[k][2] & ENUMERABLE) {
-            if (k !== props[k][0] || k !== 'length' && !(k >= 0 && k < len)) {
-              keys.push(props[k][0]);
+          var prop = props[k];
+          if (hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
+            if (k !== prop[0] || k !== 'length' && !(k >= 0 && k < len)) {
+              keys.push(prop[0]);
             }
           }
         }
@@ -726,10 +726,8 @@ var debug = (function(exports){
         }
 
         this.subject.each(function(prop){
-          if (!prop[0].Private) {
-            var key = prop[0] === '__proto__' ? proto : prop[0];
-            props[key] = prop;
-          }
+          var key = prop[0] === '__proto__' ? proto : prop[0];
+          props[key] = prop;
         });
 
         return props;
@@ -761,6 +759,9 @@ var debug = (function(exports){
     }, [
       function label(){
         return '@' + (this.subject.Name || 'Symbol');
+      },
+      function isPrivate(){
+        return this.subject.Private;
       }
     ]);
 

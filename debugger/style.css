@@ -414,6 +414,7 @@ h1, h2
 .ƒ_CA > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #683 }
 .ƒECA > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #af0 }
 
+.ƒPrivateSymbol { font-style: italic; }
 .ƒParams    { font-style: italic }
 .ƒException { font-weight: bold }
 
