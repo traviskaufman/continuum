@@ -6534,7 +6534,7 @@ exports.utility = (function(exports){
 
         Token.prototype.inspect = function(){ return this.value };
 
-        define(PropertyList.prototype, function inspect(){
+        define(PropertyList.prototype, function inspect(fn){
           var out = create(null);
 
           this.forEach(function(prop){
@@ -6961,12 +6961,12 @@ exports.utility = (function(exports){
     return Feeder;
   })();
 
-  function inspect(o){
-    o = require('util').inspect(o, null, 4);
-    console.log(o);
-    return o;
-  }
-  exports.inspect = inspect;
+  // function inspect(o){
+  //   o = require('util').inspect(o, null, 4);
+  //   console.log(o);
+  //   return o;
+  // }
+  // exports.inspect = inspect;
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
@@ -7285,7 +7285,8 @@ exports.errors = (function(errors, messages, exports){
     generator_executing                 : ["'", "$0", "' called on executing generator"],
     generator_closed                    : ["'", "$0", "' called on closed generator"],
     generator_send_newborn              : ["Sent value into newborn generator"],
-    unnamed_symbol                      : ["Symbol must have a name"]
+    unnamed_symbol                      : ["Symbol must have a name"],
+    missing_fundamental_handler         : ["Exotic object missing fundamental handler for '", "$0", "'"]
   },
   ReferenceError: {
     undefined_symbol               : ["Referenced undefined symbol @", "$0"],
@@ -8195,7 +8196,9 @@ exports.assembler = (function(exports){
 
   function ArrowFunctionExpression(node, name){
     var code = new Code(node, null, FUNCTYPE.ARROW, SCOPE.FUNCTION);
-    code.name = name;
+    if (name) {
+      code.name = name.name || name;
+    }
     context.queue(code);
     FUNCTION(null, code);
     return code;
@@ -8450,7 +8453,7 @@ exports.assembler = (function(exports){
   function FunctionExpression(node, methodName){
     var code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
     if (methodName) {
-      code.name = methodName;
+      code.name = methodName.name || methodName;
     }
     context.queue(code);
     FUNCTION(intern(node.id ? node.id.name : ''), code);
@@ -10987,15 +10990,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     var hide = function(){};
   }
 
-  function setDirect(o, key, value){
-    if (o.properties.has(key)) {
-      o.properties.set(key, value);
-    } else {
-      o.properties.set(key, value, ECW);
-    }
-  }
-
-
   // ###############################
   // ###############################
   // ### Specification Functions ###
@@ -11092,7 +11086,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     for (var i=0; i < props.length; i++) {
       var field = props[i];
       if (!(field in standardFields)) {
-        to.properties.set(field, from.Get(field), ECW);
+        to.define(field, from.Get(field), ECW);
       }
     }
   }
@@ -12562,6 +12556,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function setPrototype(value){
         if (typeof value === OBJECT && this.getExtensible()) {
+          var proto = value;
+          while (proto) {
+            if (proto === this) {
+              return ThrowException('cyclic_proto');
+            }
+            proto = proto.getPrototype();
+          }
           this.NativeBrand = this.NativeBrand;
           this.Prototype = value;
           return true;
@@ -12723,15 +12724,22 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           var prop = this.describe(key);
 
           if (IsAccessorDescriptor(desc)) {
-            prop[2] = desc.Enumerable | (desc.Configurable << 1) | A;
+            this.update(key, desc.Enumerable | (desc.Configurable << 1) | A);
             if (IsDataDescriptor(current)) {
-              prop[1] = new Accessor(desc.Get, desc.Set);
+              this.set(key, new Accessor(desc.Get, desc.Set));
             } else {
-              if (SET in desc) {
-                prop[1].Set = desc.Set;
+              var accessor = prop[1],
+                  setter = SET in desc,
+                  getter = GET in desc;
+
+              if (setter) {
+                accessor.Set = desc.Set;
               }
-              if (GET in desc) {
-                prop[1].Get = desc.Get;
+              if (getter) {
+                accessor.Get = desc.Get;
+              }
+              if (setter || getter) {
+                this.set(key, accessor)
               }
             }
           } else {
@@ -12740,9 +12748,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             }
             WRITABLE in desc || (desc.Writable = current.Writable);
             if ('Value' in desc) {
-              prop[1] = desc.Value;
+              this.set(key, desc.Value)
             }
-            prop[2] = desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2);
+            this.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
           }
 
           return true;
@@ -14163,28 +14171,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return $NativeFunction;
   })();
 
-
-  var $ExoticObject = (function(){
-    function $ExoticObject(){}
-
-    inherit($ExoticObject, $Object, {
-      Native: true,
-    }, [
-      function has(key){},
-      function remove(key){},
-      function describe(key){},
-      function define(key, value, attrs){},
-      function get(key){},
-      function set(key, value){},
-      function each(callback){},
-      function getPrototype(){},
-      function setPrototype(value){},
-      function getExtensible(){},
-      function setExtensible(value){},
-    ]);
-
-    return $ExoticObject;
-  })();
 
 
   var ExecutionContext = (function(){
@@ -15855,7 +15841,7 @@ exports.debug = (function(exports){
         }
       },
       function getProperty(key){
-        return this.subject.describe(key) || this.getPrototype().describe(key);
+        return this.subject.describe(key) || this.getPrototype().getProperty(key);
       },
       function isClass(){
         return !!this.subject.Class;
@@ -16953,12 +16939,40 @@ exports.index = (function(exports){
       assembler = require('./assembler'),
       debug     = require('./debug'),
       constants = require('./constants'),
-      utility   = require('./utility');
+      utility   = require('./utility'),
+      errors    = require('./errors');
 
   var Realm = runtime.Realm,
       Script = runtime.Script,
+      Renderer = debug.Renderer,
       $NativeFunction = runtime.$NativeFunction,
-      Renderer = debug.Renderer;
+      builtins = runtime.builtins;
+
+
+  var exoticTemplates = {
+    Array: function(){
+      return function $ExoticArray(len){
+        builtins.$Array.call(this, +len || 0);
+        this.init.apply(this, arguments);
+      };
+    },
+    Function: function(){
+      return function $ExoticFunction(call, construct){
+        this.call = call;
+        if (construct) {
+          this.construct = construct;
+        }
+        this.init.apply(this, arguments);
+      }
+    },
+    Object: function(){
+      return function $ExoticObject(){
+        builtins.$Object.call(this);
+        this.init.apply(this, arguments);
+      }
+    }
+  };
+
 
   utility.assign(exports, [
     function createRealm(listener){
@@ -16973,8 +16987,76 @@ exports.index = (function(exports){
     function createRenderer(handlers){
       return new Renderer(handlers);
     },
-    function createFunction(o){
-      return new $NativeFunction(o)
+    function createFunction(options){
+      return new $NativeFunction(options);
+    },
+    function createExotic(inherits, handlers){
+      if (typeof inherits === 'string') {
+        if (!(inherits in exoticTemplates)) {
+          inherits = 'Object';
+        }
+        var $Exotic = exoticTemplates[inherits]();
+      } else if (!handlers) {
+        handlers = inherits;
+      }
+
+      if (!$Exotic) {
+        $Exotic = exoticTemplates.Object();
+        inherits = 'Object';
+      }
+
+      var Super = builtins['$'+inherits];
+
+
+      utility.inherit($Exotic, Super, {
+        Native: true,
+      }, [
+        function init(){},
+        function remove(key){
+          this.update(key, undefined);
+        },
+        function describe(key){
+          return [key, this.get(key), this.query(key)];
+        },
+        function define(key, value, attrs){
+          this.set(key, value);
+          this.update(key, attrs);
+        },
+        function has(key){
+          return this.query(key) !== undefined;
+        },
+        function each(callback){
+          return errors.ThrowException('missing_fundamental_handler', 'each');
+        },
+        function get(key){
+          return errors.ThrowException('missing_fundamental_handler', 'get');
+        },
+        function set(key, value){
+          return errors.ThrowException('missing_fundamental_handler', 'set');
+        },
+        function query(key){
+          return errors.ThrowException('missing_fundamental_handler', 'query');
+        },
+        function update(key, attr){
+          return errors.ThrowException('missing_fundamental_handler', 'update');
+        }
+      ]);
+
+      if (Super.prototype.Call) {
+        utility.define($Exotic.prototype, [
+          function call(){},
+          function construct(){},
+          $NativeFunction.prototype.Call,
+          $NativeFunction.prototype.Construct,
+          $NativeFunction.prototype.HasInstance,
+        ]);
+      }
+
+      if (handlers) {
+        utility.define($Exotic.prototype, handlers);
+      }
+
+      return $Exotic;
     }
   ]);
 
