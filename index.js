@@ -1,1 +1,1 @@
-module.exports = require('./engine');
+var continuum = module.exports = require('./engine');

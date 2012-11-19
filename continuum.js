@@ -15515,7 +15515,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       intrinsics = this.intrinsics = this.natives.bindings;
       intrinsics.global = global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
       this.global.NativeBrand = BRANDS.GlobalObject;
-      globalEnv = this.globalEnv = new GlobalEnvironmentRecord(this.global);
+      this.globalEnv = new GlobalEnvironmentRecord(this.global);
       this.globalEnv.Realm = this;
 
       this.intrinsics.FunctionProto.Scope = this.globalEnv;
