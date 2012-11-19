@@ -190,7 +190,7 @@ var debug = (function(exports){
         }
       },
       function getProperty(key){
-        return this.subject.describe(key) || this.getPrototype().describe(key);
+        return this.subject.describe(key) || this.getPrototype().getProperty(key);
       },
       function isClass(){
         return !!this.subject.Class;
