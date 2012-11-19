@@ -133,15 +133,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     var hide = function(){};
   }
 
-  function setDirect(o, key, value){
-    if (o.properties.has(key)) {
-      o.properties.set(key, value);
-    } else {
-      o.properties.set(key, value, ECW);
-    }
-  }
-
-
   // ###############################
   // ###############################
   // ### Specification Functions ###
@@ -238,7 +229,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     for (var i=0; i < props.length; i++) {
       var field = props[i];
       if (!(field in standardFields)) {
-        to.properties.set(field, from.Get(field), ECW);
+        to.define(field, from.Get(field), ECW);
       }
     }
   }
@@ -1708,6 +1699,13 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function setPrototype(value){
         if (typeof value === OBJECT && this.getExtensible()) {
+          var proto = value;
+          while (proto) {
+            if (proto === this) {
+              return ThrowException('cyclic_proto');
+            }
+            proto = proto.getPrototype();
+          }
           this.NativeBrand = this.NativeBrand;
           this.Prototype = value;
           return true;
@@ -1869,15 +1867,22 @@ var runtime = (function(GLOBAL, exports, undefined){
           var prop = this.describe(key);
 
           if (IsAccessorDescriptor(desc)) {
-            prop[2] = desc.Enumerable | (desc.Configurable << 1) | A;
+            this.update(key, desc.Enumerable | (desc.Configurable << 1) | A);
             if (IsDataDescriptor(current)) {
-              prop[1] = new Accessor(desc.Get, desc.Set);
+              this.set(key, new Accessor(desc.Get, desc.Set));
             } else {
-              if (SET in desc) {
-                prop[1].Set = desc.Set;
+              var accessor = prop[1],
+                  setter = SET in desc,
+                  getter = GET in desc;
+
+              if (setter) {
+                accessor.Set = desc.Set;
               }
-              if (GET in desc) {
-                prop[1].Get = desc.Get;
+              if (getter) {
+                accessor.Get = desc.Get;
+              }
+              if (setter || getter) {
+                this.set(key, accessor)
               }
             }
           } else {
@@ -1886,9 +1891,9 @@ var runtime = (function(GLOBAL, exports, undefined){
             }
             WRITABLE in desc || (desc.Writable = current.Writable);
             if ('Value' in desc) {
-              prop[1] = desc.Value;
+              this.set(key, desc.Value)
             }
-            prop[2] = desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2);
+            this.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
           }
 
           return true;
@@ -3309,28 +3314,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $NativeFunction;
   })();
 
-
-  var $ExoticObject = (function(){
-    function $ExoticObject(){}
-
-    inherit($ExoticObject, $Object, {
-      Native: true,
-    }, [
-      function has(key){},
-      function remove(key){},
-      function describe(key){},
-      function define(key, value, attrs){},
-      function get(key){},
-      function set(key, value){},
-      function each(callback){},
-      function getPrototype(){},
-      function setPrototype(value){},
-      function getExtensible(){},
-      function setExtensible(value){},
-    ]);
-
-    return $ExoticObject;
-  })();
 
 
   var ExecutionContext = (function(){
