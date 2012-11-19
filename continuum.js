@@ -12561,7 +12561,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return this.Prototype;
       },
       function setPrototype(value){
-        if (typeof value === 'object' && this.getExtensible()) {
+        if (typeof value === OBJECT && this.getExtensible()) {
+          this.NativeBrand = this.NativeBrand;
           this.Prototype = value;
           return true;
         } else {
@@ -12581,7 +12582,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function GetOwnProperty(key){
         if (key === '__proto__') {
           var val = this.GetP(this, '__proto__');
-          return typeof val === OBJECT ? new DataDescriptor(val, 6) : undefined;
+          return typeof val === OBJECT ? new DataDescriptor(val, _CW) : undefined;
         }
 
         var prop = this.describe(key);
@@ -12590,7 +12591,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             var Descriptor = AccessorDescriptor,
                 val = prop[1];
           } else {
-            var val = prop[3] ? prop[3](this) : prop[1],
+            var val = prop[3] ? prop[3].Get.Call(this, []) : prop[1],
                 Descriptor = DataDescriptor;
           }
           return new Descriptor(val, prop[2]);
@@ -12624,7 +12625,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
         } else if (prop[3]) {
           var getter = prop[3].Get;
-          return getter.Call(receiver, [key]);
+          return getter.Call(receiver, []);
         } else if (prop[2] & A) {
           var getter = prop[1].Get;
           if (IsCallable(getter)) {
@@ -12639,7 +12640,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (prop) {
           if (prop[3]) {
             var setter = prop[3].Set;
-            setter.Call(receiver, [key, value]);
+            setter.Call(receiver, [value]);
             return true;
           } else if (prop[2] & A) {
             var setter = prop[1].Set;
@@ -13006,7 +13007,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
       this.define('caller', intrinsics.ThrowTypeError, __A);
-      this.define('length', target.properties.get('length'), ___);
+      this.define('length', target.get('length'), ___);
     }
 
     inherit($BoundFunction, $Function, {
