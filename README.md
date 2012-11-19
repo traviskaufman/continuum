@@ -47,7 +47,7 @@ var $Function = realm.global.Get('Function');
 // if your code uses the module system then it must be run asynchronously
 realm.evaluateAsync('module F = "@function"; F', function(result){
   console.log(result) // $Module { Function, call, apply, bind }
-})
+});
 ```
 
 # ES6 Implementation Status
@@ -103,7 +103,7 @@ realm.evaluateAsync('module F = "@function"; F', function(result){
 A Realm is the main thing you interact with. Each realm has a global object with a unique set of builtin globals. A realm is roughly equivalent to an iframe or a node vm context.
 
 * __realm.evaluate(code)__: Executes code in the virtual machine and returns the completion value, if any. "code" can be a string or an already compiled Script object. If a string is provided, a new Script will be created and added to realm.scripts.
-* __realm.evaluateAsync(code, callback)__: Primarily for when executing code that uses the module system, which must be run asynchronously if importing remote resources.
+* __realm.evaluateAsync(code, callback, [errback])__: Primarily for when executing code that uses the module system, which must be run asynchronously if importing remote resources.
 
 
 ### State Events
