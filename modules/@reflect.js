@@ -210,19 +210,6 @@ export class Handler {
     return proto === null ? out : out.concat(enumerate(proto));
   }
 
-  iterate(target){
-    var result = this.enumerate(target),
-        len = +result.length,
-        i = 0;
-
-    return {
-      next(){
-        if (i === len) throw StopIteration;
-        return result[i++];
-      }
-    };
-  }
-
   keys(target){
     var result = this.getOwnPropertyNames(target),
         len = +result.length,

@@ -90,11 +90,13 @@
     return o;
   };
 
-  $__EmptyClass = function(...args){ super(...args) }
+  private @toStringTag, @iterator;
+  $__toStringTag = @toStringTag;
+  $__iterator = @iterator;
+
+  $__EmptyClass = function(...args){ super(...args) };
   $__define($__EmptyClass, 'name', '', FROZEN);
 }
-
-
 
 
 

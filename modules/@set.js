@@ -1,7 +1,6 @@
 import Map from '@map';
 import Iterator from '@iter';
-import iterator from '@iter';
-symbol @iterator = iterator;
+private @iterator = $__iterator;
 
 
 export function Set(iterable){
@@ -19,11 +18,14 @@ export function Set(iterable){
     throw $__Exception('double_initialization', ['Set']);
   }
 
+  var data = new Map;
+  $__SetInternal(set, 'SetData', data);
+
   if (iterable !== undefined) {
     iterable = $__ToObject(iterable);
-    $__SetInternal(set, 'SetData', new Map(iterable.values()));
-  } else {
-    $__SetInternal(set, 'SetData', new Map);
+    for (var [key, value] of iterable) {
+      $__MapSet(data, value, value);
+    }
   }
   return set;
 }
@@ -88,27 +90,28 @@ let kinds = {
 
 
 class SetIterator extends Iterator {
+  private @data, @key, @kind;
+
   constructor(set, kind){
-    set = $__ToObject(set);
-    $__SetInternal(this, SET, ensureSet(set));
-    $__SetInternal(this, KEY,  $__MapSigil());
-    $__SetInternal(this, KIND, kinds[kind]);
+    this.@data = ensureSet($__ToObject(set));
+    this.@key = $__MapSigil();
+    this.@kind = kinds[kind];
   }
 
   next(){
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);
     }
-    if (!$__HasInternal(this, SET) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {
+    if (!(@data in this && @key in this && @kind in this)) {
       throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
-    var data = $__GetInternal(this, SET),
-        key = $__GetInternal(this, KEY),
-        kind = $__GetInternal(this, KIND);
+    var data = this.@data,
+        key  = this.@key,
+        kind = this.@kind;
 
     var item = $__MapNext(data, key);
-    $__SetInternal(this, KEY, item[0]);
+    this.@key = item[0];
     return kind === KV ? [item[1], item[1]] : item[1];
   }
 }

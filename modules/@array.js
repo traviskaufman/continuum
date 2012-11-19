@@ -1,6 +1,5 @@
 import Iterator from '@iter';
-import iterator from '@iter';
-symbol @iterator = iterator;
+private @iterator = $__iterator;
 
 export function Array(...values){
   if (values.length === 1 && typeof values[0] === 'number') {
@@ -273,7 +272,7 @@ $__defineProps(Array.prototype, {
     return new ArrayIterator(this, 'value');
   },
   @iterator(){
-    return new ArrayIterator(this, 'value');
+    return new ArrayIterator(this, 'key+value');
   }
 });
 

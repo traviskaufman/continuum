@@ -1,6 +1,5 @@
 import Iterator from '@iter';
-import iterator from '@iter';
-symbol @iterator = iterator;
+private @iterator = $__iterator;
 
 
 export function Map(iterable){

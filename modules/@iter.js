@@ -1,8 +1,8 @@
 import hasOwn from '@reflect';
 
-symbol @iterator;
+private @iterator = $__iterator;
 export let iterator = @iterator;
-$__iterator = @iterator;
+
 export function Iterator(){}
 
 $__define(Iterator, 'prototype', Iterator.prototype, 0);
