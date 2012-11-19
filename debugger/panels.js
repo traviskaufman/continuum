@@ -245,7 +245,7 @@ var Instructions = (function(){
             }
 
             if (!base.Proxy && base.NativeBrand) {
-              item = base.properties.get(item.name);
+              item = base.get(item.name);
             }
           }
         }
