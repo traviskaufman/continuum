@@ -318,7 +318,7 @@ let K = 0x01,
     V = 0x02,
     S = 0x04;
 
-var kinds = {
+let kinds = {
   'key': 1,
   'value': 2,
   'key+value': 3,
