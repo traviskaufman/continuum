@@ -108,7 +108,7 @@ var assembler = (function(exports){
       IFEQ             = new StandardOpCode(2, 'IFEQ'),
       IFNE             = new StandardOpCode(2, 'IFNE'),
       INC              = new StandardOpCode(0, 'INC'),
-      INDEX            = new StandardOpCode(2, 'INDEX'),
+      INDEX            = new StandardOpCode(1, 'INDEX'),
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
       LET              = new StandardOpCode(1, 'LET'),
@@ -131,6 +131,7 @@ var assembler = (function(exports){
       SAVE             = new StandardOpCode(0, 'SAVE'),
       SPREAD           = new StandardOpCode(1, 'SPREAD'),
       SPREAD_ARG       = new StandardOpCode(0, 'SPREAD_ARG'),
+      SPREAD_ARRAY     = new StandardOpCode(1, 'SPREAD_ARRAY'),
       STRING           = new InternedOpCode(1, 'STRING'),
       SUPER_CALL       = new StandardOpCode(0, 'SUPER_CALL'),
       SUPER_ELEMENT    = new StandardOpCode(0, 'SUPER_ELEMENT'),
@@ -146,7 +147,6 @@ var assembler = (function(exports){
       VAR              = new StandardOpCode(1, 'VAR'),
       WITH             = new StandardOpCode(0, 'WITH'),
       YIELD            = new StandardOpCode(1, 'YIELD');
-
 
 
 
@@ -821,22 +821,21 @@ var assembler = (function(exports){
 
   function ArrayExpression(node){
     ARRAY();
-    each(node.elements, function(item, i){
-      var empty = false,
-          spread = false,
-          item = node.elements[i];
-
+    var holes = 0;
+    each(node.elements, function(item){
       if (!item){
-        empty = true;
+        holes++;
       } else if (item.type === 'SpreadElement'){
-        spread = true;
         recurse(item.argument);
+        GET();
+        SPREAD_ARRAY(holes);
+        holes = 0;
       } else {
         recurse(item);
+        GET();
+        INDEX(holes);
+        holes = 0;
       }
-
-      GET();
-      INDEX(empty, spread);
     });
     ARRAY_DONE();
   }
@@ -1072,7 +1071,7 @@ var assembler = (function(exports){
         CALL();
         DUP();
         var compare = IFEQ(0, false);
-        if (node.left.type === 'VariableDeclaration' && node.left.kind !== 'var') {
+        if (isLexicalDeclaration(node.left)) {
           block(function(){
             lexical(function(){
               BLOCK(LexicalDeclarations(node.left));

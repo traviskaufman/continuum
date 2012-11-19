@@ -95,7 +95,7 @@ var thunk = (function(exports){
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, IFEQ, IFNE, INC, INDEX, ITERATE, JUMP, LET,
       LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, POP,
       POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
-      SPREAD_ARG, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
+      SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
       THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
 
     var thunk = this,
@@ -445,37 +445,12 @@ var thunk = (function(exports){
     }
 
     function INDEX(){
-      if (ops[ip][0]) {
-        stack[sp - 1]++;
-      } else {
-        var val = GetValue(stack[--sp]);
+      var val   = stack[--sp],
+          index = stack[--sp] + ops[ip][0],
+          array = stack[sp - 1];
 
-        if (val && val.Completion) {
-          if (val.Abrupt) {
-            error = val;
-            return unwind;
-          } else {
-            val = val.value;
-          }
-        }
-
-        var index = stack[--sp],
-            array = stack[sp - 1];
-
-        if (ops[ip][1]) {
-          var status = context.spreadArray(array, index, val);
-
-          if (status && status.Abrupt) {
-            error = status;
-            return unwind;
-          }
-
-          stack[sp++] = status;
-        } else {
-          array.DefineOwnProperty(index, new Desc(val));
-          stack[sp++] = index + 1;
-        }
-      }
+      array.DefineOwnProperty(index, new Desc(val));
+      stack[sp++] = index + 1;
 
       return cmds[++ip];
     }
@@ -529,10 +504,10 @@ var thunk = (function(exports){
     }
 
     function METHOD(){
-      var kind   = ops[ip][0],
-          obj    = stack[sp - 1],
-          code   = ops[ip][1],
-          key    = getKey(ops[ip][2]);
+      var kind = ops[ip][0],
+          obj  = stack[sp - 1],
+          code = ops[ip][1],
+          key  = getKey(ops[ip][2]);
 
       if (key && key.Abrupt) {
         error = key;
@@ -691,6 +666,21 @@ var thunk = (function(exports){
         return unwind;
       }
 
+      return cmds[++ip];
+    }
+
+    function SPREAD_ARRAY(){
+      var val = stack[--sp],
+          index = stack[--sp] + ops[ip][0],
+          array = stack[sp - 1],
+          status = context.spreadArray(array, index, val);
+
+      if (status && status.Abrupt) {
+        error = status;
+        return unwind;
+      }
+
+      stack[sp++] = status;
       return cmds[++ip];
     }
 

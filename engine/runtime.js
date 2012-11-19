@@ -1210,7 +1210,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     var len = ToUint32(spread.Get('length'));
 
     for (var i = offset; i < len; i++) {
-      var valie = spread.Get(i);
+      var value = spread.Get(i);
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
@@ -4668,16 +4668,15 @@ var runtime = (function(GLOBAL, exports, undefined){
         mutationContext(this, false);
       },
       function evaluateModule(source, global, name, callback, errback){
-        if (typeof errback !== FUNCTION) {
+        if (typeof callback !== FUNCTION) {
           if (typeof name === FUNCTION) {
-            errback = name;
+            callback = name;
             name = '';
           } else {
-            errback = noop;
+            callback = noop;
           }
         }
-        if (typeof callback !== FUNCTION) {
-          callback = errback;
+        if (typeof errback !== FUNCTION) {
           errback = noop;
         }
         resolveModule(source, global, name, callback, errback);
@@ -4686,7 +4685,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var script = new Script(subject),
             self = this;
 
-        callback = callback || errback;
+        errback = errback || callback;
 
         if (script.error) {
           this.emit(script.error.type, script.error);
