@@ -15796,7 +15796,7 @@ exports.debug = (function(exports){
         return this.introspected.label();
       },
       function getName(){
-        return this.subject.properties.get('name');
+        return this.subject.get('name');
       },
       function getParams(){
         var params = this.subject.FormalParameters;
@@ -15847,7 +15847,7 @@ exports.debug = (function(exports){
           }
           return this.accessors[key];
         } else {
-          var prop = this.props.getProperty(key);
+          var prop = this.subject.describe(key);
           if (prop) {
             return introspect(prop[1]);
           } else {
@@ -15856,7 +15856,7 @@ exports.debug = (function(exports){
         }
       },
       function getProperty(key){
-        return this.props.getProperty(key) || this.getPrototype().getProperty(key);
+        return this.subject.describe(key) || this.getPrototype().describe(key);
       },
       function isClass(){
         return !!this.subject.Class;
@@ -15872,7 +15872,7 @@ exports.debug = (function(exports){
       },
       function setPrototype(value){
         realm().enterMutationContext();
-        var ret = this.subject.SetPrototype(value);
+        var ret = this.subject.setPrototype(value);
         realm().exitMutationContext();
         return ret;
       },
@@ -15884,7 +15884,7 @@ exports.debug = (function(exports){
         return ret;
       },
       function setAttribute(key, attr){
-        var prop = this.props.getProperty(key);
+        var prop = this.subject.describe(key);
         if (prop) {
           prop[2] = attr;
           return true;
@@ -15918,8 +15918,8 @@ exports.debug = (function(exports){
         return ret;
       },
       function hasOwn(key){
-        if (this.props) {
-          return this.props.has(key);
+        if (this.subject) {
+          return this.subject.has(key);
         } else {
           return false;
         }
@@ -15934,7 +15934,7 @@ exports.debug = (function(exports){
         return this.getOwnDescriptor(key) || this.getPrototype().getDescriptor(key);
       },
       function getOwnDescriptor(key){
-        var prop = this.props.getProperty(key);
+        var prop = this.subject.describe(key);
         if (prop) {
           if (prop[2] & ACCESSOR) {
             return {
@@ -15968,7 +15968,7 @@ exports.debug = (function(exports){
         return (this.propAttributes(key) & ACCESSOR) > 0;
       },
       function isPropWritable(key){
-        var prop = this.props.get(key);
+        var prop = this.subject.get(key);
         if (prop) {
           return !!(prop[2] & ACCESSOR ? prop[1].Set : prop[2] & WRITABLE);
         } else {
@@ -15976,7 +15976,7 @@ exports.debug = (function(exports){
         }
       },
       function propAttributes(key){
-        var prop = this.props.getProperty(key);
+        var prop = this.subject.describe(key);
         return prop ? prop[2] : this.getPrototype().propAttributes(key);
       },
       function label(){
@@ -16001,7 +16001,7 @@ exports.debug = (function(exports){
       },
       function ownAttrs(props){
         props || (props = create(null));
-        this.props.forEach(function(prop){
+        this.subject.each(function(prop){
           if (!prop[0].Private) {
             var key = prop[0] === '__proto__' ? proto : prop[0];
             props[key] = prop;
@@ -16192,7 +16192,7 @@ exports.debug = (function(exports){
       kind: 'Function',
     }, [
       function getName(){
-        return this.props.get('name');
+        return this.subject.get('name');
       },
       function getParams(){
         var params = this.subject.FormalParameters;
@@ -16234,7 +16234,7 @@ exports.debug = (function(exports){
       function ownAttrs(props){
         var strict = this.isStrict();
         props || (props = create(null));
-        this.props.forEach(function(prop){
+        this.subject.each(function(prop){
           if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
             var key = prop[0] === '__proto__' ? proto : prop[0];
             props[key] = prop;
@@ -16313,7 +16313,7 @@ exports.debug = (function(exports){
 
           return this.accessors[key];
         } else {
-          var prop = this.props.getProperty(key);
+          var prop = this.subject.describe(key);
           if (prop) {
             return introspect(prop[1]);
           } else {
@@ -16370,41 +16370,45 @@ exports.debug = (function(exports){
   var MirrorString = (function(){
     function MirrorString(subject){
       MirrorObject.call(this, subject);
+      this.primitive = this.subject.PrimitiveValue;
     }
 
     inherit(MirrorString, MirrorObject,{
       kind: 'String'
     }, [
       function get(key){
-        if (key < this.props.get('length') && key >= 0) {
-          return this.subject.PrimitiveValue[key];
+        if (key < this.subject.get('length') && key >= 0) {
+          return this.primitive[key];
         } else {
           return MirrorObject.prototype.get.call(this, key);
         }
       },
       function ownAttrs(props){
-        var len = this.props.get('length');
+        var len = this.primitive.length;
         props || (props = create(null));
+
         for (var i=0; i < len; i++) {
-          props[i] = 1;
+          props[i] = [i+'', this.primitive[i], 1];
         }
-        this.props.forEach(function(prop){
+
+        this.subject.each(function(prop){
           if (!prop[0].Private) {
             var key = prop[0] === '__proto__' ? proto : prop[0];
-            props[key] = prop[2];
+            props[key] = prop;
           }
         });
+
         return props;
       },
       function propAttributes(key){
-        if (key < this.props.get('length') && key >= 0) {
+        if (key < this.subject.get('length') && key >= 0) {
           return 1;
         } else {
           return MirrorObject.prototype.propAttributes.call(this, key);
         }
       },
       function label(){
-        return 'String('+utility.quotes(this.subject.PrimitiveValue)+')';
+        return 'String('+utility.quotes(this.primitive)+')';
       }
     ]);
 
