@@ -5848,7 +5848,7 @@ exports.utility = (function(exports){
   function map(o, callback){
     var out = new Array(o.length);
     for (var i=0; i < o.length; i++) {
-      out[i] = callback(o[i]);
+      out[i] = callback(o[i], i);
     }
     return out;
   }
@@ -6534,7 +6534,7 @@ exports.utility = (function(exports){
 
         Token.prototype.inspect = function(){ return this.value };
 
-        define(PropertyList.prototype, function inspect(fn){
+        define(PropertyList.prototype, function inspect(){
           var out = create(null);
 
           this.forEach(function(prop){
@@ -6961,20 +6961,14 @@ exports.utility = (function(exports){
     return Feeder;
   })();
 
-  // function inspect(o){
-  //   o = require('util').inspect(o, null, 4);
-  //   console.log(o);
-  //   return o;
-  // }
-  // exports.inspect = inspect;
-
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
 
 
 exports.constants = (function(exports){
   var create = require('./utility').create,
-      define = require('./utility').define;
+      define = require('./utility').define,
+      ownKeys = require('./utility').keys;
 
   function Constants(array){
     this.hash = create(null);
@@ -7063,6 +7057,7 @@ exports.constants = (function(exports){
     Empty            : new Symbol('Empty'),
     Resume           : new Symbol('Resume'),
     Return           : new Symbol('Return'),
+    Normal           : new Symbol('Normal'),
     Abrupt           : new Symbol('Abrupt'),
     Native           : new Symbol('Native'),
     Continue         : new Symbol('Continue'),
@@ -7095,23 +7090,7 @@ exports.constants = (function(exports){
     ECA: E | C | A
   };
 
-  exports.AST = new Constants(['ArrayExpression', 'ArrayPattern', 'ArrowFunctionExpression',
-    'AssignmentExpression', 'BinaryExpression', 'BlockStatement', 'BreakStatement',
-    'CatchClause', 'ClassBody', 'ClassDeclaration', 'ClassExpression', 'ClassHeritage',
-    'ConditionalExpression', 'DebuggerStatement', 'DoWhileStatement', 'EmptyStatement',
-    'ExportDeclaration', 'ExportSpecifier', 'ExportSpecifierSet', 'ExpressionStatement',
-    'ForInStatement', 'ForOfStatement', 'ForStatement', 'FunctionDeclaration',
-    'FunctionExpression', 'Glob', 'Identifier', 'IfStatement', 'ImportDeclaration',
-    'ImportSpecifier', 'LabeledStatement', 'Literal', 'LogicalExpression', 'MemberExpression',
-    'MethodDefinition', 'ModuleDeclaration', 'NewExpression', 'ObjectExpression', 'ObjectPattern',
-    'Path', 'Program', 'Property', 'ReturnStatement', 'SequenceExpression', 'SwitchStatement',
-    'TaggedTemplateExpression', 'TemplateElement', 'TemplateLiteral', 'ThisExpression',
-    'ThrowStatement', 'TryStatement', 'UnaryExpression', 'UpdateExpression', 'VariableDeclaration',
-    'VariableDeclarator', 'WhileStatement', 'WithStatement', 'YieldExpression']);
-
-
-
-
+  exports.AST = new Constants(ownKeys(require('esprima').Syntax));
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
@@ -7388,11 +7367,11 @@ exports.assembler = (function(exports){
       opcodes = 0;
 
   function StandardOpCode(params, name){
-    var opcode = this;
     var func = this.creator();
     this.id = func.id = opcodes++;
     this.params = func.params = params;
     this.name = func.opname = name;
+    func.opcode = this;
     return func;
   }
 
@@ -7431,7 +7410,6 @@ exports.assembler = (function(exports){
       };
     }
   ]);
-
 
 
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
@@ -7501,6 +7479,36 @@ exports.assembler = (function(exports){
       YIELD            = new StandardOpCode(1, 'YIELD');
 
 
+
+  function macro(name){
+    var params = [],
+        ops = [];
+
+    var body = map(arguments, function(arg, a){
+      if (!a) return '';
+      arg instanceof Array || (arg = [arg]);
+      var opcode = arg.shift();
+      ops.push(opcode);
+      return opcode.opname + '('+generate(opcode.params, function(i){
+        if (i in arg) {
+          if (typeof arg[i] === 'string') {
+            return utility.quote(arg[i]);
+          }
+          return arg[i] + '';
+        } else {
+          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
+          params.push(param);
+          return param;
+        }
+      }).join(', ') + ');';
+    }).join('\n  ');
+
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
+    func.params = func.length;
+    func.opname = name;
+    return func;
+  }
 
   var Code = exports.Code = (function(){
     var Directive = (function(){
@@ -7807,6 +7815,7 @@ exports.assembler = (function(exports){
     ImportSpecifier    : 'id',
     VariableDeclarator : 'id',
     ModuleDeclaration  : 'id',
+    SpreadElement      : 'argument',
     FunctionDeclaration: 'id',
     ClassDeclaration   : 'id'
   });
@@ -7838,8 +7847,10 @@ exports.assembler = (function(exports){
     }
     return function(node){
       node.IsConstantDeclaration = isConst(node);
-      node.BoundNames = BoundNames(node)//.map(intern);
-      return node;
+      node.BoundNames || (node.BoundNames = BoundNames(node));
+      if (node.kind !== 'var') {
+        return node;
+      }
     };
   });
 
@@ -8031,22 +8042,6 @@ exports.assembler = (function(exports){
     }
   }
 
-  function macro(){
-    var opcodes = arguments;
-    MACRO.params = opcodes.length;
-    return MACRO;
-
-    function MACRO(){
-      var offset = 0,
-          args = arguments;
-
-      each(opcodes, function(opcode){
-        opcode.apply(null, generate(opcode.params, function(){
-          return args[offset++]
-        }));
-      });
-    }
-  }
 
   function block(callback){
       var entry = new ControlTransfer(context.labels);
@@ -8099,32 +8094,34 @@ exports.assembler = (function(exports){
     }
   };
 
-  function destructure(left, right){
-    var key = left.type === 'ArrayPattern' ? 'elements' : 'properties',
-        rights = right[key];
+  function destructure(left, STORE){
+    var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
 
     each(left[key], function(item, i){
-      var binding = elementAt[key](left, i);
-
-      if (isPattern(binding)){
-        var value = rights && rights[i] ? elementAt[key](right, i) : binding;
-        destructure(binding, value);
-      } else {
-        if (binding.type === 'SpreadElement') {
-          recurse(binding.argument);
-          recurse(right);
-          SPREAD(i);
+      if (!item) return;
+      DUP();
+      if (item.type === 'Property') {
+        MEMBER(symbol(item.key));
+        GET();
+        if (isPattern(item.value)) {
+          destructure(item.value, STORE);
         } else {
-          recurse(binding);
-          recurse(right);
-          if (left.type === 'ArrayPattern') {
-            LITERAL(i);
-            ELEMENT(i);
-          } else {
-            MEMBER(symbol(binding))
-          }
+          STORE(item.key.name);
         }
-        PUT();
+      } else if (item.type === 'ArrayPattern') {
+        LITERAL(i);
+        ELEMENT();
+        GET();
+        destructure(item, STORE);
+      } else if (item.type === 'Identifier') {
+        LITERAL(i);
+        ELEMENT();
+        GET();
+        STORE(item.name);
+      } else if (item.type === 'SpreadElement') {
+        GET();
+        SPREAD(i);
+        STORE(item.argument.name);
       }
     });
   }
@@ -8149,11 +8146,14 @@ exports.assembler = (function(exports){
     return context.code.ScopeType === SCOPE.EVAL || context.code.ScopeType === SCOPE.GLOBAL;
   }
 
+  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
   function AssignmentExpression(node){
     if (node.operator === '='){
       if (isPattern(node.left)){
-        destructure(node.left, node.right);
+        recurse(node.right);
+        GET();
+        destructure(node.left, ASSIGN);
       } else {
         recurse(node.left);
         recurse(node.right);
@@ -8423,23 +8423,27 @@ exports.assembler = (function(exports){
         GET();
         ARGS();
         CALL();
-        DUP();
-        var compare = IFEQ(0, false);
         if (isLexicalDeclaration(node.left)) {
           block(function(){
             lexical(function(){
               BLOCK(LexicalDeclarations(node.left));
-              recurse(node.left);
+              VariableDeclaration(node.left, true);
               recurse(node.body);
               UPSCOPE();
             });
           });
         } else {
-          recurse(node.left);
+          if (node.left.type === 'VariableDeclaration') {
+            VariableDeclaration(node.left, true);
+          } else {
+            recurse(node.left);
+            ROTATE(1);
+            PUT();
+            POP();
+          }
           recurse(node.body);
         }
         JUMP(update);
-        adjust(compare);
       });
       return update;
     });
@@ -8760,30 +8764,38 @@ exports.assembler = (function(exports){
     UPDATE(!!node.prefix | ((node.operator === '++') << 1));
   }
 
-  function VariableDeclaration(node){
+
+  function VariableDeclaration(node, forin){
     var DECLARE = {
       'var': VAR,
       'const': CONST,
       'let': LET
     }[node.kind];
 
+
     each(node.declarations, function(item){
-      var init = item.init;
-      if (init) {
-        if (item.id && item.id.type === 'Identifier' && isAnonymousFunction(init)) {
-          var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
-          var code = Expr(init, item.id.name);
-          code.writableName = true;
-        } else {
-          recurse(init);
-        }
-        GET();
-      }
-
-      DECLARE(item.id);
-
       if (node.kind === 'var') {
         push.apply(context.code.VarDeclaredNames, BoundNames(item.id));
+      }
+
+      if (item.init) {
+        if (item.id && item.id.type === 'Identifier' && isAnonymousFunction(item.init)) {
+          var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
+          recurse(item.id);
+          var code = Expr(item.init, item.id.name);
+          code.writableName = true;
+        } else {
+          recurse(item.init);
+          GET();
+        }
+      } else if (!forin) {
+        UNDEFINED();
+      }
+      if (isPattern(item.id)){
+        destructure(item.id, DECLARE);
+        POP();
+      } else {
+        DECLARE(item.id.name);
       }
     });
   }
@@ -10131,7 +10143,7 @@ exports.thunk = (function(exports){
     }
 
     function CONST(){
-      context.initializeBindings(ops[ip][0], stack[--sp], true);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
       return cmds[++ip];
     }
 
@@ -10285,7 +10297,7 @@ exports.thunk = (function(exports){
           index = stack[--sp] + ops[ip][0],
           array = stack[sp - 1];
 
-      array.DefineOwnProperty(index, new Desc(val));
+      array.DefineOwnProperty(index+'', new Desc(val));
       stack[sp++] = index + 1;
 
       return cmds[++ip];
@@ -10306,8 +10318,9 @@ exports.thunk = (function(exports){
       return cmds[ip];
     }
 
+
     function LET(){
-      context.initializeBindings(ops[ip][0], stack[--sp], true);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
       return cmds[++ip];
     }
 
@@ -10677,8 +10690,21 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function PUT(){
+      var val    = stack[--sp],
+          ref    = stack[--sp],
+          status = PutValue(ref, val);
+
+      if (status && status.Abrupt) {
+        error = status;
+        return unwind;
+      }
+
+      stack[sp++] = val;
+      return cmds[++ip];
+    }
     function VAR(){
-      context.initializeBindings(ops[ip][0], stack[--sp], false);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], false);
       return cmds[++ip];
     }
 
@@ -10913,6 +10939,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Throw         = SYMBOLS.Throw,
       Empty         = SYMBOLS.Empty,
       Return        = SYMBOLS.Return,
+      Normal        = SYMBOLS.Normal,
       Native        = SYMBOLS.Native,
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
@@ -12024,7 +12051,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   }
 
   function SpreadArguments(precedingArgs, spread){
-    if (typeof spread !== 'object') {
+    if (typeof spread !== OBJECT) {
       return ThrowException('spread_non_object');
     }
 
@@ -12046,7 +12073,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   }
 
   function SpreadInitialization(array, offset, spread){
-    if (typeof spread !== 'object') {
+    if (typeof spread !== OBJECT) {
       return ThrowException('spread_non_object');
     }
 
@@ -12097,7 +12124,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     if (target == null) {
       return array;
     }
-    if (typeof target !== 'object') {
+    if (typeof target !== OBJECT) {
       return ThrowException('spread_non_object', typeof target);
     }
 
@@ -12700,7 +12727,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (!current.Configurable) {
-            if (desc.Configurable || desc.Enumerable === !current.Configurable) {
+            if (desc.Configurable || desc.Enumerable === !current.Enumerable) {
               return reject('redefine_disallowed', []);
             } else {
               var currentIsData = IsDataDescriptor(current),
@@ -13094,6 +13121,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
   var $Generator = (function(){
+    var EXECUTING = 'executing',
+        CLOSED    = 'closed',
+        NEWBORN   = 'newborn';
+
     function setFunction(obj, name, func){
       obj.set(name, new $NativeFunction({
         name: name,
@@ -13108,7 +13139,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.Scope = scope;
       this.Code = thunk.code;
       this.ExecutionContext = ctx;
-      this.State = 'newborn';
+      this.State = NEWBORN;
       this.thunk = thunk;
 
       var self = this;
@@ -13127,55 +13158,55 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       State: null,
     }, [
       function Send(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'send');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return ThrowException('generator_closed', 'send');
         }
-        if (this.State === 'newborn') {
+        if (this.State === NEWBORN) {
           if (value !== undefined) {
             return ThrowException('generator_send_newborn');
           }
           this.ExecutionContext.currentGenerator = this;
-          this.State = 'executing';
+          this.State = EXECUTING;
           ExecutionContext.push(this.ExecutionContext);
           return this.thunk.run(this.ExecutionContext);
         }
 
-        this.State = 'executing';
-        return Resume(this.ExecutionContext, 'normal', value);
+        this.State = EXECUTING;
+        return Resume(this.ExecutionContext, Normal, value);
       },
       function Throw(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'throw');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return ThrowException('generator_closed', 'throw');
         }
-        if (this.State === 'newborn') {
-          this.State = 'closed';
+        if (this.State === NEWBORN) {
+          this.State = CLOSED;
           this.Code = null;
-          return new AbruptCompletion('throw', value);
+          return new AbruptCompletion(Throw, value);
         }
 
-        this.State = 'executing';
-        var result = Resume(this.ExecutionContext, 'throw', value);
+        this.State = EXECUTING;
+        return Resume(this.ExecutionContext, Throw, value);
       },
       function Close(value){
-        if (this.State === 'executing') {
+        if (this.State === EXECUTING) {
           return ThrowException('generator_executing', 'close');
-        } else if (this.State === 'closed') {
+        } else if (this.State === CLOSED) {
           return;
         }
 
-        if (state === 'newborn') {
-          this.State = 'closed';
+        if (state === NEWBORN) {
+          this.State = CLOSED;
           this.Code = null;
           return;
         }
 
-        this.State = 'executing';
-        var result = Resume(this.ExecutionContext, 'return', value);
-        this.State = 'closed';
+        this.State = EXECUTING;
+        var result = Resume(this.ExecutionContext, Return, value);
+        this.State = CLOSED;
         return result;
       }
     ]);
@@ -13183,7 +13214,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     function Resume(ctx, completionType, value){
       ExecutionContext.push(ctx);
-      if (completionType !== 'normal') {
+      if (completionType !== Normal) {
         value = new AbruptCompletion(completionType, value);
       }
       return ctx.currentGenerator.thunk.send(ctx, value);
@@ -13253,7 +13284,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (key && key.Completion) {
           if (key.Abrupt) return key; else key = key.value;
         }
-        if (typeof key === 'string') {
+        if (typeof key === STRING) {
           if (key < this.get('length') && key >= 0) {
             return true;
           }
@@ -13646,10 +13677,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           if (IsAccessorDescriptor(desc)) {
             this.ParameterMap.Delete(key, false);
           } else {
-            if ('Value' in desc) {
+            if (VALUE in desc) {
               this.ParameterMap.Put(key, desc.Value, strict);
             }
-            if ('Writable' in desc) {
+            if (WRITABLE in desc) {
               this.ParameterMap.Delete(key, false);
             }
           }
@@ -14219,8 +14250,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
-      function initializeBinding(name, value){
-        return this.LexicalEnvironment.InitializeBinding(name, value);
+      function initializeBinding(name, value, strict){
+        return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
       function initializeBindings(pattern, value){
         return BindingInitialization(pattern, value, this.LexicalEnvironment);
@@ -14596,7 +14627,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
                   try { v = source.constructor(v) }
                   catch (e) { v = new source.constructor }
                 }
-                if (v instanceof source.constructor || typeof v !== 'object') {
+                if (v instanceof source.constructor || typeof v !== OBJECT) {
                   var result =  v[key](a, b, c, d);
                 } else if (v.PrimitiveValue) {
                   var result = v.PrimitiveValue[key](a, b, c, d);
@@ -14774,7 +14805,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
         },
         eval: function(code){
-          if (typeof code !== 'string') {
+          if (typeof code !== STRING) {
             return code;
           }
           var script = new Script({
@@ -14824,7 +14855,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return new $Object(proto);
         },
         RegExpCreate: function(pattern, flags){
-          if (typeof pattern === 'object') {
+          if (typeof pattern === OBJECT) {
             pattern = pattern.PrimitiveValue;
           }
           try {
@@ -14966,7 +14997,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return escape(ToString(value));
         },
         SetTimer: function(f, time, repeating){
-          if (typeof f === 'string') {
+          if (typeof f === STRING) {
             f = natives.FunctionCreate(f);
           }
           var id = Math.random() * 1000000 << 10;
@@ -14995,7 +15026,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
           function escaper(a) {
             var c = meta[a];
-            return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+            return typeof c === STRING ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
           }
 
           return function(string){
@@ -15499,7 +15530,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       activate(this);
       this.natives = new Intrinsics(this);
       intrinsics = this.intrinsics = this.natives.bindings;
-      intrinsics.global = global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
+      intrinsics.global = global = operators.global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
       this.global.NativeBrand = BRANDS.GlobalObject;
       this.globalEnv = new GlobalEnvironmentRecord(this.global);
       this.globalEnv.Realm = this;
