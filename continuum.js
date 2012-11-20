@@ -10318,7 +10318,6 @@ exports.thunk = (function(exports){
       return cmds[ip];
     }
 
-
     function LET(){
       context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
       return cmds[++ip];
@@ -10690,19 +10689,6 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function PUT(){
-      var val    = stack[--sp],
-          ref    = stack[--sp],
-          status = PutValue(ref, val);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      stack[sp++] = val;
-      return cmds[++ip];
-    }
     function VAR(){
       context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], false);
       return cmds[++ip];
