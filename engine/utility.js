@@ -400,7 +400,7 @@ var utility = (function(exports){
   function map(o, callback){
     var out = new Array(o.length);
     for (var i=0; i < o.length; i++) {
-      out[i] = callback(o[i]);
+      out[i] = callback(o[i], i);
     }
     return out;
   }
