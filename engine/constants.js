@@ -1,6 +1,7 @@
 var constants = (function(exports){
   var create = require('./utility').create,
-      define = require('./utility').define;
+      define = require('./utility').define,
+      ownKeys = require('./utility').keys;
 
   function Constants(array){
     this.hash = create(null);
@@ -122,23 +123,7 @@ var constants = (function(exports){
     ECA: E | C | A
   };
 
-  exports.AST = new Constants(['ArrayExpression', 'ArrayPattern', 'ArrowFunctionExpression',
-    'AssignmentExpression', 'BinaryExpression', 'BlockStatement', 'BreakStatement',
-    'CatchClause', 'ClassBody', 'ClassDeclaration', 'ClassExpression', 'ClassHeritage',
-    'ConditionalExpression', 'DebuggerStatement', 'DoWhileStatement', 'EmptyStatement',
-    'ExportDeclaration', 'ExportSpecifier', 'ExportSpecifierSet', 'ExpressionStatement',
-    'ForInStatement', 'ForOfStatement', 'ForStatement', 'FunctionDeclaration',
-    'FunctionExpression', 'Glob', 'Identifier', 'IfStatement', 'ImportDeclaration',
-    'ImportSpecifier', 'LabeledStatement', 'Literal', 'LogicalExpression', 'MemberExpression',
-    'MethodDefinition', 'ModuleDeclaration', 'NewExpression', 'ObjectExpression', 'ObjectPattern',
-    'Path', 'Program', 'Property', 'ReturnStatement', 'SequenceExpression', 'SwitchStatement',
-    'TaggedTemplateExpression', 'TemplateElement', 'TemplateLiteral', 'ThisExpression',
-    'ThrowStatement', 'TryStatement', 'UnaryExpression', 'UpdateExpression', 'VariableDeclaration',
-    'VariableDeclarator', 'WhileStatement', 'WithStatement', 'YieldExpression']);
-
-
-
-
+  exports.AST = new Constants(ownKeys(require('esprima').Syntax));
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
