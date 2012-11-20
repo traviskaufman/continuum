@@ -36,11 +36,11 @@ var assembler = (function(exports){
       opcodes = 0;
 
   function StandardOpCode(params, name){
-    var opcode = this;
     var func = this.creator();
     this.id = func.id = opcodes++;
     this.params = func.params = params;
     this.name = func.opname = name;
+    func.opcode = this;
     return func;
   }
 
@@ -79,7 +79,6 @@ var assembler = (function(exports){
       };
     }
   ]);
-
 
 
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
@@ -149,6 +148,36 @@ var assembler = (function(exports){
       YIELD            = new StandardOpCode(1, 'YIELD');
 
 
+
+  function macro(name){
+    var params = [],
+        ops = [];
+
+    var body = map(arguments, function(arg, a){
+      if (!a) return '';
+      arg instanceof Array || (arg = [arg]);
+      var opcode = arg.shift();
+      ops.push(opcode);
+      return opcode.opname + '('+generate(opcode.params, function(i){
+        if (i in arg) {
+          if (typeof arg[i] === 'string') {
+            return utility.quote(arg[i]);
+          }
+          return arg[i] + '';
+        } else {
+          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
+          params.push(param);
+          return param;
+        }
+      }).join(', ') + ');';
+    }).join('\n  ');
+
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
+    func.params = func.length;
+    func.opname = name;
+    return func;
+  }
 
   var Code = exports.Code = (function(){
     var Directive = (function(){
@@ -455,6 +484,7 @@ var assembler = (function(exports){
     ImportSpecifier    : 'id',
     VariableDeclarator : 'id',
     ModuleDeclaration  : 'id',
+    SpreadElement      : 'argument',
     FunctionDeclaration: 'id',
     ClassDeclaration   : 'id'
   });
@@ -486,8 +516,10 @@ var assembler = (function(exports){
     }
     return function(node){
       node.IsConstantDeclaration = isConst(node);
-      node.BoundNames = BoundNames(node)//.map(intern);
-      return node;
+      node.BoundNames || (node.BoundNames = BoundNames(node));
+      if (node.kind !== 'var') {
+        return node;
+      }
     };
   });
 
@@ -679,22 +711,6 @@ var assembler = (function(exports){
     }
   }
 
-  function macro(){
-    var opcodes = arguments;
-    MACRO.params = opcodes.length;
-    return MACRO;
-
-    function MACRO(){
-      var offset = 0,
-          args = arguments;
-
-      each(opcodes, function(opcode){
-        opcode.apply(null, generate(opcode.params, function(){
-          return args[offset++]
-        }));
-      });
-    }
-  }
 
   function block(callback){
       var entry = new ControlTransfer(context.labels);
@@ -747,32 +763,34 @@ var assembler = (function(exports){
     }
   };
 
-  function destructure(left, right){
-    var key = left.type === 'ArrayPattern' ? 'elements' : 'properties',
-        rights = right[key];
+  function destructure(left, STORE){
+    var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
 
     each(left[key], function(item, i){
-      var binding = elementAt[key](left, i);
-
-      if (isPattern(binding)){
-        var value = rights && rights[i] ? elementAt[key](right, i) : binding;
-        destructure(binding, value);
-      } else {
-        if (binding.type === 'SpreadElement') {
-          recurse(binding.argument);
-          recurse(right);
-          SPREAD(i);
+      if (!item) return;
+      DUP();
+      if (item.type === 'Property') {
+        MEMBER(symbol(item.key));
+        GET();
+        if (isPattern(item.value)) {
+          destructure(item.value, STORE);
         } else {
-          recurse(binding);
-          recurse(right);
-          if (left.type === 'ArrayPattern') {
-            LITERAL(i);
-            ELEMENT(i);
-          } else {
-            MEMBER(symbol(binding))
-          }
+          STORE(item.key.name);
         }
-        PUT();
+      } else if (item.type === 'ArrayPattern') {
+        LITERAL(i);
+        ELEMENT();
+        GET();
+        destructure(item, STORE);
+      } else if (item.type === 'Identifier') {
+        LITERAL(i);
+        ELEMENT();
+        GET();
+        STORE(item.name);
+      } else if (item.type === 'SpreadElement') {
+        GET();
+        SPREAD(i);
+        STORE(item.argument.name);
       }
     });
   }
@@ -797,11 +815,14 @@ var assembler = (function(exports){
     return context.code.ScopeType === SCOPE.EVAL || context.code.ScopeType === SCOPE.GLOBAL;
   }
 
+  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
   function AssignmentExpression(node){
     if (node.operator === '='){
       if (isPattern(node.left)){
-        destructure(node.left, node.right);
+        recurse(node.right);
+        GET();
+        destructure(node.left, ASSIGN);
       } else {
         recurse(node.left);
         recurse(node.right);
@@ -1071,23 +1092,27 @@ var assembler = (function(exports){
         GET();
         ARGS();
         CALL();
-        DUP();
-        var compare = IFEQ(0, false);
         if (isLexicalDeclaration(node.left)) {
           block(function(){
             lexical(function(){
               BLOCK(LexicalDeclarations(node.left));
-              recurse(node.left);
+              VariableDeclaration(node.left, true);
               recurse(node.body);
               UPSCOPE();
             });
           });
         } else {
-          recurse(node.left);
+          if (node.left.type === 'VariableDeclaration') {
+            VariableDeclaration(node.left, true);
+          } else {
+            recurse(node.left);
+            ROTATE(1);
+            PUT();
+            POP();
+          }
           recurse(node.body);
         }
         JUMP(update);
-        adjust(compare);
       });
       return update;
     });
@@ -1408,30 +1433,38 @@ var assembler = (function(exports){
     UPDATE(!!node.prefix | ((node.operator === '++') << 1));
   }
 
-  function VariableDeclaration(node){
+
+  function VariableDeclaration(node, forin){
     var DECLARE = {
       'var': VAR,
       'const': CONST,
       'let': LET
     }[node.kind];
 
+
     each(node.declarations, function(item){
-      var init = item.init;
-      if (init) {
-        if (item.id && item.id.type === 'Identifier' && isAnonymousFunction(init)) {
-          var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
-          var code = Expr(init, item.id.name);
-          code.writableName = true;
-        } else {
-          recurse(init);
-        }
-        GET();
-      }
-
-      DECLARE(item.id);
-
       if (node.kind === 'var') {
         push.apply(context.code.VarDeclaredNames, BoundNames(item.id));
+      }
+
+      if (item.init) {
+        if (item.id && item.id.type === 'Identifier' && isAnonymousFunction(item.init)) {
+          var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
+          recurse(item.id);
+          var code = Expr(item.init, item.id.name);
+          code.writableName = true;
+        } else {
+          recurse(item.init);
+          GET();
+        }
+      } else if (!forin) {
+        UNDEFINED();
+      }
+      if (isPattern(item.id)){
+        destructure(item.id, DECLARE);
+        POP();
+      } else {
+        DECLARE(item.id.name);
       }
     });
   }

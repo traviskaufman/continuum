@@ -3367,8 +3367,8 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
-      function initializeBinding(name, value){
-        return this.LexicalEnvironment.InitializeBinding(name, value);
+      function initializeBinding(name, value, strict){
+        return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
       function initializeBindings(pattern, value){
         return BindingInitialization(pattern, value, this.LexicalEnvironment);
@@ -4647,7 +4647,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       activate(this);
       this.natives = new Intrinsics(this);
       intrinsics = this.intrinsics = this.natives.bindings;
-      intrinsics.global = global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
+      intrinsics.global = global = operators.global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
       this.global.NativeBrand = BRANDS.GlobalObject;
       this.globalEnv = new GlobalEnvironmentRecord(this.global);
       this.globalEnv.Realm = this;

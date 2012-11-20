@@ -295,7 +295,7 @@ var thunk = (function(exports){
     }
 
     function CONST(){
-      context.initializeBindings(ops[ip][0], stack[--sp], true);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
       return cmds[++ip];
     }
 
@@ -449,7 +449,7 @@ var thunk = (function(exports){
           index = stack[--sp] + ops[ip][0],
           array = stack[sp - 1];
 
-      array.DefineOwnProperty(index, new Desc(val));
+      array.DefineOwnProperty(index+'', new Desc(val));
       stack[sp++] = index + 1;
 
       return cmds[++ip];
@@ -471,7 +471,7 @@ var thunk = (function(exports){
     }
 
     function LET(){
-      context.initializeBindings(ops[ip][0], stack[--sp], true);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
       return cmds[++ip];
     }
 
@@ -842,7 +842,7 @@ var thunk = (function(exports){
     }
 
     function VAR(){
-      context.initializeBindings(ops[ip][0], stack[--sp], false);
+      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], false);
       return cmds[++ip];
     }
 
