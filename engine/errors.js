@@ -1,8 +1,9 @@
 var errors = (function(errors, messages, exports){
-  var inherit = require('./utility').inherit,
-      define = require('./utility').define,
+  var objects   = require('../lib/objects'),
       constants = require('./constants');
 
+  var define    = objects.define,
+      inherit   = objects.inherit;
 
   function Exception(name, type, message){
     var args = {},

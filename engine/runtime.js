@@ -1,36 +1,42 @@
 var runtime = (function(GLOBAL, exports, undefined){
-  var esprima   = require('../third_party/esprima'),
-      errors    = require('./errors'),
-      utility   = require('./utility'),
-      assemble  = require('./assembler').assemble,
-      constants = require('./constants'),
-      operators = require('./operators');
+  var esprima      = require('../third_party/esprima'),
+      objects      = require('../lib/objects'),
+      functions    = require('../lib/functions'),
+      iteration    = require('../lib/iteration'),
+      utility      = require('../lib/utility'),
+      errors       = require('./errors'),
+      assemble     = require('./assembler').assemble,
+      constants    = require('./constants'),
+      operators    = require('./operators'),
+      Emitter      = require('../lib/Emitter'),
+      PropertyList = require('../lib/PropertyList'),
+      Thunk        = require('./thunk').Thunk;
 
-  operators.ToObject = ToObject;
-  var Thunk = require('./thunk').Thunk;
-
-  var Hash             = utility.Hash,
-      Emitter          = utility.Emitter,
-      PropertyList     = utility.PropertyList,
-      create           = utility.create,
-      numbers          = utility.numbers,
-      isObject         = utility.isObject,
-      nextTick         = utility.nextTick,
-      enumerate        = utility.enumerate,
-      ownKeys          = utility.keys,
-      define           = utility.define,
-      copy             = utility.copy,
-      inherit          = utility.inherit,
-      each             = utility.each,
-      iterate          = utility.iterate,
-      unique           = utility.unique;
-
+  var Hash          = objects.Hash,
+      create        = objects.create,
+      isObject      = objects.isObject,
+      enumerate     = objects.enumerate,
+      ownKeys       = objects.keys,
+      define        = objects.define,
+      copy          = objects.copy,
+      inherit       = objects.inherit,
+      ownProperties = objects.properties,
+      hide          = objects.hide,
+      fname         = functions.fname,
+      toArray       = functions.toArray,
+      applyNew      = functions.applyNew,
+      each          = iteration.each,
+      iterate       = iteration.iterate,
+      numbers       = utility.numbers,
+      nextTick      = utility.nextTick,
+      unique        = utility.unique;
 
   var ThrowException   = errors.ThrowException,
       MakeException    = errors.MakeException,
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
+  operators.ToObject = ToObject;
   var GetValue         = operators.GetValue,
       PutValue         = operators.PutValue,
       GetThisValue     = operators.GetThisValue,
@@ -62,7 +68,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       Uninitialized = SYMBOLS.Uninitialized;
 
   var StopIteration = constants.BRANDS.StopIteration;
-  var slice = [].slice;
   var uid = (Math.random() * (1 << 30)) | 0;
 
   var BINARYOPS = constants.BINARYOPS.array,
@@ -119,20 +124,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   Completion.prototype.Completion   = SYMBOLS.Completion;
 
 
-
-  // ##################################################
-  // ### Internal Utilities not from specification ####
-  // ##################################################
-
   function noop(){}
-
-  if (Object.getOwnPropertyNames) {
-    var hide = function(o, k){
-      Object.defineProperty(o, k, { enumerable: false });
-    };
-  } else {
-    var hide = function(){};
-  }
 
   // ###############################
   // ###############################
@@ -3370,9 +3362,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
-      function initializeBindings(pattern, value){
-        return BindingInitialization(pattern, value, this.LexicalEnvironment);
-      },
       function popBlock(){
         var block = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
@@ -3649,7 +3638,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       if (typeof options === FUNCTION) {
         this.type = 'recompiled function';
-        if (!utility.fname(options)) {
+        if (!fname(options)) {
           options = {
             scope: SCOPE.FUNCTION,
             filename: '',
@@ -3658,7 +3647,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else {
           options = {
             scope: SCOPE.FUNCTION,
-            filename: utility.fname(options),
+            filename: fname(options),
             source: options+''
           };
         }
@@ -3730,7 +3719,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       function wrapNatives(source, target){
-        each(utility.ownProperties(source), function(key){
+        each(ownProperties(source), function(key){
           if (typeof source[key] === 'function'
                           && key !== 'constructor'
                           && key !== 'toString'
@@ -3963,7 +3952,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return new $Boolean(boolean);
         },
         DateCreate: function(args){
-          return new $Date(utility.applyNew(Date, toInternalArray(args)));
+          return new $Date(applyNew(Date, toInternalArray(args)));
         },
         NumberCreate: function(number){
           return new $Number(number);

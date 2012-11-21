@@ -4,7 +4,8 @@ var utility = continuum.utility,
     create = utility.create,
     assign = utility.assign,
     define = utility.define,
-    each = utility.each;
+    each = utility.each,
+    Hash = utility.Hash;
 
 var DoublyLinkedList = utility.DoublyLinkedList;
 
@@ -41,7 +42,7 @@ try {
         this.type = type;
     }
 
-    EventInit.prototype = assign(create(null), eventOptions);
+    EventInit.prototype = assign(new Hash, eventOptions);
     EventInit.prototype.type = '';
 
 
@@ -443,7 +444,7 @@ var Component = (function(){
     ]);
   } else {
     void function(){
-      var realEvents = create(null);
+      var realEvents = new Hash;
       each([
         'activate', 'afterupdate', 'beforeactivate', 'beforecopy', 'beforecut', 'beforedeactivate',
         'beforeeditfocus', 'beforepaste', 'beforeupdate', 'blur', 'cellchange', 'click', 'contextmenu',

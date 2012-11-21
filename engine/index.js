@@ -1,16 +1,22 @@
 var index = (function(exports){
-  var runtime   = require('./runtime'),
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration'),
+      runtime   = require('./runtime'),
       assembler = require('./assembler'),
       debug     = require('./debug'),
       constants = require('./constants'),
-      utility   = require('./utility'),
       errors    = require('./errors');
 
-  var Realm = runtime.Realm,
-      Script = runtime.Script,
-      Renderer = debug.Renderer,
+  var assign          = objects.assign,
+      assignAll       = objects.assignAll,
+      define          = objects.define,
+      inherit         = objects.inherit,
+      Realm           = runtime.Realm,
+      Script          = runtime.Script,
+      Renderer        = debug.Renderer,
+      ThrowException  = errors.ThrowException,
       $NativeFunction = runtime.$NativeFunction,
-      builtins = runtime.builtins;
+      builtins        = runtime.builtins;
 
 
   var exoticTemplates = {
@@ -38,7 +44,7 @@ var index = (function(exports){
   };
 
 
-  utility.assign(exports, [
+  assign(exports, [
     function createRealm(listener){
       return new Realm(listener);
     },
@@ -72,7 +78,7 @@ var index = (function(exports){
       var Super = builtins['$'+inherits];
 
 
-      utility.inherit($Exotic, Super, {
+      inherit($Exotic, Super, {
         Native: true,
       }, [
         function init(){},
@@ -90,24 +96,24 @@ var index = (function(exports){
           return this.query(key) !== undefined;
         },
         function each(callback){
-          return errors.ThrowException('missing_fundamental_handler', 'each');
+          return ThrowException('missing_fundamental_handler', 'each');
         },
         function get(key){
-          return errors.ThrowException('missing_fundamental_handler', 'get');
+          return ThrowException('missing_fundamental_handler', 'get');
         },
         function set(key, value){
-          return errors.ThrowException('missing_fundamental_handler', 'set');
+          return ThrowException('missing_fundamental_handler', 'set');
         },
         function query(key){
-          return errors.ThrowException('missing_fundamental_handler', 'query');
+          return ThrowException('missing_fundamental_handler', 'query');
         },
         function update(key, attr){
-          return errors.ThrowException('missing_fundamental_handler', 'update');
+          return ThrowException('missing_fundamental_handler', 'update');
         }
       ]);
 
       if (Super.prototype.Call) {
-        utility.define($Exotic.prototype, [
+        define($Exotic.prototype, [
           function call(){},
           function construct(){},
           $NativeFunction.prototype.Call,
@@ -117,23 +123,38 @@ var index = (function(exports){
       }
 
       if (handlers) {
-        utility.define($Exotic.prototype, handlers);
+        define($Exotic.prototype, handlers);
       }
 
       return $Exotic;
     }
   ]);
 
-  utility.define(exports, {
+  define(exports, {
     Assembler : assembler.Assembler,
     Code      : assembler.Code,
     Realm     : Realm,
     Renderer  : Renderer,
     Script    : Script,
-    utility   : utility,
     constants : constants,
-    iterate   : utility.iterate,
-    introspect: debug.introspect
+    iterate   : iteration.iterate,
+    introspect: debug.introspect,
+    utility: assignAll({}, [
+      require('../lib/functions'),
+      require('../lib/iteration'),
+      require('../lib/objects'),
+      require('../lib/traversal'),
+      require('../lib/utility'),
+      require('../lib/DoublyLinkedList'),
+      require('../lib/Emitter'),
+      require('../lib/Feeder'),
+      require('../lib/HashMap'),
+      require('../lib/HashSet'),
+      require('../lib/LinkedList'),
+      require('../lib/PropertyList'),
+      require('../lib/Queue'),
+      require('../lib/Stack')
+    ])
   });
 
   return exports;

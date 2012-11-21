@@ -79,7 +79,25 @@ builder.addFiles('../third_party/esprima/esprima.js', function(name, source){
 });
 
 builder.addFiles([
-  '../engine/utility.js',
+  '../lib/functions.js',
+  '../lib/objects.js',
+  '../lib/iteration.js',
+  '../lib/utility.js',
+  '../lib/Queue.js',
+  '../lib/traversal.js',
+  '../lib/Emitter.js',
+  '../lib/Stack.js',
+  '../lib/LinkedList.js',
+  '../lib/DoublyLinkedList.js',
+  '../lib/HashMap.js',
+  '../lib/HashSet.js',
+  '../lib/Feeder.js',
+  '../lib/PropertyList.js',
+], function(name, source){
+  return 'exports.'+source.slice(4);
+});
+
+builder.addFiles([
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',
@@ -158,5 +176,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-builder.writeFile('../continuum');
-//builder.writeFile('../continuum', true);
+//builder.writeFile('../continuum');
+builder.writeFile('../continuum', true);

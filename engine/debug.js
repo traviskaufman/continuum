@@ -1,21 +1,25 @@
 var debug = (function(exports){
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration'),
+      utility   = require('../lib/utility'),
+      runtime   = require('./runtime');
 
-  var utility = require('./utility'),
-      isObject = utility.isObject,
-      inherit = utility.inherit,
-      create = utility.create,
-      each = utility.each,
-      define = utility.define,
-      assign = utility.assign;
+  var isObject   = objects.isObject,
+      inherit    = objects.inherit,
+      create     = objects.create,
+      define     = objects.define,
+      assign     = objects.assign,
+      getBrandOf = objects.getBrandOf,
+      Hash       = objects.Hash,
+      each       = iteration.each,
+      quotes     = utility.quotes,
+      uid        = utility.uid,
+      realm      = runtime.activeRealm;
 
-  var constants = require('./constants'),
-      ENUMERABLE = constants.ATTRIBUTES.ENUMERABLE,
-      CONFIGURABLE = constants.ATTRIBUTES.CONFIGURABLE,
-      WRITABLE = constants.ATTRIBUTES.WRITABLE,
-      ACCESSOR = constants.ATTRIBUTES.ACCESSOR;
-
-  var runtime = require('./runtime'),
-      realm = runtime.activeRealm;
+  var ENUMERABLE   = 0x01,
+      CONFIGURABLE = 0x02,
+      WRITABLE     = 0x04,
+      ACCESSOR     = 0x08;
 
   function always(value){
     return function(){ return value };
@@ -63,19 +67,10 @@ var debug = (function(exports){
     propAttributes: always(null)
   });
 
-  function brand(v){
-    if (v === null) {
-      return 'Null';
-    } else if (v === void 0) {
-      return 'Undefined';
-    }
-    return Object.prototype.toString.call(v).slice(8, -1);
-  }
-
   function MirrorValue(subject, label){
     this.subject = subject;
     this.type = typeof subject;
-    this.kind = brand(subject)+'Value';
+    this.kind = getBrandOf(subject)+'Value';
     if (this.type === 'number' && isNegativeZero(subject)) {
       label = '-0';
     }
@@ -149,7 +144,7 @@ var debug = (function(exports){
     return MirrorAccessor;
   })();
 
-  var proto = Math.random().toString(36).slice(2);
+  var proto = uid();
 
 
 
@@ -158,7 +153,7 @@ var debug = (function(exports){
       subject.__introspected = this;
       this.subject = subject;
       this.props = subject.properties;
-      this.accessors = create(null);
+      this.accessors = new Hash;
     }
 
     inherit(MirrorObject, Mirror, {
@@ -334,7 +329,7 @@ var debug = (function(exports){
         return this.ownAttrs(this.getPrototype().inheritedAttrs());
       },
       function ownAttrs(props){
-        props || (props = create(null));
+        props || (props = new Hash);
         this.subject.each(function(prop){
           var key = prop[0] === '__proto__' ? proto : prop[0];
           props[key] = prop;
@@ -375,14 +370,17 @@ var debug = (function(exports){
   })();
 
 
+  var MirrorArguments = (function(){
+    function MirrorArguments(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  function MirrorArguments(subject){
-    MirrorObject.call(this, subject);
-  }
+    inherit(MirrorArguments, MirrorObject, {
+      kind: 'Arguments'
+    });
 
-  inherit(MirrorArguments, MirrorObject, {
-    kind: 'Arguments'
-  });
+    return MirrorArguments;
+  })();
 
 
   var MirrorArray = (function(){
@@ -482,7 +480,7 @@ var debug = (function(exports){
 
   var MirrorThrown = (function(){
     function MirrorThrown(subject){
-      if (utility.isObject(subject)) {
+      if (isObject(subject)) {
         MirrorError.call(this, subject);
       } else {
         return introspect(subject);
@@ -567,7 +565,7 @@ var debug = (function(exports){
       },
       function ownAttrs(props){
         var strict = this.isStrict();
-        props || (props = create(null));
+        props || (props = new Hash);
         this.subject.each(function(prop){
           if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
             var key = prop[0] === '__proto__' ? proto : prop[0];
@@ -719,7 +717,7 @@ var debug = (function(exports){
       },
       function ownAttrs(props){
         var len = this.primitive.length;
-        props || (props = create(null));
+        props || (props = new Hash);
 
         for (var i=0; i < len; i++) {
           props[i] = [i+'', this.primitive[i], 1];
@@ -740,7 +738,7 @@ var debug = (function(exports){
         }
       },
       function label(){
-        return 'String('+utility.quotes(this.primitive)+')';
+        return 'String('+quotes(this.primitive)+')';
       }
     ]);
 
@@ -859,8 +857,8 @@ var debug = (function(exports){
       if ('Call' in subject) {
         this.type = 'function';
       }
-      this.attrs = create(null);
-      this.props = create(null);
+      this.attrs = new Hash;
+      this.props = new Hash;
       this.kind = introspect(subject.Target).kind;
     }
 
@@ -929,9 +927,9 @@ var debug = (function(exports){
       function ownAttrs(props){
         var key, keys = this.subject.Enumerate(false, true);
 
-        props || (props = create(null));
-        this.props = create(null);
-        this.attrs = create(null);
+        props || (props = new Hash);
+        this.props = new Hash;
+        this.attrs = new Hash;
 
         for (var i=0; i < keys.length; i++) {
           var desc = this.subject.GetOwnProperty(key);
@@ -996,7 +994,7 @@ var debug = (function(exports){
         return this.ownAttrs(this.getPrototype().inheritedAttrs());
       },
       function ownAttrs(props){
-        props || (props = create(null));
+        props || (props = new Hash);
 
         each(this.subject.EnumerateBindings(), function(key){
           key = key === '__proto__' ? proto : key;
@@ -1132,8 +1130,8 @@ var debug = (function(exports){
       _NegOne      = new MirrorValue(-1, '-1'),
       _Empty       = new MirrorValue('', "''");
 
-  var numbers = create(null),
-      strings = create(null);
+  var numbers = new Hash,
+      strings = new Hash;
 
 
   function introspect(subject){
@@ -1224,7 +1222,7 @@ var debug = (function(exports){
       Unknown: alwaysLabel,
       BooleanValue: alwaysLabel,
       StringValue: function(mirror){
-        return utility.quotes(mirror.subject);
+        return quotes(mirror.subject);
       },
       NumberValue: function(mirror){
         var label = mirror.label();

@@ -1,10 +1,13 @@
 var constants = (function(exports){
-  var create = require('./utility').create,
-      define = require('./utility').define,
-      ownKeys = require('./utility').keys;
+  var objects = require('../lib/objects');
+
+  var create  = objects.create,
+      define  = objects.define,
+      ownKeys = objects.keys,
+      Hash    = objects.Hash;
 
   function Constants(array){
-    this.hash = create(null);
+    this.hash = new Hash;
     for (var i=0; i < array.length; i++) {
       this.hash[array[i]] = i;
     }

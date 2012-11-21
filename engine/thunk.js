@@ -1,8 +1,9 @@
 var thunk = (function(exports){
-  var utility = require('./utility'),
-      Emitter          = utility.Emitter,
-      define           = utility.define,
-      inherit          = utility.inherit;
+  var objects   = require('../lib/objects'),
+      Emitter   = require('../lib/Emitter');
+
+  var define  = objects.define,
+      inherit = objects.inherit;
 
   var operators    = require('./operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,

@@ -1,25 +1,35 @@
 var assembler = (function(exports){
-  var utility   = require('./utility'),
-      util      = require('util');
+  var util      = require('util');
 
-  var walk      = utility.walk,
-      collector = utility.collector,
-      Stack     = utility.Stack,
-      define    = utility.define,
-      assign    = utility.assign,
-      create    = utility.create,
-      copy      = utility.copy,
-      decompile = utility.decompile,
-      inherit   = utility.inherit,
-      ownKeys   = utility.keys,
-      isObject  = utility.isObject,
-      iterate   = utility.iterate,
-      each      = utility.each,
-      repeat    = utility.repeat,
-      map       = utility.map,
-      fold      = utility.fold,
-      generate  = utility.generate,
-      quotes    = utility.quotes;
+  var objects   = require('../lib/objects'),
+      functions = require('../lib/functions'),
+      iteration = require('../lib/iteration'),
+      utility   = require('../lib/utility'),
+      traversal = require('../lib/traversal'),
+      Stack     = require('../lib/Stack'),
+      HashMap   = require('../lib/HashMap');
+
+  var walk      = traversal.walk,
+      collector = traversal.collector,
+      fname     = functions.fname,
+      define    = objects.define,
+      assign    = objects.assign,
+      create    = objects.create,
+      copy      = objects.copy,
+      inherit   = objects.inherit,
+      ownKeys   = objects.keys,
+      hasOwn    = objects.hasOwn,
+      isObject  = objects.isObject,
+      Hash      = objects.Hash,
+      iterate   = iteration.iterate,
+      each      = iteration.each,
+      repeat    = iteration.repeat,
+      map       = iteration.map,
+      fold      = iteration.fold,
+      generate  = iteration.generate,
+      quotes    = utility.quotes,
+      uid       = utility.uid,
+      pushAll   = utility.pushAll;
 
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.hash,
@@ -29,9 +39,7 @@ var assembler = (function(exports){
       AST       = constants.AST,
       FUNCTYPE  = constants.FUNCTYPE.hash;
 
-  var hasOwn = {}.hasOwnProperty,
-      push = [].push,
-      proto = Math.random().toString(36).slice(2),
+  var proto = Math.random().toString(36).slice(2),
       context,
       opcodes = 0;
 
@@ -79,6 +87,39 @@ var assembler = (function(exports){
       };
     }
   ]);
+
+
+  function macro(name){
+    var params = [],
+        ops = [];
+
+    var body = map(arguments, function(arg, a){
+      if (!a) return '';
+      arg instanceof Array || (arg = [arg]);
+      var opcode = arg.shift();
+      ops.push(opcode);
+      return opcode.opname + '('+generate(opcode.params, function(i){
+        if (i in arg) {
+          if (typeof arg[i] === 'string') {
+            return quotes(arg[i]);
+          }
+          return arg[i] + '';
+        } else {
+          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
+          params.push(param);
+          return param;
+        }
+      }).join(', ') + ');';
+    }).join('\n  ');
+
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
+    func.params = func.length;
+    func.opname = name;
+    return func;
+  }
+
+
 
 
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
@@ -147,37 +188,8 @@ var assembler = (function(exports){
       WITH             = new StandardOpCode(0, 'WITH'),
       YIELD            = new StandardOpCode(1, 'YIELD');
 
+  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
-
-  function macro(name){
-    var params = [],
-        ops = [];
-
-    var body = map(arguments, function(arg, a){
-      if (!a) return '';
-      arg instanceof Array || (arg = [arg]);
-      var opcode = arg.shift();
-      ops.push(opcode);
-      return opcode.opname + '('+generate(opcode.params, function(i){
-        if (i in arg) {
-          if (typeof arg[i] === 'string') {
-            return utility.quote(arg[i]);
-          }
-          return arg[i] + '';
-        } else {
-          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
-          params.push(param);
-          return param;
-        }
-      }).join(', ') + ');';
-    }).join('\n  ');
-
-    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
-    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
-    func.params = func.length;
-    func.opname = name;
-    return func;
-  }
 
   var Code = exports.Code = (function(){
     var Directive = (function(){
@@ -207,7 +219,7 @@ var assembler = (function(exports){
       function Params(params, node, rest){
         this.length = 0;
         if (params) {
-          push.apply(this, params)
+          pushAll(this, params)
           this.BoundNames = BoundNames(params);
         } else {
           this.BoundNames = [];
@@ -285,7 +297,9 @@ var assembler = (function(exports){
         this.ExportedNames = getExports(this.body);
         this.Strict = true;
       }
-      this.params = new Params(node.params, node, node.rest);
+      if (node.params) {
+        this.params = new Params(node.params, node, node.rest);
+      }
       this.ops = [];
     }
 
@@ -488,14 +502,50 @@ var assembler = (function(exports){
     FunctionDeclaration: 'id',
     ClassDeclaration   : 'id'
   });
+/*
+  function LexicallyDeclaredNames(){
+    LinkedHashMap.call(this);
+  }
+
+  inherit(LexicallyDeclaredNames, LinkedHashMap, [
+    function add()
+  ]);
 
 
-  function BoundNames(node){
-    if (isFunction(node) || node.type === 'ClassDeclaration') {
-      //node = node.body;
+  function StaticScope(node){
+    this.node = node;
+  }
+
+
+
+  function GlobalScope(){
+    this.LexicallyDeclaredNames = new LinkedHashMap;
+    this.VarDeclaredNames = new LinkedHashMap;
+    this.VarScopedDeclarations = new LinkedHashMap;
+  }
+
+  inherit(GlobalScope, StaticScope, [
+    function enqueue(node){
+
     }
+  ]);
+
+  function FunctionScope(node){
+    this.node = node;
+    this.
+  }
+
+  inherit(FunctionScope, StaticScope, [
+    function enqueue(node){
+
+    }
+  ]);
+
+*/
+  function BoundNames(node){
     return boundNamesCollector(node);
   }
+
 
   var LexicalDeclarations = (function(lexical){
     return collector({
@@ -613,7 +663,7 @@ var assembler = (function(exports){
           if (decl.type === 'ModuleDeclaration') {
             var name = decl.id.name;
           } else {
-            var specifiers = create(null);
+            var specifiers = new Hash;
             each(decl.specifiers, function(specifier){
               var result = handlers[specifier.type](specifier);
               result = typeof result === 'string' ? [result, result] : result;
@@ -715,7 +765,7 @@ var assembler = (function(exports){
   function block(callback){
       var entry = new ControlTransfer(context.labels);
       context.jumps.push(entry);
-      context.labels = create(null);
+      context.labels = new Hash;
       callback();
       entry.updateBreaks(current());
       context.jumps.pop();
@@ -724,7 +774,7 @@ var assembler = (function(exports){
   function control(callback){
     var entry = new ControlTransfer(context.labels);
     context.jumps.push(entry);
-    context.labels = create(null);
+    context.labels = new Hash;
     entry.updateContinues(callback());
     entry.updateBreaks(current());
     context.jumps.pop();
@@ -815,7 +865,6 @@ var assembler = (function(exports){
     return context.code.ScopeType === SCOPE.EVAL || context.code.ScopeType === SCOPE.GLOBAL;
   }
 
-  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
   function AssignmentExpression(node){
     if (node.operator === '='){
@@ -1071,14 +1120,14 @@ var assembler = (function(exports){
   }
 
   function ForInStatement(node){
-    iteration(node, ENUM);
+    iter(node, ENUM);
   }
 
   function ForOfStatement(node){
-    iteration(node, ITERATE);
+    iter(node, ITERATE);
   }
 
-  function iteration(node, KIND){
+  function iter(node, KIND){
     control(function(){
       var update;
       lexical(ENTRY.FOROF, function(){
@@ -1171,7 +1220,7 @@ var assembler = (function(exports){
 
   function LabeledStatement(node){
     if (!context.labels){
-      context.labels = create(null);
+      context.labels = new Hash;
     } else if (label in context.labels) {
       context.earlyError(node, 'duplicate_label');
     }
@@ -1444,7 +1493,7 @@ var assembler = (function(exports){
 
     each(node.declarations, function(item){
       if (node.kind === 'var') {
-        push.apply(context.code.VarDeclaredNames, BoundNames(item.id));
+        pushAll(context.code.VarDeclaredNames, BoundNames(item.id));
       }
 
       if (item.init) {
@@ -1506,7 +1555,7 @@ var assembler = (function(exports){
 
   var handlers = {};
 
-  utility.iterate([ ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
+  each([ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
     AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
     ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression,
     DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
@@ -1517,9 +1566,10 @@ var assembler = (function(exports){
     Property, ReturnStatement, SequenceExpression, SwitchStatement, SymbolDeclaration, SymbolDeclarator,
     TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement,
     TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator,
-    WhileStatement, WithStatement, YieldExpression], function(handler){
-      handlers[utility.fname(handler)] = handler;
-    });
+    WhileStatement, WithStatement, YieldExpression],
+    function(handler){
+    handlers[fname(handler)] = handler;
+  });
 
 
 
@@ -1563,7 +1613,7 @@ var assembler = (function(exports){
       this.options = new AssemblerOptions(options);
       define(this, {
         strings: [],
-        hash: create(null)
+        hash: new Hash
       });
     }
 
