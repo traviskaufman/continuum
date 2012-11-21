@@ -6,6 +6,7 @@ var utility = continuum.utility,
     define = utility.define,
     each = utility.each;
 
+var DoublyLinkedList = utility.DoublyLinkedList;
 
 
 var eventOptions = { bubbles: true, cancelable: true },
@@ -118,7 +119,7 @@ var Component = (function(){
     function append(subject){
       if (!subject) return subject;
       if (subject.element) {
-        this.children || (this.children = new utility.LinkedList);
+        this.children || (this.children = new DoublyLinkedList);
         this.children.push(subject);
         this.element.appendChild(subject.element);
       } else if (subject instanceof Element) {
@@ -202,7 +203,7 @@ var Component = (function(){
       if (this.children) {
         this.children.replace(child, replacement);
       } else {
-        this.children = new utility.LinkedList;
+        this.children = new DoublyLinkedList;
         this.children.push(replacement);
       }
 

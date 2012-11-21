@@ -16,6 +16,7 @@ var utility = (function(exports){
 
   var toBrand = {}.toString,
       _slice = [].slice,
+      _push = [].push,
       hasOwn = {}.hasOwnProperty,
       toSource = Function.toString;
 
@@ -27,6 +28,7 @@ var utility = (function(exports){
   };
 
   var proto = uid();
+
 
 
   function getBrandOf(o){
@@ -44,6 +46,7 @@ var utility = (function(exports){
       throw new TypeError(name + ' called with non-object ' + getBrandOf(o));
     }
   }
+
 
   function uid(){
     return Math.random().toString(36).slice(2);
@@ -351,24 +354,34 @@ var utility = (function(exports){
   }
   exports.enumerate = enumerate;
 
-  var StopIteration = exports.StopIteration = global.StopIteration || create(null);
+
+  var StopIteration = exports.StopIteration = global.StopIteration || {};
+
+  function Iterator(){}
+
+  define(Iterator.prototype, [
+    function __iterator__(){
+      return this;
+    }
+  ]);
+
 
   function iterate(o, callback, context){
     if (o == null) return;
     var type = typeof o;
     context = context || o;
     if (type === 'number' || type === 'boolean') {
-      callback.call(context, o, 0, o);
+      call(callback, context, o, 0, o);
     } else {
       o = Object(o);
       var iterator = o.iterator || o.__iterator__;
 
       if (typeof iterator === 'function') {
-        var iter = iterator.call(o);
+        var iter = call(iterator, o);
         if (iter && typeof iter.next === 'function') {
           var i=0;
           try {
-            while (1) callback.call(context, iter.next(), i++, o);
+            while (1) call(callback, context, iter.next());
           } catch (e) {
             if (e === StopIteration) return;
             throw e;
@@ -378,12 +391,12 @@ var utility = (function(exports){
 
       if (type !== 'function' && o.length) {
         for (var i=0; i < o.length; i++) {
-          callback.call(context, o[i], i, o);
+          call(callback, context, o[i], i, o);
         }
       } else {
         var keys = ownKeys(o);
         for (var i=0; i < keys.length; i++) {
-          callback.call(context, o[keys[i]], keys[i], o);
+          call(callback, context, o[keys[i]], keys[i], o);
         }
       }
     }
@@ -789,7 +802,7 @@ var utility = (function(exports){
 
     define(Emitter.prototype, [
       function on(events, handler){
-        iterate(events.split(/\s+/), function(event){
+        each(events.split(/\s+/), function(event){
           if (!(event in this)) {
             this[event] = [];
           }
@@ -797,7 +810,7 @@ var utility = (function(exports){
         }, this._events);
       },
       function off(events, handler){
-        iterate(events.split(/\s+/), function(event){
+        each(events.split(/\s+/), function(event){
           if (event in this) {
             var index = '__index' in handler ? handler.__index : this[event].indexOf(handler);
             if (~index) {
@@ -848,7 +861,7 @@ var utility = (function(exports){
         this.index = 0;
       }
 
-      define(PropertyListIterator.prototype, [
+      inherit(PropertyListIterator, Iterator, [
         function next(){
           var props = this.list.props, property;
           while (!property) {
@@ -858,9 +871,6 @@ var utility = (function(exports){
             property = props[this.index++];
           }
           return this.type === ITEMS ? property : property[this.type];
-        },
-        function __iterator__(){
-          return this;
         }
       ]);
 
@@ -1109,7 +1119,191 @@ var utility = (function(exports){
     return PropertyList;
   })();
 
+
+
+
+
   var LinkedList = exports.LinkedList = (function(){
+    function LinkedListIterator(list){
+      this.item = list.sentinel;
+      this.sentinel = list.sentinel;
+    }
+
+    inherit(LinkedListIterator, Iterator, [
+      function next(){
+        this.item = this.item.next;
+        if (this.item === this.sentinel) {
+          throw StopIteration;
+        }
+        return this.item.data;
+      }
+    ]);
+
+
+    function Item(data){
+      this.data = data;
+    }
+
+    define(Item.prototype, [
+      function link(item){
+        item.next = this;
+        return item;
+      },
+      function unlink(){
+        var next = this.next;
+        this.next = next.next;
+        next.next = null;
+        return this;
+      },
+      function clear(){
+        var data = this.data;
+        this.data = undefined;
+        this.next = null;
+        return data;
+      }
+    ]);
+
+    function Sentinel(){
+      this.next = null;
+    }
+
+    inherit(Sentinel, Item, [
+      function unlink(){
+        return this;
+      },
+      function clear(){}
+    ]);
+
+    function find(list, value){
+      if (list.lastFind && list.lastFind.next.data === value) {
+        return list.lastFind;
+      }
+
+      var item = list.tail,
+          i = 0;
+
+      while ((item = item.next) !== list.sentinel) {
+        if (item.next.data === value) {
+          return list.lastFind = item;
+        }
+      }
+    }
+
+    function LinkedList(){
+      var sentinel = new Sentinel;
+      this.size = 0;
+      define(this, {
+        sentinel: sentinel,
+        tail: sentinel,
+        lastFind: null
+      });
+    }
+
+    define(LinkedList.prototype, [
+      function push(value){
+        this.tail = this.tail.link(new Item(value));
+        return ++this.size;
+      },
+      function pop() {
+        var tail = this.tail,
+            data = tail.data;
+        this.tail = tail.next;
+        tail.next = null;
+        tail.data = undefined;
+        return data;
+      },
+      function insert(value, before){
+        var item = find(this, before);
+        if (item) {
+          var inserted = new Item(value);
+          inserted.next = item.next;
+          item.next = inserted;
+          return ++this.size;
+        }
+        return false;
+      },
+      function remove(value){
+        var item = find(this, value);
+        if (item) {
+          item.unlink();
+          return --this.size;
+        }
+        return false;
+      },
+      function replace(value, replacement){
+        var item = find(this, value);
+        if (item) {
+          var replacer = new Item(replacement);
+          replacer.next = item.next.next;
+          item.next.next = null;
+          item.next = replacer;
+          return true;
+        }
+        return false;
+      },
+      function has(value) {
+        return !!find(this, value);
+      },
+      function items(){
+        var item = this.tail,
+            array = [];
+
+        while (item !== this.sentinel) {
+          array.push(item.data);
+          item = item.next;
+        }
+
+        return array;
+      },
+      function clear(){
+        var next,
+            item = this.tail;
+
+        while (item !== this.sentinel) {
+          next = item.next;
+          item.clear();
+          item = next;
+        }
+
+        this.tail = this.sentinel;
+        this.size = 0;
+        return this;
+      },
+      function clone(){
+        var items = this.items(),
+            list = new LinkedList,
+            i = items.length;
+
+        while (i--) {
+          list.push(items[i]);
+        }
+        return list;
+      },
+      function __iterator__(){
+        return new LinkedListIterator(this);
+      }
+    ]);
+
+    return LinkedList;
+  })();
+
+  var DoublyLinkedList = exports.DoublyLinkedList = (function(){
+    function DoublyLinkedListIterator(list){
+      this.item = list.sentinel;
+      this.sentinel = list.sentinel;
+    }
+
+    inherit(DoublyLinkedListIterator, Iterator, [
+      function next(){
+        this.item = this.item.next;
+        if (this.item === this.sentinel) {
+          throw StopIteration;
+        }
+        return this.item.data;
+      }
+    ]);
+
+
     function Item(data, prev){
       this.data = data;
       this.after(prev);
@@ -1149,31 +1343,13 @@ var utility = (function(exports){
     ]);
 
     function Sentinel(list){
-      this.list = list;
       this.next = this;
       this.prev = this;
-      this.data = undefined;
     }
 
     inherit(Sentinel, Item, [
       function unlink(){
         return this;
-      }
-    ]);
-
-
-    function LinkedListIterator(list){
-      this.item = list.sentinel;
-      this.sentinel = list.sentinel;
-    }
-
-    define(LinkedListIterator.prototype, [
-      function next(){
-        this.item = this.item.next;
-        if (this.item === this.sentinel) {
-          throw StopIteration;
-        }
-        return this.item.data;
       }
     ]);
 
@@ -1192,15 +1368,15 @@ var utility = (function(exports){
       }
     }
 
-    function LinkedList(){
-      this.sentinel = new Sentinel(this);
+    function DoublyLinkedList(){
       this.size = 0;
-      this.lastFind = null;
-      hide(this, 'sentinel');
-      hide(this, 'lastFind');
+      define(this, {
+        sentinel: new Sentinel,
+        lastFind: null
+      });
     }
 
-    define(LinkedList.prototype, [
+    define(DoublyLinkedList.prototype, [
       function first() {
         return this.sentinel.next.data;
       },
@@ -1283,56 +1459,202 @@ var utility = (function(exports){
           item = next;
         }
 
+        this.lastFind = null;
         this.size = 0;
         return this;
       },
       function clone(){
         var item = this.sentinel,
-            list = new LinkedList;
+            list = new DoublyLinkedList;
 
         while ((item = item.next) !== this.sentinel) {
           list.push(item.data);
         }
         return list;
       },
-      function forEach(callback, context){
-        var item = this.sentinel,
-            i = 0;
-        context = context || this;
-        while ((item = item.next) !== this.sentinel) {
-          callback.call(context, item.data, i++, this);
-        }
-      },
-      function map(callback, context) {
-        var array = [];
-        context = context || this;
-
-        this.forEach(function(data, i){
-          array.push(callback.call(context, data, i, this));
-        });
-
-        return array;
-      },
-      function filter(callback, context) {
-        var array = [];
-        context = context || this;
-
-        this.forEach(function(data, i){
-          if (callback.call(context, data, i, this)) {
-            array.push(data);
-          }
-        });
-
-        return array;
-      },
       function __iterator__(){
-        return new LinkedListIterator(this);
+        return new DoublyLinkedListIterator(this);
       }
     ]);
 
-    return LinkedList;
+    return DoublyLinkedList;
   })();
 
+  var types = assign(create(null), {
+    string: 'strings',
+    number: 'numbers',
+    undefined: 'others',
+    boolean: 'others',
+    object: 'others'
+  });
+
+  exports.HashMap = (function(){
+
+    function HashMapIterator(map, type){
+      this.item = map.list.sentinel;
+      this.sentinel = map.list.sentinel;
+      this.type = type || 'items';
+    }
+
+    inherit(HashMapIterator, Iterator, [
+      function next(){
+        var item = this.item = this.item.next;
+
+        if (item === this.sentinel) {
+          throw StopIteration;
+        } else if (this.type === 'key') {
+          return item.key;
+        } else if (this.type === 'value') {
+          return item.data;
+        } else {
+          return [item.key, item.data];
+        }
+      }
+    ]);
+
+    function HashMap(){
+      define(this, 'list', new DoublyLinkedList);
+      this.clear();
+    }
+
+    define(HashMap.prototype, [
+      function get(key){
+        var item = this[types[typeof key]][key];
+        if (item) {
+          return item.data;
+        }
+      },
+      function set(key, value){
+        var data = this[types[typeof key]],
+            item = data[key];
+
+        if (item) {
+          item.data = value;
+        } else {
+          this.list.push(value);
+          item = this.list.sentinel.prev;
+          item.key = key;
+          data[key] = item;
+        }
+        this.size = this.list.size;
+        return value;
+      },
+      function has(key){
+        return key in this[types[typeof key]];
+      },
+      function remove(key){
+        var data = this[types[typeof key]];
+
+        if (key in data) {
+          data[key].unlink();
+          delete data[key];
+          this.size = this.list.size;
+          return true;
+        }
+        return false;
+      },
+      function clear(){
+        define(this, {
+          strings: create(null),
+          numbers: create(null),
+          others: create(null)
+        });
+        this.list.clear();
+        this.size = 0;
+      },
+      function keys(){
+        var out = [];
+        iterate(this.__iterator__('key'), bind(_push, out));
+        return out;
+      },
+      function values(){
+        var out = [];
+        iterate(this.__iterator__('value'), bind(_push, out));
+        return out;
+      },
+      function items(){
+        var out = [];
+        iterate(this, bind(_push, out));
+        return out;
+      },
+      function __iterator__(type){
+        return new HashMapIterator(this, type);
+      }
+    ]);
+
+    return HashMap;
+  })();
+
+
+  exports.HashSet = (function(){
+    function HashSetIterator(set){
+      this.item = set.list.sentinel;
+      this.sentinel = set.list.sentinel;
+    }
+
+    inherit(HashSetIterator, Iterator, [
+      function next(){
+        var item = this.item = this.item.next;
+        if (item === this.sentinel) {
+          throw StopIteration;
+        } else {
+          return item.data;
+        }
+      }
+    ]);
+
+    function HashSet(){
+      define(this, 'list', new DoublyLinkedList);
+      this.clear();
+    }
+
+    define(HashSet.prototype, [
+      function add(value){
+        var data = this[types[typeof value]],
+            item = data[value];
+
+        if (!item) {
+          this.list.push(value);
+          data[value] = this.list.sentinel.prev;
+          this.size = this.list.size;
+        }
+        return value;
+      },
+      function has(value){
+        return value in this[types[typeof value]];
+      },
+      function remove(value){
+        var data = this[types[typeof value]];
+
+        if (value in data) {
+          data[value].unlink();
+          delete data[value];
+          this.size = this.list.size;
+          return true;
+        }
+        return false;
+      },
+      function clear(){
+        define(this, {
+          strings: create(null),
+          numbers: create(null),
+          others: create(null)
+        });
+        this.list.clear();
+        this.size = 0;
+      },
+      function values(){
+        var out = [];
+        iterate(this, bind(_push, out));
+        return out;
+      },
+      function __iterator__(){
+        return new HashSetIterator(this);
+      }
+    ]);
+
+    return HashSet;
+  })();
 
   exports.Stack = (function(){
     function StackIterator(stack){
