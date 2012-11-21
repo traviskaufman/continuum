@@ -5446,59 +5446,9 @@ parseYieldExpression: true
 return exports;
 })({});
 
-exports.utility = (function(exports){
-  var BOOLEAN   = 'boolean',
-      FUNCTION  = 'function',
-      NUMBER    = 'number',
-      OBJECT    = 'object',
-      STRING    = 'string',
-      UNDEFINED = 'undefined';
-
-  var KEYS   = 'keys',
-      VALUES = 'values',
-      ITEMS  = 'items',
-      ATTRS  = 'attributes';
-
-  var hasDunderProto = { __proto__: [] } instanceof Array,
-      isES5 = !(!Object.getOwnPropertyNames || 'prototype' in Object.getOwnPropertyNames);
-
-  var toBrand = {}.toString,
-      _slice = [].slice,
-      hasOwn = {}.hasOwnProperty,
-      toSource = Function.toString;
-
-  var hidden = {
-    configurable: true,
-    enumerable: false,
-    writable: true,
-    value: undefined
-  };
-
-  var proto = uid();
-
-
-  function getBrandOf(o){
-    if (o === null) {
-      return 'Null';
-    } else if (o === undefined) {
-      return 'Undefined';
-    } else {
-      return toBrand.call(o).slice(8, -1);
-    }
-  }
-
-  function ensureObject(name, o){
-    if (o === null || typeof o !== 'object') {
-      throw new TypeError(name + ' called with non-object ' + getBrandOf(o));
-    }
-  }
-
-  function uid(){
-    return Math.random().toString(36).slice(2);
-  }
-
-  exports.uid = uid;
-
+exports.functions = (function(exports){
+  var _slice = [].slice,
+      _concat = [].concat;
 
   function toArray(o){
     var len = o.length;
@@ -5527,156 +5477,10 @@ exports.utility = (function(exports){
   }
   exports.slice = slice;
 
-  var fname = exports.fname = (function(){
-    if (Function.name === 'Function') {
-      return function fname(f){
-        return f ? f.name || '' : '';
-      };
-    }
-    return function fname(f){
-      if (typeof f !== FUNCTION) {
-        return '';
-      }
-
-      if (!hasOwn.call(f, 'name')) {
-        hidden.value = toSource.call(f).match(/^\n?function\s?(\w*)?_?\(/)[1];
-        defineProperty(f, 'name', hidden);
-      }
-
-      return f.name || '';
-    };
-  })();
-
-  function isObject(v){
-    var type = typeof v;
-    return type === OBJECT ? v !== null : type === FUNCTION;
-  }
-  exports.isObject = isObject;
-
-  exports.nextTick = typeof process !== UNDEFINED
-                    ? process.nextTick
-                    : function nextTick(f){ setTimeout(f, 1) };
-
-  exports.numbers = (function(cache){
-    return function numbers(start, end){
-      if (!isFinite(end)) {
-        end = start;
-        start = 0;
-      }
-      var length = end - start,
-          curr;
-
-      if (end > cache.length) {
-        while (length--)
-          cache[curr = length + start] = '' + curr;
-      }
-      return cache.slice(start, end);
-    };
-  })([]);
-
-
-  if (isES5) {
-    var create = exports.create = Object.create;
-  } else {
-    var Null = function(){};
-    var hiddens = ['constructor', 'hasOwnProperty', 'propertyIsEnumerable',
-                   'isPrototypeOf', 'toLocaleString', 'toString', 'valueOf'];
-
-    var create = exports.create = (function(F){
-      var iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      iframe.src = 'javascript:';
-      Null.prototype = iframe.contentWindow.Object.prototype;
-      document.body.removeChild(iframe);
-
-      while (hiddens.length) {
-        delete Null.prototype[hiddens.pop()];
-      }
-
-      return function create(object){
-        if (object === null) {
-          return new Null;
-        } else {
-          F.prototype = object;
-          object = new F;
-          F.prototype = null;
-          return object;
-        }
-      };
-    })(function(){});
-  }
-
-  var ownKeys = exports.keys = (function(){
-    if (isES5) return Object.keys;
-    return function keys(o){
-      var out = [], i=0;
-      for (var k in o) {
-        if (hasOwn.call(o, k)) {
-          out[i++] = k;
-        }
-      }
-      return out;
-    };
-  })();
-
-  var getPrototypeOf = exports.getPrototypeOf = (function(){
-    if (isES5) {
-      return Object.getPrototypeOf;
-    } else if (hasDunderProto) {
-      return function getPrototypeOf(o){
-        ensureObject('getPrototypeOf', o);
-        return o.__proto__;
-      };
-    } else {
-      return function getPrototypeOf(o){
-        ensureObject('getPrototypeOf', o);
-
-        var ctor = o.constructor;
-
-        if (typeof ctor === FUNCTION) {
-          var proto = ctor.prototype;
-          if (o !== proto) {
-            return proto;
-          } else if (!ctor._super) {
-            delete o.constructor;
-            ctor._super = o.constructor;
-            o.constructor = ctor;
-          }
-          return ctor._super.prototype;
-        } else if (o instanceof Null) {
-          return null;
-        } else if (o instanceof Object) {
-          return Object.prototype;
-        }
-      };
-    }
-  })();
-
-  var defineProperty = exports.defineProperty = (function(){
-    if (isES5) return Object.defineProperty;
-    return function defineProperty(o, k, desc){
-      o[k] = desc.value;
-      return o;
-    };
-  })();
-
-
-  var describeProperty = exports.describeProperty = (function(){
-    if (isES5) return Object.getOwnPropertyDescriptor;
-    return function getOwnPropertyDescriptor(o, k){
-      ensureObject('getOwnPropertyDescriptor', o);
-      if (hasOwn.call(o, k)) {
-        return { value: o[k] };
-      }
-    };
-  })();
-
-  var ownProperties = exports.ownProperties = isES5 ? Object.getOwnPropertyNames : ownKeys;
 
   var _call, _apply, _bind;
 
-  if (typeof Function.prototype.bind === FUNCTION && !('prototype' in Function.prototype.bind)) {
+  if (typeof Function.prototype.bind === 'function' && !('prototype' in Function.prototype.bind)) {
     _bind = Function.prototype.bind;
     _call = Function.prototype.call;
     _apply = Function.prototype.apply;
@@ -5726,70 +5530,255 @@ exports.utility = (function(exports){
     }();
   }
 
-  var bindbind  = exports.bindbind  = _bind.call(_bind, _bind),
-      callbind  = exports.callbind  = bindbind(_call),
-      applybind = exports.applybind = bindbind(_apply),
+  var __ = partial.__ = {};
+
+  function partial(f){
+    var argv = [],
+        argc = 0,
+        holes = 0;
+
+    for (var i=1; i < arguments.length; i++) {
+      if (arguments[i] === __) {
+        holes++;
+      }
+      argv[argc++] = arguments[i];
+    }
+
+    if (holes) {
+      return function(){
+        var extra = arguments.length > holes ? arguments.length - holes : 0,
+            args = [],
+            j = 0;
+
+        for (var i=0; i < argc; i++) {
+          args[i] = argv[i] === __ ? arguments[j++] : argv[i];
+        }
+
+        while (extra--) {
+          args[i++] = arguments[j++];
+        }
+
+        return f.apply(this, args);
+      };
+    } else if (argc) {
+      return function(){
+        return f.apply(this, _concat.apply(argv, arguments));
+      };
+    } else {
+      return function(){
+        return f.apply(this, arguments);
+      };
+    }
+  }
+  exports.partial = partial;
+
+
+  function bind(f, receiver){
+    var argv = [],
+        argc = 0;
+
+    for (var i=2; i < arguments.length; i++) {
+      argv[argc++] = arguments[i];
+    }
+
+    if (argc) {
+      return function(){
+        return f.apply(receiver, _concat.apply(argv, arguments));
+      };
+    } else {
+      return function(){
+        return f.apply(receiver, arguments);
+      };
+    }
+  }
+  exports.bind = bind;
+
+
+  var bindbind  = exports.bindbind  = bind(_bind, _bind),
+      callbind  = exports.callbind  = partial(bind, _call),
+      applybind = exports.applybind = partial(bind, _apply),
       bindapply = exports.bindapply = applybind(_bind),
-      bind      = exports.bind      = callbind(_bind),
       call      = exports.call      = callbind(_call),
       apply     = exports.apply     = callbind(_apply);
 
+  var nil = [null];
 
-  function applyNew(Ctor, args){
-    return new (bindapply(Ctor, [null].concat(args)));
+  exports.applyNew = function applyNew(Ctor, args){
+    return new (bindapply(Ctor, nil.concat(args)));
   }
-  exports.applyNew = applyNew;
 
+  var hasOwn   = callbind({}.hasOwnProperty),
+      toSource = callbind(function(){}.toString);
 
-  function copy(o){
-    return assign(create(getPrototypeOf(o)), o);
-  }
-  exports.copy = copy;
-
-  function clone(o, hidden){
-    function recurse(from, to, key){
-      try {
-        var val = from[key];
-        if (!isObject(val)) {
-          return to[key] = val;
-        }
-        if (from[key] === val) {
-          if (hasOwn.call(from[key], tag)) {
-            return to[key] = from[key][tag];
-          }
-          to[key] = enqueue(from[key]);
-        }
-      } catch (e) {}
+  exports.fname = (function(){
+    if (Function.name === 'Function') {
+      return function fname(f){
+        return f ? f.name || '' : '';
+      };
     }
-
-    function enqueue(o){
-      var out = o instanceof Array ? [] : create(getPrototypeOf(o));
-      tagged.push(o);
-      var keys = list(o);
-      for (var i=0; i < keys.length; i++) {
-        queue.push([o, out, keys[i]]);
+    return function fname(f){
+      if (typeof f !== 'function') {
+        return '';
       }
-      o[tag] = out;
-      return out;
+
+      if (!hasOwn(f, 'name')) {
+        hidden.value = toSource(f).match(/^\n?function\s?(\w*)?_?\(/)[1];
+        defineProperty(f, 'name', hidden);
+      }
+
+      return f.name || '';
+    };
+  })();
+
+  return exports;
+})(typeof module !== 'undefined' ? module.exports : {});
+
+
+exports.objects = (function(exports){
+  var functions = require('./functions'),
+      callbind  = functions.callbind,
+      bind      = functions.bind,
+      fname     = functions.fname;
+
+  var toBrand = callbind({}.toString),
+      hasOwn = callbind({}.hasOwnProperty);
+
+  exports.hasOwn = hasOwn;
+
+  var hasDunderProto = { __proto__: [] } instanceof Array,
+      isES5 = !(!Object.getOwnPropertyNames || 'prototype' in Object.getOwnPropertyNames);
+
+  var hidden = {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: undefined
+  };
+
+
+  function getBrandOf(o){
+    if (o === null) {
+      return 'Null';
+    } else if (o === undefined) {
+      return 'Undefined';
+    } else {
+      return toBrand(o).slice(8, -1);
     }
-
-    var queue = new Queue,
-        tag = uid(),
-        tagged = [],
-        list = hidden ? ownProperties : ownKeys,
-        out = enqueue(o);
-
-    while (queue.length) {
-      recurse.apply(this, queue.shift());
-    }
-
-    for (var i=0; i < tagged.length; i++) {
-      delete tagged[tag];
-    }
-
-    return out;
   }
-  exports.clone = clone;
+  exports.getBrandOf = getBrandOf;
+
+  function ensureObject(name, o){
+    if (o === null || typeof o !== 'object') {
+      throw new TypeError(name + ' called with non-object ' + getBrandOf(o));
+    }
+  }
+
+  function isObject(v){
+    var type = typeof v;
+    return type === 'object' ? v !== null : type === 'function';
+  }
+  exports.isObject = isObject;
+
+
+
+  if (isES5) {
+    var create = exports.create = Object.create;
+  } else {
+    var Null = function(){};
+    var hiddens = ['constructor', 'hasOwnProperty', 'propertyIsEnumerable',
+                   'isPrototypeOf', 'toLocaleString', 'toString', 'valueOf'];
+
+    var create = exports.create = (function(F){
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      iframe.src = 'javascript:';
+      Null.prototype = iframe.contentWindow.Object.prototype;
+      document.body.removeChild(iframe);
+
+      while (hiddens.length) {
+        delete Null.prototype[hiddens.pop()];
+      }
+
+      return function create(object){
+        if (object === null) {
+          return new Null;
+        } else {
+          F.prototype = object;
+          object = new F;
+          F.prototype = null;
+          return object;
+        }
+      };
+    })(function(){});
+  }
+
+  var ownKeys = exports.keys = (function(){
+    if (isES5) return Object.keys;
+    return function keys(o){
+      var out = [], i=0;
+      for (var k in o) {
+        if (hasOwn(o, k)) {
+          out[i++] = k;
+        }
+      }
+      return out;
+    };
+  })();
+
+  var getPrototypeOf = exports.getPrototypeOf = (function(){
+    if (isES5) {
+      return Object.getPrototypeOf;
+    } else if (hasDunderProto) {
+      return function getPrototypeOf(o){
+        ensureObject('getPrototypeOf', o);
+        return o.__proto__;
+      };
+    } else {
+      return function getPrototypeOf(o){
+        ensureObject('getPrototypeOf', o);
+
+        var ctor = o.constructor;
+
+        if (typeof ctor === 'function') {
+          var proto = ctor.prototype;
+          if (o !== proto) {
+            return proto;
+          } else if (!ctor._super) {
+            delete o.constructor;
+            ctor._super = o.constructor;
+            o.constructor = ctor;
+          }
+          return ctor._super.prototype;
+        } else if (o instanceof Null) {
+          return null;
+        } else if (o instanceof Object) {
+          return Object.prototype;
+        }
+      };
+    }
+  })();
+
+  var defineProperty = exports.defineProperty = (function(){
+    if (isES5) return Object.defineProperty;
+    return function defineProperty(o, k, desc){
+      o[k] = desc.value;
+      return o;
+    };
+  })();
+
+
+  var describeProperty = exports.describeProperty = (function(){
+    if (isES5) return Object.getOwnPropertyDescriptor;
+    return function getOwnPropertyDescriptor(o, k){
+      ensureObject('getOwnPropertyDescriptor', o);
+      if (hasOwn(o, k)) {
+        return { value: o[k] };
+      }
+    };
+  })();
+
+  var ownProperties = exports.properties = isES5 ? Object.getOwnPropertyNames : ownKeys;
 
 
   function enumerate(o){
@@ -5799,126 +5788,29 @@ exports.utility = (function(exports){
   }
   exports.enumerate = enumerate;
 
-  var StopIteration = exports.StopIteration = global.StopIteration || create(null);
 
-  function iterate(o, callback, context){
-    if (o == null) return;
-    var type = typeof o;
-    context = context || o;
-    if (type === 'number' || type === 'boolean') {
-      callback.call(context, o, 0, o);
-    } else {
-      o = Object(o);
-      var iterator = o.iterator || o.__iterator__;
-
-      if (typeof iterator === 'function') {
-        var iter = iterator.call(o);
-        if (iter && typeof iter.next === 'function') {
-          var i=0;
-          try {
-            while (1) callback.call(context, iter.next(), i++, o);
-          } catch (e) {
-            if (e === StopIteration) return;
-            throw e;
-          }
-        }
-      }
-
-      if (type !== 'function' && o.length) {
-        for (var i=0; i < o.length; i++) {
-          callback.call(context, o[i], i, o);
-        }
-      } else {
-        var keys = ownKeys(o);
-        for (var i=0; i < keys.length; i++) {
-          callback.call(context, o[keys[i]], keys[i], o);
-        }
-      }
-    }
+  function copy(o){
+    return assign(create(getPrototypeOf(o)), o);
   }
-  exports.iterate = iterate;
-
-  function each(o, callback){
-    for (var i=0; i < o.length; i++) {
-      callback(o[i], i, o);
-    }
-  }
-  exports.each = each;
-
-  function map(o, callback){
-    var out = new Array(o.length);
-    for (var i=0; i < o.length; i++) {
-      out[i] = callback(o[i], i);
-    }
-    return out;
-  }
-  exports.map = map;
-
-  function fold(o, initial, callback){
-    if (callback) {
-      var val = initial, i = 0;
-    } else {
-      if (typeof initial === STRING) {
-        callback = fold[initial];
-      } else {
-        callback = initial;
-      }
-
-      var val = o[0], i = 1;
-    }
-    for (; i < o.length; i++) {
-      val = callback(val, o[i], i, o);
-    }
-    return val;
-  }
-  exports.fold = fold;
-
-  fold['+'] = function(a, b){ return a + b };
-  fold['*'] = function(a, b){ return a - b };
-  fold['-'] = function(a, b){ return a * b };
-  fold['/'] = function(a, b){ return a / b };
-
-  function repeat(n, args, callback){
-    if (typeof args === FUNCTION) {
-      callback = args;
-      for (var i=0; i < n; i++) {
-        callback();
-      }
-    } else {
-      for (var i=0; i < n; i++) {
-        callback.apply(this, args);
-      }
-    }
-  }
-  exports.repeat = repeat;
-
-
-  function generate(n, callback){
-    var out = new Array(n);
-    for (var i=0; i < n; i++) {
-      out[i] = callback(i, n, out);
-    }
-    return out;
-  }
-  exports.generate = generate;
+  exports.copy = copy;
 
 
   function define(o, p, v){
     switch (typeof p) {
-      case FUNCTION:
+      case 'function':
         v = p;
         p = fname(v);
-      case STRING:
+      case 'string':
         hidden.value = v;
         defineProperty(o, p, hidden);
         break;
-      case OBJECT:
+      case 'object':
         if (p instanceof Array) {
           for (var i=0; i < p.length; i++) {
             var f = p[i];
-            if (typeof f === FUNCTION) {
+            if (typeof f === 'function') {
               var name = fname(f);
-            } else if (typeof f === STRING && typeof p[i+1] !== FUNCTION || !fname(p[i+1])) {
+            } else if (typeof f === 'string' && typeof p[i+1] !== 'function' || !fname(p[i+1])) {
               var name = f;
               f = p[i+1];
             }
@@ -5948,19 +5840,19 @@ exports.utility = (function(exports){
 
   function assign(o, p, v){
     switch (typeof p) {
-      case FUNCTION:
+      case 'function':
         o[fname(p)] = p;
         break;
-      case STRING:
+      case 'string':
         o[p] = v;
         break;
-      case OBJECT:
+      case 'object':
         if (p instanceof Array) {
           for (var i=0; i < p.length; i++) {
             var f = p[i];
-            if (typeof f === FUNCTION && fname(f)) {
+            if (typeof f === 'function' && fname(f)) {
               var name = fname(f);
-            } else if (typeof f === STRING && typeof p[i+1] !== FUNCTION || !fname(p[i+1])) {
+            } else if (typeof f === 'string' && typeof p[i+1] !== 'function' || !fname(p[i+1])) {
               var name = f;
               f = p[i+1];
             }
@@ -5981,50 +5873,212 @@ exports.utility = (function(exports){
   }
   exports.assign = assign;
 
+  exports.assignAll = function assignAll(o, array){
+    for (var i=0; i < array.length; i++) {
+      assign(o, array[i]);
+    }
+    return o;
+  }
 
+  var nonEnumerable = { enumerable: false };
 
   var hide = exports.hide = (function(){
     if (isES5) {
       return function hide(o, k){
-        Object.defineProperty(o, k, { enumerable: false });
+        defineProperty(o, k, nonEnumerable);
       };
     }
     return function hide(){};
   })();
 
-
-
   function inherit(Ctor, Super, properties, methods){
-    define(Ctor, { inherits: Super });
-
-    Ctor.prototype = create(Super.prototype, {
-      constructor: { value: Ctor,
-                     writable: true,
-                     configurable: true }
-    });
-
+    define(Ctor, 'inherits', Super);
+    Ctor.prototype = create(Super.prototype);
+    define(Ctor.prototype, 'constructor', Ctor);
     properties && define(Ctor.prototype, properties);
-    methods && define(Ctor.prototype, methods);
+    methods    && define(Ctor.prototype, methods);
     return Ctor;
   }
   exports.inherit = inherit;
 
+  function Hash(){}
+  Hash.prototype = create(null);
+  exports.Hash = Hash;
 
-  var __ = partial.__ = {};
+  return exports;
+})(typeof module !== 'undefined' ? module.exports : {});
 
-  function partial(f, args){
-    args instanceof Array || (args = [args]);
-    return function(){
-      var a = [],
-          j = 0;
 
-      for (var i=0; i < args.length; i++) {
-        a[i] = args[i] === __ ? arguments[j++] : args[i];
+exports.iteration = (function(exports){
+  var objects   = require('./objects'),
+      functions = require('./functions');
+
+  var define  = objects.define,
+      ownKeys = objects.keys,
+      call    = functions.call,
+      apply   = functions.apply;
+
+
+  var StopIteration = exports.StopIteration = global.StopIteration || {};
+
+  function Iterator(){}
+
+  define(Iterator.prototype, [
+    function __iterator__(){
+      return this;
+    }
+  ]);
+
+  exports.Iterator = Iterator;
+
+
+  function iterate(o, callback, context){
+    if (o == null) return;
+    var type = typeof o;
+    context = context || o;
+    if (type === 'number' || type === 'boolean') {
+      callback.call(context, o, 0, o);
+    } else {
+      o = Object(o);
+      var iterator = o.__iterator__ || o.iterator;
+
+      if (typeof iterator === 'function') {
+        var iter = iterator.call(o);
+        if (iter && typeof iter.next === 'function') {
+          var i=0;
+          try {
+            while (1) callback.call(context, iter.next());
+          } catch (e) {
+            if (e === StopIteration) return;
+            throw e;
+          }
+        }
       }
-      return f.apply(this, a);
-    };
+
+      if (type !== 'function' && o.length) {
+        for (var i=0; i < o.length; i++) {
+          callback.call(context, o[i], i, o);
+        }
+      } else {
+        var keys = ownKeys(o);
+        for (var i=0; i < keys.length; i++) {
+          callback.call(context, o[keys[i]], keys[i], o);
+        }
+      }
+    }
   }
-  exports.partial = partial;
+  exports.iterate = iterate;
+
+
+  function each(o, callback){
+    for (var i=0; i < o.length; i++) {
+      callback(o[i], i, o);
+    }
+  }
+  exports.each = each;
+
+
+  function map(o, callback){
+    var out = new Array(o.length);
+    for (var i=0; i < o.length; i++) {
+      out[i] = callback(o[i], i);
+    }
+    return out;
+  }
+  exports.map = map;
+
+
+  function fold(o, initial, callback){
+    if (callback) {
+      var val = initial, i = 0;
+    } else {
+      if (typeof initial === 'string') {
+        callback = fold[initial];
+      } else {
+        callback = initial;
+      }
+
+      var val = o[0], i = 1;
+    }
+    for (; i < o.length; i++) {
+      val = callback(val, o[i], i, o);
+    }
+    return val;
+  }
+  exports.fold = fold;
+
+  fold['+'] = function(a, b){ return a + b };
+  fold['*'] = function(a, b){ return a - b };
+  fold['-'] = function(a, b){ return a * b };
+  fold['/'] = function(a, b){ return a / b };
+
+
+  function repeat(n, args, callback){
+    if (typeof args === 'function') {
+      callback = args;
+      for (var i=0; i < n; i++) {
+        callback();
+      }
+    } else {
+      for (var i=0; i < n; i++) {
+        callback.apply(this, args);
+      }
+    }
+  }
+  exports.repeat = repeat;
+
+
+  function generate(n, callback){
+    var out = new Array(n);
+    for (var i=0; i < n; i++) {
+      out[i] = callback(i, n, out);
+    }
+    return out;
+  }
+  exports.generate = generate;
+
+  return exports;
+})(typeof module !== 'undefined' ? module.exports : {});
+
+
+
+exports.utility = (function(exports){
+  var objects   = require('./objects'),
+      functions = require('./functions');
+
+  var Hash      = objects.Hash,
+      applybind = functions.applybind;
+
+  var seed = Math.random().toString(36).slice(2),
+      count = (Math.random() * (1 << 30)) | 0;
+
+  exports.uid = function uid(){
+    return seed + count++;
+  }
+
+  exports.pushAll = applybind([].push, []);
+
+  exports.nextTick = typeof process !== 'undefined'
+                    ? process.nextTick
+                    : function nextTick(f){ setTimeout(f, 1) };
+
+
+  exports.numbers = (function(cache){
+    return function numbers(start, end){
+      if (!isFinite(end)) {
+        end = start;
+        start = 0;
+      }
+      var length = end - start,
+          curr;
+
+      if (end > cache.length) {
+        while (length--)
+          cache[curr = length + start] = '' + curr;
+      }
+      return cache.slice(start, end);
+    };
+  })([]);
 
 
   function quotes(s) {
@@ -6051,7 +6105,7 @@ exports.utility = (function(exports){
 
 
   function unique(strings){
-    var seen = create(null),
+    var seen = new Hash,
         out = [];
 
     for (var i=0; i < strings.length; i++) {
@@ -6096,13 +6150,166 @@ exports.utility = (function(exports){
 
 
   function isInteger(value) {
-    return typeof value === NUMBER
+    return typeof value === 'number'
                && value === value
                && value > -MAX_INTEGER
                && value < MAX_INTEGER
                && value >> 0 === value;
   }
   exports.isInteger = isInteger;
+
+  return exports;
+})(typeof module !== 'undefined' ? module.exports : {});
+
+
+exports.Queue = (function(module){
+  var objects   = require('./objects'),
+      functions = require('./functions'),
+      iteration = require('./iteration');
+
+  var isObject      = objects.isObject,
+      define        = objects.define,
+      inherit       = objects.inherit,
+      toArray       = functions.toArray,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  function QueueIterator(queue){
+    this.queue = queue;
+    this.index = queue.index;
+  }
+
+  inherit(QueueIterator, Iterator, [
+    function next(){
+      if (this.index === this.queue.items.length) {
+        throw StopIteration;
+      }
+      return this.queue.items[this.index++];
+    }
+  ]);
+
+  function Queue(items){
+    if (isObject(items)) {
+      if (items instanceof Queue) {
+        this.items = items.items.slice(items.front);
+      } else if (items instanceof Array) {
+        this.items = items.slice();
+      } else if (items.length) {
+        this.items = toArray(items);
+      } else {
+        this.items = [items];
+      }
+    } else if (items != null) {
+      this.items = [items];
+    } else {
+      this.items = [];
+    }
+    this.length = this.items.length;
+    this.index = 0;
+  }
+
+  define(Queue.prototype, [
+    function push(item){
+      this.items.push(item);
+      this.length++;
+      return this;
+    },
+    function shift(){
+      if (this.length) {
+        var item = this.items[this.index];
+        this.items[this.index++] = null;
+        this.length--;
+        if (this.index === 500) {
+          this.items = this.items.slice(this.index);
+          this.index = 0;
+        }
+        return item;
+      }
+    },
+    function empty(){
+      this.length = 0;
+      this.index = 0;
+      this.items = [];
+      return this;
+    },
+    function front(){
+      return this.items[this.index];
+    },
+    function item(depth){
+      return this.items[this.index + depth];
+    },
+    function __iterator__(){
+      return new QueueIterator(this);
+    }
+  ]);
+
+  return module.exports = Queue;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.traversal = (function(exports){
+  var objects   = require('./objects'),
+      functions = require('./functions'),
+      utility   = require('./utility'),
+      Queue     = require('./Queue');
+
+  var isObject       = objects.isObject,
+      hasOwn         = objects.hasOwn,
+      create         = objects.create,
+      ownKeys        = objects.keys,
+      ownProperties  = objects.properties,
+      getPrototypeOf = objects.getPrototypeOf,
+      Hash           = objects.Hash,
+      uid            = utility.uid,
+      toArray        = functions.toArray;
+
+
+
+  function clone(o, hidden){
+    function recurse(from, to, key){
+      try {
+        var val = from[key];
+        if (!isObject(val)) {
+          return to[key] = val;
+        }
+        if (from[key] === val) {
+          if (hasOwn(from[key], tag)) {
+            return to[key] = from[key][tag];
+          }
+          to[key] = enqueue(from[key]);
+        }
+      } catch (e) {}
+    }
+
+    function enqueue(o){
+      var out = o instanceof Array ? [] : create(getPrototypeOf(o));
+      tagged.push(o);
+      var keys = list(o);
+      for (var i=0; i < keys.length; i++) {
+        queue.push([o, out, keys[i]]);
+      }
+      o[tag] = out;
+      return out;
+    }
+
+    var queue = new Queue,
+        tag = uid(),
+        tagged = [],
+        list = hidden ? ownProperties : ownKeys,
+        out = enqueue(o);
+
+    while (queue.length) {
+      recurse.apply(this, queue.shift());
+    }
+
+    for (var i=0; i < tagged.length; i++) {
+      delete tagged[tag];
+    }
+
+    return out;
+  }
+  exports.clone = clone;
 
   function walk(root, callback){
     var queue = new Queue([[root]]),
@@ -6124,7 +6331,7 @@ exports.utility = (function(exports){
         var key = keys[i],
             item = node[key];
 
-        if (isObject(item) && !hasOwn.call(tag, tag)) {
+        if (isObject(item) && !hasOwn(item, tag)) {
           item[tag] = true;
           branded.push(item);
           var result = callback(item, node);
@@ -6176,11 +6383,11 @@ exports.utility = (function(exports){
 
 
     function collector(o){
-      var handlers = create(null);
+      var handlers = new Hash;
       for (var k in o) {
         if (o[k] instanceof Array) {
           handlers[k] = path(o[k]);
-        } else if (typeof o[k] === FUNCTION) {
+        } else if (typeof o[k] === 'function') {
           handlers[k] = o[k];
         } else {
           handlers[k] = o[k];
@@ -6203,11 +6410,11 @@ exports.utility = (function(exports){
             items.push(node);
           } else if (handler === RECURSE || handler === CONTINUE) {
             return handler;
-          } else if (typeof handler === STRING) {
+          } else if (typeof handler === 'string') {
             if (node[handler]) {
               walk(node[handler], walker);
             }
-          } else if (typeof handler === FUNCTION) {
+          } else if (typeof handler === 'function') {
             var item = handler(node);
             if (item !== undefined) {
               items.push(item);
@@ -6226,752 +6433,1082 @@ exports.utility = (function(exports){
     return collector;
   })();
 
-  function Hash(){}
-  Hash.prototype = create(null);
-  exports.Hash = Hash;
-
-  exports.Emitter = (function(){
-    function Emitter(){
-      '_events' in this || define(this, '_events', create(null));
-    }
-
-    define(Emitter.prototype, [
-      function on(events, handler){
-        iterate(events.split(/\s+/), function(event){
-          if (!(event in this)) {
-            this[event] = [];
-          }
-          this[event].push(handler);
-        }, this._events);
-      },
-      function off(events, handler){
-        iterate(events.split(/\s+/), function(event){
-          if (event in this) {
-            var index = '__index' in handler ? handler.__index : this[event].indexOf(handler);
-            if (~index) {
-              this[event].splice(index, 1);
-            }
-          }
-        }, this._events);
-      },
-      function once(events, handler){
-        function one(val){
-          this.off(events, one);
-          handler.call(this, val);
-        }
-        this.on(events, one);
-      },
-      function emit(event, val){
-        var handlers = this._events['*'];
-
-        if (handlers) {;
-          for (var i=0; i < handlers.length; i++) {
-            handlers[i].call(this, event, val);
-          }
-        }
-
-        handlers = this._events[event];
-        if (handlers) {
-          for (var i=0; i < handlers.length; i++) {
-            handlers[i].call(this, val);
-          }
-        }
-      }
-    ]);
-
-    return Emitter;
-  })();
-
-  var PropertyList = exports.PropertyList = (function(){
-    var PropertyListIterator = (function(){
-      var types = {
-        keys: 0,
-        values: 1,
-        attributes: 2
-      };
-
-      function PropertyListIterator(list, type){
-        this.list = list;
-        this.type = type ? types[type] : ITEMS;
-        this.index = 0;
-      }
-
-      define(PropertyListIterator.prototype, [
-        function next(){
-          var props = this.list.props, property;
-          while (!property) {
-            if (this.index >= props.length) {
-              throw StopIteration;
-            }
-            property = props[this.index++];
-          }
-          return this.type === ITEMS ? property : property[this.type];
-        },
-        function __iterator__(){
-          return this;
-        }
-      ]);
-
-      return PropertyListIterator;
-    })();
-
-    function PropertyList(){
-      this.hash = new Hash;
-      this.props = [];
-      this.holes = 0;
-      this.length = 0;
-    }
-
-    define(PropertyList.prototype, [
-      function get(key){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index !== undefined) {
-          return this.props[index][1];
-        }
-      },
-      function getAttribute(key){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index !== undefined) {
-          return this.props[index][2];
-        } else {
-          return null;
-        }
-      },
-      function getProperty(key){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index !== undefined) {
-          return this.props[index];
-        } else {
-          return null;
-        }
-      },
-      function set(key, value, attr){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name],
-            prop;
-
-        if (index === undefined) {
-          index = this.hash[name] = this.props.length;
-          prop = this.props[index] = [key, value, 0];
-          this.length++;
-        } else {
-          prop = this.props[index];
-          prop[1] = value;
-        }
-
-        if (attr !== undefined) {
-          prop[2] = attr;
-        }
-        return true;
-      },
-      function initialize(props){
-        var len = props.length;
-        for (var i=0; i < len; i += 3) {
-          var index = this.hash[props[i]] = this.props.length;
-          this.props[index] = [props[i], props[i + 1], props[i + 2]];
-        }
-      },
-      function setAttribute(key, attr){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index !== undefined) {
-          this.props[index][2] = attr;
-          return true;
-        } else {
-          return false;
-        }
-      },
-      function setProperty(prop){
-        var key = prop[0],
-            name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index === undefined) {
-          index = this.hash[name] = this.props.length;
-          this.length++;
-        }
-        this.props[index] = prop;
-      },
-      function remove(key){
-        var name = key === '__proto__' ? proto : key,
-            index = this.hash[name];
-        if (index !== undefined) {
-          this.hash[name] = undefined;
-          this.props[index] = undefined;
-          this.holes++;
-          this.length--;
-          return true;
-        } else {
-          return false;
-        }
-      },
-      function has(key){
-        var name = key === '__proto__' ? proto : key;
-        return this.hash[name] !== undefined;
-      },
-      function hasAttribute(key, mask){
-        var name = key === '__proto__' ? proto : key,
-            attr = this.getAttribute(name);
-        if (attr !== null) {
-          return (attr & mask) > 0;
-        }
-      },
-      function compact(){
-        var props = this.props,
-            len = props.length,
-            index = 0,
-            prop;
-
-        this.hash = new Hash;
-        this.props = [];
-        this.holes = 0;
-
-        for (var i=0; i < len; i++) {
-          if (prop = props[i]) {
-            var name = prop[0] === '__proto__' ? proto : prop[0];
-            this.props[index] = prop;
-            this.hash[name] = index++;
-          }
-        }
-      },
-      function forEach(callback, context){
-        var len = this.props.length,
-            index = 0,
-            prop;
-
-        context = context || this;
-
-        for (var i=0; i < len; i++) {
-          if (prop = this.props[i]) {
-            callback.call(context, prop, index++, this);
-          }
-        }
-      },
-      function map(callback, context){
-        var out = [],
-            len = this.props.length,
-            index = 0,
-            prop;
-
-        context = context || this;
-
-        for (var i=0; i < len; i++) {
-          if (prop = this.props[i]) {
-            out[index] = callback.call(context, prop, index++, this);
-          }
-        }
-
-        return out;
-      },
-      function translate(callback, context){
-        var out = new PropertyList;
-
-        out.length = this.length;
-        context = context || this;
-
-        this.forEach(function(prop, index){
-          prop = callback.call(context, prop, index, this);
-          var name = prop[0] === '__proto__' ? proto : prop[0];
-          out.props[index] = prop;
-          out.hash[name] = index;
-        });
-
-        return out;
-      },
-      function filter(callback, context){
-        var out = new PropertyList,
-            index = 0;
-
-        context = context || this;
-
-        this.forEach(function(prop, i){
-          if (callback.call(context, prop, i, this)) {
-            var name = prop[0] === '__proto__' ? proto : prop[0];
-            out.props[index] = prop;
-            out.hash[name] = index++;
-          }
-        });
-
-        return out;
-      },
-      function clone(deep){
-        return this.translate(function(prop, i){
-          return deep ? prop.slice() : prop;
-        });
-      },
-      function keys(){
-        return this.map(function(prop){
-          return prop[0];
-        });
-      },
-      function values(){
-        return this.map(function(prop){
-          return prop[1];
-        });
-      },
-      function items(){
-        return this.map(function(prop){
-          return prop.slice();
-        });
-      },
-      function merge(list){
-        each(list, this.setProperty, this);
-      },
-      function __iterator__(type){
-        return new PropertyListIterator(this, type);
-      }
-    ]);
-
-    if (require('util')) {
-      void function(){
-        var insp = require('util').inspect;
-
-        function Token(value){
-          this.value = value + '';
-        }
-
-        Token.prototype.inspect = function(){ return this.value };
-
-        define(PropertyList.prototype, function inspect(){
-          var out = create(null);
-
-          this.forEach(function(prop){
-            var key = typeof prop[0] === STRING ? prop[0] : '_@_'+insp(prop[0]);
-
-            var attrs = (prop[2] & 0x01 ? 'E' : '_') +
-                        (prop[2] & 0x02 ? 'C' : '_') +
-                        (prop[2] & 0x04 ? 'W' :
-                         prop[2] & 0x08 ? 'A' : '_');
-
-            out[key] = new Token(attrs + ' ' + (isObject(prop[1]) ? prop[1].NativeBrand : prop[1]));
-          });
-
-          return insp(out).replace(/'_@_@(\w+)'/g, '@$1');
-        });
-      }();
-    }
-
-
-    return PropertyList;
-  })();
-
-  var LinkedList = exports.LinkedList = (function(){
-    function Item(data, prev){
-      this.data = data;
-      this.after(prev);
-    }
-
-    define(Item.prototype, [
-      function after(item){
-        this.relink(item);
-        return this;
-      },
-      function before(item){
-        this.prev.relink(item);
-        return this;
-      },
-      function relink(prev){
-        if (this.next) {
-          this.next.prev = this.prev;
-          this.prev.next = this.next;
-        }
-        this.prev = prev;
-        this.next = prev.next;
-        prev.next.prev = this;
-        prev.next = this;
-        return this;
-      },
-      function unlink(){
-        this.next.prev = this.prev;
-        this.prev.next = this.next;
-        this.prev = this.next = null;
-        return this;
-      },
-      function clear(){
-        var data = this.data;
-        this.next = this.prev = this.data = null;
-        return data;
-      }
-    ]);
-
-    function Sentinel(list){
-      this.list = list;
-      this.next = this;
-      this.prev = this;
-      this.data = undefined;
-    }
-
-    inherit(Sentinel, Item, [
-      function unlink(){
-        return this;
-      }
-    ]);
-
-
-    function LinkedListIterator(list){
-      this.item = list.sentinel;
-      this.sentinel = list.sentinel;
-    }
-
-    define(LinkedListIterator.prototype, [
-      function next(){
-        this.item = this.item.next;
-        if (this.item === this.sentinel) {
-          throw StopIteration;
-        }
-        return this.item.data;
-      }
-    ]);
-
-    function find(list, value){
-      if (list.lastFind && list.lastFind.data === value) {
-        return list.lastFind;
-      }
-
-      var item = list.sentinel,
-          i = 0;
-
-      while ((item = item.next) !== list.sentinel) {
-        if (item.data === value) {
-          return list.lastFind = item;
-        }
-      }
-    }
-
-    function LinkedList(){
-      this.sentinel = new Sentinel(this);
-      this.size = 0;
-      this.lastFind = null;
-      hide(this, 'sentinel');
-      hide(this, 'lastFind');
-    }
-
-    define(LinkedList.prototype, [
-      function first() {
-        return this.sentinel.next.data;
-      },
-      function last() {
-        return this.sentinel.prev.data;
-      },
-      function unshift(value){
-        var item = new Item(value, this.sentinel);
-        return this.size++;
-      },
-      function push(value){
-        var item = new Item(value, this.sentinel.prev);
-        return this.size++;
-      },
-      function insert(value, after){
-        var item = find(this, after);
-        if (item) {
-          item = new Item(value, item);
-          return this.size++;
-        }
-        return false;
-      },
-      function replace(value, replacement){
-        var item = find(this, value);
-        if (item) {
-          new Item(replacement, item);
-          item.unlink();
-          return true;
-        }
-        return false;
-      },
-      function insertBefore(value, before){
-        var item = find(this, before);
-        if (item) {
-          item = new Item(value, item.prev);
-          return this.size++;
-        }
-        return false;
-      },
-      function pop(){
-        if (this.size) {
-          this.size--;
-          return this.sentinel.prev.unlink().data;
-        }
-      },
-      function shift() {
-        if (this.size) {
-          this.size--;
-          return this.sentinel.next.unlink().data;
-        }
-      },
-      function remove(value){
-        var item = find(this, value);
-        if (item) {
-          item.unlink();
-          return true;
-        }
-        return false;
-      },
-      function has(value) {
-        return !!find(this, value);
-      },
-      function items(){
-        var item = this.sentinel,
-            array = [];
-
-        while ((item = item.next) !== this.sentinel) {
-          array.push(item.data);
-        }
-
-        return array;
-      },
-      function clear(){
-        var next,
-            item = this.sentinel.next;
-
-        while (item !== this.sentinel) {
-          next = item.next;
-          item.clear();
-          item = next;
-        }
-
-        this.size = 0;
-        return this;
-      },
-      function clone(){
-        var item = this.sentinel,
-            list = new LinkedList;
-
-        while ((item = item.next) !== this.sentinel) {
-          list.push(item.data);
-        }
-        return list;
-      },
-      function forEach(callback, context){
-        var item = this.sentinel,
-            i = 0;
-        context = context || this;
-        while ((item = item.next) !== this.sentinel) {
-          callback.call(context, item.data, i++, this);
-        }
-      },
-      function map(callback, context) {
-        var array = [];
-        context = context || this;
-
-        this.forEach(function(data, i){
-          array.push(callback.call(context, data, i, this));
-        });
-
-        return array;
-      },
-      function filter(callback, context) {
-        var array = [];
-        context = context || this;
-
-        this.forEach(function(data, i){
-          if (callback.call(context, data, i, this)) {
-            array.push(data);
-          }
-        });
-
-        return array;
-      },
-      function __iterator__(){
-        return new LinkedListIterator(this);
-      }
-    ]);
-
-    return LinkedList;
-  })();
-
-
-  exports.Stack = (function(){
-    function StackIterator(stack){
-      this.stack = stack;
-      this.index = stack.length;
-    }
-
-    define(StackIterator.prototype, [
-      function next(){
-        if (!this.index) {
-          throw StopIteration;
-        }
-        return this.stack[--this.index];
-      }
-    ]);
-
-    function Stack(){
-      this.empty();
-      for (var k in arguments) {
-        this.push(arguments[k]);
-      }
-    }
-
-    define(Stack.prototype, [
-      function push(item){
-        this.items.push(item);
-        this.length++;
-        this.top = item;
-        return this;
-      },
-      function pop(){
-        this.length--;
-        this.top = this.items[this.length - 1];
-        return this.items.pop();
-      },
-      function empty(){
-        this.length = 0;
-        this.items = [];
-        this.top = undefined;
-      },
-      function first(callback, context){
-        var i = this.length;
-        context || (context = this);
-        while (i--)
-          if (callback.call(context, this[i], i, this))
-            return this[i];
-      },
-      function filter(callback, context){
-        var i = this.length,
-            out = new Stack;
-
-        context || (context = this);
-
-        for (var i=0; i < this.length; i++) {
-          if (callback.call(context, this[i], i, this)) {
-            out.push(this[i]);
-          }
-        }
-
-        return out;
-      },
-      function __iterator__(){
-        return new StackIterator(this);
-      }
-    ]);
-
-    return Stack;
-  })();
-
-  var Queue = exports.Queue = (function(){
-    function QueueIterator(queue){
-      this.queue = queue;
-      this.index = queue.index;
-    }
-
-    define(QueueIterator.prototype, [
-      function next(){
-        if (this.index === this.queue.items.length) {
-          throw StopIteration;
-        }
-        return this.queue.items[this.index++];
-      }
-    ]);
-
-    function Queue(items){
-      if (isObject(items)) {
-        if (items instanceof Queue) {
-          this.items = items.items.slice(items.front);
-        } else if (items instanceof Array) {
-          this.items = items.slice();
-        } else if (items.length) {
-          this.items = slice.call(items);
-        } else {
-          this.items = [items];
-        }
-      } else if (items != null) {
-        this.items = [items];
-      } else {
-        this.items = [];
-      }
-      this.length = this.items.length;
-      this.index = 0;
-    }
-
-    define(Queue.prototype, [
-      function push(item){
-        this.items.push(item);
-        this.length++;
-        return this;
-      },
-      function shift(){
-        if (this.length) {
-          var item = this.items[this.index];
-          this.items[this.index++] = null;
-          this.length--;
-          if (this.index === 500) {
-            this.items = this.items.slice(this.index);
-            this.index = 0;
-          }
-          return item;
-        }
-      },
-      function empty(){
-        this.length = 0;
-        this.index = 0;
-        this.items = [];
-        return this;
-      },
-      function front(){
-        return this.items[this.index];
-      },
-      function item(depth){
-        return this.items[this.index + depth];
-      },
-      function __iterator__(){
-        return new QueueIterator(this);
-      }
-    ]);
-
-    return Queue;
-  })();
-
-  exports.Feeder = (function(){
-    function Feeder(callback, context, pace){
-      var self = this;
-      this.queue = new Queue;
-      this.active = false;
-      this.pace = pace || 5;
-      this.feeder = function feeder(){
-        var count = Math.min(self.pace, self.queue.length);
-
-        while (self.active && count--) {
-          callback.call(context, self.queue.shift());
-        }
-
-        if (!self.queue.length) {
-          self.active = false;
-        } else if (self.active) {
-          setTimeout(feeder, 15);
-        }
-      };
-    }
-
-    define(Feeder.prototype, [
-      function push(item){
-        this.queue.push(item);
-        if (!this.active) {
-          this.active = true;
-          setTimeout(this.feeder, 15);
-        }
-        return this;
-      },
-      function pause(){
-        this.active = false;
-      }
-    ]);
-
-    return Feeder;
-  })();
-
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
 
 
+exports.Emitter = (function(module){
+  var objects   = require('./objects'),
+      iteration = require('./iteration');
+
+  var define   = objects.define,
+      Hash     = objects.Hash,
+      each     = iteration.each;
+
+ function Emitter(){
+    '_events' in this || define(this, '_events', new Hash);
+  }
+
+  define(Emitter.prototype, [
+    function on(events, handler){
+      each(events.split(/\s+/), function(event){
+        if (!(event in this)) {
+          this[event] = [];
+        }
+        this[event].push(handler);
+      }, this._events);
+    },
+    function off(events, handler){
+      each(events.split(/\s+/), function(event){
+        if (event in this) {
+          var index = '__index' in handler ? handler.__index : this[event].indexOf(handler);
+          if (~index) {
+            this[event].splice(index, 1);
+          }
+        }
+      }, this._events);
+    },
+    function once(events, handler){
+      function one(val){
+        this.off(events, one);
+        handler.call(this, val);
+      }
+      this.on(events, one);
+    },
+    function emit(event, val){
+      var handlers = this._events['*'];
+
+      if (handlers) {;
+        for (var i=0; i < handlers.length; i++) {
+          handlers[i].call(this, event, val);
+        }
+      }
+
+      handlers = this._events[event];
+      if (handlers) {
+        for (var i=0; i < handlers.length; i++) {
+          handlers[i].call(this, val);
+        }
+      }
+    }
+  ]);
+
+  return module.exports = Emitter;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.Stack = (function(module){
+  var objects   = require('./objects'),
+      functions = require('./functions'),
+      iteration = require('./iteration');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      toArray       = functions.toArray,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  function StackIterator(stack){
+    this.stack = stack;
+    this.index = stack.length;
+  }
+
+  inherit(StackIterator, Iterator, [
+    function next(){
+      if (!this.index) {
+        throw StopIteration;
+      }
+      return this.stack[--this.index];
+    }
+  ]);
+
+  function Stack(){
+    this.empty();
+    for (var k in arguments) {
+      this.push(arguments[k]);
+    }
+  }
+
+  define(Stack.prototype, [
+    function push(item){
+      this.items.push(item);
+      this.length++;
+      this.top = item;
+      return this;
+    },
+    function pop(){
+      this.length--;
+      this.top = this.items[this.length - 1];
+      return this.items.pop();
+    },
+    function empty(){
+      this.length = 0;
+      this.items = [];
+      this.top = undefined;
+    },
+    function first(callback, context){
+      var i = this.length;
+      context || (context = this);
+      while (i--)
+        if (callback.call(context, this[i], i, this))
+          return this[i];
+    },
+    function filter(callback, context){
+      var i = this.length,
+          out = new Stack;
+
+      context || (context = this);
+
+      for (var i=0; i < this.length; i++) {
+        if (callback.call(context, this[i], i, this)) {
+          out.push(this[i]);
+        }
+      }
+
+      return out;
+    },
+    function __iterator__(){
+      return new StackIterator(this);
+    }
+  ]);
+
+  return module.exports = Stack;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.LinkedList = (function(module){
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  function LinkedListIterator(list){
+    this.item = list.sentinel;
+    this.sentinel = list.sentinel;
+  }
+
+  inherit(LinkedListIterator, Iterator, [
+    function next(){
+      this.item = this.item.next;
+      if (this.item === this.sentinel) {
+        throw StopIteration;
+      }
+      return this.item.data;
+    }
+  ]);
+
+
+  function Item(data){
+    this.data = data;
+  }
+
+  define(Item.prototype, [
+    function link(item){
+      item.next = this;
+      return item;
+    },
+    function unlink(){
+      var next = this.next;
+      this.next = next.next;
+      next.next = null;
+      return this;
+    },
+    function clear(){
+      var data = this.data;
+      this.data = undefined;
+      this.next = null;
+      return data;
+    }
+  ]);
+
+  function Sentinel(){
+    this.next = null;
+  }
+
+  inherit(Sentinel, Item, [
+    function unlink(){
+      return this;
+    },
+    function clear(){}
+  ]);
+
+  function find(list, value){
+    if (list.lastFind && list.lastFind.next.data === value) {
+      return list.lastFind;
+    }
+
+    var item = list.tail,
+        i = 0;
+
+    while ((item = item.next) !== list.sentinel) {
+      if (item.next.data === value) {
+        return list.lastFind = item;
+      }
+    }
+  }
+
+  function LinkedList(){
+    var sentinel = new Sentinel;
+    this.size = 0;
+    define(this, {
+      sentinel: sentinel,
+      tail: sentinel,
+      lastFind: null
+    });
+  }
+
+  define(LinkedList.prototype, [
+    function push(value){
+      this.tail = this.tail.link(new Item(value));
+      return ++this.size;
+    },
+    function pop() {
+      var tail = this.tail,
+          data = tail.data;
+      this.tail = tail.next;
+      tail.next = null;
+      tail.data = undefined;
+      return data;
+    },
+    function insert(value, before){
+      var item = find(this, before);
+      if (item) {
+        var inserted = new Item(value);
+        inserted.next = item.next;
+        item.next = inserted;
+        return ++this.size;
+      }
+      return false;
+    },
+    function remove(value){
+      var item = find(this, value);
+      if (item) {
+        item.unlink();
+        return --this.size;
+      }
+      return false;
+    },
+    function replace(value, replacement){
+      var item = find(this, value);
+      if (item) {
+        var replacer = new Item(replacement);
+        replacer.next = item.next.next;
+        item.next.next = null;
+        item.next = replacer;
+        return true;
+      }
+      return false;
+    },
+    function has(value) {
+      return !!find(this, value);
+    },
+    function items(){
+      var item = this.tail,
+          array = [];
+
+      while (item !== this.sentinel) {
+        array.push(item.data);
+        item = item.next;
+      }
+
+      return array;
+    },
+    function clear(){
+      var next,
+          item = this.tail;
+
+      while (item !== this.sentinel) {
+        next = item.next;
+        item.clear();
+        item = next;
+      }
+
+      this.tail = this.sentinel;
+      this.size = 0;
+      return this;
+    },
+    function clone(){
+      var items = this.items(),
+          list = new LinkedList,
+          i = items.length;
+
+      while (i--) {
+        list.push(items[i]);
+      }
+      return list;
+    },
+    function __iterator__(){
+      return new LinkedListIterator(this);
+    }
+  ]);
+
+  return module.exports = LinkedList;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.DoublyLinkedList = (function(module){
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+  function DoublyLinkedListIterator(list){
+    this.item = list.sentinel;
+    this.sentinel = list.sentinel;
+  }
+
+  inherit(DoublyLinkedListIterator, Iterator, [
+    function next(){
+      this.item = this.item.next;
+      if (this.item === this.sentinel) {
+        throw StopIteration;
+      }
+      return this.item.data;
+    }
+  ]);
+
+
+  function Item(data, prev){
+    this.data = data;
+    this.after(prev);
+  }
+
+  define(Item.prototype, [
+    function after(item){
+      this.relink(item);
+      return this;
+    },
+    function before(item){
+      this.prev.relink(item);
+      return this;
+    },
+    function relink(prev){
+      if (this.next) {
+        this.next.prev = this.prev;
+        this.prev.next = this.next;
+      }
+      this.prev = prev;
+      this.next = prev.next;
+      prev.next.prev = this;
+      prev.next = this;
+      return this;
+    },
+    function unlink(){
+      this.next.prev = this.prev;
+      this.prev.next = this.next;
+      this.prev = this.next = null;
+      return this;
+    },
+    function clear(){
+      var data = this.data;
+      this.next = this.prev = this.data = null;
+      return data;
+    }
+  ]);
+
+  function Sentinel(list){
+    this.next = this;
+    this.prev = this;
+  }
+
+  inherit(Sentinel, Item, [
+    function unlink(){
+      return this;
+    }
+  ]);
+
+  function find(list, value){
+    if (list.lastFind && list.lastFind.data === value) {
+      return list.lastFind;
+    }
+
+    var item = list.sentinel,
+        i = 0;
+
+    while ((item = item.next) !== list.sentinel) {
+      if (item.data === value) {
+        return list.lastFind = item;
+      }
+    }
+  }
+
+  function DoublyLinkedList(){
+    this.size = 0;
+    define(this, {
+      sentinel: new Sentinel,
+      lastFind: null
+    });
+  }
+
+  define(DoublyLinkedList.prototype, [
+    function first() {
+      return this.sentinel.next.data;
+    },
+    function last() {
+      return this.sentinel.prev.data;
+    },
+    function unshift(value){
+      var item = new Item(value, this.sentinel);
+      return this.size++;
+    },
+    function push(value){
+      var item = new Item(value, this.sentinel.prev);
+      return this.size++;
+    },
+    function insert(value, after){
+      var item = find(this, after);
+      if (item) {
+        item = new Item(value, item);
+        return this.size++;
+      }
+      return false;
+    },
+    function replace(value, replacement){
+      var item = find(this, value);
+      if (item) {
+        new Item(replacement, item);
+        item.unlink();
+        return true;
+      }
+      return false;
+    },
+    function insertBefore(value, before){
+      var item = find(this, before);
+      if (item) {
+        item = new Item(value, item.prev);
+        return this.size++;
+      }
+      return false;
+    },
+    function pop(){
+      if (this.size) {
+        this.size--;
+        return this.sentinel.prev.unlink().data;
+      }
+    },
+    function shift() {
+      if (this.size) {
+        this.size--;
+        return this.sentinel.next.unlink().data;
+      }
+    },
+    function remove(value){
+      var item = find(this, value);
+      if (item) {
+        item.unlink();
+        return true;
+      }
+      return false;
+    },
+    function has(value) {
+      return !!find(this, value);
+    },
+    function items(){
+      var item = this.sentinel,
+          array = [];
+
+      while ((item = item.next) !== this.sentinel) {
+        array.push(item.data);
+      }
+
+      return array;
+    },
+    function clear(){
+      var next,
+          item = this.sentinel.next;
+
+      while (item !== this.sentinel) {
+        next = item.next;
+        item.clear();
+        item = next;
+      }
+
+      this.lastFind = null;
+      this.size = 0;
+      return this;
+    },
+    function clone(){
+      var item = this.sentinel,
+          list = new DoublyLinkedList;
+
+      while ((item = item.next) !== this.sentinel) {
+        list.push(item.data);
+      }
+      return list;
+    },
+    function __iterator__(){
+      return new DoublyLinkedListIterator(this);
+    }
+  ]);
+
+  return module.exports = DoublyLinkedList;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.HashMap = (function(module){
+  var objects   = require('../lib/objects'),
+      functions = require('../lib/functions'),
+      iteration = require('../lib/iteration'),
+      DoublyLinkedList = require('../lib/DoublyLinkedList');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      assign        = objects.assign,
+      Hash          = objects.Hash,
+      bind          = functions.bind,
+      iterate       = functions.iterate,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  var types = assign(new Hash, {
+    string: 'strings',
+    number: 'numbers',
+    undefined: 'others',
+    boolean: 'others',
+    object: 'others'
+  });
+
+
+  function HashMapIterator(map, type){
+    this.item = map.list.sentinel;
+    this.sentinel = map.list.sentinel;
+    this.type = type || 'items';
+  }
+
+  inherit(HashMapIterator, Iterator, [
+    function next(){
+      var item = this.item = this.item.next;
+
+      if (item === this.sentinel) {
+        throw StopIteration;
+      } else if (this.type === 'key') {
+        return item.key;
+      } else if (this.type === 'value') {
+        return item.data;
+      } else {
+        return [item.key, item.data];
+      }
+    }
+  ]);
+
+  function HashMap(){
+    define(this, 'list', new DoublyLinkedList);
+    this.clear();
+  }
+
+  define(HashMap.prototype, [
+    function get(key){
+      var item = this[types[typeof key]][key];
+      if (item) {
+        return item.data;
+      }
+    },
+    function set(key, value){
+      var data = this[types[typeof key]],
+          item = data[key];
+
+      if (item) {
+        item.data = value;
+      } else {
+        this.list.push(value);
+        item = this.list.sentinel.prev;
+        item.key = key;
+        data[key] = item;
+      }
+      this.size = this.list.size;
+      return value;
+    },
+    function has(key){
+      return key in this[types[typeof key]];
+    },
+    function remove(key){
+      var data = this[types[typeof key]];
+
+      if (key in data) {
+        data[key].unlink();
+        delete data[key];
+        this.size = this.list.size;
+        return true;
+      }
+      return false;
+    },
+    function clear(){
+      define(this, {
+        strings: new Hash,
+        numbers: new Hash,
+        others: new Hash
+      });
+      this.list.clear();
+      this.size = 0;
+    },
+    function keys(){
+      var out = [];
+      iterate(this.__iterator__('key'), bind(_push, out));
+      return out;
+    },
+    function values(){
+      var out = [];
+      iterate(this.__iterator__('value'), bind(_push, out));
+      return out;
+    },
+    function items(){
+      var out = [];
+      iterate(this, bind(_push, out));
+      return out;
+    },
+    function __iterator__(type){
+      return new HashMapIterator(this, type);
+    }
+  ]);
+
+
+  return module.exports = HashMap;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.HashSet = (function(module){
+  var objects   = require('../lib/objects'),
+      functions = require('../lib/functions'),
+      iteration = require('../lib/iteration'),
+      DoublyLinkedList = require('../lib/DoublyLinkedList');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      assign        = objects.assign,
+      Hash          = objects.Hash,
+      bind          = functions.bind,
+      iterate       = functions.iterate,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  var types = assign(new Hash, {
+    string: 'strings',
+    number: 'numbers',
+    undefined: 'others',
+    boolean: 'others',
+    object: 'others'
+  });
+
+
+  function HashSetIterator(set){
+    this.item = set.list.sentinel;
+    this.sentinel = set.list.sentinel;
+  }
+
+  inherit(HashSetIterator, Iterator, [
+    function next(){
+      var item = this.item = this.item.next;
+      if (item === this.sentinel) {
+        throw StopIteration;
+      } else {
+        return item.data;
+      }
+    }
+  ]);
+
+  function HashSet(){
+    define(this, 'list', new DoublyLinkedList);
+    this.clear();
+  }
+
+  define(HashSet.prototype, [
+    function add(value){
+      var data = this[types[typeof value]],
+          item = data[value];
+
+      if (!item) {
+        this.list.push(value);
+        data[value] = this.list.sentinel.prev;
+        this.size = this.list.size;
+      }
+      return value;
+    },
+    function has(value){
+      return value in this[types[typeof value]];
+    },
+    function remove(value){
+      var data = this[types[typeof value]];
+
+      if (value in data) {
+        data[value].unlink();
+        delete data[value];
+        this.size = this.list.size;
+        return true;
+      }
+      return false;
+    },
+    function clear(){
+      define(this, {
+        strings: new Hash,
+        numbers: new Hash,
+        others: new Hash
+      });
+      this.list.clear();
+      this.size = 0;
+    },
+    function values(){
+      var out = [];
+      iterate(this, bind(_push, out));
+      return out;
+    },
+    function __iterator__(){
+      return new HashSetIterator(this);
+    }
+  ]);
+
+  return module.exports = HashSet;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.Feeder = (function(module){
+  var objects = require('./objects'),
+      Queue   = require('./Queue');
+
+  var define = objects.define;
+
+
+  function Feeder(callback, context, pace){
+    var self = this;
+    this.queue = new Queue;
+    this.active = false;
+    this.pace = pace || 5;
+    this.feeder = function feeder(){
+      var count = Math.min(self.pace, self.queue.length);
+
+      while (self.active && count--) {
+        callback.call(context, self.queue.shift());
+      }
+
+      if (!self.queue.length) {
+        self.active = false;
+      } else if (self.active) {
+        setTimeout(feeder, 15);
+      }
+    };
+  }
+
+  define(Feeder.prototype, [
+    function push(item){
+      this.queue.push(item);
+      if (!this.active) {
+        this.active = true;
+        setTimeout(this.feeder, 15);
+      }
+      return this;
+    },
+    function pause(){
+      this.active = false;
+    }
+  ]);
+
+  return module.exports = Feeder;
+})(typeof module !== 'undefined' ? module.exports : {});
+
+
+exports.PropertyList = (function(module){
+  var objects   = require('./objects'),
+      iteration = require('./iteration');
+
+  var isObject      = objects.isObject,
+      define        = objects.define,
+      inherit       = objects.inherit,
+      Hash          = objects.Hash,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+  var proto = require('./utility').uid();
+
+  var PropertyListIterator = (function(){
+    var types = {
+      keys: 0,
+      values: 1,
+      attributes: 2
+    };
+
+    function PropertyListIterator(list, type){
+      this.list = list;
+      this.type = type ? types[type] : 'items';
+      this.index = 0;
+    }
+
+    inherit(PropertyListIterator, Iterator, [
+      function next(){
+        var props = this.list.props, property;
+        while (!property) {
+          if (this.index >= props.length) {
+            throw StopIteration;
+          }
+          property = props[this.index++];
+        }
+        return this.type === 'items' ? property : property[this.type];
+      }
+    ]);
+
+    return PropertyListIterator;
+  })();
+
+  function PropertyList(){
+    this.hash = new Hash;
+    this.props = [];
+    this.holes = 0;
+    this.length = 0;
+  }
+
+  define(PropertyList.prototype, [
+    function get(key){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index !== undefined) {
+        return this.props[index][1];
+      }
+    },
+    function getAttribute(key){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index !== undefined) {
+        return this.props[index][2];
+      } else {
+        return null;
+      }
+    },
+    function getProperty(key){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index !== undefined) {
+        return this.props[index];
+      } else {
+        return null;
+      }
+    },
+    function set(key, value, attr){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name],
+          prop;
+
+      if (index === undefined) {
+        index = this.hash[name] = this.props.length;
+        prop = this.props[index] = [key, value, 0];
+        this.length++;
+      } else {
+        prop = this.props[index];
+        prop[1] = value;
+      }
+
+      if (attr !== undefined) {
+        prop[2] = attr;
+      }
+      return true;
+    },
+    function initialize(props){
+      var len = props.length;
+      for (var i=0; i < len; i += 3) {
+        var index = this.hash[props[i]] = this.props.length;
+        this.props[index] = [props[i], props[i + 1], props[i + 2]];
+      }
+    },
+    function setAttribute(key, attr){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index !== undefined) {
+        this.props[index][2] = attr;
+        return true;
+      } else {
+        return false;
+      }
+    },
+    function setProperty(prop){
+      var key = prop[0],
+          name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index === undefined) {
+        index = this.hash[name] = this.props.length;
+        this.length++;
+      }
+      this.props[index] = prop;
+    },
+    function remove(key){
+      var name = key === '__proto__' ? proto : key,
+          index = this.hash[name];
+      if (index !== undefined) {
+        this.hash[name] = undefined;
+        this.props[index] = undefined;
+        this.holes++;
+        this.length--;
+        return true;
+      } else {
+        return false;
+      }
+    },
+    function has(key){
+      var name = key === '__proto__' ? proto : key;
+      return this.hash[name] !== undefined;
+    },
+    function hasAttribute(key, mask){
+      var name = key === '__proto__' ? proto : key,
+          attr = this.getAttribute(name);
+      if (attr !== null) {
+        return (attr & mask) > 0;
+      }
+    },
+    function compact(){
+      var props = this.props,
+          len = props.length,
+          index = 0,
+          prop;
+
+      this.hash = new Hash;
+      this.props = [];
+      this.holes = 0;
+
+      for (var i=0; i < len; i++) {
+        if (prop = props[i]) {
+          var name = prop[0] === '__proto__' ? proto : prop[0];
+          this.props[index] = prop;
+          this.hash[name] = index++;
+        }
+      }
+    },
+    function forEach(callback, context){
+      var len = this.props.length,
+          index = 0,
+          prop;
+
+      context = context || this;
+
+      for (var i=0; i < len; i++) {
+        if (prop = this.props[i]) {
+          callback.call(context, prop, index++, this);
+        }
+      }
+    },
+    function map(callback, context){
+      var out = [],
+          len = this.props.length,
+          index = 0,
+          prop;
+
+      context = context || this;
+
+      for (var i=0; i < len; i++) {
+        if (prop = this.props[i]) {
+          out[index] = callback.call(context, prop, index++, this);
+        }
+      }
+
+      return out;
+    },
+    function translate(callback, context){
+      var out = new PropertyList;
+
+      out.length = this.length;
+      context = context || this;
+
+      this.forEach(function(prop, index){
+        prop = callback.call(context, prop, index, this);
+        var name = prop[0] === '__proto__' ? proto : prop[0];
+        out.props[index] = prop;
+        out.hash[name] = index;
+      });
+
+      return out;
+    },
+    function filter(callback, context){
+      var out = new PropertyList,
+          index = 0;
+
+      context = context || this;
+
+      this.forEach(function(prop, i){
+        if (callback.call(context, prop, i, this)) {
+          var name = prop[0] === '__proto__' ? proto : prop[0];
+          out.props[index] = prop;
+          out.hash[name] = index++;
+        }
+      });
+
+      return out;
+    },
+    function clone(deep){
+      return this.translate(function(prop, i){
+        return deep ? prop.slice() : prop;
+      });
+    },
+    function keys(){
+      return this.map(function(prop){
+        return prop[0];
+      });
+    },
+    function values(){
+      return this.map(function(prop){
+        return prop[1];
+      });
+    },
+    function items(){
+      return this.map(function(prop){
+        return prop.slice();
+      });
+    },
+    function merge(list){
+      each(list, this.setProperty, this);
+    },
+    function __iterator__(type){
+      return new PropertyListIterator(this, type);
+    }
+  ]);
+
+  if (require('util')) {
+    void function(){
+      var insp = require('util').inspect;
+
+      function Token(value){
+        this.value = value + '';
+      }
+
+      Token.prototype.inspect = function(){ return this.value };
+
+      define(PropertyList.prototype, function inspect(){
+        var out = new Hash;
+
+        this.forEach(function(prop){
+          var key = typeof prop[0] === 'string' ? prop[0] : '_@_'+insp(prop[0]);
+
+          var attrs = (prop[2] & 0x01 ? 'E' : '_') +
+                      (prop[2] & 0x02 ? 'C' : '_') +
+                      (prop[2] & 0x04 ? 'W' :
+                       prop[2] & 0x08 ? 'A' : '_');
+
+          out[key] = new Token(attrs + ' ' + (isObject(prop[1]) ? prop[1].NativeBrand : prop[1]));
+        });
+
+        return insp(out).replace(/'_@_@(\w+)'/g, '@$1');
+      });
+    }();
+  }
+
+  return module.exports = PropertyList;
+})(typeof module !== 'undefined' ? module : {});
+
+
 exports.constants = (function(exports){
-  var create = require('./utility').create,
-      define = require('./utility').define,
-      ownKeys = require('./utility').keys;
+  var objects = require('../lib/objects');
+
+  var create  = objects.create,
+      define  = objects.define,
+      ownKeys = objects.keys,
+      Hash    = objects.Hash;
 
   function Constants(array){
-    this.hash = create(null);
+    this.hash = new Hash;
     for (var i=0; i < array.length; i++) {
       this.hash[array[i]] = i;
     }
@@ -7097,10 +7634,11 @@ exports.constants = (function(exports){
 
 
 exports.errors = (function(errors, messages, exports){
-  var inherit = require('./utility').inherit,
-      define = require('./utility').define,
+  var objects   = require('../lib/objects'),
       constants = require('./constants');
 
+  var define    = objects.define,
+      inherit   = objects.inherit;
 
   function Exception(name, type, message){
     var args = {},
@@ -7330,27 +7868,37 @@ exports.errors = (function(errors, messages, exports){
 
 
 exports.assembler = (function(exports){
-  var utility   = require('./utility'),
-      util      = require('util');
+  var util      = require('util');
 
-  var walk      = utility.walk,
-      collector = utility.collector,
-      Stack     = utility.Stack,
-      define    = utility.define,
-      assign    = utility.assign,
-      create    = utility.create,
-      copy      = utility.copy,
-      decompile = utility.decompile,
-      inherit   = utility.inherit,
-      ownKeys   = utility.keys,
-      isObject  = utility.isObject,
-      iterate   = utility.iterate,
-      each      = utility.each,
-      repeat    = utility.repeat,
-      map       = utility.map,
-      fold      = utility.fold,
-      generate  = utility.generate,
-      quotes    = utility.quotes;
+  var objects   = require('../lib/objects'),
+      functions = require('../lib/functions'),
+      iteration = require('../lib/iteration'),
+      utility   = require('../lib/utility'),
+      traversal = require('../lib/traversal'),
+      Stack     = require('../lib/Stack'),
+      HashMap   = require('../lib/HashMap');
+
+  var walk      = traversal.walk,
+      collector = traversal.collector,
+      fname     = functions.fname,
+      define    = objects.define,
+      assign    = objects.assign,
+      create    = objects.create,
+      copy      = objects.copy,
+      inherit   = objects.inherit,
+      ownKeys   = objects.keys,
+      hasOwn    = objects.hasOwn,
+      isObject  = objects.isObject,
+      Hash      = objects.Hash,
+      iterate   = iteration.iterate,
+      each      = iteration.each,
+      repeat    = iteration.repeat,
+      map       = iteration.map,
+      fold      = iteration.fold,
+      generate  = iteration.generate,
+      quotes    = utility.quotes,
+      uid       = utility.uid,
+      pushAll   = utility.pushAll;
 
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.hash,
@@ -7360,9 +7908,7 @@ exports.assembler = (function(exports){
       AST       = constants.AST,
       FUNCTYPE  = constants.FUNCTYPE.hash;
 
-  var hasOwn = {}.hasOwnProperty,
-      push = [].push,
-      proto = Math.random().toString(36).slice(2),
+  var proto = Math.random().toString(36).slice(2),
       context,
       opcodes = 0;
 
@@ -7410,6 +7956,39 @@ exports.assembler = (function(exports){
       };
     }
   ]);
+
+
+  function macro(name){
+    var params = [],
+        ops = [];
+
+    var body = map(arguments, function(arg, a){
+      if (!a) return '';
+      arg instanceof Array || (arg = [arg]);
+      var opcode = arg.shift();
+      ops.push(opcode);
+      return opcode.opname + '('+generate(opcode.params, function(i){
+        if (i in arg) {
+          if (typeof arg[i] === 'string') {
+            return quotes(arg[i]);
+          }
+          return arg[i] + '';
+        } else {
+          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
+          params.push(param);
+          return param;
+        }
+      }).join(', ') + ');';
+    }).join('\n  ');
+
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
+    func.params = func.length;
+    func.opname = name;
+    return func;
+  }
+
+
 
 
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
@@ -7478,37 +8057,8 @@ exports.assembler = (function(exports){
       WITH             = new StandardOpCode(0, 'WITH'),
       YIELD            = new StandardOpCode(1, 'YIELD');
 
+  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
-
-  function macro(name){
-    var params = [],
-        ops = [];
-
-    var body = map(arguments, function(arg, a){
-      if (!a) return '';
-      arg instanceof Array || (arg = [arg]);
-      var opcode = arg.shift();
-      ops.push(opcode);
-      return opcode.opname + '('+generate(opcode.params, function(i){
-        if (i in arg) {
-          if (typeof arg[i] === 'string') {
-            return utility.quote(arg[i]);
-          }
-          return arg[i] + '';
-        } else {
-          var param = '$'+String.fromCharCode(a + 96) + String.fromCharCode(i + 97);
-          params.push(param);
-          return param;
-        }
-      }).join(', ') + ');';
-    }).join('\n  ');
-
-    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
-    var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
-    func.params = func.length;
-    func.opname = name;
-    return func;
-  }
 
   var Code = exports.Code = (function(){
     var Directive = (function(){
@@ -7538,7 +8088,7 @@ exports.assembler = (function(exports){
       function Params(params, node, rest){
         this.length = 0;
         if (params) {
-          push.apply(this, params)
+          pushAll(this, params)
           this.BoundNames = BoundNames(params);
         } else {
           this.BoundNames = [];
@@ -7616,7 +8166,9 @@ exports.assembler = (function(exports){
         this.ExportedNames = getExports(this.body);
         this.Strict = true;
       }
-      this.params = new Params(node.params, node, node.rest);
+      if (node.params) {
+        this.params = new Params(node.params, node, node.rest);
+      }
       this.ops = [];
     }
 
@@ -7819,14 +8371,50 @@ exports.assembler = (function(exports){
     FunctionDeclaration: 'id',
     ClassDeclaration   : 'id'
   });
+/*
+  function LexicallyDeclaredNames(){
+    LinkedHashMap.call(this);
+  }
+
+  inherit(LexicallyDeclaredNames, LinkedHashMap, [
+    function add()
+  ]);
 
 
-  function BoundNames(node){
-    if (isFunction(node) || node.type === 'ClassDeclaration') {
-      //node = node.body;
+  function StaticScope(node){
+    this.node = node;
+  }
+
+
+
+  function GlobalScope(){
+    this.LexicallyDeclaredNames = new LinkedHashMap;
+    this.VarDeclaredNames = new LinkedHashMap;
+    this.VarScopedDeclarations = new LinkedHashMap;
+  }
+
+  inherit(GlobalScope, StaticScope, [
+    function enqueue(node){
+
     }
+  ]);
+
+  function FunctionScope(node){
+    this.node = node;
+    this.
+  }
+
+  inherit(FunctionScope, StaticScope, [
+    function enqueue(node){
+
+    }
+  ]);
+
+*/
+  function BoundNames(node){
     return boundNamesCollector(node);
   }
+
 
   var LexicalDeclarations = (function(lexical){
     return collector({
@@ -7944,7 +8532,7 @@ exports.assembler = (function(exports){
           if (decl.type === 'ModuleDeclaration') {
             var name = decl.id.name;
           } else {
-            var specifiers = create(null);
+            var specifiers = new Hash;
             each(decl.specifiers, function(specifier){
               var result = handlers[specifier.type](specifier);
               result = typeof result === 'string' ? [result, result] : result;
@@ -8046,7 +8634,7 @@ exports.assembler = (function(exports){
   function block(callback){
       var entry = new ControlTransfer(context.labels);
       context.jumps.push(entry);
-      context.labels = create(null);
+      context.labels = new Hash;
       callback();
       entry.updateBreaks(current());
       context.jumps.pop();
@@ -8055,7 +8643,7 @@ exports.assembler = (function(exports){
   function control(callback){
     var entry = new ControlTransfer(context.labels);
     context.jumps.push(entry);
-    context.labels = create(null);
+    context.labels = new Hash;
     entry.updateContinues(callback());
     entry.updateBreaks(current());
     context.jumps.pop();
@@ -8146,7 +8734,6 @@ exports.assembler = (function(exports){
     return context.code.ScopeType === SCOPE.EVAL || context.code.ScopeType === SCOPE.GLOBAL;
   }
 
-  var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
   function AssignmentExpression(node){
     if (node.operator === '='){
@@ -8402,14 +8989,14 @@ exports.assembler = (function(exports){
   }
 
   function ForInStatement(node){
-    iteration(node, ENUM);
+    iter(node, ENUM);
   }
 
   function ForOfStatement(node){
-    iteration(node, ITERATE);
+    iter(node, ITERATE);
   }
 
-  function iteration(node, KIND){
+  function iter(node, KIND){
     control(function(){
       var update;
       lexical(ENTRY.FOROF, function(){
@@ -8502,7 +9089,7 @@ exports.assembler = (function(exports){
 
   function LabeledStatement(node){
     if (!context.labels){
-      context.labels = create(null);
+      context.labels = new Hash;
     } else if (label in context.labels) {
       context.earlyError(node, 'duplicate_label');
     }
@@ -8775,7 +9362,7 @@ exports.assembler = (function(exports){
 
     each(node.declarations, function(item){
       if (node.kind === 'var') {
-        push.apply(context.code.VarDeclaredNames, BoundNames(item.id));
+        pushAll(context.code.VarDeclaredNames, BoundNames(item.id));
       }
 
       if (item.init) {
@@ -8837,7 +9424,7 @@ exports.assembler = (function(exports){
 
   var handlers = {};
 
-  utility.iterate([ ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
+  each([ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
     AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
     ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression,
     DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
@@ -8848,9 +9435,10 @@ exports.assembler = (function(exports){
     Property, ReturnStatement, SequenceExpression, SwitchStatement, SymbolDeclaration, SymbolDeclarator,
     TaggedTemplateExpression, TemplateElement, TemplateLiteral, ThisExpression, ThrowStatement,
     TryStatement, UnaryExpression, UpdateExpression, VariableDeclaration, VariableDeclarator,
-    WhileStatement, WithStatement, YieldExpression], function(handler){
-      handlers[utility.fname(handler)] = handler;
-    });
+    WhileStatement, WithStatement, YieldExpression],
+    function(handler){
+    handlers[fname(handler)] = handler;
+  });
 
 
 
@@ -8894,7 +9482,7 @@ exports.assembler = (function(exports){
       this.options = new AssemblerOptions(options);
       define(this, {
         strings: [],
-        hash: create(null)
+        hash: new Hash
       });
     }
 
@@ -9847,10 +10435,11 @@ exports.operators = (function(exports){
 
 
 exports.thunk = (function(exports){
-  var utility = require('./utility'),
-      Emitter          = utility.Emitter,
-      define           = utility.define,
-      inherit          = utility.inherit;
+  var objects   = require('../lib/objects'),
+      Emitter   = require('../lib/Emitter');
+
+  var define  = objects.define,
+      inherit = objects.inherit;
 
   var operators    = require('./operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
@@ -10868,38 +11457,44 @@ exports.thunk = (function(exports){
 
 
 exports.runtime = (function(GLOBAL, exports, undefined){
-  var esprima   = require('../third_party/esprima'),
-      errors    = require('./errors'),
-      utility   = require('./utility'),
-      assemble  = require('./assembler').assemble,
-      constants = require('./constants'),
-      operators = require('./operators');
+  var esprima      = require('../third_party/esprima'),
+      objects      = require('../lib/objects'),
+      functions    = require('../lib/functions'),
+      iteration    = require('../lib/iteration'),
+      utility      = require('../lib/utility'),
+      errors       = require('./errors'),
+      assemble     = require('./assembler').assemble,
+      constants    = require('./constants'),
+      operators    = require('./operators'),
+      Emitter      = require('../lib/Emitter'),
+      PropertyList = require('../lib/PropertyList'),
+      Thunk        = require('./thunk').Thunk;
 
-  operators.ToObject = ToObject;
-  var Thunk = require('./thunk').Thunk;
-
-  var Hash             = utility.Hash,
-      Emitter          = utility.Emitter,
-      PropertyList     = utility.PropertyList,
-      create           = utility.create,
-      numbers          = utility.numbers,
-      isObject         = utility.isObject,
-      nextTick         = utility.nextTick,
-      enumerate        = utility.enumerate,
-      ownKeys          = utility.keys,
-      define           = utility.define,
-      copy             = utility.copy,
-      inherit          = utility.inherit,
-      each             = utility.each,
-      iterate          = utility.iterate,
-      unique           = utility.unique;
-
+  var Hash          = objects.Hash,
+      create        = objects.create,
+      isObject      = objects.isObject,
+      enumerate     = objects.enumerate,
+      ownKeys       = objects.keys,
+      define        = objects.define,
+      copy          = objects.copy,
+      inherit       = objects.inherit,
+      ownProperties = objects.properties,
+      hide          = objects.hide,
+      fname         = functions.fname,
+      toArray       = functions.toArray,
+      applyNew      = functions.applyNew,
+      each          = iteration.each,
+      iterate       = iteration.iterate,
+      numbers       = utility.numbers,
+      nextTick      = utility.nextTick,
+      unique        = utility.unique;
 
   var ThrowException   = errors.ThrowException,
       MakeException    = errors.MakeException,
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
+  operators.ToObject = ToObject;
   var GetValue         = operators.GetValue,
       PutValue         = operators.PutValue,
       GetThisValue     = operators.GetThisValue,
@@ -10931,7 +11526,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Uninitialized = SYMBOLS.Uninitialized;
 
   var StopIteration = constants.BRANDS.StopIteration;
-  var slice = [].slice;
   var uid = (Math.random() * (1 << 30)) | 0;
 
   var BINARYOPS = constants.BINARYOPS.array,
@@ -10988,20 +11582,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   Completion.prototype.Completion   = SYMBOLS.Completion;
 
 
-
-  // ##################################################
-  // ### Internal Utilities not from specification ####
-  // ##################################################
-
   function noop(){}
-
-  if (Object.getOwnPropertyNames) {
-    var hide = function(o, k){
-      Object.defineProperty(o, k, { enumerable: false });
-    };
-  } else {
-    var hide = function(){};
-  }
 
   // ###############################
   // ###############################
@@ -14239,9 +14820,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
-      function initializeBindings(pattern, value){
-        return BindingInitialization(pattern, value, this.LexicalEnvironment);
-      },
       function popBlock(){
         var block = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
@@ -14518,7 +15096,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       if (typeof options === FUNCTION) {
         this.type = 'recompiled function';
-        if (!utility.fname(options)) {
+        if (!fname(options)) {
           options = {
             scope: SCOPE.FUNCTION,
             filename: '',
@@ -14527,7 +15105,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         } else {
           options = {
             scope: SCOPE.FUNCTION,
-            filename: utility.fname(options),
+            filename: fname(options),
             source: options+''
           };
         }
@@ -14599,7 +15177,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       function wrapNatives(source, target){
-        each(utility.ownProperties(source), function(key){
+        each(ownProperties(source), function(key){
           if (typeof source[key] === 'function'
                           && key !== 'constructor'
                           && key !== 'toString'
@@ -14832,7 +15410,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return new $Boolean(boolean);
         },
         DateCreate: function(args){
-          return new $Date(utility.applyNew(Date, toInternalArray(args)));
+          return new $Date(applyNew(Date, toInternalArray(args)));
         },
         NumberCreate: function(number){
           return new $Number(number);
@@ -15667,23 +16245,27 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
 exports.debug = (function(exports){
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration'),
+      utility   = require('../lib/utility'),
+      runtime   = require('./runtime');
 
-  var utility = require('./utility'),
-      isObject = utility.isObject,
-      inherit = utility.inherit,
-      create = utility.create,
-      each = utility.each,
-      define = utility.define,
-      assign = utility.assign;
+  var isObject   = objects.isObject,
+      inherit    = objects.inherit,
+      create     = objects.create,
+      define     = objects.define,
+      assign     = objects.assign,
+      getBrandOf = objects.getBrandOf,
+      Hash       = objects.Hash,
+      each       = iteration.each,
+      quotes     = utility.quotes,
+      uid        = utility.uid,
+      realm      = runtime.activeRealm;
 
-  var constants = require('./constants'),
-      ENUMERABLE = constants.ATTRIBUTES.ENUMERABLE,
-      CONFIGURABLE = constants.ATTRIBUTES.CONFIGURABLE,
-      WRITABLE = constants.ATTRIBUTES.WRITABLE,
-      ACCESSOR = constants.ATTRIBUTES.ACCESSOR;
-
-  var runtime = require('./runtime'),
-      realm = runtime.activeRealm;
+  var ENUMERABLE   = 0x01,
+      CONFIGURABLE = 0x02,
+      WRITABLE     = 0x04,
+      ACCESSOR     = 0x08;
 
   function always(value){
     return function(){ return value };
@@ -15731,19 +16313,10 @@ exports.debug = (function(exports){
     propAttributes: always(null)
   });
 
-  function brand(v){
-    if (v === null) {
-      return 'Null';
-    } else if (v === void 0) {
-      return 'Undefined';
-    }
-    return Object.prototype.toString.call(v).slice(8, -1);
-  }
-
   function MirrorValue(subject, label){
     this.subject = subject;
     this.type = typeof subject;
-    this.kind = brand(subject)+'Value';
+    this.kind = getBrandOf(subject)+'Value';
     if (this.type === 'number' && isNegativeZero(subject)) {
       label = '-0';
     }
@@ -15817,7 +16390,7 @@ exports.debug = (function(exports){
     return MirrorAccessor;
   })();
 
-  var proto = Math.random().toString(36).slice(2);
+  var proto = uid();
 
 
 
@@ -15826,7 +16399,7 @@ exports.debug = (function(exports){
       subject.__introspected = this;
       this.subject = subject;
       this.props = subject.properties;
-      this.accessors = create(null);
+      this.accessors = new Hash;
     }
 
     inherit(MirrorObject, Mirror, {
@@ -16002,7 +16575,7 @@ exports.debug = (function(exports){
         return this.ownAttrs(this.getPrototype().inheritedAttrs());
       },
       function ownAttrs(props){
-        props || (props = create(null));
+        props || (props = new Hash);
         this.subject.each(function(prop){
           var key = prop[0] === '__proto__' ? proto : prop[0];
           props[key] = prop;
@@ -16043,14 +16616,17 @@ exports.debug = (function(exports){
   })();
 
 
+  var MirrorArguments = (function(){
+    function MirrorArguments(subject){
+      MirrorObject.call(this, subject);
+    }
 
-  function MirrorArguments(subject){
-    MirrorObject.call(this, subject);
-  }
+    inherit(MirrorArguments, MirrorObject, {
+      kind: 'Arguments'
+    });
 
-  inherit(MirrorArguments, MirrorObject, {
-    kind: 'Arguments'
-  });
+    return MirrorArguments;
+  })();
 
 
   var MirrorArray = (function(){
@@ -16150,7 +16726,7 @@ exports.debug = (function(exports){
 
   var MirrorThrown = (function(){
     function MirrorThrown(subject){
-      if (utility.isObject(subject)) {
+      if (isObject(subject)) {
         MirrorError.call(this, subject);
       } else {
         return introspect(subject);
@@ -16235,7 +16811,7 @@ exports.debug = (function(exports){
       },
       function ownAttrs(props){
         var strict = this.isStrict();
-        props || (props = create(null));
+        props || (props = new Hash);
         this.subject.each(function(prop){
           if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
             var key = prop[0] === '__proto__' ? proto : prop[0];
@@ -16387,7 +16963,7 @@ exports.debug = (function(exports){
       },
       function ownAttrs(props){
         var len = this.primitive.length;
-        props || (props = create(null));
+        props || (props = new Hash);
 
         for (var i=0; i < len; i++) {
           props[i] = [i+'', this.primitive[i], 1];
@@ -16408,7 +16984,7 @@ exports.debug = (function(exports){
         }
       },
       function label(){
-        return 'String('+utility.quotes(this.primitive)+')';
+        return 'String('+quotes(this.primitive)+')';
       }
     ]);
 
@@ -16527,8 +17103,8 @@ exports.debug = (function(exports){
       if ('Call' in subject) {
         this.type = 'function';
       }
-      this.attrs = create(null);
-      this.props = create(null);
+      this.attrs = new Hash;
+      this.props = new Hash;
       this.kind = introspect(subject.Target).kind;
     }
 
@@ -16597,9 +17173,9 @@ exports.debug = (function(exports){
       function ownAttrs(props){
         var key, keys = this.subject.Enumerate(false, true);
 
-        props || (props = create(null));
-        this.props = create(null);
-        this.attrs = create(null);
+        props || (props = new Hash);
+        this.props = new Hash;
+        this.attrs = new Hash;
 
         for (var i=0; i < keys.length; i++) {
           var desc = this.subject.GetOwnProperty(key);
@@ -16664,7 +17240,7 @@ exports.debug = (function(exports){
         return this.ownAttrs(this.getPrototype().inheritedAttrs());
       },
       function ownAttrs(props){
-        props || (props = create(null));
+        props || (props = new Hash);
 
         each(this.subject.EnumerateBindings(), function(key){
           key = key === '__proto__' ? proto : key;
@@ -16800,8 +17376,8 @@ exports.debug = (function(exports){
       _NegOne      = new MirrorValue(-1, '-1'),
       _Empty       = new MirrorValue('', "''");
 
-  var numbers = create(null),
-      strings = create(null);
+  var numbers = new Hash,
+      strings = new Hash;
 
 
   function introspect(subject){
@@ -16892,7 +17468,7 @@ exports.debug = (function(exports){
       Unknown: alwaysLabel,
       BooleanValue: alwaysLabel,
       StringValue: function(mirror){
-        return utility.quotes(mirror.subject);
+        return quotes(mirror.subject);
       },
       NumberValue: function(mirror){
         var label = mirror.label();
@@ -16952,18 +17528,24 @@ exports.debug = (function(exports){
 
 
 exports.index = (function(exports){
-  var runtime   = require('./runtime'),
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration'),
+      runtime   = require('./runtime'),
       assembler = require('./assembler'),
       debug     = require('./debug'),
       constants = require('./constants'),
-      utility   = require('./utility'),
       errors    = require('./errors');
 
-  var Realm = runtime.Realm,
-      Script = runtime.Script,
-      Renderer = debug.Renderer,
+  var assign          = objects.assign,
+      assignAll       = objects.assignAll,
+      define          = objects.define,
+      inherit         = objects.inherit,
+      Realm           = runtime.Realm,
+      Script          = runtime.Script,
+      Renderer        = debug.Renderer,
+      ThrowException  = errors.ThrowException,
       $NativeFunction = runtime.$NativeFunction,
-      builtins = runtime.builtins;
+      builtins        = runtime.builtins;
 
 
   var exoticTemplates = {
@@ -16991,7 +17573,7 @@ exports.index = (function(exports){
   };
 
 
-  utility.assign(exports, [
+  assign(exports, [
     function createRealm(listener){
       return new Realm(listener);
     },
@@ -17025,7 +17607,7 @@ exports.index = (function(exports){
       var Super = builtins['$'+inherits];
 
 
-      utility.inherit($Exotic, Super, {
+      inherit($Exotic, Super, {
         Native: true,
       }, [
         function init(){},
@@ -17043,24 +17625,24 @@ exports.index = (function(exports){
           return this.query(key) !== undefined;
         },
         function each(callback){
-          return errors.ThrowException('missing_fundamental_handler', 'each');
+          return ThrowException('missing_fundamental_handler', 'each');
         },
         function get(key){
-          return errors.ThrowException('missing_fundamental_handler', 'get');
+          return ThrowException('missing_fundamental_handler', 'get');
         },
         function set(key, value){
-          return errors.ThrowException('missing_fundamental_handler', 'set');
+          return ThrowException('missing_fundamental_handler', 'set');
         },
         function query(key){
-          return errors.ThrowException('missing_fundamental_handler', 'query');
+          return ThrowException('missing_fundamental_handler', 'query');
         },
         function update(key, attr){
-          return errors.ThrowException('missing_fundamental_handler', 'update');
+          return ThrowException('missing_fundamental_handler', 'update');
         }
       ]);
 
       if (Super.prototype.Call) {
-        utility.define($Exotic.prototype, [
+        define($Exotic.prototype, [
           function call(){},
           function construct(){},
           $NativeFunction.prototype.Call,
@@ -17070,24 +17652,41 @@ exports.index = (function(exports){
       }
 
       if (handlers) {
-        utility.define($Exotic.prototype, handlers);
+        define($Exotic.prototype, handlers);
       }
 
       return $Exotic;
     }
   ]);
 
-  utility.define(exports, {
+  define(exports, {
     Assembler : assembler.Assembler,
     Code      : assembler.Code,
     Realm     : Realm,
     Renderer  : Renderer,
     Script    : Script,
-    utility   : utility,
     constants : constants,
-    iterate   : utility.iterate,
-    introspect: debug.introspect
+    iterate   : iteration.iterate,
+    introspect: debug.introspect,
+    utility: assignAll({}, [
+      require('../lib/functions'),
+      require('../lib/iteration'),
+      require('../lib/objects'),
+      require('../lib/traversal'),
+      require('../lib/utility'),
+      require('../lib/DoublyLinkedList'),
+      require('../lib/Emitter'),
+      require('../lib/Feeder'),
+      require('../lib/HashMap'),
+      require('../lib/HashSet'),
+      require('../lib/LinkedList'),
+      require('../lib/PropertyList'),
+      require('../lib/Queue'),
+      require('../lib/Stack')
+    ])
   });
+
+  console.log(exports.utility);
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
