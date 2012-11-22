@@ -106,7 +106,7 @@ var debug = (function(exports){
       this.accessor = accessor;
       this.key = key;
       realm().enterMutationContext();
-      this.subject = accessor.Get.Call(holder, key);
+      this.subject = accessor.Get.Call(holder, []);
       if (this.subject && this.subject.__introspected) {
         this.introspected = this.subject.__introspected;
       } else {
@@ -147,6 +147,34 @@ var debug = (function(exports){
   var proto = uid();
 
 
+  var MirrorPrototypeAccessor = (function(){
+    function MirrorPrototypeAccessor(holder, accessor, key){
+      this.holder = holder;
+      this.subject = accessor;
+      this.key = key;
+    }
+
+
+    inherit(MirrorPrototypeAccessor, Mirror, {
+      accessor: true,
+      kind: 'Accessor'
+    }, [
+      function label(){
+        var label = [];
+        if ('Get' in this.subject) label.push('Getter');
+        if ('Set' in this.subject) label.push('Setter');
+        return label.join('/');
+      },
+      function getName(){
+        return (this.subject.Get || this.subject.Set).get('name');
+      }
+    ]);
+
+    return MirrorPrototypeAccessor;
+  })();
+
+
+
 
   var MirrorObject = (function(){
     function MirrorObject(subject){
@@ -165,14 +193,15 @@ var debug = (function(exports){
     }, [
       function get(key){
         if (this.isPropAccessor(key)) {
-          if (this.subject.IsProto) {
-            return _Undefined;
-          }
           var prop = this.getProperty(key),
               accessor = prop[1] || prop[3];
 
           if (!this.accessors[key]) {
-            this.accessors[key] = new MirrorAccessor(this.subject, accessor, key);
+            if (this.subject.IsProto) {
+              this.accessors[key] = new MirrorPrototypeAccessor(this.subject, accessor, key);
+            } else {
+              this.accessors[key] = new MirrorAccessor(this.subject, accessor, key);
+            }
           }
           return this.accessors[key];
         } else {
