@@ -1665,9 +1665,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       function describe(key){
         return this.properties.getProperty(key);
       },
-      function define(key, value, attrs){
-        return this.properties.set(key, value, attrs);
-      },
+      (function(){
+        return function define(key, value, attrs){
+          return this.properties.set(key, value, attrs);
+        };
+      })(),
       function get(key){
         return this.properties.get(key);
       },
