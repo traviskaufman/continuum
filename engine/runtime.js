@@ -4043,14 +4043,17 @@ var runtime = (function(GLOBAL, exports, undefined){
               return str.replace(trimmer, '');
             };
           })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
-        getExtensible: function(obj){
+        GetExtensible: function(obj){
           return obj.getExtensible();
         },
-        setExtensible: function(obj, value){
+        SetExtensible: function(obj, value){
           return obj.setExtensible(value);
         },
-        getPrototype: function(obj){
+        GetPrototype: function(obj){
           return obj.getPrototype();
+        },
+        SetPrototype: function(obj, proto){
+          return obj.setPrototype(proto);
         },
         DefineOwnProperty: function(obj, key, desc){
           return obj.DefineOwnProperty(key, ToPropertyDescriptor(desc), false);
