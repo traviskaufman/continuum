@@ -1,35 +1,104 @@
 
+var utility          = continuum.utility,
+    Feeder           = utility.Feeder,
+    uid              = utility.uid,
+    fname            = utility.fname,
+    hasOwn           = utility.hasOwn,
+    define           = utility.define,
+    isObject         = utility.isObject,
+    isExtensible     = utility.isExtensible,
+    ownProperties    = utility.properties,
+    getPrototypeOf   = utility.getPrototypeOf,
+    getBrandOf       = utility.getBrandOf,
+    describeProperty = utility.describeProperty,
+    defineProperty   = utility.defineProperty,
+    block            = continuum.block,
+    createPanel      = continuum.createPanel,
+    render           = continuum.render,
+    _                = continuum._;
+
+
 var wrap = (function(){
+  var id = uid();
 
-  function resolvedNames(o){
-    var names = Object.create(null),
-        proto = Object(o),
-        keys = [];
-
-    Object.getOwnPropertyNames(proto).forEach(function(key){
-      var desc = Object.getOwnPropertyDescriptor(proto, key);
-      if (desc && !(key in names) && !('get' in desc)) {
-        names[key] = true;
-        keys.push(key);
-      }
-    });
-
-    while (proto = Object.getPrototypeOf(proto)) {
-      Object.getOwnPropertyNames(proto).forEach(function(key){
-        var desc = Object.getOwnPropertyDescriptor(proto, key);
-        if (desc && !(key in names) && 'get' in desc) {
-          names[key] = true;
-          keys.push(key);
+  var map = (function(){
+    if (typeof Map === 'function') {
+      var weakmap = new Map;
+      return {
+        set: function set(key, value){
+          try { weakmap.set(key, value) } catch (e) { console.log(e) }
+        },
+        get: function get(key){
+          try { return weakmap.get(key) } catch (e) { console.log(e) }
+        },
+        has: function has(key){
+          try { return weakmap.has(key) } catch (e) { console.log(e) }
+        },
+        remove: function remove(key){
+          try { return weakmap['delete'](key) } catch (e) { console.log(e) }
         }
-      });
+      };
+    } else {
+      var keys = [],
+          vals = [];
+
+      return {
+        set: function set(key, value){
+          if (isExtensible(key)) {
+            define(key, id, value);
+          } else {
+            var index = key === this.lastKey ? this.lastIndex : keys.indexOf(key);
+            if (~index) {
+              keys[index] = key;
+              vals[index] = value;
+            } else {
+              keys.push(key);
+              vals.push(value);
+            }
+          }
+        },
+        get: function get(key){
+          if (isExtensible(key)) {
+            return key[id];
+          } else {
+            var index = key === this.lastKey ? this.lastIndex : keys.indexOf(key);
+            if (~index) {
+              return vals[index];
+            }
+          }
+        },
+        has: function has(key){
+          if (isExtensible(key)) {
+            return hasOwn(key, id);
+          } else {
+            var lastIndex = keys.indexOf(key);
+            if (~lastIndex) {
+              this.lastIndex = lastIndex;
+              this.lastKey = key;
+              return true;
+            }
+          }
+          return false;
+        },
+        remove: function remove(key){
+          if (isExtensible(key)) {
+            if (hasOwn(key, id)) {
+              delete key[id];
+              return true;
+            }
+          } else {
+            var index = keys.indexOf(key);
+            if (!index) {
+              keys.splice(index, 1);
+              vals.splice(index, 1);
+              return true;
+            }
+          }
+          return false;
+        }
+      };
     }
-
-    return keys;
-  }
-
-
-  var wrapped = new WeakMap,
-      isObject = continuum.utility.isObject;
+  })();
 
   function unwrap(value){
     if (isObject(value)) {
@@ -42,13 +111,21 @@ var wrap = (function(){
 
   function wrap(value){
     if (isObject(value)) {
-      if (wrapped.has(value)) {
-        return wrapped.get(value);
+      if (value instanceof $ExoticObject) {
+        return value;
       }
-      if (typeof value === 'function') {
-        return new $ExoticFunction(value);
+
+      if (map.has(value)) {
+        return map.get(value);
       }
-      return new $ExoticObject(value);
+
+      var wrapper = typeof value === 'function' ? new $ExoticFunction(value) : new $ExoticObject(value);
+
+      map.set(value, wrapper);
+      return wrapper;
+
+    } else if (typeof value === 'string' && value.length > 100) {
+      value = value.slice(0, 100);
     }
     return value;
   }
@@ -72,75 +149,103 @@ var wrap = (function(){
 
   function descToAttrs(desc){
     if (desc) {
-      return desc.enumerable | (desc.configurable << 1) | (desc.writable << 2);
+      var attrs = desc.enumerable | (desc.configurable << 1) | (desc.writable << 2);
+      if ('get' in desc || 'set' in desc) {
+       attrs |= 0x08;
+      }
+      return attrs;
     }
   }
 
-
+  function getDescriptor(o, key){
+    if (hasOwn(o, key)) {
+      try {
+        return describeProperty(o, key);
+      } catch (e) {
+      }
+    }
+  }
 
   var handlers = [
     function init(object){
       this.object = object;
-      wrapped.set(object, this);
-      if ((typeof object === 'function' || 'prototype' in object) && !('name' in object)) {
-        try {
-          Object.defineProperty(object, 'name', {
-            configurable: false,
-            enumerable: false,
-            writable: false,
-            value: utility.fname(object)
-          });
-        } catch (e) {}
+      this.Extensible = isExtensible(object);
+      this.Prototype = wrap(getPrototypeOf(object));
+
+      if (object !== location) {
+        var ctor = object.constructor;
+        if (ctor) {
+          if (ctor.prototype === object) {
+            this.IsProto = true;
+          }
+          this.ConstructorName = fname(ctor) || getBrandOf(ctor);
+        }
+      }
+
+      if (!this.ConstructorName) {
+        this.ConstructorName = getBrandOf(object);
+      }
+
+      if (typeof object === 'function') {
+        try { fname(object) } catch (e) {}
       }
     },
     function remove(key){
       delete this.object[key];
     },
     function describe(key){
-      return [key, this.get(key), this.query(key)];
+      if (key === id) return;
+      var desc = getDescriptor(this.object, key);
+      if (desc) {
+        var attrs = descToAttrs(desc);
+        if ('value' in desc) {
+          var val = wrap(desc.value);
+        } else if ('get' in desc || 'set' in desc) {
+          var val = { Get: wrap(desc.get),
+                      Set: wrap(desc.set) };
+        }
+        var prop = [key, val, attrs];
+        return prop;
+      }
     },
     function define(key, value, attrs){
       this.object[key] = unwrap(value);
       return;
       var desc = attrsToDesc(attrs);
       desc.value = unwrap(value);
-      //console.log(desc);
-      //Object.defineProperty(this.object, key, desc);
+      defineProperty(this.object, key, desc);
     },
     function has(key){
+      if (key === id) return false;
       return key in this.object;
     },
     function each(callback){
-      var keys = resolvedNames(this.object);
+      var keys = ownProperties(this.object);
       for (var i=0; i < keys.length; i++) {
-        var val = this.get(keys[i]);
-        if (typeof val !== 'string' || val.length < 50) {
-          callback([keys[i], val, this.query(keys[i])]);
+        if (keys[i] === id) continue;
+
+        var val = this.describe(keys[i]);
+        if (typeof val === 'object' && val !== null) {
+          callback(val);
         }
       }
     },
     function get(key){
       try {
         return wrap(this.object[key]);
-      } catch (e) { }
+      } catch (e) { console.log(e) }
     },
     function set(key, value){
       this.object[key] = unwrap(value);
     },
     function query(key){
-      return this.object.propertyIsEnumerable(key) + 6;//descToAttrs(Object.getOwnPropertyDescriptor(this, key));
+      var desc = describeProperty(this.object, key);
+      if (desc) {
+        return descToAttrs(desc);
+      }
     },
     function update(key, attr){
-      //Object.defineProperty(this.object, key, attrsToDesc(attr));
-    },
-    function getExtensible(){
-      return true;
-    },
-    function getPrototype(){
-      if (!this.protoSet) {
-        this.Prototype = wrap(Object.getPrototypeOf(this.object));
-      }
-      return this.Prototype;
+      defineProperty(this.object, key, attrsToDesc(attr));
     }
   ]
 
@@ -148,8 +253,13 @@ var wrap = (function(){
   var $ExoticObject = continuum.createExotic('Object', handlers);
   var $ExoticFunction = continuum.createExotic('Function', handlers);
 
+
   $ExoticFunction.prototype.Call = function Call(receiver, args){
-    return wrap(this.call.apply(unwrap(receiver), args.map(unwrap)));
+    try {
+      return wrap(this.call.apply(unwrap(receiver), args.map(unwrap)));
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   $ExoticFunction.prototype.Construct = function Construct(args){
@@ -159,3 +269,12 @@ var wrap = (function(){
   return wrap;
 })();
 
+
+var oproto = wrap(Object.prototype);
+oproto.properties.setProperty(['__proto__', null, 6, {
+  Get: { Call: function(r){ return r.getPrototype() } },
+  Set: { Call: function(r, a){ return r.setPrototype(a[0]) } }
+}]);
+
+realm.global.Put('document', wrap(document));
+realm.global.Put('window', wrap(window));
