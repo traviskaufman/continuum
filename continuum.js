@@ -17617,6 +17617,7 @@ exports.index = (function(exports){
     },
     Function: function(){
       return function $ExoticFunction(call, construct){
+        builtins.$Object.call(this);
         this.call = call;
         if (construct) {
           this.construct = construct;

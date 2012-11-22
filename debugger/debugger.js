@@ -303,10 +303,16 @@ if (location.hash === '#experimental') {
         }
       },
       function remove(key){
+        if (this.properties.has(key)) {
+          return this.properties.remove(key);
+        }
         delete this.object[key];
       },
       function describe(key){
         if (key === id) return;
+        if (this.properties.has(key)) {
+          return this.properties.getProperty(key);
+        }
         var desc = getDescriptor(this.object, key);
         if (desc) {
           var attrs = descToAttrs(desc);
@@ -321,6 +327,9 @@ if (location.hash === '#experimental') {
         }
       },
       function define(key, value, attrs){
+        if (this.properties.has(key)) {
+          return this.properties.set(key, value, attrs);
+        }
         this.object[key] = unwrap(value);
         return;
         var desc = attrsToDesc(attrs);
@@ -329,9 +338,10 @@ if (location.hash === '#experimental') {
       },
       function has(key){
         if (key === id) return false;
-        return key in this.object;
+        return this.properties.has(key) || key in this.object;
       },
       function each(callback){
+        this.properties.forEach(callback, this);
         var keys = ownProperties(this.object);
         for (var i=0; i < keys.length; i++) {
           if (keys[i] === id) continue;
@@ -343,20 +353,32 @@ if (location.hash === '#experimental') {
         }
       },
       function get(key){
+        if (this.properties.has(key)) {
+          return this.properties.get(key);
+        }
         try {
           return wrap(this.object[key]);
         } catch (e) { console.log(e) }
       },
       function set(key, value){
+        if (this.properties.has(key)) {
+          return this.properties.set(key, value);
+        }
         this.object[key] = unwrap(value);
       },
       function query(key){
+        if (this.properties.has(key)) {
+          return this.properties.getAttribute(key);
+        }
         var desc = describeProperty(this.object, key);
         if (desc) {
           return descToAttrs(desc);
         }
       },
       function update(key, attr){
+        if (this.properties.has(key)) {
+          return this.properties.setAttribute(key, attr);
+        }
         defineProperty(this.object, key, attrsToDesc(attr));
       }
     ]
@@ -382,7 +404,7 @@ if (location.hash === '#experimental') {
   })();
 
 
-  var oproto = wrap(Object.prototype);
+  oproto = wrap(Object.prototype);
   oproto.properties.setProperty(['__proto__', null, 6, {
     Get: { Call: function(r){ return r.getPrototype() } },
     Set: { Call: function(r, a){ return r.setPrototype(a[0]) } }
