@@ -5448,7 +5448,8 @@ return exports;
 
 exports.functions = (function(exports){
   var _slice = [].slice,
-      _concat = [].concat;
+      _concat = [].concat,
+      _push = [].push;
 
   function toArray(o){
     var len = o.length;
@@ -5607,8 +5608,19 @@ exports.functions = (function(exports){
     return new (bindapply(Ctor, nil.concat(args)));
   }
 
+  exports.pushable = bindbind([].push);
+
   var hasOwn   = callbind({}.hasOwnProperty),
       toSource = callbind(function(){}.toString);
+
+  var hidden = { configurable: true,
+                 enumerable: false,
+                 writable: true,
+                 value: undefined }
+
+  var defineProperty = Object.defineProperty && !('prototype' in Object.defineProperty)
+                       ? Object.defineProperty
+                       : function defineProperty(o, k, d){ o[k] = d.value };
 
   exports.fname = (function(){
     if (Function.name === 'Function') {
@@ -5622,8 +5634,11 @@ exports.functions = (function(exports){
       }
 
       if (!hasOwn(f, 'name')) {
-        hidden.value = toSource(f).match(/^\n?function\s?(\w*)?_?\(/)[1];
-        defineProperty(f, 'name', hidden);
+        var match = toSource(f).match(/^\n?function\s?(\w*)?_?\(/);
+        if (match) {
+          hidden.value = match[1];
+          defineProperty(f, 'name', hidden);
+        }
       }
 
       return f.name || '';
@@ -5632,6 +5647,7 @@ exports.functions = (function(exports){
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
+
 
 
 exports.objects = (function(exports){
@@ -5780,6 +5796,11 @@ exports.objects = (function(exports){
 
   var ownProperties = exports.properties = isES5 ? Object.getOwnPropertyNames : ownKeys;
 
+  if (isES5) {
+    exports.isExtensible = Object.isExtensible;
+  } else {
+    exports.isExtensible = function isExtensible(){ return true };
+  }
 
   function enumerate(o){
     var out = [], i = 0;
@@ -6171,6 +6192,8 @@ exports.Queue = (function(module){
       define        = objects.define,
       inherit       = objects.inherit,
       toArray       = functions.toArray,
+      pushable      = functions.pushable,
+      iterate       = iteration.iterate,
       Iterator      = iteration.Iterator,
       StopIteration = iteration.StopIteration;
 
@@ -6189,24 +6212,19 @@ exports.Queue = (function(module){
     }
   ]);
 
-  function Queue(items){
-    if (isObject(items)) {
-      if (items instanceof Queue) {
-        this.items = items.items.slice(items.front);
-      } else if (items instanceof Array) {
-        this.items = items.slice();
-      } else if (items.length) {
-        this.items = toArray(items);
+  function Queue(iterable){
+    this.index = this.length = 0;
+    if (iterable != null) {
+      if (iterable instanceof Queue) {
+        this.items = iterable.items.slice(iterable.front);
+        this.length = this.items.length;
       } else {
-        this.items = [items];
+        this.items = [];
+        iterate(iterable, this.push, this);
       }
-    } else if (items != null) {
-      this.items = [items];
     } else {
       this.items = [];
     }
-    this.length = this.items.length;
-    this.index = 0;
   }
 
   define(Queue.prototype, [
@@ -6505,6 +6523,7 @@ exports.Stack = (function(module){
   var define        = objects.define,
       inherit       = objects.inherit,
       toArray       = functions.toArray,
+      iterate       = iteration.iterate,
       Iterator      = iteration.Iterator,
       StopIteration = iteration.StopIteration;
 
@@ -6523,10 +6542,10 @@ exports.Stack = (function(module){
     }
   ]);
 
-  function Stack(){
+  function Stack(iterable){
     this.empty();
-    for (var k in arguments) {
-      this.push(arguments[k]);
+    if (iterable != null) {
+      iterate(iterable, this.push, this);
     }
   }
 
@@ -7000,9 +7019,16 @@ exports.HashMap = (function(module){
     }
   ]);
 
-  function HashMap(){
+  function HashMap(iterable){
     define(this, 'list', new DoublyLinkedList);
     this.clear();
+    if (iterable != null) {
+      iterate(iterable, function(item){
+        if (item && typeof item === 'object' && item.length  === 2) {
+          this.set(item[0], item[1]);
+        }
+      }, this);
+    }
   }
 
   define(HashMap.prototype, [
@@ -16352,7 +16378,7 @@ exports.debug = (function(exports){
       this.accessor = accessor;
       this.key = key;
       realm().enterMutationContext();
-      this.subject = accessor.Get.Call(holder, key);
+      this.subject = accessor.Get.Call(holder, []);
       if (this.subject && this.subject.__introspected) {
         this.introspected = this.subject.__introspected;
       } else {
@@ -16393,6 +16419,34 @@ exports.debug = (function(exports){
   var proto = uid();
 
 
+  var MirrorPrototypeAccessor = (function(){
+    function MirrorPrototypeAccessor(holder, accessor, key){
+      this.holder = holder;
+      this.subject = accessor;
+      this.key = key;
+    }
+
+
+    inherit(MirrorPrototypeAccessor, Mirror, {
+      accessor: true,
+      kind: 'Accessor'
+    }, [
+      function label(){
+        var label = [];
+        if ('Get' in this.subject) label.push('Getter');
+        if ('Set' in this.subject) label.push('Setter');
+        return label.join('/');
+      },
+      function getName(){
+        return (this.subject.Get || this.subject.Set).get('name');
+      }
+    ]);
+
+    return MirrorPrototypeAccessor;
+  })();
+
+
+
 
   var MirrorObject = (function(){
     function MirrorObject(subject){
@@ -16411,14 +16465,15 @@ exports.debug = (function(exports){
     }, [
       function get(key){
         if (this.isPropAccessor(key)) {
-          if (this.subject.IsProto) {
-            return _Undefined;
-          }
           var prop = this.getProperty(key),
               accessor = prop[1] || prop[3];
 
           if (!this.accessors[key]) {
-            this.accessors[key] = new MirrorAccessor(this.subject, accessor, key);
+            if (this.subject.IsProto) {
+              this.accessors[key] = new MirrorPrototypeAccessor(this.subject, accessor, key);
+            } else {
+              this.accessors[key] = new MirrorAccessor(this.subject, accessor, key);
+            }
           }
           return this.accessors[key];
         } else {
@@ -17685,8 +17740,6 @@ exports.index = (function(exports){
       require('../lib/Stack')
     ])
   });
-
-  console.log(exports.utility);
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
