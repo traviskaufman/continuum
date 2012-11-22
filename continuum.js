@@ -5618,7 +5618,7 @@ exports.functions = (function(exports){
                  writable: true,
                  value: undefined }
 
-  var defineProperty = Object.defineProperty && !('prototype' in Object.defineProperty)
+  var defineProperty = Object.getOwnPropertyNames && !('prototype' in Object.getOwnPropertyNames)
                        ? Object.defineProperty
                        : function defineProperty(o, k, d){ o[k] = d.value };
 
@@ -13149,9 +13149,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function describe(key){
         return this.properties.getProperty(key);
       },
-      function define(key, value, attrs){
-        return this.properties.set(key, value, attrs);
-      },
+      (function(){
+        return function define(key, value, attrs){
+          return this.properties.set(key, value, attrs);
+        };
+      })(),
       function get(key){
         return this.properties.get(key);
       },
