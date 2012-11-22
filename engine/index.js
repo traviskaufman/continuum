@@ -89,10 +89,12 @@ var index = (function(exports){
         function describe(key){
           return [key, this.get(key), this.query(key)];
         },
-        function define(key, value, attrs){
-          this.set(key, value);
-          this.update(key, attrs);
-        },
+        (function(){
+          return function define(key, value, attrs){
+            this.set(key, value);
+            this.update(key, attrs);
+          };
+        })(),
         function has(key){
           return this.query(key) !== undefined;
         },

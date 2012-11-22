@@ -278,110 +278,113 @@ if (location.hash === '#experimental') {
       }
     }
 
-    var handlers = [
-      function init(object){
-        this.object = object;
-        this.Extensible = isExtensible(object);
-        this.Prototype = wrap(getPrototypeOf(object));
 
-        if (object !== location) {
-          var ctor = object.constructor;
-          if (ctor) {
-            if (ctor.prototype === object) {
-              this.IsProto = true;
+    var handlers = (function(){
+      return [
+        function init(object){
+          this.object = object;
+          this.Extensible = isExtensible(object);
+          this.Prototype = wrap(getPrototypeOf(object));
+
+          if (object !== location) {
+            var ctor = object.constructor;
+            if (ctor) {
+              if (ctor.prototype === object) {
+                this.IsProto = true;
+              }
+              this.ConstructorName = fname(ctor) || getBrandOf(ctor);
             }
-            this.ConstructorName = fname(ctor) || getBrandOf(ctor);
           }
-        }
 
-        if (!this.ConstructorName) {
-          this.ConstructorName = getBrandOf(object);
-        }
-
-        if (typeof object === 'function') {
-          try { fname(object) } catch (e) {}
-        }
-      },
-      function remove(key){
-        if (this.properties.has(key)) {
-          return this.properties.remove(key);
-        }
-        delete this.object[key];
-      },
-      function describe(key){
-        if (key === id) return;
-        if (this.properties.has(key)) {
-          return this.properties.getProperty(key);
-        }
-        var desc = getDescriptor(this.object, key);
-        if (desc) {
-          var attrs = descToAttrs(desc);
-          if ('value' in desc) {
-            var val = wrap(desc.value);
-          } else if ('get' in desc || 'set' in desc) {
-            var val = { Get: wrap(desc.get),
-                        Set: wrap(desc.set) };
+          if (!this.ConstructorName) {
+            this.ConstructorName = getBrandOf(object);
           }
-          var prop = [key, val, attrs];
-          return prop;
-        }
-      },
-      function define(key, value, attrs){
-        if (this.properties.has(key)) {
-          return this.properties.set(key, value, attrs);
-        }
-        this.object[key] = unwrap(value);
-        return;
-        var desc = attrsToDesc(attrs);
-        desc.value = unwrap(value);
-        defineProperty(this.object, key, desc);
-      },
-      function has(key){
-        if (key === id) return false;
-        return this.properties.has(key) || key in this.object;
-      },
-      function each(callback){
-        this.properties.forEach(callback, this);
-        var keys = ownProperties(this.object);
-        for (var i=0; i < keys.length; i++) {
-          if (keys[i] === id) continue;
 
-          var val = this.describe(keys[i]);
-          if (typeof val === 'object' && val !== null) {
-            callback(val);
+          if (typeof object === 'function') {
+            try { fname(object) } catch (e) {}
           }
+        },
+        function remove(key){
+          if (this.properties.has(key)) {
+            return this.properties.remove(key);
+          }
+          delete this.object[key];
+        },
+        function describe(key){
+          if (key === id) return;
+          if (this.properties.has(key)) {
+            return this.properties.getProperty(key);
+          }
+          var desc = getDescriptor(this.object, key);
+          if (desc) {
+            var attrs = descToAttrs(desc);
+            if ('value' in desc) {
+              var val = wrap(desc.value);
+            } else if ('get' in desc || 'set' in desc) {
+              var val = { Get: wrap(desc.get),
+                          Set: wrap(desc.set) };
+            }
+            var prop = [key, val, attrs];
+            return prop;
+          }
+        },
+        function define(key, value, attrs){
+          if (this.properties.has(key)) {
+            return this.properties.set(key, value, attrs);
+          }
+          this.object[key] = unwrap(value);
+          return;
+          var desc = attrsToDesc(attrs);
+          desc.value = unwrap(value);
+          defineProperty(this.object, key, desc);
+        },
+        function has(key){
+          if (key === id) return false;
+          return this.properties.has(key) || key in this.object;
+        },
+        function each(callback){
+          this.properties.forEach(callback, this);
+          var keys = ownProperties(this.object);
+          for (var i=0; i < keys.length; i++) {
+            if (keys[i] === id) continue;
+
+            var val = this.describe(keys[i]);
+            if (typeof val === 'object' && val !== null) {
+              callback(val);
+            }
+          }
+        },
+        function get(key){
+          if (this.properties.has(key)) {
+            return this.properties.get(key);
+          }
+          try {
+            return wrap(this.object[key]);
+          } catch (e) { console.log(e) }
+        },
+        function set(key, value){
+          if (this.properties.has(key)) {
+            return this.properties.set(key, value);
+          }
+          this.object[key] = unwrap(value);
+        },
+        function query(key){
+          if (this.properties.has(key)) {
+            return this.properties.getAttribute(key);
+          }
+          var desc = describeProperty(this.object, key);
+          if (desc) {
+            return descToAttrs(desc);
+          }
+        },
+        function update(key, attr){
+          if (this.properties.has(key)) {
+            return this.properties.setAttribute(key, attr);
+          }
+          defineProperty(this.object, key, attrsToDesc(attr));
         }
-      },
-      function get(key){
-        if (this.properties.has(key)) {
-          return this.properties.get(key);
-        }
-        try {
-          return wrap(this.object[key]);
-        } catch (e) { console.log(e) }
-      },
-      function set(key, value){
-        if (this.properties.has(key)) {
-          return this.properties.set(key, value);
-        }
-        this.object[key] = unwrap(value);
-      },
-      function query(key){
-        if (this.properties.has(key)) {
-          return this.properties.getAttribute(key);
-        }
-        var desc = describeProperty(this.object, key);
-        if (desc) {
-          return descToAttrs(desc);
-        }
-      },
-      function update(key, attr){
-        if (this.properties.has(key)) {
-          return this.properties.setAttribute(key, attr);
-        }
-        defineProperty(this.object, key, attrsToDesc(attr));
-      }
-    ]
+      ];
+    })();
 
     var applyNew = continuum.utility.applyNew;
     var $ExoticObject = continuum.createExotic('Object', handlers);
