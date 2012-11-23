@@ -81,7 +81,7 @@ export function freeze(object){
     }
   }
 
-  $__SetExtensible(object, false);
+  $__PreventExtensions(object, false);
   return object;
 }
 
@@ -109,17 +109,17 @@ export function getPropertyNames(object){
 
 export function getPrototypeOf(object){
   ensureObject(object, 'Object.getPrototypeOf');
-  return $__GetPrototype(object);
+  return $__GetInheritence(object);
 }
 
 export function isExtensible(object){
   ensureObject(object, 'Object.isExtensible');
-  return $__GetExtensible(object);
+  return $__IsExtensible(object);
 }
 
 export function isFrozen(object){
   ensureObject(object, 'Object.isFrozen');
-  if ($__GetExtensible(object)) {
+  if ($__IsExtensible(object)) {
     return false;
   }
 
@@ -139,7 +139,7 @@ export function isFrozen(object){
 
 export function isSealed(object){
   ensureObject(object, 'Object.isSealed');
-  if ($__GetExtensible(object)) {
+  if ($__IsExtensible(object)) {
     return false;
   }
 
@@ -162,7 +162,7 @@ export function keys(object){
 
 export function preventExtensions(object){
   ensureObject(object, 'Object.preventExtensions');
-  $__SetExtensible(object, false);
+  $__PreventExtensions(object, false);
   return object;
 }
 
@@ -176,7 +176,7 @@ export function seal(object){
     $__DefineOwnProperty(object, props[i], desc);
   }
 
-  $__SetExtensible(object, false);
+  $__PreventExtensions(object, false);
   return object;
 }
 

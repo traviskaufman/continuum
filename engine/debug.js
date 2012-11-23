@@ -226,11 +226,11 @@ var debug = (function(exports){
         return this.get(key).subject;
       },
       function getPrototype(){
-        return introspect(this.subject.getPrototype());
+        return introspect(this.subject.GetInheritance());
       },
       function setPrototype(value){
         realm().enterMutationContext();
-        var ret = this.subject.setPrototype(value);
+        var ret = this.subject.SetInheritance(value);
         realm().exitMutationContext();
         return ret;
       },
@@ -286,7 +286,7 @@ var debug = (function(exports){
         return this.hasOwn(key) || this.getPrototype().has(key);
       },
       function isExtensible(key){
-        return this.subject.getExtensible();
+        return this.subject.IsExtensible();
       },
       function getDescriptor(key){
         return this.getOwnDescriptor(key) || this.getPrototype().getDescriptor(key);
@@ -330,7 +330,7 @@ var debug = (function(exports){
         if (prop) {
           return !!(prop[2] & ACCESSOR ? prop[1].Set : prop[2] & WRITABLE);
         } else {
-          return this.subject.getExtensible();
+          return this.subject.IsExtensible();
         }
       },
       function propAttributes(key){

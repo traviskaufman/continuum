@@ -135,7 +135,7 @@ export class Handler {
     if (desc !== undefined) {
       return true;
     }
-    var proto = $__GetPrototype(target);
+    var proto = $__GetInheritance(target);
     return proto === null ? false : has(proto, name);
   }
 
@@ -148,7 +148,7 @@ export class Handler {
 
     var desc = this.getOwnPropertyDescriptor(target, name);
     if (desc === undefined) {
-      var proto = $__GetPrototype(target);
+      var proto = $__GetInheritance(target);
       return proto === null ? undefined : this.get(proto, name, receiver);
     }
     if ('writable' in desc || 'value' in desc) {
@@ -176,15 +176,15 @@ export class Handler {
         return true;
       } else {
         $__DefineOwnProperty(receiver, name, newDesc);
-        var extensible = $__GetExtensible(receiver);
+        var extensible = $__IsExtensible(receiver);
         extensible && defineNormal(receiver, name, value);
         return extensible;
       }
     }
 
-    var proto = $__GetPrototype(target);
+    var proto = $__GetInheritance(target);
     if (proto === null) {
-      var extensible = $__GetExtensible(receiver);
+      var extensible = $__IsExtensible(receiver);
       extensible && defineNormal(receiver, name, value);
       return extensible;
     }
@@ -206,7 +206,7 @@ export class Handler {
       }
     }
 
-    var proto = $__GetPrototype(target);
+    var proto = $__GetInheritance(target);
     return proto === null ? out : out.concat(enumerate(proto));
   }
 
@@ -266,7 +266,7 @@ export function enumerate(target){
 
 export function freeze(target){
   if (Type(target) !== 'Object') return false;
-  var success = $__SetExtensible(target, false);
+  var success = $__PreventExtensions(target, false);
   if (!success) return success;
 
   var props = $__Enumerate(target, false, false);
@@ -303,7 +303,7 @@ export function getOwnPropertyNames(target){
 
 export function getPrototypeOf(target){
   ensureObject(target, '@Reflect.getPrototypeOf');
-  return $__GetPrototype(target);
+  return $__GetInheritance(target);
 }
 
 export function has(target, name){
@@ -320,7 +320,7 @@ export function hasOwn(target, name){
 
 export function isFrozen(target){
   ensureObject(target, '@Reflect.isFrozen');
-  if ($__GetExtensible(target)) {
+  if ($__IsExtensible(target)) {
     return false;
   }
 
@@ -340,7 +340,7 @@ export function isFrozen(target){
 
 export function isSealed(target){
   ensureObject(target, '@Reflect.isSealed');
-  if ($__GetExtensible(target)) {
+  if ($__IsExtensible(target)) {
     return false;
   }
 
@@ -358,7 +358,7 @@ export function isSealed(target){
 
 export function isExtensible(target){
   ensureObject(target, '@Reflect.isExtensible');
-  return $__GetExtensible(target);
+  return $__IsExtensible(target);
 }
 
 export function keys(target){
@@ -368,12 +368,12 @@ export function keys(target){
 
 export function preventExtensions(target){
   if (Type(target) !== 'Object') return false;
-  return $__SetExtensible(target, false);
+  return $__PreventExtensions(target, false);
 }
 
 export function seal(target){
   if (Type(target) !== 'Object') return false;
-  var success = $__SetExtensible(target, false);
+  var success = $__PreventExtensions(target, false);
   if (!success) return success;
 
   var props = $__Enumerate(target, false, false);
