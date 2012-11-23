@@ -80,7 +80,11 @@
         i = keys.length;
 
     while (i--) {
-      $__update(o, keys[i], -1);
+      if (typeof o[keys[i]] === 'number') {
+        $__update(o, keys[i], 0);
+      } else {
+        $__update(o, keys[i], 6);
+      }
     }
 
     if (typeof o === 'function') {
@@ -233,7 +237,7 @@ export function Module(object){
 $__remove(Module, 'prototype');
 
 
-export let System = new Loader(null, {
+let System = $__System = new Loader(null, {
   fetch(relURL, baseURL, request, resolved) {
     var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;
 
@@ -241,7 +245,7 @@ export let System = new Loader(null, {
       if (typeof src === 'string') {
         request.fulfill(src);
       } else {
-        request.reject(src.message);
+        request.reject(src);
       }
     });
   },
@@ -253,7 +257,8 @@ export let System = new Loader(null, {
   }
 });
 
-$__System = System;
+export System;
+
 
 System.@strict = false;
 let std = System.eval(`

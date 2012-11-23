@@ -49,6 +49,9 @@ var index = (function(exports){
     function createRealm(listener){
       return new Realm(listener);
     },
+    function createRealmAsync(){
+      return new Realm(true);
+    },
     function createScript(options){
       return new Script(options);
     },

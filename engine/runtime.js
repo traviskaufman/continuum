@@ -3753,18 +3753,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         });
       }
 
-      function wrapMapFunction(name){
-        return function(map, key, val){
-          return map.MapData[name](key, val);
-        };
-      }
-
-      function wrapWeakMapFunction(name){
-        return function(map, key, val){
-          return map.WeakMapData[name](key, val);
-        };
-      }
-
       var timers = {};
 
       var nativeCode = ['function ', '() { [native code] }'];
@@ -3791,7 +3779,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         update: function(obj, key, attr){
           var prop = obj.describe(key);
           if (prop) {
-            prop[2] &= attr;
+            prop[2] = attr;
             return true;
           }
           return false;
@@ -4183,167 +4171,18 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           return ThrowException('invalid_json', source);
         },
-        MathCreate: (function(Math){
-          var consts = ['E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'PI', 'SQRT1_2', 'SQRT2'],
-              sqrt = Math.sqrt,
-              log = Math.log,
-              pow = Math.pow,
-              exp = Math.exp,
-              LN2 = Math.LN2,
-              LN10 = Math.LN10;
-
-
-          function wrapMathFunction(fn, args){
-            if (args === 0) {
-              return fn;
-            }
-            if (args === 1) {
-              return function(x){
-                x = ToNumber(x);
-                if (x && x.Completion) {
-                  if (x.Abrupt) return x; else x = x.value;
-                }
-                return fn(x);
-              }
-            } else if (args === 2) {
-              return function(x, y){
-                x = ToNumber(x);
-                if (x && x.Completion) {
-                  if (x.Abrupt) return x; else x = x.value;
-                }
-                y = ToNumber(y);
-                if (y && y.Completion) {
-                  if (y.Abrupt) return y; else y = y.value;
-                }
-                return fn(x, y);
-              }
-            } else {
-              return function(){
-                var values = [];
-                for (var k in arguments) {
-                  var x = arguments[k]
-                  if (x && x.Completion) {
-                    if (x.Abrupt) return x; else x = x.value;
-                  }
-                  values.push(x);
-                }
-                return fn.apply(null, values);
-              };
-            }
-          }
-
-          var funcs = {
-            abs: wrapMathFunction(Math.abs, 1),
-            acos: wrapMathFunction(Math.acos, 1),
-            acosh: wrapMathFunction(function(x){
-              return Math.log(x + Math.sqrt(x * x - 1));
-            }, 1),
-            asinh: wrapMathFunction(function(x){
-              return Math.log(x + Math.sqrt(x * x + 1));
-            }, 1),
-            asin: wrapMathFunction(Math.asin, 1),
-            atan: wrapMathFunction(Math.atan, 1),
-            atanh: wrapMathFunction(function(x) {
-              return .5 * log((1 + x) / (1 - x));
-            }, 1),
-            atan2: wrapMathFunction(Math.atan2, 2),
-            ceil: wrapMathFunction(Math.ceil, 1),
-            cos: wrapMathFunction(Math.acos, 1),
-            cosh: wrapMathFunction(function(x) {
-              if (x < 0) {
-                x = -x;
-              }
-              if (x > 21) {
-                return exp(x) / 2;
-              } else {
-                return (exp(x) + exp(-x)) / 2;
-              }
-            }, 1),
-            exp: wrapMathFunction(Math.exp, 1),
-            expm1: wrapMathFunction(function(x) {
-              function factorial(x){
-                for (var i = 2, o = 1; i <= x; i++) {
-                  o *= i;
-                }
-                return o;
-              }
-
-              var o = 0, n = 50;
-              for (var i = 1; i < n; i++) {
-                o += pow(x, i) / factorial(i);
-              }
-              return o;
-            }, 1),
-            floor: wrapMathFunction(Math.floor, 1),
-            hypot: wrapMathFunction(function(x, y) {
-              return sqrt(x * x + y * y) || 0;
-            }, 2),
-            log: wrapMathFunction(Math.log, 1),
-            log2: wrapMathFunction(function(x){
-              return log(x) * (1 / LN2);
-            }, 1),
-            log10: wrapMathFunction(function(x){
-              return log(x) * (1 / LN10);
-            }, 1),
-            log1p: wrapMathFunction(function(x){
-              var o = 0,
-                  n = 50;
-
-              if (x <= -1) {
-                return -Infinity;
-              } else if (x < 0 || value > 1) {
-                return log(1 + x);
-              } else {
-                for (var i = 1; i < n; i++) {
-                  if ((i % 2) === 0) {
-                    o -= pow(x, i) / i;
-                  } else {
-                    o += pow(x, i) / i;
-                  }
-                }
-                return o;
-              }
-            }, 1),
-            max: wrapMathFunction(Math.max),
-            min: wrapMathFunction(Math.min),
-            pow: wrapMathFunction(Math.pow, 2),
-            random: wrapMathFunction(Math.random, 0),
-            round: wrapMathFunction(Math.round, 1),
-            sign: wrapMathFunction(function(x){
-              x = +x;
-              return x === 0 || x !== x ? x : x < 0 ? -1 : 1;
-            }, 1),
-            sinh: wrapMathFunction(function(x){
-              return (exp(x) - exp(-x)) / 2;
-            }, 1),
-            sin: wrapMathFunction(Math.sin, 1),
-            sqrt: wrapMathFunction(Math.sqrt, 1),
-            tan: wrapMathFunction(Math.tan, 1),
-            tanh: wrapMathFunction(function(x) {
-              return (exp(x) - exp(-x)) / (exp(x) + exp(-x));
-            }, 1),
-            trunc: wrapMathFunction(function(x){
-              return ~~x;
-            }, 1)
-          };
-
-          return function(){
-            var math = new $Object;
-            math.NativeBrand = BRANDS.NativeMath;
-            for (var i=0; i < consts.length; i++) {
-              math.define(consts[i], Math[consts[i]], ___);
-            }
-            for (var k in funcs) {
-              math.define(k, new $NativeFunction({
-                call: funcs[k],
-                name: k,
-                length: funcs[k].length
-              }), _CW);
-            }
-            return math;
-          };
-        })(Math),
-
+        acos: Math.acos,
+        asin: Math.asin,
+        atan: Math.atan,
+        atan2: Math.atan2,
+        cos: Math.acos,
+        exp: Math.exp,
+        log: Math.log,
+        pow: Math.pow,
+        random: Math.random,
+        sin: Math.sin,
+        sqrt: Math.sqrt,
+        tan: Math.tan,
         MapInitialization: CollectionInitializer(MapData, 'Map'),
         MapSigil: function(){
           return MapData.sigil;
@@ -4351,21 +4190,39 @@ var runtime = (function(GLOBAL, exports, undefined){
         MapSize: function(map){
           return map.MapData ? map.MapData.size : 0;
         },
-        MapClear: wrapMapFunction('clear'),
-        MapSet: wrapMapFunction('set'),
-        MapDelete: wrapMapFunction('remove'),
-        MapGet: wrapMapFunction('get'),
-        MapHas: wrapMapFunction('has'),
+        MapClear: function(map){
+          return map.MapData.clear();
+        },
+        MapGet: function(map, key){
+          return map.MapData.get(key);
+        },
+        MapSet: function(map, key, val){
+          return map.MapData.set(key, val);
+        },
+        MapDelete: function(map, key){
+          return map.MapData.remove(key);
+        },
+        MapHas: function(map, key){
+          return map.MapData.has(key);
+        },
         MapNext: function(map, key){
           var result = map.MapData.after(key);
           return result instanceof Array ? fromInternalArray(result) : result;
         },
 
         WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-        WeakMapSet: wrapWeakMapFunction('set'),
-        WeakMapDelete: wrapWeakMapFunction('remove'),
-        WeakMapGet: wrapWeakMapFunction('get'),
-        WeakMapHas: wrapWeakMapFunction('has'),
+        WeakMapGet: function(map, key){
+          return map.WeakMapData.get(key);
+        },
+        WeakMapSet: function(map, key, val){
+          return map.WeakMapData.set(key, val);
+        },
+        WeakMapDelete: function(map, key){
+          return map.WeakMapData.remove(key);
+        },
+        WeakMapHas: function(map, key){
+          return map.WeakMapData.has(key);
+        },
         readFile: function(path, callback){
           require('fs').readFile(path, 'utf8', function(err, file){
             callback.Call(undefined, [file]);
@@ -4398,11 +4255,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       scope: SCOPE.GLOBAL,
       natives: true,
       filename: 'module-init.js',
-      source: 'import * from "@std";\n'+
-              'for (let k in this) {\n'+
-              '  let isConstant = typeof this[k] !== "function" && typeof this[k] !== "object";\n'+
-              '  Object.defineProperty(this, k, { enumerable: false, configurable: !isConstant, writable: !isConstant });\n'+
-              '}'
+      source: 'import * from "@std"; $__hideEverything(this); $__update(this, "undefined", 0);'
     });
 
     var mutationScopeInit = new Script('void 0');
@@ -4456,12 +4309,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       } else {
         realm.executing = null;
         realm.state = 'idle';
-        if (result && result.Abrupt) {
-          realm.emit(result.type, result);
-        } else {
-          realm.emit('complete', result);
-        }
-
         return result;
       }
     }
@@ -4603,6 +4450,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         ExecutionContext.push(ctx);
         var result = run(realm, script.thunk, script.bytecode);
         context === ctx && ExecutionContext.pop();
+
+        if (result && result.Abrupt) {
+          ƒ(result);
+        }
         Ω(result);
       }, ƒ);
     }
@@ -4627,13 +4478,15 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
 
-    function Realm(callback){
+    function Realm(oncomplete){
       var self = this;
 
       Emitter.call(this);
       realms.push(this);
       this.active = false;
       this.quiet = false;
+      this.initialized = false;
+      this.mutationScope = null;
       this.scripts = [];
       this.templates = {};
       this.state = 'bootstrapping';
@@ -4656,28 +4509,38 @@ var runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'templates');
       hide(this, 'scripts');
       hide(this, 'globalEnv');
+      hide(this, 'initialized');
+      hide(this, 'quiet');
+      hide(this, 'mutationScope');
 
       for (var k in natives) {
         this.natives.binding({ name: k, call: natives[k] });
       }
 
+      function init(){
+        initialize(self, function(){
+          deactivate(self);
+          self.scripts = [];
+          self.state = 'idle';
+          self.emit('ready');
+          if (typeof oncomplete === FUNCTION) {
+            oncomplete(self);
+          }
+        }, function(error){
+          self.state = 'error';
+          self.emit('throw', error);
+          if (typeof oncomplete === FUNCTION) {
+            oncomplete(error);
+          }
+        });
+      }
+
       this.state = 'initializing';
-
-      initialize(this, function(){
-        deactivate(self);
-        self.scripts = [];
-        self.state = 'idle';
-        callback && callback(self);
-        self.emit('ready');
-      }, function(error){
-        self.state = 'error';
-        callback && callback(error);
-        self.emit('throw', error);
-      });
-
-      hide(this, 'mutationScope');
-      hide(this, 'initialized');
-      hide(this, 'quiet');
+      if (oncomplete === true) {
+        setTimeout(init, 10);
+      } else {
+        init();
+      }
     }
 
     inherit(Realm, Emitter, [
@@ -4705,14 +4568,20 @@ var runtime = (function(GLOBAL, exports, undefined){
         var script = new Script(subject),
             self = this;
 
-        errback = errback || callback;
+        callback || (callback = noop);
+        errback || (errback = callback);
 
         if (script.error) {
-          this.emit(script.error.type, script.error);
-          errback(script.error);
+          nextTick(function(){
+            self.emit(script.error.type, script.error);
+            errback(script.error);
+          });
         } else {
           this.scripts.push(script);
-          runScript(script, this, callback, function(error){
+          runScript(script, this, function(result){
+            self.emit('complete', result);
+            callback(result);
+          }, function(error){
             self.emit('throw', error);
             errback(error);
           });
@@ -4723,12 +4592,21 @@ var runtime = (function(GLOBAL, exports, undefined){
         var script = new Script(subject);
 
         if (script.error) {
-          this.emit(script.error.type, script.error);
+          this.emit('throw', script.error);
           return script.error;
         }
 
         this.scripts.push(script);
-        return prepareToRun(script.bytecode, this.globalEnv) || run(this, script.thunk, script.bytecode);
+
+        var result = prepareToRun(script.bytecode, this.globalEnv)
+                  || run(this, script.thunk, script.bytecode);
+
+        if (result && result.Abrupt) {
+          this.emit('throw', result);
+        } else {
+          this.emit('complete', result);
+        }
+        return result;
       }
     ]);
 

@@ -81,17 +81,19 @@ function inspect(o){
   return tree;
 }
 
-
- realm = continuum.createRealm();
+input.on('entry', function(evt){
+  realm.evaluateAsync(evt.value);
+});
 
 var ops = new Feeder(function(op){
   instructions.addInstruction(op);
 });
 
-input.on('entry', function(evt){
-  realm.evaluateAsync(evt.value, inspect);
-});
 
+
+var realm = window.realm = continuum.createRealmAsync();
+
+realm.on('throw', inspect);
 
 realm.on('write', function(args){
   stdout.write.apply(stdout, args);
@@ -120,16 +122,25 @@ realm.on('pause', function(){
   });
 });
 
-setTimeout(function(){
-  realm.on('op', function(op){
-    ops.push(op);
-  });
-}, 100);
+realm.on('ready', function(){
+  if (location.hash === '#experimental') {
+    initializeDOM(realm);
+  }
+
+  inspect(realm.evaluate('this')).expand();
+
+  realm.on('complete', inspect);
+
+  setTimeout(function(){
+    realm.on('op', function(op){
+      ops.push(op);
+    });
+  }, 100);
+});
 
 
-setTimeout(function(){ inspect(realm.evaluate('this')).expand() }, 10);
 
-if (location.hash === '#experimental') {
+function initializeDOM(realm){
   var wrap = (function(){
     var id = uid();
 
@@ -406,14 +417,16 @@ if (location.hash === '#experimental') {
     return wrap;
   })();
 
-
-  oproto = wrap(Object.prototype);
+  var oproto = wrap(Object.prototype);
   oproto.properties.setProperty(['__proto__', null, 6, {
     Get: { Call: function(r){ return r.getPrototype() } },
     Set: { Call: function(r, a){ return r.setPrototype(a[0]) } }
   }]);
 
-  realm.global.Put('document', wrap(document));
-  realm.global.Put('window', wrap(window));
+  realm.global.set('document', wrap(document));
+  realm.global.set('window', wrap(window));
 }
+
+
+
 })(continuum);
