@@ -112,6 +112,14 @@ export function getPrototypeOf(object){
   return $__GetInheritence(object);
 }
 
+export function is(x, y){
+  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;
+}
+
+export function isnt(x, y){
+  return x === y ? x === 0 && 1 / x !== 1 / y : x === x || y === y;
+}
+
 export function isExtensible(object){
   ensureObject(object, 'Object.isExtensible');
   return $__IsExtensible(object);
@@ -181,9 +189,9 @@ export function seal(object){
 }
 
 
-$__defineMethods(Object, [assign, create, defineProperty, defineProperties, freeze,
+$__defineProps(Object, { assign, create, defineProperty, defineProperties, freeze,
   getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor, getPropertyNames,
-  getPrototypeOf, isExtensible, isFrozen, isSealed, keys, preventExtensions, seal]);
+  getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, preventExtensions, seal });
 
 
 export function isPrototypeOf(object, prototype){
