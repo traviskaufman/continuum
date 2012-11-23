@@ -320,5 +320,7 @@ export var Math = {
   min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc
 };
 
+$__set(min, 'length', 2);
+$__set(max, 'length', 2);
 $__hideEverything(Math);
 $__SetNativeBrand(Math, 'NativeMath');
