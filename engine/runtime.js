@@ -699,7 +699,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     MakeConstructor(ctor, false, proto);
     ctor.Class = true;
-    ctor.setPrototype(superctor);
+    ctor.SetInheritance(superctor);
     ctor.set('name', brand);
     ctor.define('prototype', proto, ___);
     proto.define('constructor', ctor, _CW);
@@ -790,7 +790,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         for (var i=0; i < len; i++) {
           array.define(i, args.get(params.length + i));
         }
-        array.set('length', len);
+        array.define('length', len, 4);
       }
       BindingInitialization(params.Rest, array, env);
     }
@@ -1222,8 +1222,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     site.define('length', count, ___);
     raw.define('length', count, ___);
     site.define('raw', raw, ___);
-    site.setExtensible(false);
-    raw.setExtensible(false);
+    site.PreventExtensions(false);
+    raw.PreventExtensions(false);
     realm.templates[template.id] = site;
     return site;
   }
@@ -1354,6 +1354,12 @@ var runtime = (function(GLOBAL, exports, undefined){
   });
 
 
+  function NativeAccessor(get, set){
+    if (get) this.Get = { Call: get };
+    if (set) this.Set = { Call: set };
+  }
+
+  inherit(NativeAccessor, Accessor);
 
 
   function ArgAccessor(name, env){
@@ -1566,7 +1572,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.thisValue;
       },
       function GetSuperBase(){
-        return this.HomeObject ? this.HomeObject.getPrototype() : undefined;
+        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
       },
       function GetMethodName() {
         return this.MethodName;
@@ -1614,15 +1620,16 @@ var runtime = (function(GLOBAL, exports, undefined){
     var Proto = {
       Get: {
         Call: function(receiver){
-          return receiver.getPrototype();
+          return receiver.GetInheritance();
         }
       },
       Set: {
         Call: function(receiver, args){
-          return receiver.setPrototype(args[0]);
+          return receiver.SetInheritance(args[0]);
         }
       }
     };
+
 
     function $Object(proto){
       if (proto === undefined) {
@@ -1689,17 +1696,17 @@ var runtime = (function(GLOBAL, exports, undefined){
       function each(callback){
         this.properties.forEach(callback, this);
       },
-      function getPrototype(){
+      function GetInheritance(){
         return this.Prototype;
       },
-      function setPrototype(value){
-        if (typeof value === OBJECT && this.getExtensible()) {
+      function SetInheritance(value){
+        if (typeof value === OBJECT && this.IsExtensible()) {
           var proto = value;
           while (proto) {
             if (proto === this) {
               return ThrowException('cyclic_proto');
             }
-            proto = proto.getPrototype();
+            proto = proto.GetInheritance();
           }
           this.NativeBrand = this.NativeBrand;
           this.Prototype = value;
@@ -1708,10 +1715,10 @@ var runtime = (function(GLOBAL, exports, undefined){
           return false;
         }
       },
-      function getExtensible(){
+      function IsExtensible(){
         return this.Extensible;
       },
-      function setExtensible(v){
+      function PreventExtensions(v){
         v = !!v;
         if (this.Extensible) {
           this.Extensible = v;
@@ -1758,7 +1765,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function GetP(receiver, key){
         var prop = this.describe(key);
         if (!prop) {
-          var proto = this.getPrototype();
+          var proto = this.GetInheritance();
           if (proto) {
             return proto.GetP(receiver, key);
           }
@@ -1792,7 +1799,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           } else if (prop[2] & W) {
             if (this === receiver) {
               return this.DefineOwnProperty(key, new Value(value), false);
-            } else if (!receiver.getExtensible()) {
+            } else if (!receiver.IsExtensible()) {
               return false;
             } else {
               return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
@@ -1801,9 +1808,9 @@ var runtime = (function(GLOBAL, exports, undefined){
             return false;
           }
         } else {
-          var proto = this.getPrototype();
+          var proto = this.GetInheritance();
           if (!proto) {
-            if (!receiver.getExtensible()) {
+            if (!receiver.IsExtensible()) {
               return false;
             } else {
               return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
@@ -1821,7 +1828,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var current = this.GetOwnProperty(key);
 
         if (current === undefined) {
-          if (!this.getExtensible()) {
+          if (!this.IsExtensible()) {
             return reject('define_disallowed', []);
           } else {
             if (IsGenericDescriptor(desc) || IsDataDescriptor(desc)) {
@@ -1901,7 +1908,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (this.has(key)) {
           return true;
         } else {
-          var proto = this.getPrototype();
+          var proto = this.GetInheritance();
           if (proto) {
             return proto.HasProperty(key);
           } else {
@@ -1925,43 +1932,39 @@ var runtime = (function(GLOBAL, exports, undefined){
         return Invoke(intrinsics.iterator, this, []);
       },
       function enumerator(){
-        var keys = this.Enumerate(true, true),
-            index = 0,
-            len = keys.length;
-
-        var iterator = new $Object;
-        iterator.set('next', new $NativeFunction({
-          length: 0,
-          name: 'next',
-          call: function next(){
-            if (index < len) {
-              return keys[index++];
-            } else {
-              return ThrowStopIteration();
-            }
-          }
-        }));
-        return iterator;
+        return new $Enumerator(this.Enumerate(true, true));
       },
       function Enumerate(includePrototype, onlyEnumerable){
         var props = [],
             seen = create(null);
 
-        this.each(function(prop){
-          if (!(prop[0] in seen) && !prop[0].Private && !onlyEnumerable || (prop[2] & E)) {
-            props.push(prop[0]);
-            seen[prop[0]] = true;
-          }
-        });
+        if (onlyEnumerable) {
+          this.each(function(prop){
+            var key = prop[0];
+            if (typeof key === STRING && !(key in seen) && (prop[2] & E)) {
+              props.push(key);
+              seen[key] = true;
+            }
+          });
+        } else {
+          this.each(function(prop){
+            var key = prop[0];
+            if (!(key in seen) && !key.Private) {
+              props.push(key);
+              seen[key] = true;
+            }
+          });
+        }
 
         if (includePrototype) {
-          var proto = this.getPrototype();
+          var proto = this.GetInheritance();
           if (proto) {
             var inherited = proto.Enumerate(includePrototype, onlyEnumerable);
             for (var i=0; i < inherited.length; i++) {
-              if (!(inherited[i] in seen)) {
-                props.push(inherited[i]);
-                seen[inherited[i]] = true;
+              var key = inherited[i][0];
+              if (!(key in seen)) {
+                props.push(key);
+                seen[key] = true;
               }
             }
           }
@@ -1990,8 +1993,70 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         return ThrowException('cannot_convert_to_primitive', []);
-      }
+      },
+      // function Keys(){
+
+      // },
+      // function OwnPropertyKeys(){
+
+      // },
+      // function Freeze(){
+
+      // },
+      // function Seal(){
+
+      // },
+      // function IsFrozen(){
+
+      // },
+      // function IsSealed(){
+
+      // }
     ]);
+
+
+    var $Enumerator = (function(){
+      function next(keys){
+        this.keys = keys;
+        this.index = 0;
+        this.count = keys.length;
+        this.depleted = false;
+      }
+      next.prototype.Call = function(obj){
+        if (this.depleted || this.index >= this.count) {
+          this.depleted = true;
+          this.keys = null;
+          return ThrowStopIteration();
+        } else {
+          return this.keys[this.index++];
+        }
+      }
+
+      function $Enumerator(keys){
+        this.next = ['next', new next(keys), 7];
+      }
+
+      inherit($Enumerator, $Object, [
+        function has(key){
+          return key === 'next';
+        },
+        function describe(key){
+          if (key === 'next') {
+            return this.next;
+          }
+        },
+        function get(key){
+          if (key === 'next') {
+            return this.next[1];
+          }
+        },
+        function Get(key){
+          return this.next[1];
+        }
+      ]);
+
+      return $Enumerator;
+    })();
 
     return $Object;
   })();
@@ -2132,7 +2197,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         while (arg) {
-          arg = arg.getPrototype();
+          arg = arg.GetInheritance();
           if (prototype === arg) {
             return true;
           }
@@ -2530,7 +2595,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       } else {
         var len = 0;
       }
-      this.set('length', len, _CW);
+      this.define('length', len, __W);
     }
 
     inherit($Array, $Object, {
@@ -2915,7 +2980,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var trapResult = trap.Call(handler, [target, key, normalizedDescObj]),
             success = ToBoolean(trapResult),
             targetDesc = target.GetOwnProperty(key),
-            extensible = target.getExtensible();
+            extensible = target.IsExtensible();
 
         if (!extensible && targetDesc === undefined) {
           return ThrowException('proxy_configurability_non_extensible_inconsistent');
@@ -2948,13 +3013,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (targetDesc !== undefined) {
             if (!targetDesc.Configurable) {
               return ThrowException('proxy_configurability_inconsistent');
-            } else if (!target.getExtensible()) {
+            } else if (!target.IsExtensible()) {
               return ThrowException('proxy_configurability_non_extensible_inconsistent');
             }
             return undefined;
           }
         }
-        var extensible = target.getExtensible();
+        var extensible = target.IsExtensible();
         if (!extensible && targetDesc === undefined) {
           return ThrowException('proxy_configurability_non_extensible_inconsistent');
         } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(desc))) {
@@ -2987,13 +3052,13 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($Proxy, $Object, {
       Proxy: true
     }, [
-      function getPrototype(){
-        var trap = GetTrap(this.Handler, 'getPrototypeOf');
+      function GetInheritance(){
+        var trap = GetTrap(this.Handler, 'GetInheritanceOf');
         if (trap === undefined) {
-          return this.Target.getPrototype();
+          return this.Target.GetInheritance();
         } else {
           var result = trap.Call(this.Handler, [this.Target]),
-              targetProto = this.Target.getPrototype();
+              targetProto = this.Target.GetInheritance();
 
           if (result !== targetProto) {
             return ThrowException('proxy_prototype_inconsistent');
@@ -3002,13 +3067,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         }
       },
-      function getExtensible(){
+      function IsExtensible(){
         var trap = GetTrap(this.Handler, 'isExtensible');
         if (trap === undefined) {
-          return this.Target.getExtensible();
+          return this.Target.IsExtensible();
         }
         var proxyIsExtensible = ToBoolean(trap.Call(this.Handler, [this.Target])),
-            targetIsExtensible  = this.Target.getExtensible();
+            targetIsExtensible  = this.Target.IsExtensible();
 
         if (proxyIsExtensible !== targetIsExtensible) {
           return ThrowException('proxy_extensibility_inconsistent');
@@ -3087,7 +3152,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_hasown_inconsistent');
-          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_hasown_inconsistent');
           }
         }
@@ -3106,7 +3171,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_has_inconsistent');
-          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_has_inconsistent');
           }
         }
@@ -3124,7 +3189,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var targetDesc = this.Target.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_delete_inconsistent');
-          } else if (!this.Target.getExtensible() && targetDesc !== undefined) {
+          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_delete_inconsistent');
           }
           return true;
@@ -3162,7 +3227,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             return ThrowException('trap_returned_duplicate', trap);
           }
           seen[element] = true;
-          if (!includePrototype && !this.Target.getExtensible() && !this.Target.HasOwnProperty(element)) {
+          if (!includePrototype && !this.Target.IsExtensible() && !this.Target.HasOwnProperty(element)) {
             return ThrowException('proxy_'+trap+'_inconsistent');
           }
           array[i] = element;
@@ -3177,7 +3242,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (targetDesc && !targetDesc.Configurable) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
-            if (targetDesc && !this.Target.getExtensible()) {
+            if (targetDesc && !this.Target.IsExtensible()) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
           }
@@ -3234,30 +3299,34 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($PrimitiveBase, $Object, [
       function SetP(receiver, key, value, strict){
-        var desc = this.GetProperty(key);
-        if (desc) {
-          if (IsDataDescriptor(desc)) {
-            return desc.Value;
-          } else if (desc.Get) {
-            if (!receiver) {
-              receiver = this.PrimitiveValue;
+        var object = this;
+        while (object && !object.has(key)) {
+          object = object.GetInheritance();
+        }
+        if (object) {
+          var prop = object.describe(key);
+          if (prop[2] & A) {
+            var setter = prop[1].Set;
+            if (IsCallable(setter)) {
+              return setter.Call(receiver, [value]);
             }
-
-            return desc.Get.Call(receiver, []);
           }
         }
       },
       function GetP(receiver, key) {
-        var desc = this.GetProperty(key);
-        if (desc) {
-          if (IsDataDescriptor(desc)) {
-            return desc.Value;
-          } else if (desc.Get) {
-            if (!receiver) {
-              receiver = this.PrimitiveValue;
+        var object = this;
+        while (object && !object.has(key)) {
+          object = object.GetInheritance();
+        }
+        if (object) {
+          var prop = object.describe(key);
+          if (prop[2] & A) {
+            var getter = prop[1].Get;
+            if (IsCallable(getter)) {
+              return getter.Call(receiver, []);
             }
-
-            return desc.Get.Call(receiver, []);
+          } else {
+            return prop[1];
           }
         }
       }
@@ -4031,17 +4100,17 @@ var runtime = (function(GLOBAL, exports, undefined){
               return str.replace(trimmer, '');
             };
           })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
-        GetExtensible: function(obj){
-          return obj.getExtensible();
+        IsExtensible: function(obj){
+          return obj.IsExtensible();
         },
-        SetExtensible: function(obj, value){
-          return obj.setExtensible(value);
+        PreventExtensions: function(obj, value){
+          return obj.PreventExtensions(value);
         },
-        GetPrototype: function(obj){
-          return obj.getPrototype();
+        GetInheritance: function(obj){
+          return obj.GetInheritance();
         },
-        SetPrototype: function(obj, proto){
-          return obj.setPrototype(proto);
+        SetInheritance: function(obj, proto){
+          return obj.SetInheritance(proto);
         },
         DefineOwnProperty: function(obj, key, desc){
           return obj.DefineOwnProperty(key, ToPropertyDescriptor(desc), false);
