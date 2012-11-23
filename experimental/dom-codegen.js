@@ -24,13 +24,13 @@ var DICT = $('#ident', 'dict'),
     TARGET = $('#ident', 'target'),
     THIS = $('#this'),
     WRAPPED = THIS.get($('#at', 'wrapped')),
-    _get = $('#at', 'get'),
-    _set = $('#at', 'set'),
-    _call = $('#at', 'call'),
-    _wrap = $('#at', 'wrap'),
-    _wrapOrNull = $('#at', 'wrapOrNull'),
-    _unwrapOrNull = $('#at', 'unwrapOrNull'),
-    _unwrap = $('#at', 'unwrap'),
+    _get = $('#ident', 'GET'),
+    _set = $('#ident', 'SET'),
+    _call = $('#ident', 'CALL'),
+    _wrap = $('#ident', 'WRAP'),
+    _unwrap = $('#ident', 'UNWRAP'),
+    _wrapOrNull = $('#ident', 'WRAP_OR_NULL'),
+    _unwrapOrNull = $('#ident', 'UNWRAP_OR_NULL'),
     ZERO = VALUE(0),
     EMPTY = VALUE(''),
     MAX_INT16 = VALUE(65536);
@@ -91,6 +91,18 @@ var TO = {
   String: passthrough(function(node){
     return $('#binary', '+', EMPTY, node);
   }),
+  Uint64: {
+    unwrap: function(node){
+      return $('#binary', '>>>', node, ZERO);
+    },
+    wrap: converter('toUint64')
+  },
+  Int64: {
+    unwrap: function(node){
+      return $('#binary', '>>', node, ZERO);
+    },
+    wrap: converter('toInt64')
+  },
   Uint32: passthrough(function(node){
     return $('#binary', '>>>', node, ZERO);
   }),
@@ -111,29 +123,31 @@ var TO = {
     return NOT(NOT(node));
   }),
   EventHandler: {
-    wrap: function(node){
-      return $('#call', $('#at', 'wrapOrNull'), [node]);
-    },
+    wrap: wrap,
     unwrap: function(node){
-      return $('#call', $('#at', 'callbackOrNull'), [node]);
+      return $('#call', $('#ident', 'CALLBACK_OR_NULL'), [node]);
     }
   },
   EventHandlerNonNull: {
-    wrap: function(node){
-      return $('#call', $('#at', 'wrap'), [node]);
-    },
+    wrap: wrap,
     unwrap: function(node){
-      return $('#call', $('#at', 'callback'), [node]);
+      return $('#call', $('#ident', 'CALLBACK'), [node]);
     }
   }
 };
 
 
 function ensure(node, type, callback){
+  if (typeof node === 'string') {
+    node = IDENT(node);
+  }
   if (type in TO) {
     return TO[type][callback.name](node);
   }
-  if (type in json) {
+  if (/Callback$/.test(type)) {
+    return TO.EventHandlerNonNull[callback.name](node);
+  }
+  if (type in ordered) {
     return callback(node, type);
   }
   if (type instanceof Array) {
@@ -150,14 +164,6 @@ function wrap(node){
 
 function unwrap(node){
   return $('#call', _unwrap, node);
-}
-
-function wrapOrNull(node){
-  return $('#call', _wrapOrNull, node);
-}
-
-function unwrapOrNull(node){
-  return $('#call', _unwrapOrNull, node);
 }
 
 
@@ -225,31 +231,32 @@ function INSTANCEOF(test, equals, consequent, alternate){
 
 
 
-function method(name, json){
-  var args = ownKeys(Object(json.args));
-  if (args.length && json.args[args[args.length - 1]].slice(-3) === '...') {
-    var rest = args.pop();
+function method(name, json, construct){
+  var params = ownKeys(Object(json.args));
+  if (params.length && json.args[params[params.length - 1]].slice(-3) === '...') {
+    var rest = params.pop();
   }
 
   var body = new ASTArray;
+  var args = construct ? [IDENT(construct)] : [WRAPPED, name];
 
-  var a = $('#array', map(args, function(arg){
-    var type = json.args[arg];
-    if (json[type] && json[type].type === 'dictionary') {
-      return $('#new', $(type), [$('#this'), $('#ident', arg)]);
+  iterate(params, function(param){
+    var type = json.args[param];
+    if (ordered[type] && ordered[type].type === 'dictionary') {
+      args.push($('#new', $(type), [IDENT(param)]));
+    } else {
+      args.push(ensure(param, type, unwrap));
     }
+  });
 
-    return ensure(arg, type, unwrap);
-  }));
+  var call = construct ? $('#assign', '=', WRAPPED, $('#call', IDENT('CONSTRUCT'), args)) : $('#call', _call, args);
 
-  var call = $('#call', _call, [WRAPPED, name, a]);
   if (json.returns) {
-
     body.append($('#return', ensure(call, json.returns, wrap)));
   } else {
     body.append(call);
   }
-  return $('#method', name, $('#functionexpr', name, args, body, rest));
+  return $('#method', name, $('#functionexpr', name, params, body, rest));
 }
 
 
@@ -280,7 +287,7 @@ var types = {
 
 
     if (json.construct) {
-      body.append(method('constructor', json.construct));
+      body.append(method('constructor', json.construct, name));
     }
 
     iterate(json.properties, function(item, key){
@@ -296,7 +303,7 @@ var types = {
       body.append(method(key, item));
     });
 
-    return ret;
+    return $('#export', ret);
   },
   dictionary: function(name, json){
     var inherits = json.inherits[0],
@@ -305,7 +312,7 @@ var types = {
         body = ctor.value.body;
 
     dict.body.append(ctor);
-    body.append(DICT.set(OR(DICT, $('#object'))));
+    body.append(DICT.set(OR(DICT, IDENT('EMPTY'))));
 
     if (inherits) {
       body.append($('super').call(DICT));
@@ -350,13 +357,16 @@ function orderDependencies(items){
 
 
 
-var out = $('#block');
+var out = $('#module', 'DOM', []);
 
-json = orderDependencies(json);
+var ordered = orderDependencies(json);
 
-iterate(json, function(item, name){
+iterate(ordered, function(item, name){
   if (item.type in types) {
     out.append(types[item.type](name, item));
+    if (item.constants) {
+      out.append($('#call', 'constants', [IDENT(name), $('#object', item.constants)]));
+    }
   }
 });
 
