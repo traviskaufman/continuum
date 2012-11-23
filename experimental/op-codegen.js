@@ -1,83 +1,104 @@
-function generateOp(name, body){
-  return 'function '+name+'(){\n'+
-         body+
-         '  return cmds[++ip];\n'+
-         '}\n';
+//!#es6
+
+function indent(parts, ...values){
+  var combined = '';
+  for (var [index, part] of parts) {
+    combined += part;
+    if (index in value) {
+      combined += values[index];
+    }
+  }
+  combined.split('\n')
 }
 
-function binaryOp(name, op){
-  var body = checkCompletion('lhs', 'sp - 2') +
-             checkCompletion('rhs', 'sp - 1') +
-             '  stack[--sp] = lhs '+op+' rhs;\n';
-  return generateOp(name, body);
+function opcode(name, body){
+  return `
+    function ${name}(){
+      ${body}
+      return cmds[++ip];
+    }
+  `;
 }
 
-function unaryOp(name, op){
-  var body = checkCompletion('arg', 'sp - 1') +
-             '  stack[sp - 1] = '+op+'arg;\n';
-  return generateOp(name, body);
+function binary(name, op){
+  return opcode(name, `
+    ${completion('lhs', 'sp - 2')}
+    ${completion('rhs', 'sp - 1')}
+    stack[--sp] = lhs ${op} rhs;
+  `);
 }
 
-function typeOp(name, type){
-  var body = checkCompletion('arg', 'sp - 1') +
-             '  stack[sp - 1] = typeof arg === "'+type+'";\n';
-  return generateOp(name, body);
+function unary(name, op){
+  return opcode(name, `
+    ${completion('arg', 'sp - 1')}
+    stack[sp - 1] = ${op}arg;
+  `);
 }
 
-function methodOp(name, method){
-  var body = checkCompletion('lhs', 'sp - 2') +
-             checkCompletion('rhs', 'sp - 1') +
-             '  stack[--sp] = rhs.'+method+'(lhs);\n';
-  return generateOp(name, body);
+function type(name, type){
+  return opcode(name, `
+    ${completion('arg', 'sp - 1')}
+    stack[sp - 1] = typeof arg === "${type}";
+  `);
 }
 
-
-function checkCompletion(name, sp){
-  return '  var '+name+' = stack['+sp+'];\n'+
-         '  if ('+name+' && '+name+'.Completion) {\n'+
-         '    if ('+name+'.Abrupt) {\n'+
-         '      error = '+name+';\n'+
-         '      return unwind;\n'+
-         '    } else {\n'+
-         '      stack['+sp+'] = '+name+' = '+name+'.value;\n'+
-         '    }\n'+
-         '  }\n';
+function method(name, method){
+  return opcode(name, `
+    ${completion('lhs', 'sp - 2')}
+    ${completion('rhs', 'sp - 1')}
+    stack[--sp] = rhs.${method}(lhs);
+  `);
 }
 
 
-var code = [
-  methodOp('INSTANCE_OF', 'HasInstance'),
-  methodOp('IN', 'HasProperty'),
-  unaryOp('VOID',      'void '),
-  unaryOp('TO_NUMBER', '+'),
-  unaryOp('NEGATE',    '-'),
-  unaryOp('BIT_NOT',   '~'),
-  unaryOp('NOT',       '!'),
-  typeOp('IS_BOOLEAN',   'boolean'),
-  typeOp('IS_NUMBER',    'number'),
-  typeOp('IS_STRING',    'string'),
-  typeOp('IS_UNDEFINED', 'undefined'),
-  binaryOp('EQ',          '=='),
-  binaryOp('NEQ',         '!='),
-  binaryOp('STRICT_EQ',   '==='),
-  binaryOp('STRICT_NEQ',  '!=='),
-  binaryOp('LT',          '<'),
-  binaryOp('GT',          '>'),
-  binaryOp('LTE',         '<='),
-  binaryOp('GTE',         '>='),
-  binaryOp('MUL',         '*'),
-  binaryOp('DIV',         '/'),
-  binaryOp('MOD',         '%'),
-  binaryOp('ADD',         '+'),
-  binaryOp('CONCAT',      '+ "" +'),
-  binaryOp('SUB',         '-'),
-  binaryOp('SHL',         '<<'),
-  binaryOp('SHR',         '>>'),
-  binaryOp('SAR',         '>>>'),
-  binaryOp('BIT_OR',      '|'),
-  binaryOp('BIT_AND',     '&'),
-  binaryOp('BIT_XOR',     '^'),
-].join('\n');
+function completion(name, sp){
+  return `
+    var ${name} = stack[${sp}];
+    if (${name} && ${name}.Completion) {
+      if (${name}.Abrupt) {
+        error = ${name};
+        return unwind;
+      } else {
+        stack[${sp}] = ${name} = ${name}.value;
+      }
+    }
+  `;
+}
+
+
+var code = `
+  ${method('INSTANCE_OF', 'HasInstance')}
+  ${method('IN', 'HasProperty')}
+  ${unary('VOID', 'void ')}
+  ${unary('TO_NUMBER', '+')}
+  ${unary('NEGATE',    '-')}
+  ${unary('BIT_NOT', '~')}
+  ${unary('NOT', '!')}
+  ${type('IS_BOOLEAN', 'boolean')}
+  ${type('IS_NUMBER', 'number')}
+  ${type('IS_STRING', 'string')}
+  ${type('IS_UNDEFINED', 'undefined')}
+  ${binary('EQ', '==')}
+  ${binary('NEQ', '!=')}
+  ${binary('STRICT_EQ',  '===')}
+  ${binary('STRICT_NEQ', '!==')}
+  ${binary('LT', '<')}
+  ${binary('GT', '>')}
+  ${binary('LTE', '<=')}
+  ${binary('GTE', '>=')}
+  ${binary('MUL', '*')}
+  ${binary('DIV', '/')}
+  ${binary('MOD', '%')}
+  ${binary('ADD', '+')}
+  ${binary('CONCAT', '+ "" +')}
+  ${binary('SUB', '-')}
+  ${binary('SHL', '<<')}
+  ${binary('SHR', '>>')}
+  ${binary('SAR', '>>>')}
+  ${binary('BIT_OR', '|')}
+  ${binary('BIT_AND', '&')}
+  ${binary('BIT_XOR', '^')}
+`;
 
 
 console.log(code);
