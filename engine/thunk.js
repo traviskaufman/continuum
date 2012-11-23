@@ -183,7 +183,7 @@ var thunk = (function(exports){
 
     function ARRAY_DONE(){
       var len = stack[--sp];
-      stack[sp - 1].set('length', len, 4);
+      stack[sp - 1].set('length', len);
       return cmds[++ip];
     }
 
