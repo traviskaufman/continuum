@@ -6476,41 +6476,43 @@ exports.Emitter = (function(module){
   }
 
   define(Emitter.prototype, [
-    function on(events, handler){
-      each(events.split(/\s+/), function(event){
-        if (!(event in this)) {
-          this[event] = [];
+    function on(type, handler){
+      var events = this._events;
+      each(type.split(/\s+/), function(event){
+        if (!(event in events)) {
+          events[event] = [];
         }
-        this[event].push(handler);
-      }, this._events);
+        events[event].push(handler);
+      });
     },
-    function off(events, handler){
-      each(events.split(/\s+/), function(event){
-        if (event in this) {
-          var index = '__index' in handler ? handler.__index : this[event].indexOf(handler);
+    function off(type, handler){
+      var events = this._events;
+      each(type.split(/\s+/), function(event){
+        if (event in events) {
+          var index = '__index' in handler ? handler.__index : events[event].indexOf(handler);
           if (~index) {
-            this[event].splice(index, 1);
+            events[event].splice(index, 1);
           }
         }
-      }, this._events);
+      });
     },
-    function once(events, handler){
+    function once(type, handler){
       function one(val){
-        this.off(events, one);
+        this.off(type, one);
         handler.call(this, val);
       }
-      this.on(events, one);
+      this.on(type, one);
     },
-    function emit(event, val){
+    function emit(type, val){
       var handlers = this._events['*'];
 
       if (handlers) {;
         for (var i=0; i < handlers.length; i++) {
-          handlers[i].call(this, event, val);
+          handlers[i].call(this, type, val);
         }
       }
 
-      handlers = this._events[event];
+      handlers = this._events[type];
       if (handlers) {
         for (var i=0; i < handlers.length; i++) {
           handlers[i].call(this, val);
@@ -9846,7 +9848,7 @@ exports.operators = (function(exports){
       return argument;
     }
 
-    return argument >> 0;;
+    return argument >> 0;
   }
   exports.ToInteger = ToInteger;
 
@@ -15245,18 +15247,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         });
       }
 
-      function wrapMapFunction(name){
-        return function(map, key, val){
-          return map.MapData[name](key, val);
-        };
-      }
-
-      function wrapWeakMapFunction(name){
-        return function(map, key, val){
-          return map.WeakMapData[name](key, val);
-        };
-      }
-
       var timers = {};
 
       var nativeCode = ['function ', '() { [native code] }'];
@@ -15283,7 +15273,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         update: function(obj, key, attr){
           var prop = obj.describe(key);
           if (prop) {
-            prop[2] &= attr;
+            prop[2] = attr;
             return true;
           }
           return false;
@@ -15675,167 +15665,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
           return ThrowException('invalid_json', source);
         },
-        MathCreate: (function(Math){
-          var consts = ['E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'PI', 'SQRT1_2', 'SQRT2'],
-              sqrt = Math.sqrt,
-              log = Math.log,
-              pow = Math.pow,
-              exp = Math.exp,
-              LN2 = Math.LN2,
-              LN10 = Math.LN10;
-
-
-          function wrapMathFunction(fn, args){
-            if (args === 0) {
-              return fn;
-            }
-            if (args === 1) {
-              return function(x){
-                x = ToNumber(x);
-                if (x && x.Completion) {
-                  if (x.Abrupt) return x; else x = x.value;
-                }
-                return fn(x);
-              }
-            } else if (args === 2) {
-              return function(x, y){
-                x = ToNumber(x);
-                if (x && x.Completion) {
-                  if (x.Abrupt) return x; else x = x.value;
-                }
-                y = ToNumber(y);
-                if (y && y.Completion) {
-                  if (y.Abrupt) return y; else y = y.value;
-                }
-                return fn(x, y);
-              }
-            } else {
-              return function(){
-                var values = [];
-                for (var k in arguments) {
-                  var x = arguments[k]
-                  if (x && x.Completion) {
-                    if (x.Abrupt) return x; else x = x.value;
-                  }
-                  values.push(x);
-                }
-                return fn.apply(null, values);
-              };
-            }
-          }
-
-          var funcs = {
-            abs: wrapMathFunction(Math.abs, 1),
-            acos: wrapMathFunction(Math.acos, 1),
-            acosh: wrapMathFunction(function(x){
-              return Math.log(x + Math.sqrt(x * x - 1));
-            }, 1),
-            asinh: wrapMathFunction(function(x){
-              return Math.log(x + Math.sqrt(x * x + 1));
-            }, 1),
-            asin: wrapMathFunction(Math.asin, 1),
-            atan: wrapMathFunction(Math.atan, 1),
-            atanh: wrapMathFunction(function(x) {
-              return .5 * log((1 + x) / (1 - x));
-            }, 1),
-            atan2: wrapMathFunction(Math.atan2, 2),
-            ceil: wrapMathFunction(Math.ceil, 1),
-            cos: wrapMathFunction(Math.acos, 1),
-            cosh: wrapMathFunction(function(x) {
-              if (x < 0) {
-                x = -x;
-              }
-              if (x > 21) {
-                return exp(x) / 2;
-              } else {
-                return (exp(x) + exp(-x)) / 2;
-              }
-            }, 1),
-            exp: wrapMathFunction(Math.exp, 1),
-            expm1: wrapMathFunction(function(x) {
-              function factorial(x){
-                for (var i = 2, o = 1; i <= x; i++) {
-                  o *= i;
-                }
-                return o;
-              }
-
-              var o = 0, n = 50;
-              for (var i = 1; i < n; i++) {
-                o += pow(x, i) / factorial(i);
-              }
-              return o;
-            }, 1),
-            floor: wrapMathFunction(Math.floor, 1),
-            hypot: wrapMathFunction(function(x, y) {
-              return sqrt(x * x + y * y) || 0;
-            }, 2),
-            log: wrapMathFunction(Math.log, 1),
-            log2: wrapMathFunction(function(x){
-              return log(x) * (1 / LN2);
-            }, 1),
-            log10: wrapMathFunction(function(x){
-              return log(x) * (1 / LN10);
-            }, 1),
-            log1p: wrapMathFunction(function(x){
-              var o = 0,
-                  n = 50;
-
-              if (x <= -1) {
-                return -Infinity;
-              } else if (x < 0 || value > 1) {
-                return log(1 + x);
-              } else {
-                for (var i = 1; i < n; i++) {
-                  if ((i % 2) === 0) {
-                    o -= pow(x, i) / i;
-                  } else {
-                    o += pow(x, i) / i;
-                  }
-                }
-                return o;
-              }
-            }, 1),
-            max: wrapMathFunction(Math.max),
-            min: wrapMathFunction(Math.min),
-            pow: wrapMathFunction(Math.pow, 2),
-            random: wrapMathFunction(Math.random, 0),
-            round: wrapMathFunction(Math.round, 1),
-            sign: wrapMathFunction(function(x){
-              x = +x;
-              return x === 0 || x !== x ? x : x < 0 ? -1 : 1;
-            }, 1),
-            sinh: wrapMathFunction(function(x){
-              return (exp(x) - exp(-x)) / 2;
-            }, 1),
-            sin: wrapMathFunction(Math.sin, 1),
-            sqrt: wrapMathFunction(Math.sqrt, 1),
-            tan: wrapMathFunction(Math.tan, 1),
-            tanh: wrapMathFunction(function(x) {
-              return (exp(x) - exp(-x)) / (exp(x) + exp(-x));
-            }, 1),
-            trunc: wrapMathFunction(function(x){
-              return ~~x;
-            }, 1)
-          };
-
-          return function(){
-            var math = new $Object;
-            math.NativeBrand = BRANDS.NativeMath;
-            for (var i=0; i < consts.length; i++) {
-              math.define(consts[i], Math[consts[i]], ___);
-            }
-            for (var k in funcs) {
-              math.define(k, new $NativeFunction({
-                call: funcs[k],
-                name: k,
-                length: funcs[k].length
-              }), _CW);
-            }
-            return math;
-          };
-        })(Math),
-
+        acos: Math.acos,
+        asin: Math.asin,
+        atan: Math.atan,
+        atan2: Math.atan2,
+        cos: Math.acos,
+        exp: Math.exp,
+        log: Math.log,
+        pow: Math.pow,
+        random: Math.random,
+        sin: Math.sin,
+        sqrt: Math.sqrt,
+        tan: Math.tan,
         MapInitialization: CollectionInitializer(MapData, 'Map'),
         MapSigil: function(){
           return MapData.sigil;
@@ -15843,21 +15684,39 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         MapSize: function(map){
           return map.MapData ? map.MapData.size : 0;
         },
-        MapClear: wrapMapFunction('clear'),
-        MapSet: wrapMapFunction('set'),
-        MapDelete: wrapMapFunction('remove'),
-        MapGet: wrapMapFunction('get'),
-        MapHas: wrapMapFunction('has'),
+        MapClear: function(map){
+          return map.MapData.clear();
+        },
+        MapGet: function(map, key){
+          return map.MapData.get(key);
+        },
+        MapSet: function(map, key, val){
+          return map.MapData.set(key, val);
+        },
+        MapDelete: function(map, key){
+          return map.MapData.remove(key);
+        },
+        MapHas: function(map, key){
+          return map.MapData.has(key);
+        },
         MapNext: function(map, key){
           var result = map.MapData.after(key);
           return result instanceof Array ? fromInternalArray(result) : result;
         },
 
         WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-        WeakMapSet: wrapWeakMapFunction('set'),
-        WeakMapDelete: wrapWeakMapFunction('remove'),
-        WeakMapGet: wrapWeakMapFunction('get'),
-        WeakMapHas: wrapWeakMapFunction('has'),
+        WeakMapGet: function(map, key){
+          return map.WeakMapData.get(key);
+        },
+        WeakMapSet: function(map, key, val){
+          return map.WeakMapData.set(key, val);
+        },
+        WeakMapDelete: function(map, key){
+          return map.WeakMapData.remove(key);
+        },
+        WeakMapHas: function(map, key){
+          return map.WeakMapData.has(key);
+        },
         readFile: function(path, callback){
           require('fs').readFile(path, 'utf8', function(err, file){
             callback.Call(undefined, [file]);
@@ -15890,11 +15749,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       scope: SCOPE.GLOBAL,
       natives: true,
       filename: 'module-init.js',
-      source: 'import * from "@std";\n'+
-              'for (let k in this) {\n'+
-              '  let isConstant = typeof this[k] !== "function" && typeof this[k] !== "object";\n'+
-              '  Object.defineProperty(this, k, { enumerable: false, configurable: !isConstant, writable: !isConstant });\n'+
-              '}'
+      source: 'import * from "@std"; $__hideEverything(this); $__update(this, "undefined", 0);'
     });
 
     var mutationScopeInit = new Script('void 0');
@@ -15948,12 +15803,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       } else {
         realm.executing = null;
         realm.state = 'idle';
-        if (result && result.Abrupt) {
-          realm.emit(result.type, result);
-        } else {
-          realm.emit('complete', result);
-        }
-
         return result;
       }
     }
@@ -16095,6 +15944,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         ExecutionContext.push(ctx);
         var result = run(realm, script.thunk, script.bytecode);
         context === ctx && ExecutionContext.pop();
+
+        if (result && result.Abrupt) {
+          ƒ(result);
+        }
         Ω(result);
       }, ƒ);
     }
@@ -16119,13 +15972,15 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
 
-    function Realm(callback){
+    function Realm(oncomplete){
       var self = this;
 
       Emitter.call(this);
       realms.push(this);
       this.active = false;
       this.quiet = false;
+      this.initialized = false;
+      this.mutationScope = null;
       this.scripts = [];
       this.templates = {};
       this.state = 'bootstrapping';
@@ -16148,28 +16003,38 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'templates');
       hide(this, 'scripts');
       hide(this, 'globalEnv');
+      hide(this, 'initialized');
+      hide(this, 'quiet');
+      hide(this, 'mutationScope');
 
       for (var k in natives) {
         this.natives.binding({ name: k, call: natives[k] });
       }
 
+      function init(){
+        initialize(self, function(){
+          deactivate(self);
+          self.scripts = [];
+          self.state = 'idle';
+          self.emit('ready');
+          if (typeof oncomplete === FUNCTION) {
+            oncomplete(self);
+          }
+        }, function(error){
+          self.state = 'error';
+          self.emit('throw', error);
+          if (typeof oncomplete === FUNCTION) {
+            oncomplete(error);
+          }
+        });
+      }
+
       this.state = 'initializing';
-
-      initialize(this, function(){
-        deactivate(self);
-        self.scripts = [];
-        self.state = 'idle';
-        callback && callback(self);
-        self.emit('ready');
-      }, function(error){
-        self.state = 'error';
-        callback && callback(error);
-        self.emit('throw', error);
-      });
-
-      hide(this, 'mutationScope');
-      hide(this, 'initialized');
-      hide(this, 'quiet');
+      if (oncomplete === true) {
+        setTimeout(init, 10);
+      } else {
+        init();
+      }
     }
 
     inherit(Realm, Emitter, [
@@ -16197,14 +16062,20 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var script = new Script(subject),
             self = this;
 
-        errback = errback || callback;
+        callback || (callback = noop);
+        errback || (errback = callback);
 
         if (script.error) {
-          this.emit(script.error.type, script.error);
-          errback(script.error);
+          nextTick(function(){
+            self.emit(script.error.type, script.error);
+            errback(script.error);
+          });
         } else {
           this.scripts.push(script);
-          runScript(script, this, callback, function(error){
+          runScript(script, this, function(result){
+            self.emit('complete', result);
+            callback(result);
+          }, function(error){
             self.emit('throw', error);
             errback(error);
           });
@@ -16215,12 +16086,21 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var script = new Script(subject);
 
         if (script.error) {
-          this.emit(script.error.type, script.error);
+          this.emit('throw', script.error);
           return script.error;
         }
 
         this.scripts.push(script);
-        return prepareToRun(script.bytecode, this.globalEnv) || run(this, script.thunk, script.bytecode);
+
+        var result = prepareToRun(script.bytecode, this.globalEnv)
+                  || run(this, script.thunk, script.bytecode);
+
+        if (result && result.Abrupt) {
+          this.emit('throw', result);
+        } else {
+          this.emit('complete', result);
+        }
+        return result;
       }
     ]);
 
@@ -17646,6 +17526,9 @@ exports.index = (function(exports){
     function createRealm(listener){
       return new Realm(listener);
     },
+    function createRealmAsync(){
+      return new Realm(true);
+    },
     function createScript(options){
       return new Script(options);
     },
@@ -17782,7 +17665,7 @@ exports.modules["@json"] = "export let JSON = {};\n\n$__SetNativeBrand(JSON, 'Na
 
 exports.modules["@map"] = "import Iterator from '@iter';\nprivate @iterator = $__iterator;\n\n\nexport function Map(iterable){\n  var map;\n  if ($__IsConstructCall()) {\n    map = this;\n  } else {\n    if (this == null || this === $__MapProto) {\n      map = $__ObjectCreate($__MapProto) ;\n    } else {\n      map = $__ToObject(this);\n    }\n  }\n\n  if ($__HasInternal(map, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map'])\n  }\n\n  $__MapInitialization(map, iterable);\n  return map;\n}\n\n\n$__setupConstructor(Map, $__MapProto);\n{\n$__defineProps(Map.prototype, {\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  },\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  },\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  },\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  },\n  delete: function(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  },\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator(this, 'key+value');\n  },\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator(this, 'key');\n  },\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator(this, 'value');\n  },\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n});\n\n$__set(Map.prototype.delete, 'name', 'delete');\n\n$__DefineOwnProperty(Map.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get: function(){\n    if (this === $__MapProto) {\n      return 0;\n    }\n    return $__MapSize(this);\n  },\n  set: void 0\n});\n\nlet MAP = 'Map',\n    KEY  = 'MapNextKey',\n    KIND  = 'MapIterationKind';\n\nlet K = 0x01,\n    V = 0x02;\n\nlet kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3\n};\n\nclass MapIterator extends Iterator {\n  constructor(map, kind){\n    map = $__ToObject(map);\n    $__SetInternal(this, MAP, map);\n    $__SetInternal(this, KEY,  $__MapSigil());\n    $__SetInternal(this, KIND, kinds[kind]);\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!$__HasInternal(this, MAP) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var map = $__GetInternal(this, MAP),\n        key = $__GetInternal(this, KEY),\n        kind = $__GetInternal(this, KIND);\n\n    var item = $__MapNext(map, key);\n    $__SetInternal(this, KEY, item[0]);\n\n    if (kind & V) {\n      if (kind & K) {\n        return item;\n      }\n      return item[1];\n    }\n    return item[0];\n  }\n}\n\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n}\n";
 
-exports.modules["@math"] = "export let Math = $__MathCreate();\n\n\nconst E       = 2.718281828459045,\n      LN10    = 2.302585092994046,\n      LN2     = 0.6931471805599453,\n      LOG10E  = 0.4342944819032518,\n      LOG2E   = 1.4426950408889634,\n      PI      = 3.141592653589793,\n      SQRT1_2 = 0.7071067811865476,\n      SQRT2   = 1.4142135623730951;\n\n\nlet abs    = $__abs,\n    acos   = $__acos,\n    acosh  = $__acosh,\n    asinh  = $__asinh,\n    asin   = $__asin,\n    atan   = $__atan,\n    atanh  = $__atanh,\n    atan2  = $__atan2,\n    ceil   = $__ceil,\n    cos    = $__cos,\n    cosh   = $__cosh,\n    exp    = $__exp,\n    expm1  = $__expm1,\n    floor  = $__floor,\n    hypot  = $__hypot,\n    log    = $__log,\n    log2   = $__log2,\n    log10  = $__log10,\n    log1p  = $__log1p,\n    max    = $__max,\n    min    = $__min,\n    pow    = $__pow,\n    random = $__random,\n    round  = $__round,\n    sign   = $__sign,\n    sinh   = $__sinh,\n    sin    = $__sin,\n    sqrt   = $__sqrt,\n    tan    = $__tan,\n    tanh   = $__tanh,\n    trunc  = $__trunc;\n\nexport E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2;\n\nexport abs, acos, acosh, asinh, asin, atan, atanh,\n       atan2, ceil, cos, cosh, exp, expm1, floor, hypot,\n       log, log2, log10, log1p, max, min, pow, rando,\n       round, sign, sinh, sin, sqrt,tan, tanh, trunc;\n";
+exports.modules["@math"] = "const Infinity = 1 / 0,\n      NaN = +'NaN';\n\nexport const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\n\nexport function abs(x){\n  x = +x;\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function acosh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x - 1));\n}\n\nexport function asinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x + 1));\n}\n\nexport function atan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan(x);\n}\n\nexport function asin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__asin(x);\n}\n\nexport function atanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return .5 * $__log((1 + x) / (1 - x));\n}\n\nexport function atan2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan2(x);\n}\n\n\nexport function ceil(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + 1 >> 0;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function cos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__cos(x);\n}\n\nexport function cosh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (x < 0) {\n    x = -x;\n  }\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__exp(x);\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\nexport function expm1(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x >> 0;\n}\n\nexport function hypot(x, y) {\n  x = +x;\n  y = +y;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (y === 0 || y !== y || y === Infinity || y === -Infinity) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x);\n}\n\nexport function log2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG2E;\n}\n\nexport function log10(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG10E;\n}\n\nexport function log1p(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nexport function pow(x, y){\n  return $__pow(+x, +y);\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + .5 | 0;\n}\n\nexport function sign(x){\n  x = +x;\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / 2;\n}\n\nexport function sin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__sin(x);\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__tan(x);\n}\n\nexport function tanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x));\n}\n\nexport function trunc(x){\n  x = +x;\n  return x === 0 || x !== x || x === Infinity || x === -Infinity ? x : ~~x;\n}\n\nexport var Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\n$__hideEverything(Math);\n$__SetNativeBrand(Math, 'NativeMath');\n";
 
 exports.modules["@number"] = "export function Number(value){\n  value = $__ToNumber(value);\n  if ($__IsConstructCall()) {\n    return $__NumberCreate(value);\n  } else {\n    return value;\n  }\n}\n\n$__setupConstructor(Number, $__NumberProto);\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\n$__defineMethods(Number, [isNaN, isFinite, isInteger, toInteger]);\n\n\nexport let\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = +'NaN',\n  NEGATIVE_INFINITY = 1 / 0,\n  POSITIVE_INFINITY = 1 / -0;\n\n$__defineConstants(Number, {\n  EPSILON          : EPSILON,\n  MAX_INTEGER      : MAX_INTEGER,\n  MAX_VALUE        : MAX_VALUE,\n  MIN_VALUE        : MIN_VALUE,\n  NaN              : NaN,\n  NEGATIVE_INFINITY: NEGATIVE_INFINITY,\n  POSITIVE_INFINITY: POSITIVE_INFINITY\n});\n\n\n\n$__defineProps(Number.prototype, {\n  toString(radix){\n    if ($__GetNativeBrand(this) === 'Number') {\n      var number = $__GetPrimitiveValue(this);\n      radix = $__ToInteger(radix);\n      return $__NumberToString(number, radix);\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.toString']);\n    }\n  },\n  valueOf(){\n    if ($__GetNativeBrand(this) === 'Number') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  },\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n});\n";
 
@@ -17796,11 +17679,11 @@ exports.modules["@set"] = "import Map from '@map';\nimport Iterator from '@iter'
 
 exports.modules["@std"] = "// standard constants\nconst NaN       = +'NaN';\nconst Infinity  = 1 / 0;\nconst undefined = void 0;\n\n// standard functions\nimport { decodeURI,\n         decodeURIComponent,\n         encodeURI,\n         encodeURIComponent,\n         eval,\n         isFinite,\n         isNaN,\n         parseFloat,\n         parseInt } from '@globals';\n\n\nimport { clearInterval,\n         clearTimeout,\n         setInterval,\n         setTimeout } from '@timers';\n\n// standard types\nimport Array    from '@array';\nimport Boolean  from '@boolean';\nimport Date     from '@date';\nimport Function from '@function';\nimport Map      from '@map';\nimport Number   from '@number';\nimport Object   from '@object';\nimport Proxy    from '@reflect';\nimport RegExp   from '@regexp';\nimport Set      from '@set';\nimport String   from '@string';\nimport WeakMap  from '@weakmap';\n\n\n\n// standard errors\nimport { Error,\n         EvalError,\n         RangeError,\n         ReferenceError,\n         SyntaxError,\n         TypeError,\n         URIError } from '@error';\n\n\n// standard pseudo-modules\nimport JSON from '@json';\nimport Math from '@math';\n\nimport Symbol from '@symbol';\nimport Iterator from '@iter';\n\nlet StopIteration = $__StopIteration\n\n\nexport Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,\n       Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,\n       decodeURI, decodeURIComponent, encodeURI, encodeURIComponent, eval, isFinite, isNaN,\n       parseFloat, parseInt, clearInterval, clearTimeout, setInterval, setTimeout,\n       StopIteration, JSON, Math, NaN, Infinity, undefined;\n\n\n";
 
-exports.modules["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp from '@regexp';\n\n\nexport function String(string){\n  string = arguments.length ? $__ToString(string) : '';\n  if ($__IsConstructCall()) {\n    return $__StringCreate(string);\n  } else {\n    return string;\n  }\n}\n\n$__setupConstructor(String, $__StringProto);\n\nexport function fromCharCode(...codeUnits){\n  var length = codeUnits.length,\n      str = '';\n  for (var i=0; i < length; i++) {\n    str += $__FromCharCode($__ToUint16(codeUnits[i]));\n  }\n  return str;\n}\n\n$__defineMethods(String, [fromCharCode]);\n\n\n{\n$__defineProps(String.prototype, {\n  anchor(name){\n    var string = ensureCoercible(this, 'anchor');\n    return ToHTML('a', string, 'name', name);\n  },\n  big(){\n    var string = ensureCoercible(this, 'big');\n    return ToHTML('big', string);\n  },\n  blink(){\n    var string = ensureCoercible(this, 'blink');\n    return ToHTML('blink', string);\n  },\n  bold(){\n    var string = ensureCoercible(this, 'bold');\n    return ToHTML('b', string);\n  },\n  fixed(){\n    var string = ensureCoercible(this, 'fixed');\n    return ToHTML('fixed', string);\n  },\n  fontcolor(color){\n    var string = ensureCoercible(this, 'fontcolor');\n    return ToHTML('font', string, 'color', color);\n  },\n  fontsize(size){\n    var string = ensureCoercible(this, 'fontsize');\n    return ToHTML('font', string, 'size', size);\n  },\n  italics(){\n    var string = ensureCoercible(this, 'italics');\n    return ToHTML('i', string);\n  },\n  link(href){\n    var string = ensureCoercible(this, 'link');\n    return ToHTML('a', string, 'href', href);\n  },\n  small(){\n    var string = ensureCoercible(this, 'small');\n    return ToHTML('small', string);\n  },\n  strike(){\n    var string = ensureCoercible(this, 'strike');\n    return ToHTML('s', string);\n  },\n  sub(){\n    var string = ensureCoercible(this, 'sub');\n    return ToHTML('sub', string);\n  },\n  sup(){\n    var string = ensureCoercible(this, 'sup');\n    return ToHTML('sup', string);\n  },\n  charAt(position){\n    var string = ensureCoercible(this, 'charAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? '' : string[position];\n  },\n  charCodeAt(position){\n    var string = ensureCoercible(this, 'charCodeAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);\n  },\n  concat(...args){\n    var string = ensureCoercible(this, 'concat');\n    for (var i=0; i < args.length; i++) {\n      string += $__ToString(args[i]);\n    }\n    return string;\n  },\n  indexOf(search){\n    var string = ensureCoercible(this, 'indexOf');\n    return stringIndexOf(string, search, arguments[1]);\n  },\n  lastIndexOf(search){\n    var string = ensureCoercible(this, 'lastIndexOf'),\n        len = string.length,\n        position = $__ToNumber(arguments[1]);\n\n    search = $__ToString(search);\n    var searchLen = search.length;\n\n    position = position !== position ? Infinity : $__ToInteger(position);\n    position -= searchLen;\n\n    var i = position > 0 ? position < len ? position : len : 0;\n\n    while (i--) {\n      var j = 0;\n      while (j < searchLen && search[j] === string[i + j]) {\n        if (j++ === searchLen - 1) {\n          return i;\n        }\n      }\n    }\n    return -1;\n  },\n  localeCompare(){\n    var string = ensureCoercible(this, 'localeCompare');\n  },\n  match(regexp){\n    var string = ensureCoercible(this, 'match');\n    return stringMatch(string, regexp);\n  },\n  repeat(count){\n    var string = ensureCoercible(this, 'repeat'),\n        n = $__ToInteger(count),\n        o = '';\n\n    if (n <= 1 || n === Infinity || n === -Infinity) {\n      throw $__Exception('invalid_repeat_count', []);\n    }\n\n    while (n > 0) {\n      n & 1 && (o += string);\n      n >>= 1;\n      string += string;\n    }\n\n    return o;\n  },\n  replace(search, replace){\n    var string = ensureCoercible(this, 'replace');\n\n    if (typeof replace === 'function') {\n      var match, count;\n      if (isRegExp(search)) {\n        match = stringMatch(string, search);\n        count = matches.length;\n      } else {\n        match = stringIndexOf(string, $__ToString(search));\n        count = 1;\n      }\n      //TODO\n    } else {\n      replace = $__ToString(replace);\n      if (!isRegExp(search)) {\n        search = $__ToString(search);\n      }\n      return $__StringReplace(string, search, replace);\n    }\n  },\n  search(regexp){\n    var string = ensureCoercible(this, 'search');\n    if (!isRegExp(regexp)) {\n      regexp = new RegExp(regexp);\n    }\n    return $__StringSearch(string, regexp);\n  },\n  slice(start, end){\n    var string = ensureCoercible(this, 'slice');\n    start = $__ToInteger(start);\n    if (end === undefined) {\n      return $__StringSlice(string, start);\n    } else {\n      return $__StringSlice(string, start, $__ToInteger(end));\n    }\n  },\n  split(separator, limit){\n    var string = ensureCoercible(this, 'split');\n    limit = limit === undefined ? MAX_INTEGER - 1 : $__ToInteger(limit);\n    separator = isRegExp(separator) ? separator : $__ToString(separator);\n    return $__StringSplit(string, separator, limit);\n  },\n  substr(start, length){\n    var string = ensureCoercible(this, 'substr'),\n        start = $__ToInteger(start),\n        chars = string.length;\n\n    length = length === undefined ? Infinity : $__ToInteger(length);\n\n    if (start < 0) {\n      start += chars;\n      if (start < 0) start = 0;\n    }\n    if (length < 0) {\n      length = 0;\n    }\n    if (length > chars - start) {\n      length = chars - start;\n    }\n\n    return length <= 0 ? '' : $__StringSlice(string, start, start + length);\n  },\n  substring(start, end){\n    var string = ensureCoercible(this, 'substring'),\n        start = $__ToInteger(start),\n        len = string.length;\n\n    end = end === undefined ? len : $__ToInteger(end);\n\n    start = start > 0 ? start < len ? start : len : 0;\n    end = end > 0 ? end < len ? end : len : 0;\n\n    var from = start < end ? start : end,\n        to = start > end ? start : end;\n\n    return $__StringSlice(string, from, to);\n  },\n  toLowerCase(){\n    var string = ensureCoercible(this, 'toLowerCase');\n    return $__CallNative(string, 'toLowerCase');\n  },\n  toLocaleLowerCase(){\n    var string = ensureCoercible(this, 'toLocaleLowerCase');\n    return $__CallNative(string, 'toLocaleLowerCase');\n  },\n  toUpperCase(){\n    var string = ensureCoercible(this, 'toUpperCase');\n    return $__CallNative(string, 'toUpperCase');\n  },\n  toLocaleUpperCase(){\n    var string = ensureCoercible(this, 'toLocaleUpperCase');\n    return $__CallNative(string, 'toLocaleUpperCase');\n  },\n  toString(){\n    if ($__GetNativeBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__exception('not_generic', ['String.prototype.toString']);\n    }\n  },\n  trim(){\n    var string = ensureCoercible(this, 'trim');\n    return $__StringTrim(string);\n  },\n  valueOf(){\n    if ($__GetNativeBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['String.prototype.valueOf']);\n    }\n  }\n});\n\nfunction ensureCoercible(target, method){\n  if (target === null || target === undefined) {\n    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);\n  }\n  return $__ToString(target);\n}\n\nfunction ToHTML(tag, content, attrName, attrVal){\n  attrVal = $__ToString(attrVal);\n  var attr = attrName === undefined ? '' : ' '+attrName+'=\"'+$__StringReplace(attrVal, '\"', '&quot;')+'\"';\n  return '<'+tag+attr+'>'+content+'</'+tag+'>';\n}\n\n\nfunction isRegExp(subject){\n  return subject != null && typeof subject === 'object' && $__GetNativeBrand(subject) === 'RegExp';\n}\n\nfunction stringIndexOf(string, search, position){\n  search = $__ToString(search);\n  position = $__ToInteger(position);\n\n  var len = string.length,\n      searchLen = search.length,\n      i = position > 0 ? position < len ? position : len : 0,\n      maxLen = len - searchLen;\n\n  while (i < maxLen) {\n    var j = 0;\n    while (j < searchLen && search[j] === string[i + j]) {\n      if (j++ === searchLen - 1) {\n        return i;\n      }\n    }\n  }\n  return -1;\n}\n\nfunction stringMatch(string, regexp){\n  if (!isRegExp(regexp)) {\n    regexp = new RegExp(regexp);\n  }\n  if (!regexp.global) {\n    return regexp.exec(string);\n  }\n  regexp.lastIndex = 0;\n  var array = [],\n      previous = 0,\n      lastMatch = true,\n      n = 0;\n\n  while (lastMatch) {\n    var result = regexp.exec(string);\n    if (result === null) {\n      lastMatch = false;\n    } else {\n      var thisIndex = regexp.lastIndex;\n      if (thisIndex === lastIndex) {\n        previous = regexp.lastIndex = thisIndex + 1;\n      } else {\n        previous = thisIndex;\n      }\n      array[n++] = result[0];\n    }\n  }\n\n  return n === 0 ? null : array;\n}\n}\n";
+exports.modules["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp from '@regexp';\n\n\nexport function String(string){\n  string = arguments.length ? $__ToString(string) : '';\n  if ($__IsConstructCall()) {\n    return $__StringCreate(string);\n  } else {\n    return string;\n  }\n}\n\n$__setupConstructor(String, $__StringProto);\n\nexport function fromCharCode(...codeUnits){\n  var length = codeUnits.length,\n      str = '';\n  for (var i=0; i < length; i++) {\n    str += $__FromCharCode($__ToUint16(codeUnits[i]));\n  }\n  return str;\n}\n\nexport function trim(str){\n  return $__StringTrim(ensureCoercible(string, 'trim'));\n}\n\n$__defineMethods(String, [fromCharCode]);\n\n\n{\n$__defineProps(String.prototype, {\n  anchor(name){\n    var string = ensureCoercible(this, 'anchor');\n    return ToHTML('a', string, 'name', name);\n  },\n  big(){\n    var string = ensureCoercible(this, 'big');\n    return ToHTML('big', string);\n  },\n  blink(){\n    var string = ensureCoercible(this, 'blink');\n    return ToHTML('blink', string);\n  },\n  bold(){\n    var string = ensureCoercible(this, 'bold');\n    return ToHTML('b', string);\n  },\n  fixed(){\n    var string = ensureCoercible(this, 'fixed');\n    return ToHTML('fixed', string);\n  },\n  fontcolor(color){\n    var string = ensureCoercible(this, 'fontcolor');\n    return ToHTML('font', string, 'color', color);\n  },\n  fontsize(size){\n    var string = ensureCoercible(this, 'fontsize');\n    return ToHTML('font', string, 'size', size);\n  },\n  italics(){\n    var string = ensureCoercible(this, 'italics');\n    return ToHTML('i', string);\n  },\n  link(href){\n    var string = ensureCoercible(this, 'link');\n    return ToHTML('a', string, 'href', href);\n  },\n  small(){\n    var string = ensureCoercible(this, 'small');\n    return ToHTML('small', string);\n  },\n  strike(){\n    var string = ensureCoercible(this, 'strike');\n    return ToHTML('s', string);\n  },\n  sub(){\n    var string = ensureCoercible(this, 'sub');\n    return ToHTML('sub', string);\n  },\n  sup(){\n    var string = ensureCoercible(this, 'sup');\n    return ToHTML('sup', string);\n  },\n  charAt(position){\n    var string = ensureCoercible(this, 'charAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? '' : string[position];\n  },\n  charCodeAt(position){\n    var string = ensureCoercible(this, 'charCodeAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);\n  },\n  concat(...args){\n    var string = ensureCoercible(this, 'concat');\n    for (var i=0; i < args.length; i++) {\n      string += $__ToString(args[i]);\n    }\n    return string;\n  },\n  indexOf(search){\n    var string = ensureCoercible(this, 'indexOf');\n    return stringIndexOf(string, search, arguments[1]);\n  },\n  lastIndexOf(search){\n    var string = ensureCoercible(this, 'lastIndexOf'),\n        len = string.length,\n        position = $__ToNumber(arguments[1]);\n\n    search = $__ToString(search);\n    var searchLen = search.length;\n\n    position = position !== position ? Infinity : $__ToInteger(position);\n    position -= searchLen;\n\n    var i = position > 0 ? position < len ? position : len : 0;\n\n    while (i--) {\n      var j = 0;\n      while (j < searchLen && search[j] === string[i + j]) {\n        if (j++ === searchLen - 1) {\n          return i;\n        }\n      }\n    }\n    return -1;\n  },\n  localeCompare(){\n    var string = ensureCoercible(this, 'localeCompare');\n  },\n  match(regexp){\n    var string = ensureCoercible(this, 'match');\n    return stringMatch(string, regexp);\n  },\n  repeat(count){\n    var string = ensureCoercible(this, 'repeat'),\n        n = $__ToInteger(count),\n        o = '';\n\n    if (n <= 1 || n === Infinity || n === -Infinity) {\n      throw $__Exception('invalid_repeat_count', []);\n    }\n\n    while (n > 0) {\n      n & 1 && (o += string);\n      n >>= 1;\n      string += string;\n    }\n\n    return o;\n  },\n  replace(search, replace){\n    var string = ensureCoercible(this, 'replace');\n\n    if (typeof replace === 'function') {\n      var match, count;\n      if (isRegExp(search)) {\n        match = stringMatch(string, search);\n        count = matches.length;\n      } else {\n        match = stringIndexOf(string, $__ToString(search));\n        count = 1;\n      }\n      //TODO\n    } else {\n      replace = $__ToString(replace);\n      if (!isRegExp(search)) {\n        search = $__ToString(search);\n      }\n      return $__StringReplace(string, search, replace);\n    }\n  },\n  search(regexp){\n    var string = ensureCoercible(this, 'search');\n    if (!isRegExp(regexp)) {\n      regexp = new RegExp(regexp);\n    }\n    return $__StringSearch(string, regexp);\n  },\n  slice(start, end){\n    var string = ensureCoercible(this, 'slice');\n    start = $__ToInteger(start);\n    if (end === undefined) {\n      return $__StringSlice(string, start);\n    } else {\n      return $__StringSlice(string, start, $__ToInteger(end));\n    }\n  },\n  split(separator, limit){\n    var string = ensureCoercible(this, 'split');\n    limit = limit === undefined ? MAX_INTEGER - 1 : $__ToInteger(limit);\n    separator = isRegExp(separator) ? separator : $__ToString(separator);\n    return $__StringSplit(string, separator, limit);\n  },\n  substr(start, length){\n    var string = ensureCoercible(this, 'substr'),\n        start = $__ToInteger(start),\n        chars = string.length;\n\n    length = length === undefined ? Infinity : $__ToInteger(length);\n\n    if (start < 0) {\n      start += chars;\n      if (start < 0) start = 0;\n    }\n    if (length < 0) {\n      length = 0;\n    }\n    if (length > chars - start) {\n      length = chars - start;\n    }\n\n    return length <= 0 ? '' : $__StringSlice(string, start, start + length);\n  },\n  substring(start, end){\n    var string = ensureCoercible(this, 'substring'),\n        start = $__ToInteger(start),\n        len = string.length;\n\n    end = end === undefined ? len : $__ToInteger(end);\n\n    start = start > 0 ? start < len ? start : len : 0;\n    end = end > 0 ? end < len ? end : len : 0;\n\n    var from = start < end ? start : end,\n        to = start > end ? start : end;\n\n    return $__StringSlice(string, from, to);\n  },\n  toLowerCase(){\n    var string = ensureCoercible(this, 'toLowerCase');\n    return $__CallNative(string, 'toLowerCase');\n  },\n  toLocaleLowerCase(){\n    var string = ensureCoercible(this, 'toLocaleLowerCase');\n    return $__CallNative(string, 'toLocaleLowerCase');\n  },\n  toUpperCase(){\n    var string = ensureCoercible(this, 'toUpperCase');\n    return $__CallNative(string, 'toUpperCase');\n  },\n  toLocaleUpperCase(){\n    var string = ensureCoercible(this, 'toLocaleUpperCase');\n    return $__CallNative(string, 'toLocaleUpperCase');\n  },\n  toString(){\n    if ($__GetNativeBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__exception('not_generic', ['String.prototype.toString']);\n    }\n  },\n  trim(){\n    var string = ensureCoercible(this, 'trim');\n    return $__StringTrim(string);\n  },\n  valueOf(){\n    if ($__GetNativeBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['String.prototype.valueOf']);\n    }\n  }\n});\n\nfunction ensureCoercible(target, method){\n  if (target === null || target === undefined) {\n    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);\n  }\n  return $__ToString(target);\n}\n\nfunction ToHTML(tag, content, attrName, attrVal){\n  attrVal = $__ToString(attrVal);\n  var attr = attrName === undefined ? '' : ' '+attrName+'=\"'+$__StringReplace(attrVal, '\"', '&quot;')+'\"';\n  return '<'+tag+attr+'>'+content+'</'+tag+'>';\n}\n\n\nfunction isRegExp(subject){\n  return subject != null && typeof subject === 'object' && $__GetNativeBrand(subject) === 'RegExp';\n}\n\nfunction stringIndexOf(string, search, position){\n  search = $__ToString(search);\n  position = $__ToInteger(position);\n\n  var len = string.length,\n      searchLen = search.length,\n      i = position > 0 ? position < len ? position : len : 0,\n      maxLen = len - searchLen;\n\n  while (i < maxLen) {\n    var j = 0;\n    while (j < searchLen && search[j] === string[i + j]) {\n      if (j++ === searchLen - 1) {\n        return i;\n      }\n    }\n  }\n  return -1;\n}\n\nfunction stringMatch(string, regexp){\n  if (!isRegExp(regexp)) {\n    regexp = new RegExp(regexp);\n  }\n  if (!regexp.global) {\n    return regexp.exec(string);\n  }\n  regexp.lastIndex = 0;\n  var array = [],\n      previous = 0,\n      lastMatch = true,\n      n = 0;\n\n  while (lastMatch) {\n    var result = regexp.exec(string);\n    if (result === null) {\n      lastMatch = false;\n    } else {\n      var thisIndex = regexp.lastIndex;\n      if (thisIndex === lastIndex) {\n        previous = regexp.lastIndex = thisIndex + 1;\n      } else {\n        previous = thisIndex;\n      }\n      array[n++] = result[0];\n    }\n  }\n\n  return n === 0 ? null : array;\n}\n}\n";
 
 exports.modules["@symbol"] = "export function Symbol(name, isPublic){\n  if (name == null) {\n    throw $__Exception('unnamed_symbol', []);\n  }\n  return $__SymbolCreate(name, !!isPublic);\n}\n\n$__setupConstructor(Symbol, $__SymbolProto);\n\n$__defineProps(Symbol.prototype, {\n  valueOf(){\n    if ($__GetNativeBrand(this) === 'Symbol') {\n      return $__GetInternal(this, 'Label');\n    } else {\n      throw $__Exception('not_generic', ['Symbol.prototype.toString']);\n    }\n  },\n  toString(){\n    if ($__GetNativeBrand(this) === 'Symbol') {\n      return $__GetInternal(this, 'Label');\n    } else {\n      throw $__Exception('not_generic', ['Symbol.prototype.toString']);\n    }\n  }\n});\n\n$__DefineOwnProperty(Symbol.prototype, 'constructor', { configurable: false, writable: false });\n$__SetExtensible(Symbol.prototype, false);\n";
 
-exports.modules["@system"] = "{\n  let HIDDEN = 6,\n      FROZEN = 0;\n\n  $__defineMethods = function defineMethods(obj, props){\n    for (var i=0; i < props.length; i++) {\n      $__SetInternal(props[i], 'Native', true);\n      $__define(obj, props[i].name, props[i], HIDDEN);\n      $__remove(props[i], 'prototype');\n    }\n    return obj;\n  };\n\n  $__defineProps = function defineProps(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      var name = keys[i],\n          prop = props[name];\n\n      $__define(obj, name, prop, HIDDEN);\n\n      if (typeof prop === 'function') {\n        $__SetInternal(prop, 'Native', true);\n        $__define(prop, 'name', name, FROZEN);\n        $__remove(prop, 'prototype');\n      }\n    }\n    return obj;\n  };\n\n  $__setupFunctions = function setupFunctions(...funcs){\n    var len = funcs.length;\n    for (var i=0; i < len; i++) {\n      $__SetInternal(funcs[i], 'Native', true);\n      $__remove(funcs[i], 'prototype');\n    }\n  };\n\n  $__defineConstants = function defineConstants(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      $__define(obj, keys[i], props[keys[i]], FROZEN);\n    }\n  };\n\n  $__setupConstructor = function setupConstructor(ctor, proto){\n    $__define(ctor, 'prototype', proto, FROZEN);\n    $__define(ctor, 'length', 1, FROZEN);\n    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);\n    $__SetInternal(ctor, 'Native', true);\n    $__SetInternal(ctor, 'NativeConstructor', true);\n  };\n\n\n  $__setLength = function setLength(f, length){\n    if (typeof length === 'string') {\n      $__set(f, 'length', length);\n    } else {\n      var keys = $__Enumerate(length, false, false);\n      for (var i=0; i < keys.length; i++) {\n        var key = keys[i];\n        $__set(f[key], 'length', length[key]);\n      }\n    }\n  };\n\n  $__setProperty = function setProperty(key, object, values){\n    var keys = $__Enumerate(values, false, false),\n        i = keys.length;\n\n    while (i--) {\n      $__define(object[keys[i]], key, values[keys[i]], FROZEN);\n    }\n  };\n\n  $__hideEverything = function hideEverything(o){\n    if (!o || typeof o !== 'object') return o;\n\n    var keys = $__Enumerate(o, false, true),\n        i = keys.length;\n\n    while (i--) {\n      $__update(o, keys[i], -1);\n    }\n\n    if (typeof o === 'function') {\n      hideEverything(o.prototype);\n    }\n\n    return o;\n  };\n\n  private @toStringTag, @iterator;\n  $__toStringTag = @toStringTag;\n  $__iterator = @iterator;\n\n  $__EmptyClass = function(...args){ super(...args) };\n  $__define($__EmptyClass, 'name', '', FROZEN);\n}\n\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {\n      $__SetInternal(module, 'loader', loader);\n      $__SetInternal(module, 'resolved', this.@resolved);\n      $__SetInternal(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.translate;\n    this.@resolve   = options.resolve   || parent.resolve;\n    this.@fetch     = options.fetch     || parent.fetch;\n    this.@global    = options.global    || $__global;\n    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');\n  }\n\n  get global(){\n    return this.@global;\n  }\n\n  get baseURL(){\n    return this.@baseURL;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.@baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(src, this.@global, this.@baseURL);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.@global);\n    for (var k in std) {\n      desc.value = std[k];\n      $__DefineOwnProperty(object, k, desc);\n    }\n\n    return object;\n  }\n}\n\n\nexport function Module(object){\n  if ($__GetNativeBrand(object) === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\n$__remove(Module, 'prototype');\n\n\nexport let System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src.message);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__System = System;\n\nSystem.@strict = false;\nlet std = System.eval(`\n  module std = '@std';\n  export std;\n`).std;\nSystem.@strict = true;\n";
+exports.modules["@system"] = "{\n  let HIDDEN = 6,\n      FROZEN = 0;\n\n  $__defineMethods = function defineMethods(obj, props){\n    for (var i=0; i < props.length; i++) {\n      $__SetInternal(props[i], 'Native', true);\n      $__define(obj, props[i].name, props[i], HIDDEN);\n      $__remove(props[i], 'prototype');\n    }\n    return obj;\n  };\n\n  $__defineProps = function defineProps(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      var name = keys[i],\n          prop = props[name];\n\n      $__define(obj, name, prop, HIDDEN);\n\n      if (typeof prop === 'function') {\n        $__SetInternal(prop, 'Native', true);\n        $__define(prop, 'name', name, FROZEN);\n        $__remove(prop, 'prototype');\n      }\n    }\n    return obj;\n  };\n\n  $__setupFunctions = function setupFunctions(...funcs){\n    var len = funcs.length;\n    for (var i=0; i < len; i++) {\n      $__SetInternal(funcs[i], 'Native', true);\n      $__remove(funcs[i], 'prototype');\n    }\n  };\n\n  $__defineConstants = function defineConstants(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      $__define(obj, keys[i], props[keys[i]], FROZEN);\n    }\n  };\n\n  $__setupConstructor = function setupConstructor(ctor, proto){\n    $__define(ctor, 'prototype', proto, FROZEN);\n    $__define(ctor, 'length', 1, FROZEN);\n    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);\n    $__SetInternal(ctor, 'Native', true);\n    $__SetInternal(ctor, 'NativeConstructor', true);\n  };\n\n\n  $__setLength = function setLength(f, length){\n    if (typeof length === 'string') {\n      $__set(f, 'length', length);\n    } else {\n      var keys = $__Enumerate(length, false, false);\n      for (var i=0; i < keys.length; i++) {\n        var key = keys[i];\n        $__set(f[key], 'length', length[key]);\n      }\n    }\n  };\n\n  $__setProperty = function setProperty(key, object, values){\n    var keys = $__Enumerate(values, false, false),\n        i = keys.length;\n\n    while (i--) {\n      $__define(object[keys[i]], key, values[keys[i]], FROZEN);\n    }\n  };\n\n  $__hideEverything = function hideEverything(o){\n    if (!o || typeof o !== 'object') return o;\n\n    var keys = $__Enumerate(o, false, true),\n        i = keys.length;\n\n    while (i--) {\n      if (typeof o[keys[i]] === 'number') {\n        $__update(o, keys[i], 0);\n      } else {\n        $__update(o, keys[i], 6);\n      }\n    }\n\n    if (typeof o === 'function') {\n      hideEverything(o.prototype);\n    }\n\n    return o;\n  };\n\n  private @toStringTag, @iterator;\n  $__toStringTag = @toStringTag;\n  $__iterator = @iterator;\n\n  $__EmptyClass = function(...args){ super(...args) };\n  $__define($__EmptyClass, 'name', '', FROZEN);\n}\n\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {\n      $__SetInternal(module, 'loader', loader);\n      $__SetInternal(module, 'resolved', this.@resolved);\n      $__SetInternal(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.translate;\n    this.@resolve   = options.resolve   || parent.resolve;\n    this.@fetch     = options.fetch     || parent.fetch;\n    this.@global    = options.global    || $__global;\n    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');\n  }\n\n  get global(){\n    return this.@global;\n  }\n\n  get baseURL(){\n    return this.@baseURL;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.@baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(src, this.@global, this.@baseURL);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.@global);\n    for (var k in std) {\n      desc.value = std[k];\n      $__DefineOwnProperty(object, k, desc);\n    }\n\n    return object;\n  }\n}\n\n\nexport function Module(object){\n  if ($__GetNativeBrand(object) === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\n$__remove(Module, 'prototype');\n\n\nlet System = $__System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\nexport System;\n\n\nSystem.@strict = false;\nlet std = System.eval(`\n  module std = '@std';\n  export std;\n`).std;\nSystem.@strict = true;\n";
 
 exports.modules["@timers"] = "export function clearInterval(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nexport function clearTimeout(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nexport function setInterval(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, true);\n}\n\nexport function setTimeout(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, false);\n}\n\n$__setupFunctions(clearInterval, clearTimeout, setInterval, setTimeout);\n";
 
