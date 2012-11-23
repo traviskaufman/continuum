@@ -6,6 +6,7 @@ var utility          = continuum.utility,
     fname            = utility.fname,
     hasOwn           = utility.hasOwn,
     define           = utility.define,
+    safeDefine       = utility.safeDefine,
     isObject         = utility.isObject,
     isExtensible     = utility.isExtensible,
     ownProperties    = utility.properties,
@@ -168,7 +169,7 @@ function initializeDOM(realm){
         return {
           set: function set(key, value){
             if (isExtensible(key)) {
-              define(key, id, value);
+              safeDefine(key, id, value);
             } else {
               var index = key === this.lastKey ? this.lastIndex : keys.indexOf(key);
               if (~index) {
@@ -280,12 +281,17 @@ function initializeDOM(realm){
       }
     }
 
+    function safeDefineProperty(o, key, desc){
+      try {
+        return defineProperty(o, key, desc);
+      } catch (e) {}
+    }
+
     function getDescriptor(o, key){
       if (hasOwn(o, key)) {
         try {
           return describeProperty(o, key);
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }
 
@@ -347,7 +353,7 @@ function initializeDOM(realm){
           return;
           var desc = attrsToDesc(attrs);
           desc.value = unwrap(value);
-          defineProperty(this.object, key, desc);
+          safeDefineProperty(this.object, key, desc);
         },
         function has(key){
           if (key === id) return false;
@@ -392,7 +398,7 @@ function initializeDOM(realm){
           if (this.properties.has(key)) {
             return this.properties.setAttribute(key, attr);
           }
-          defineProperty(this.object, key, attrsToDesc(attr));
+          safeDefineProperty(this.object, key, attrsToDesc(attr));
         }
       ];
     })();
@@ -411,7 +417,11 @@ function initializeDOM(realm){
     };
 
     $ExoticFunction.prototype.Construct = function Construct(args){
-      return wrap(applyNew(this.call, args.map(unwrap)));
+      try {
+        return wrap(applyNew(this.call, args.map(unwrap)));
+      } catch (e) {
+        console.log(e);
+      }
     };
 
     return wrap;
@@ -419,12 +429,13 @@ function initializeDOM(realm){
 
   var oproto = wrap(Object.prototype);
   oproto.properties.setProperty(['__proto__', null, 6, {
-    Get: { Call: function(r){ return r.getPrototype() } },
-    Set: { Call: function(r, a){ return r.setPrototype(a[0]) } }
+    Get: { Call: function(r){ return r.GetInheritence() } },
+    Set: { Call: function(r, a){ return r.SetInheritence(a[0]) } }
   }]);
 
   realm.global.set('document', wrap(document));
-  realm.global.set('window', wrap(window));
+  realm.global.set('window', wrap((0, eval)('this')));
+  realm.global.set('_eval', wrap(eval));
 }
 
 
