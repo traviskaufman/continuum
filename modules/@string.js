@@ -22,6 +22,10 @@ export function fromCharCode(...codeUnits){
   return str;
 }
 
+export function trim(str){
+  return $__StringTrim(ensureCoercible(string, 'trim'));
+}
+
 $__defineMethods(String, [fromCharCode]);
 
 
