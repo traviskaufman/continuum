@@ -1,4 +1,5 @@
 var runtime = (function(GLOBAL, exports, undefined){
+  "use strict";
   var esprima      = require('../third_party/esprima'),
       objects      = require('../lib/objects'),
       functions    = require('../lib/functions'),
@@ -51,7 +52,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       UnaryOp          = operators.UnaryOp,
       BinaryOp         = operators.BinaryOp,
       ToPropertyName   = operators.ToPropertyName,
-      IS               = operators.IS,
       EQUAL            = operators.EQUAL,
       STRICT_EQUAL     = operators.STRICT_EQUAL;
 
@@ -287,6 +287,11 @@ var runtime = (function(GLOBAL, exports, undefined){
           || CONFIGURABLE in desc);
   }
 
+
+  function is(x, y){
+    return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;
+  }
+
   // ## IsEquivalentDescriptor
 
   function IsEquivalentDescriptor(a, b) {
@@ -296,12 +301,12 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (b && b.Completion) {
       if (b.Abrupt) return b; else b = b.value;
     }
-    return IS(a.Get, b.Get) &&
-           IS(a.Set, b.Set) &&
-           IS(a.Value, b.Value) &&
-           IS(a.Writable, b.Writable) &&
-           IS(a.Enumerable, b.Enumerable) &&
-           IS(a.Configurable, b.Configurable);
+    return is(a.Get, b.Get) &&
+           is(a.Set, b.Set) &&
+           is(a.Value, b.Value) &&
+           is(a.Writable, b.Writable) &&
+           is(a.Enumerable, b.Enumerable) &&
+           is(a.Configurable, b.Configurable);
   }
 
   // ## IsCallable
@@ -3091,7 +3096,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         if (desc !== undefined) {
           if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
-            if (!IS(trapResult, desc.Value)) {
+            if (!is(trapResult, desc.Value)) {
               return ThrowException('proxy_get_inconsistent');
             }
           } else if (IsAccessorDescriptor(desc) && desc.Configurable === false && desc.Get === undefined) {
@@ -3116,7 +3121,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var desc = this.Target.GetOwnProperty(key);
           if (desc !== undefined) {
             if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
-              if (!IS(value, desc.Value)) {
+              if (!is(value, desc.Value)) {
                 return ThrowException('proxy_set_inconsistent');
               }
             }
@@ -3457,7 +3462,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return ctor;
       },
       function createFunction(name, code){
-        var $F = code.generator ? $GeneratorFunction : $Function;
+        var $F = code.generator ? $GeneratorFunction : $Function,
             env = this.LexicalEnvironment;
 
         if (name) {

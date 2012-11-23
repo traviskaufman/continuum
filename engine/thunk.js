@@ -1,4 +1,5 @@
 var thunk = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       Emitter   = require('../lib/Emitter');
 

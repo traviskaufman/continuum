@@ -1,4 +1,5 @@
 var assembler = (function(exports){
+  "use strict";
   var util      = require('util');
 
   var objects   = require('../lib/objects'),

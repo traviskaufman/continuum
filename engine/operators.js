@@ -706,26 +706,6 @@ var operators = (function(exports){
 
 
 
-  function IS(x, y) {
-    if (x && x.Completion) {
-      if (x.Abrupt) {
-        return x;
-      } else {
-        x = x.value;
-      }
-    }
-    if (y && y.Completion) {
-      if (y.Abrupt) {
-        return y;
-      } else {
-        y = y.value;
-      }
-    }
-    return x === y ? (x !== 0 || 1 / x === 1 / y) : (x !== x && y !== y);
-  }
-  exports.IS = IS;
-
-
 
   function STRICT_EQUAL(x, y) {
     if (x && x.Completion) {
@@ -809,8 +789,6 @@ var operators = (function(exports){
     switch (operator) {
       case 'instanceof': return INSTANCE_OF(lval, rval);
       case 'in':         return IN(lval, rval);
-      case 'is':         return IS(lval, rval);
-      case 'isnt':       return NOT(IS(lval, rval));
       case '==':         return EQUAL(lval, rval);
       case '!=':         return NOT(EQUAL(lval, rval));
       case '===':        return STRICT_EQUAL(lval, rval);
