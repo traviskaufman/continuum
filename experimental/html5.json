@@ -301,17 +301,7 @@
      "image": [
       "HTMLImageElement",
       "HTMLCanvasElement",
-      "HTMLVideoElement",
-      [
-       "HTMLImageElement",
-       "HTMLCanvasElement",
-       "HTMLVideoElement"
-      ],
-      [
-       "HTMLImageElement",
-       "HTMLCanvasElement",
-       "HTMLVideoElement"
-      ]
+      "HTMLVideoElement"
      ],
      "dx": "Float64",
      "dy": "Float64",
