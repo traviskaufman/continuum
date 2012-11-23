@@ -1037,35 +1037,35 @@
     "returns": "String",
     "args": {
      "type": "String",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "toDataURLHD": {
     "returns": "String",
     "args": {
      "type": "String",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "toBlob": {
     "args": {
      "_callback": "FileCallback",
      "type": "String",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "toBlobHD": {
     "args": {
      "_callback": "FileCallback",
      "type": "String",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "getContext": {
     "returns": "Object",
     "args": {
      "contextId": "String",
-     "arguments": "Any"
+     "args": "Any"
     }
    }
   }
@@ -1303,7 +1303,7 @@
   },
   "legacyCaller": {
    "args": {
-    "arguments": "Any"
+    "args": "Any"
    }
   }
  },
@@ -1952,7 +1952,7 @@
   },
   "legacyCaller": {
    "args": {
-    "arguments": "Any"
+    "args": "Any"
    }
   }
  },
@@ -3719,7 +3719,7 @@
       "String"
      ],
      "timeout": "Int32",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "clearTimeout": {
@@ -3735,7 +3735,7 @@
       "String"
      ],
      "timeout": "Int32",
-     "arguments": "Any"
+     "args": "Any"
     }
    },
    "clearInterval": {
