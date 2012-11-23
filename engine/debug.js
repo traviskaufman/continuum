@@ -221,7 +221,7 @@ var debug = (function(exports){
         return !!this.subject.Class;
       },
       function getBrand(){
-        return this.subject.Brand || this.subject.NativeBrand;
+        return this.subject.Brand || this.subject.BuiltinBrand;
       },
       function getValue(key){
         return this.get(key).subject;
@@ -339,7 +339,7 @@ var debug = (function(exports){
         return prop ? prop[2] : this.getPrototype().propAttributes(key);
       },
       function label(){
-        var brand = this.subject.Brand || this.subject.NativeBrand;
+        var brand = this.subject.Brand || this.subject.BuiltinBrand;
         if (brand && brand.name !== 'Object') {
           return brand.name;
         }
@@ -521,7 +521,7 @@ var debug = (function(exports){
       kind: 'Thrown'
     }, [
       function getError(){
-        if (this.subject.NativeBrand.name === 'StopIteration') {
+        if (this.subject.BuiltinBrand.name === 'StopIteration') {
           return 'StopIteration';
         }
         return this.getValue('name') + ': ' + this.getValue('message');
@@ -1207,13 +1207,13 @@ var debug = (function(exports){
           return new MirrorScope(subject);
         } else if (subject.Completion) {
           return new MirrorThrown(subject.value);
-        } else if (subject.NativeBrand) {
+        } else if (subject.BuiltinBrand) {
           if (subject.Proxy) {
             return new MirrorProxy(subject);
           } else if ('Call' in subject) {
             return new MirrorFunction(subject);
-          } else if (subject.NativeBrand.name in brands) {
-            return new brands[subject.NativeBrand.name](subject);
+          } else if (subject.BuiltinBrand.name in brands) {
+            return new brands[subject.BuiltinBrand.name](subject);
           } else {
             return new MirrorObject(subject);
           }

@@ -9,12 +9,12 @@ var operators = (function(exports){
       Resume        = SYMBOLS.Resume,
       Return        = SYMBOLS.Return,
       Abrupt        = SYMBOLS.Abrupt,
-      Native        = SYMBOLS.Native,
+      Builtin        = SYMBOLS.Builtin,
       Continue      = SYMBOLS.Continue,
       Reference     = SYMBOLS.Reference,
       Completion    = SYMBOLS.Completion,
       Uninitialized = SYMBOLS.Uninitialized,
-      NativeSymbol  = require('./constants').BRANDS.NativeSymbol;
+      BuiltinSymbol  = require('./constants').BRANDS.BuiltinSymbol;
 
   var BOOLEAN   = 'boolean',
       FUNCTION  = 'function',
@@ -275,7 +275,7 @@ var operators = (function(exports){
         argument = argument.value;
       }
     }
-    if (argument && typeof argument === OBJECT && argument.NativeBrand === NativeSymbol) {
+    if (argument && typeof argument === OBJECT && argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
     } else {
       return ToString(argument);

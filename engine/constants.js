@@ -25,11 +25,11 @@ var constants = (function(exports){
 
 
 
-  function Symbol(name){
+  function Token(name){
     this.name = name;
   }
 
-  define(Symbol.prototype, [
+  define(Token.prototype, [
     function toString(){
       return this.name;
     },
@@ -39,12 +39,12 @@ var constants = (function(exports){
   ]);
 
 
-  function NativeBrand(name){
+  function BuiltinBrand(name){
     this.name = name;
     this.brand = '[object '+name+']';
   }
 
-  define(NativeBrand.prototype, [
+  define(BuiltinBrand.prototype, [
     function toString(){
       return this.name;
     },
@@ -55,27 +55,27 @@ var constants = (function(exports){
 
 
   exports.BRANDS = {
-    BooleanWrapper     : new NativeBrand('Boolean'),
-    GlobalObject       : new NativeBrand('global'),
-    NativeArguments    : new NativeBrand('Arguments'),
-    NativeArrayIterator: new NativeBrand('ArrayIterator'),
-    NativeArray        : new NativeBrand('Array'),
-    NativeDate         : new NativeBrand('Date'),
-    NativeError        : new NativeBrand('Error'),
-    NativeFunction     : new NativeBrand('Function'),
-    NativeIterator     : new NativeBrand('Iterator'),
-    NativeJSON         : new NativeBrand('JSON'),
-    NativeMap          : new NativeBrand('Map'),
-    NativeMath         : new NativeBrand('Math'),
-    NativeModule       : new NativeBrand('Module'),
-    NativeObject       : new NativeBrand('Object'),
-    NativeRegExp       : new NativeBrand('RegExp'),
-    NativeSet          : new NativeBrand('Set'),
-    NativeSymbol       : new NativeBrand('Symbol'),
-    NativeWeakMap      : new NativeBrand('WeakMap'),
-    NumberWrapper      : new NativeBrand('Number'),
-    StopIteration      : new NativeBrand('StopIteration'),
-    StringWrapper      : new NativeBrand('String')
+    BooleanWrapper      : new BuiltinBrand('Boolean'),
+    GlobalObject        : new BuiltinBrand('global'),
+    BuiltinArguments    : new BuiltinBrand('Arguments'),
+    BuiltinArrayIterator: new BuiltinBrand('ArrayIterator'),
+    BuiltinArray        : new BuiltinBrand('Array'),
+    BuiltinDate         : new BuiltinBrand('Date'),
+    BuiltinError        : new BuiltinBrand('Error'),
+    BuiltinFunction     : new BuiltinBrand('Function'),
+    BuiltinIterator     : new BuiltinBrand('Iterator'),
+    BuiltinJSON         : new BuiltinBrand('JSON'),
+    BuiltinMap          : new BuiltinBrand('Map'),
+    BuiltinMath         : new BuiltinBrand('Math'),
+    BuiltinModule       : new BuiltinBrand('Module'),
+    BuiltinObject       : new BuiltinBrand('Object'),
+    BuiltinRegExp       : new BuiltinBrand('RegExp'),
+    BuiltinSet          : new BuiltinBrand('Set'),
+    BuiltinSymbol       : new BuiltinBrand('Symbol'),
+    BuiltinWeakMap      : new BuiltinBrand('WeakMap'),
+    NumberWrapper       : new BuiltinBrand('Number'),
+    StopIteration       : new BuiltinBrand('StopIteration'),
+    StringWrapper       : new BuiltinBrand('String')
   };
 
 
@@ -87,19 +87,19 @@ var constants = (function(exports){
   exports.SCOPE = new Constants(['EVAL', 'FUNCTION', 'GLOBAL', 'MODULE' ]);
 
   exports.SYMBOLS = {
-    Break            : new Symbol('Break'),
-    Pause            : new Symbol('Pause'),
-    Throw            : new Symbol('Throw'),
-    Empty            : new Symbol('Empty'),
-    Resume           : new Symbol('Resume'),
-    Return           : new Symbol('Return'),
-    Normal           : new Symbol('Normal'),
-    Abrupt           : new Symbol('Abrupt'),
-    Native           : new Symbol('Native'),
-    Continue         : new Symbol('Continue'),
-    Reference        : new Symbol('Reference'),
-    Completion       : new Symbol('Completion'),
-    Uninitialized    : new Symbol('Uninitialized')
+    Break            : new Token('Break'),
+    Pause            : new Token('Pause'),
+    Throw            : new Token('Throw'),
+    Empty            : new Token('Empty'),
+    Resume           : new Token('Resume'),
+    Return           : new Token('Return'),
+    Normal           : new Token('Normal'),
+    Abrupt           : new Token('Abrupt'),
+    Builtin          : new Token('Builtin'),
+    Continue         : new Token('Continue'),
+    Reference        : new Token('Reference'),
+    Completion       : new Token('Completion'),
+    Uninitialized    : new Token('Uninitialized')
   };
 
   var E = 0x1,

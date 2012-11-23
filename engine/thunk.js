@@ -127,7 +127,7 @@ var thunk = (function(exports){
               console.log(ops[ip])
               return cmds[ip];
             } else if (entry.type === ENTRY.FOROF) {
-              if (error && error.value && error.value.NativeBrand === StopIteration) {
+              if (error && error.value && error.value.BuiltinBrand === StopIteration) {
                 ip = entry.end;
                 return cmds[ip];
               }

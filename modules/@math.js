@@ -323,4 +323,4 @@ export var Math = {
 $__set(min, 'length', 2);
 $__set(max, 'length', 2);
 $__hideEverything(Math);
-$__SetNativeBrand(Math, 'NativeMath');
+$__SetBuiltinBrand(Math, 'BuiltinMath');

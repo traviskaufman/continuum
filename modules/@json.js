@@ -1,6 +1,6 @@
 export let JSON = {};
 
-$__SetNativeBrand(JSON, 'NativeJSON');
+$__SetBuiltinBrand(JSON, 'BuiltinJSON');
 
 let ReplacerFunction,
     PropertyList,

@@ -240,16 +240,16 @@ var Instructions = (function(){
         if (item.Reference) {
           var base = item.base;
           if (base) {
-            if (base.bindings && base.bindings.NativeBrand) {
+            if (base.bindings && base.bindings.BuiltinBrand) {
               base = base.bindings;
             }
 
-            if (!base.Proxy && base.NativeBrand) {
+            if (!base.Proxy && base.BuiltinBrand) {
               item = base.get(item.name);
             }
           }
         }
-        if (item && item.NativeBrand) {
+        if (item && item.BuiltinBrand) {
           var result = continuum.render('normal', item);
           this.batchAppend(result);
         }
