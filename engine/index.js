@@ -136,6 +136,151 @@ var index = (function(exports){
     }
   ]);
 
+
+  function createInterceptor(name, construct){
+    if (!construct && typeof name === 'function') {
+      construct = name;
+      name = fname(construct);
+    }
+
+    var Ctor = new $NativeFunction({
+      name: name || '',
+      length: construct.length,
+      call: function(){
+        var obj = new $IndexedInterceptor(construct.apply(null, arguments));
+        obj.Prototype = Ctor.get('prototype');
+        return obj;
+      },
+      construct: function(){
+        var obj = new $IndexedInterceptor(construct.apply(null, arguments));
+        obj.Prototype = Ctor.get('prototype');
+        return obj;
+      }
+    });
+
+    var proto = new builtins.$Object;
+    proto.ConstructorName = name;
+    proto.define('constructor', Ctor, 6);
+    Ctor.define('prototype', proto, 4);
+
+    return Ctor;
+  }
+
+  function $IndexedInterceptor(target){
+    builtins.$Object.call(this);
+    this.target = target;
+    this.length = target.length;
+    this.properties.set('length', target.length, 0);
+  }
+
+  inherit($IndexedInterceptor, builtins.$Object, {
+    indexAttribute: 5,
+  }, [
+    function remove(key){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return delete this.target[index];
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.remove(key);
+      }
+    },
+    function describe(key){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return [index+'', this.target[index], this.indexAttribute];
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.getProperty(key);
+      }
+    },
+    function define(key, value, attrs){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return this.target[index] = value;
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.set(key, value, attrs);
+      }
+    },
+    function has(key){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return true;
+      }
+
+      return this.properties.has(key);
+    },
+    function each(callback){
+      var len = this.target.length;
+
+      for (var i=0; i < len; i++) {
+        callback([i+'', this.target[i], this.indexAttribute]);
+      }
+
+
+      this.properties.forEach(callback);
+    },
+    function get(key){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+       return this.target[index];
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.get(key);
+      }
+    },
+    function set(key, value){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+       return this.target[index] = value;
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.set(key, value);
+      }
+    },
+    function query(key){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return this.indexAttribute;
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.getAttribute(key);
+      }
+    },
+    function update(key, attr){
+      var index = +key;
+      if (index >= 0 && index < this.target.length) {
+        return false;
+      }
+
+      if (this.properties.has(key)) {
+        return this.properties.setAttribute(key, attr);
+      }
+    }
+  ]);
+
+  function brainTransplant(func, call, construct){
+    if (!(func instanceof $NativeFunction)) {
+      func.Call = $NativeFunction.prototype.Call;
+      func.Construct = $NativeFunction.prototype.Construct;
+      if (call instanceof $NativeFunction) {
+        construct = call.construct;
+        call = call.call;
+      }
+      func.call = call;
+      func.construct = construct;
+    }
+    return func;
+  }
+
+
   define(exports, {
     Assembler : assembler.Assembler,
     Code      : assembler.Code,
@@ -145,6 +290,8 @@ var index = (function(exports){
     constants : constants,
     iterate   : iteration.iterate,
     introspect: debug.introspect,
+    createInterceptor: createInterceptor,
+    brainTransplant: brainTransplant,
     utility: assignAll({}, [
       require('../lib/functions'),
       require('../lib/iteration'),
