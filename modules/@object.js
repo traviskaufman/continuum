@@ -253,6 +253,7 @@ $__defineProps(Object.prototype, {
   }
 });
 
+$__ObjectToString = Object.prototype.toString;
 
 function ensureObject(o, name){
   var type = typeof o;
