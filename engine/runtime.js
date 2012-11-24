@@ -2020,53 +2020,51 @@ var runtime = (function(GLOBAL, exports, undefined){
     ]);
 
 
-    var $Enumerator = (function(){
-      function next(keys){
-        this.keys = keys;
-        this.index = 0;
-        this.count = keys.length;
-        this.depleted = false;
-      }
-      next.prototype.Call = function(obj){
-        if (this.depleted || this.index >= this.count) {
-          this.depleted = true;
-          this.keys = null;
-          return ThrowStopIteration();
-        } else {
-          return this.keys[this.index++];
-        }
-      }
-
-      function $Enumerator(keys){
-        this.next = ['next', new next(keys), 7];
-      }
-
-      inherit($Enumerator, $Object, [
-        function has(key){
-          return key === 'next';
-        },
-        function describe(key){
-          if (key === 'next') {
-            return this.next;
-          }
-        },
-        function get(key){
-          if (key === 'next') {
-            return this.next[1];
-          }
-        },
-        function Get(key){
-          return this.next[1];
-        }
-      ]);
-
-      return $Enumerator;
-    })();
-
     return $Object;
   })();
 
+  var $Enumerator = (function(){
+    function next(keys){
+      this.keys = keys;
+      this.index = 0;
+      this.count = keys.length;
+      this.depleted = false;
+    }
+    next.prototype.Call = function(obj){
+      if (this.depleted || this.index >= this.count) {
+        this.depleted = true;
+        this.keys = null;
+        return ThrowStopIteration();
+      } else {
+        return this.keys[this.index++];
+      }
+    }
 
+    function $Enumerator(keys){
+      this.next = ['next', new next(keys), 7];
+    }
+
+    inherit($Enumerator, $Object, [
+      function has(key){
+        return key === 'next';
+      },
+      function describe(key){
+        if (key === 'next') {
+          return this.next;
+        }
+      },
+      function get(key){
+        if (key === 'next') {
+          return this.next[1];
+        }
+      },
+      function Get(key){
+        return this.next[1];
+      }
+    ]);
+
+    return $Enumerator;
+  })();
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
 
@@ -2219,7 +2217,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
       $Object.call(this, intrinsics.FunctionProto);
-      this.TargetFunction = target;
+      this.ProxyTargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
@@ -2228,24 +2226,24 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($BoundFunction, $Function, {
-      TargetFunction: null,
+      ProxyTargetFunction: null,
       BoundThis: null,
       BoundArguments: null
     }, [
       function Call(_, newArgs){
-        return this.TargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
+        return this.ProxyTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.TargetFunction.Construct) {
-          return ThrowException('not_constructor', this.TargetFunction.name);
+        if (!this.ProxyTargetFunction.Construct) {
+          return ThrowException('not_constructor', this.ProxyTargetFunction.name);
         }
-        return this.TargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        return this.ProxyTargetFunction.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.TargetFunction.HasInstance) {
-          return ThrowException('instanceof_function_expected', this.TargetFunction.name);
+        if (!this.ProxyTargetFunction.HasInstance) {
+          return ThrowException('instanceof_function_expected', this.ProxyTargetFunction.name);
         }
-        return This.TargetFunction.HasInstance(arg);
+        return This.ProxyTargetFunction.HasInstance(arg);
       }
     ]);
 
@@ -2748,6 +2746,9 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Symbol = (function(){
     var seed = Math.random() * 4294967296 | 0;
 
+
+    var iterator = new $Enumerator([]);
+
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
       this.Symbol = seed++;
@@ -2761,7 +2762,59 @@ var runtime = (function(GLOBAL, exports, undefined){
     }, [
       function toString(){
         return this.Symbol;
-      }
+      },
+      function GetInheritance(){
+        return null;
+      },
+      function SetInheritance(v){
+        return false;
+      },
+      function IsExtensible(){
+        return false;
+      },
+      function PreventExtensions(){},
+      function HasOwnProperty(){
+        return false;
+      },
+      function GetOwnProperty(){},
+      function GetP(receiver, key){
+        if (key === 'toString') {
+          return intrinsics.ObjectToString;
+        }
+      },
+      function SetP(receiver, key, value){
+        return false;
+      },
+      function Delete(key){
+        return true;
+      },
+      function DefineOwnProperty(key, desc){
+        return false;
+      },
+      function enumerator(){
+        return iterator;
+      },
+      function Keys(){
+        return [];
+      },
+      function OwnPropertyKeys(){
+        return [];
+      },
+      function Enumerate(){
+        return []
+      },
+      function Freeze(){
+        return true;
+      },
+      function Seal(){
+        return true;
+      },
+      function IsFrozen(){
+        return true;
+      },
+      function IsSealed(){
+        return true;
+      },
     ]);
 
     return $Symbol;
@@ -2963,7 +3016,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       return true;
     }
 
-    function GetTrap(handler, trap){
+    function GetMethod(handler, trap){
       var result = handler.Get(trap);
       if (result !== undefined && !IsCallable(result)) {
         return ThrowException('non_callable_proxy_trap');
@@ -2972,9 +3025,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     function TrapDefineOwnProperty(proxy, key, descObj, strict){
-      var handler = proxy.Handler,
-          target = proxy.Target,
-          trap = GetTrap(handler, 'defineProperty'),
+      var handler = proxy.ProxyHandler,
+          target = proxy.ProxyTarget,
+          trap = GetMethod(handler, 'defineProperty'),
           normalizedDesc = ToPropertyDescriptor(descObj);
 
       if (trap === undefined) {
@@ -3004,9 +3057,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     function TrapGetOwnProperty(proxy, key){
-      var handler = proxy.Handler,
-          target = proxy.Target,
-          trap = GetTrap(handler, 'getOwnPropertyDescriptor');
+      var handler = proxy.ProxyHandler,
+          target = proxy.ProxyTarget,
+          trap = GetMethod(handler, 'getOwnPropertyDescriptor');
 
       if (trap === undefined) {
         return target.GetOwnProperty(key);
@@ -3042,8 +3095,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     function $Proxy(target, handler){
-      this.Handler = handler;
-      this.Target = target;
+      this.ProxyHandler = handler;
+      this.ProxyTarget = target;
       this.BuiltinBrand = target.BuiltinBrand;
       if ('Call' in target) {
         this.HasInstance = $Function.prototype.HasInstance;
@@ -3059,12 +3112,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       Proxy: true
     }, [
       function GetInheritance(){
-        var trap = GetTrap(this.Handler, 'GetInheritanceOf');
+        var trap = GetMethod(this.ProxyHandler, 'getPrototypeOf');
         if (trap === undefined) {
-          return this.Target.GetInheritance();
+          return this.ProxyTarget.GetInheritance();
         } else {
-          var result = trap.Call(this.Handler, [this.Target]),
-              targetProto = this.Target.GetInheritance();
+          var result = trap.Call(this.ProxyHandler, [this.ProxyTarget]),
+              targetProto = this.ProxyTarget.GetInheritance();
 
           if (result !== targetProto) {
             return ThrowException('proxy_prototype_inconsistent');
@@ -3074,12 +3127,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function IsExtensible(){
-        var trap = GetTrap(this.Handler, 'isExtensible');
+        var trap = GetMethod(this.ProxyHandler, 'isExtensible');
         if (trap === undefined) {
-          return this.Target.IsExtensible();
+          return this.ProxyTarget.IsExtensible();
         }
-        var proxyIsExtensible = ToBoolean(trap.Call(this.Handler, [this.Target])),
-            targetIsExtensible  = this.Target.IsExtensible();
+        var proxyIsExtensible = ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget])),
+            targetIsExtensible  = this.ProxyTarget.IsExtensible();
 
         if (proxyIsExtensible !== targetIsExtensible) {
           return ThrowException('proxy_extensibility_inconsistent');
@@ -3087,13 +3140,13 @@ var runtime = (function(GLOBAL, exports, undefined){
         return targetIsExtensible;
       },
       function GetP(receiver, key){
-        var trap = GetTrap(this.Handler, 'get');
+        var trap = GetMethod(this.ProxyHandler, 'get');
         if (trap === undefined) {
-          return this.Target.GetP(receiver, key);
+          return this.ProxyTarget.GetP(receiver, key);
         }
 
-        var trapResult = trap.Call(this.Handler, [this.Target, key, receiver]),
-            desc = this.Target.GetOwnProperty(key);
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key, receiver]),
+            desc = this.ProxyTarget.GetOwnProperty(key);
 
         if (desc !== undefined) {
           if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
@@ -3110,16 +3163,16 @@ var runtime = (function(GLOBAL, exports, undefined){
         return trapResult;
       },
       function SetP(receiver, key, value){
-        var trap = GetTrap(this.Handler, 'set');
+        var trap = GetMethod(this.ProxyHandler, 'set');
         if (trap === undefined) {
-          return this.Target.SetP(receiver, key, value);
+          return this.ProxyTarget.SetP(receiver, key, value);
         }
 
-        var trapResult = trap.Call(this.Handler, [this.Target, key, value, receiver]),
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key, value, receiver]),
             success = ToBoolean(trapResult);
 
         if (success) {
-          var desc = this.Target.GetOwnProperty(key);
+          var desc = this.ProxyTarget.GetOwnProperty(key);
           if (desc !== undefined) {
             if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
               if (!is(value, desc.Value)) {
@@ -3146,56 +3199,56 @@ var runtime = (function(GLOBAL, exports, undefined){
         return TrapDefineOwnProperty(this, key, descObj, strict);
       },
       function HasOwnProperty(key){
-        var trap = GetTrap(this.Handler, 'hasOwn');
+        var trap = GetMethod(this.ProxyHandler, 'hasOwn');
         if (trap === undefined) {
-          return this.Target.HasOwnProperty(key);
+          return this.ProxyTarget.HasOwnProperty(key);
         }
 
-        var trapResult = trap.Call(this.Handler, [this.Target, key]),
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]),
             success = ToBoolean(trapResult);
 
         if (success === false) {
-          var targetDesc = this.Target.GetOwnProperty(key);
+          var targetDesc = this.ProxyTarget.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_hasown_inconsistent');
-          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
+          } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_hasown_inconsistent');
           }
         }
         return success;
       },
       function HasProperty(key){
-        var trap = GetTrap(this.Handler, 'has');
+        var trap = GetMethod(this.ProxyHandler, 'has');
         if (trap === undefined) {
-          return this.Target.HasProperty(key);
+          return this.ProxyTarget.HasProperty(key);
         }
 
-        var trapResult = trap.Call(this.Handler, [this.Target, key]),
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]),
             success = ToBoolean(trapResult);
 
         if (success === false) {
-          var targetDesc = this.Target.GetOwnProperty(key);
+          var targetDesc = this.ProxyTarget.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_has_inconsistent');
-          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
+          } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_has_inconsistent');
           }
         }
         return success;
       },
       function Delete(key, strict){
-        var trap = GetTrap(this.Handler, 'deleteProperty');
+        var trap = GetMethod(this.ProxyHandler, 'deleteProperty');
         if (trap === undefined) {
-          return this.Target.Delete(key, strict);
+          return this.ProxyTarget.Delete(key, strict);
         }
-        var trapResult = trap.Call(this.Handler, [this.Target, key]),
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]),
             success = ToBoolean(trapResult);
 
         if (success === true) {
-          var targetDesc = this.Target.GetOwnProperty(key);
+          var targetDesc = this.ProxyTarget.GetOwnProperty(key);
           if (desc !== undefined && targetDesc.Configurable === false) {
             return ThrowException('proxy_delete_inconsistent');
-          } else if (!this.Target.IsExtensible() && targetDesc !== undefined) {
+          } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
             return ThrowException('proxy_delete_inconsistent');
           }
           return true;
@@ -3212,12 +3265,12 @@ var runtime = (function(GLOBAL, exports, undefined){
           var trap = 'getOwnPropertyNames',
               recurse = includePrototype;
         }
-        var trap = GetTrap(this.Handler, trap);
+        var trap = GetMethod(this.ProxyHandler, trap);
         if (trap === undefined) {
-          return this.Target.Enumerate(includePrototype, onlyEnumerable);
+          return this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable);
         }
 
-        var trapResult = trap.Call(this.Handler, [this.Target, key]);
+        var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
 
         if (Type(trapResult) !== 'Object') {
           return ThrowException(trap+'_trap_non_object');
@@ -3233,22 +3286,22 @@ var runtime = (function(GLOBAL, exports, undefined){
             return ThrowException('trap_returned_duplicate', trap);
           }
           seen[element] = true;
-          if (!includePrototype && !this.Target.IsExtensible() && !this.Target.HasOwnProperty(element)) {
+          if (!includePrototype && !this.ProxyTarget.IsExtensible() && !this.ProxyTarget.HasOwnProperty(element)) {
             return ThrowException('proxy_'+trap+'_inconsistent');
           }
           array[i] = element;
         }
 
-        var props = this.Target.Enumerate(includePrototype, onlyEnumerable),
+        var props = this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable),
             len = props.length;
 
         for (var i=0; i < len; i++) {
           if (!(props[i] in seen)) {
-            var targetDesc = this.Target.GetOwnProperty(props[i]);
+            var targetDesc = this.ProxyTarget.GetOwnProperty(props[i]);
             if (targetDesc && !targetDesc.Configurable) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
-            if (targetDesc && !this.Target.IsExtensible()) {
+            if (targetDesc && !this.ProxyTarget.IsExtensible()) {
               return ThrowException('proxy_'+trap+'_inconsistent');
             }
           }
@@ -3259,21 +3312,21 @@ var runtime = (function(GLOBAL, exports, undefined){
     ]);
 
     function ProxyCall(thisValue, args){
-      var trap = GetTrap(this.Handler, 'apply');
+      var trap = GetMethod(this.ProxyHandler, 'apply');
       if (trap === undefined) {
-        return this.Target.Call(thisValue, args);
+        return this.ProxyTarget.Call(thisValue, args);
       }
 
-      return trap.Call(this.Handler, [this.Target, thisValue, fromInternalArray(args)]);
+      return trap.Call(this.ProxyHandler, [this.ProxyTarget, thisValue, fromInternalArray(args)]);
     }
 
     function ProxyConstruct(args){
-      var trap = GetTrap(this.Handler, 'construct');
+      var trap = GetMethod(this.ProxyHandler, 'construct');
       if (trap === undefined) {
-        return this.Target.Construct(args);
+        return this.ProxyTarget.Construct(args);
       }
 
-      return trap.Call(this.Handler, [this.Target, fromInternalArray(args)]);
+      return trap.Call(this.ProxyHandler, [this.ProxyTarget, fromInternalArray(args)]);
     }
 
     return $Proxy;
@@ -4048,7 +4101,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         FunctionToString: function(func){
           if (func.Proxy) {
-            func = func.Target;
+            func = func.ProxyTarget;
           }
           var code = func.Code;
           if (func.Builtin || !code) {
@@ -4396,7 +4449,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         toggle = !!toggle;
       }
 
-      if (toggle !== this.mutating) {
+      if (toggle !== realm.mutating) {
         realm.mutating = toggle;
         if (toggle) {
           ExecutionContext.push(realm.mutationScope);
