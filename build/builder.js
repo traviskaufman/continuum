@@ -93,7 +93,7 @@ builder.addFiles([
   '../lib/HashSet.js',
   '../lib/Feeder.js',
   '../lib/PropertyList.js',
-  '../lib/DataView.js',
+  '../lib/buffers.js',
 ], function(name, source){
   return 'exports.'+source.slice(4);
 });
@@ -177,5 +177,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-builder.writeFile('../continuum');
-//builder.writeFile('../continuum', true);
+//builder.writeFile('../continuum');
+builder.writeFile('../continuum', true);

@@ -10,10 +10,13 @@ var runtime = (function(GLOBAL, exports, undefined){
       constants    = require('./constants'),
       operators    = require('./operators'),
       Emitter      = require('../lib/Emitter'),
+      buffers      = require('../lib/buffers'),
       PropertyList = require('../lib/PropertyList'),
       Thunk        = require('./thunk').Thunk;
 
   var Hash          = objects.Hash,
+      DataView      = buffers.DataView,
+      ArrayBuffer   = buffers.ArrayBuffer,
       create        = objects.create,
       isObject      = objects.isObject,
       enumerate     = objects.enumerate,
