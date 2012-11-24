@@ -453,6 +453,22 @@ var debug = (function(exports){
     return MirrorArray;
   })();
 
+  var MirrorArrayBufferView = (function(){
+    function MirrorArrayBufferView(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorArrayBufferView, MirrorArray, {
+      kind: 'ArrayBuffer'
+    }, [
+      function label(){
+        return this.subject.BuiltinBrand.name;
+      }
+    ]);
+    return MirrorArrayBufferView;
+  })();
+
+
   var MirrorBoolean = (function(){
     function MirrorBoolean(subject){
       MirrorObject.call(this, subject);
@@ -1128,23 +1144,31 @@ var debug = (function(exports){
 
 
   var brands = {
-    Arguments: MirrorArguments,
-    Array    : MirrorArray,
-    Boolean  : MirrorBoolean,
-    Date     : MirrorDate,
-    Error    : MirrorError,
-    Function : MirrorFunction,
-    global   : MirrorGlobal,
-    JSON     : MirrorJSON,
-    Map      : MirrorMap,
-    Math     : MirrorMath,
-    Module   : MirrorModule,
-    Number   : MirrorNumber,
-    RegExp   : MirrorRegExp,
-    Set      : MirrorSet,
-    String   : MirrorString,
-    Symbol   : MirrorSymbol,
-    WeakMap  : MirrorWeakMap
+    Arguments   : MirrorArguments,
+    Array       : MirrorArray,
+    Boolean     : MirrorBoolean,
+    Date        : MirrorDate,
+    Error       : MirrorError,
+    Function    : MirrorFunction,
+    global      : MirrorGlobal,
+    JSON        : MirrorJSON,
+    Map         : MirrorMap,
+    Math        : MirrorMath,
+    Module      : MirrorModule,
+    Number      : MirrorNumber,
+    RegExp      : MirrorRegExp,
+    Set         : MirrorSet,
+    String      : MirrorString,
+    Symbol      : MirrorSymbol,
+    WeakMap     : MirrorWeakMap,
+    Int8Array   : MirrorArrayBufferView,
+    Uint8Array  : MirrorArrayBufferView,
+    Int16Array  : MirrorArrayBufferView,
+    Uint16Array : MirrorArrayBufferView,
+    Int32Array  : MirrorArrayBufferView,
+    Uint32Array : MirrorArrayBufferView,
+    Float32Array: MirrorArrayBufferView,
+    Float64Array: MirrorArrayBufferView
   };
 
   var _Null        = new MirrorValue(null, 'null'),
@@ -1266,6 +1290,7 @@ var debug = (function(exports){
       Accessor: alwaysLabel,
       Arguments: alwaysLabel,
       Array: alwaysLabel,
+      ArrayBuffer: alwaysLabel,
       Boolean: alwaysLabel,
       Date: alwaysLabel,
       Error: function(mirror){

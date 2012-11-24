@@ -75,7 +75,16 @@ var constants = (function(exports){
     BuiltinWeakMap      : new BuiltinBrand('WeakMap'),
     NumberWrapper       : new BuiltinBrand('Number'),
     StopIteration       : new BuiltinBrand('StopIteration'),
-    StringWrapper       : new BuiltinBrand('String')
+    StringWrapper       : new BuiltinBrand('String'),
+    BuiltinArrayBuffer  : new BuiltinBrand('ArrayBuffer'),
+    BuiltinInt8Array    : new BuiltinBrand('Int8Array'),
+    BuiltinUint8Array   : new BuiltinBrand('Uint8Array'),
+    BuiltinInt16Array   : new BuiltinBrand('Int16Array'),
+    BuiltinUint16Array  : new BuiltinBrand('Uint16Array'),
+    BuiltinInt32Array   : new BuiltinBrand('Int32Array'),
+    BuiltinUint32Array  : new BuiltinBrand('Uint32Array'),
+    BuiltinFloat32Array : new BuiltinBrand('Float32Array'),
+    BuiltinFloat64Array : new BuiltinBrand('Float64Array')
   };
 
 

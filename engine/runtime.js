@@ -18,6 +18,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       isObject      = objects.isObject,
       enumerate     = objects.enumerate,
       ownKeys       = objects.keys,
+      assign        = objects.assign,
       define        = objects.define,
       copy          = objects.copy,
       inherit       = objects.inherit,
@@ -1346,6 +1347,11 @@ var runtime = (function(GLOBAL, exports, undefined){
     this.Value = value;
   }
 
+  function ArrayBufferIndice(value){
+    this.Value = value;
+  }
+
+  ArrayBufferIndice.prototype = new DataDescriptor(undefined, E_W);
 
 
   function Accessor(get, set){
@@ -1753,7 +1759,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (desc) {
           return desc;
         } else {
-          var proto = this.getPrototype();
+          var proto = this.GetInheritence();
           if (proto) {
             return proto.GetProperty(key);
           }
@@ -3112,7 +3118,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Proxy: true
     }, [
       function GetInheritance(){
-        var trap = GetMethod(this.ProxyHandler, 'getPrototypeOf');
+        var trap = GetMethod(this.ProxyHandler, 'GetInheritenceOf');
         if (trap === undefined) {
           return this.ProxyTarget.GetInheritance();
         } else {
@@ -3333,6 +3339,174 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  var $TypedArray = (function(){
+
+    var types = assign({}, [
+      function Int8(x){
+        return (x &= 0xff) & 0x80 ? x - 0x100 : x & 0x7f;
+      },
+      function Int16(x){
+        return (x &= 0xffff) & 0x8000 ? x - 0x10000 : x & 0x7fff;
+      },
+      function Int32(x){
+        return x >> 0;
+      },
+      function Uint8(x){
+        return x & 0xff;
+      },
+      function Uint16(x){
+        return x & 0xffff;
+      },
+      function Uint32(x){
+        return x >>> 0;
+      },
+      function Float32(x){
+        return +x || 0;
+      },
+      function Float64(x){
+        return +x || 0;
+      }
+    ]);
+
+    var setters = {
+      Int8Array: function(view, offset, value, endian){
+        return view.setInt8(offset, value, endian);
+      },
+      Int16Array: function(view, offset, value, endian){
+        return view.setInt16(offset, value, endian);
+      },
+      Int32Array: function(view, offset, value, endian){
+        return view.setInt32(offset, value, endian);
+      },
+      Uint8Array: function(view, offset, value, endian){
+        return view.setUint8(offset, value, endian);
+      },
+      Uint16Array: function(view, offset, value, endian){
+        return view.setUint16(offset, value, endian);
+      },
+      Uint32Array: function(view, offset, value, endian){
+        return view.setUint32(offset, value, endian);
+      },
+      Float32Array: function(view, offset, value, endian){
+        return view.setFloat32(offset, value, endian);
+      },
+      Float64Array: function(view, offset, value, endian){
+        return view.setFloat64(offset, value, endian);
+      }
+    };
+
+    var getters = {
+      Int8Array: function(view, offset, endian){
+        return view.getInt8(offset, endian);
+      },
+      Int16Array: function(view, offset, endian){
+        return view.getInt16(offset, endian);
+      },
+      Int32Array: function(view, offset, endian){
+        return view.getInt32(offset, endian);
+      },
+      Uint8Array: function(view, offset, endian){
+        return view.getUint8(offset, endian);
+      },
+      Uint16Array: function(view, offset, endian){
+        return view.getUint16(offset, endian);
+      },
+      Uint32Array: function(view, offset, endian){
+        return view.getUint32(offset, endian);
+      },
+      Float32Array: function(view, offset, endian){
+        return view.getFloat32(offset, endian);
+      },
+      Float64Array: function(view, offset, endian){
+        return view.getFloat64(offset, endian);
+      }
+    };
+
+    var sizes = {
+      Int8Array: 1,
+      Uint8Array: 1,
+      Int16Array: 2,
+      Uint16Array: 2,
+      Int32Array: 4,
+      Uint32Array: 4,
+      Float32Array: 4,
+      Float64Array: 8
+    };
+
+    function $TypedArray(type, buffer, byteLength, byteOffset){
+      $Object.call(this, intrinsics[type+'Proto']);
+      this.Buffer = buffer;
+      this.ByteOffset = byteOffset;
+      this.ByteLength = byteLength;
+      this.Type = type;
+      this.BuiltinBrand = BRANDS['Builtin'+type];
+      this.Length = byteLength / sizes[type];
+      this.Size = sizes[this.Type];
+      this.define('buffer', buffer, ___);
+      this.define('byteLength', byteLength, ___);
+      this.define('byteOffset', byteOffset, ___);
+      this.define('length', this.Length, ___);
+    }
+
+
+    inherit($TypedArray, $Object, {
+    }, [
+      function getIndex(index){
+        return getters[this.Type](this.Buffer.NativeBuffer, this.ByteOffset + index * this.Size);
+      },
+      function each(callback){
+        for (var i=0; i < this.Length; i++) {
+          callback([i+'', this.getIndex(i), 5]);
+        }
+        this.properties.forEach(callback);
+      },
+      function get(key){
+        var index = +key;
+        if (index >= 0 && index < this.Length && (index | 0) === index) {
+          return this.getIndex(index);
+        }
+        return this.properties.get(key);
+      },
+      function describe(key){
+        var index = +key;
+        if (index >= 0 && index < this.Length && (index | 0) === index) {
+          return [key, this.getIndex(index), 5];
+        }
+        return this.properties.getProperty(key);
+      },
+      function GetOwnProperty(key){
+        var desc = $Object.prototype.GetOwnProperty.call(this, key);
+        if (desc !== undefined) {
+          return desc;
+        }
+
+        var index = ToInteger(key);
+        if (index >= 0 && index < this.Length) {
+          return new ArrayBufferIndice(this.getIndex(index));
+        }
+      },
+      function DefineOwnProperty(key, desc, strict){
+        var succeeded = DefineOwn.call(this, key, desc, strict);
+        if (succeeded === false) {
+          return false;
+        }
+        if (VALUE in desc) {
+          var newValue = desc.Value,
+              index = ToUint32(key);
+
+          if (index.Completion) {
+            if (index.Abrupt) return index; else index = index.value;
+          }
+
+          setters[this.Type](this.Buffer.NativeBuffer, this.ByteOffset + index * this.Size, newValue);
+          return true;
+        }
+      }
+    ]);
+
+
+    return $TypedArray;
+  })();
 
 
   var $PrimitiveBase = (function(){
@@ -4097,6 +4271,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         StringCreate: function(string){
           return new $String(string);
+        },
+        TypedArrayCreate: function(type, buffer, byteLength, byteOffset){
+          return new $TypedArray(type, buffer, byteLength, byteOffset);
+        },
+        NativeBufferCreate: function(size){
+          return new DataView(new ArrayBuffer(size));
         },
 
         FunctionToString: function(func){

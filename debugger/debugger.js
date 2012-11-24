@@ -1,4 +1,4 @@
-(function(continuum){
+(function(global, continuum){
 
 var utility          = continuum.utility,
     Feeder           = utility.Feeder,
@@ -130,6 +130,14 @@ realm.on('ready', function(){
 
   inspect(realm.evaluate('this')).expand();
 
+  var Buffer = global.Buffer || global.Uint8Array;
+
+  var $Buffer = continuum.createInterceptor('Buffer', function(size){
+    return new Buffer(size);
+  });
+
+  realm.evaluate('class Buffer { }');
+  continuum.brainTransplant(realm.global.get('Buffer'), $Buffer);
   realm.on('complete', inspect);
 
   setTimeout(function(){
@@ -435,9 +443,7 @@ function initializeDOM(realm){
 
   realm.global.set('document', wrap(document));
   realm.global.set('window', wrap((0, eval)('this')));
-  realm.global.set('_eval', wrap(eval));
+
 }
 
-
-
-})(continuum);
+})(this, continuum);
