@@ -96,6 +96,7 @@ var errors = (function(errors, messages, exports){
   return exports;
 })({}, {
   TypeError: {
+    bad_argument                   : ["$0", " received a bad argument, expecting a ", "$1"],
     cyclic_proto                   : ["Cyclic __proto__ value"],
     incompatible_method_receiver   : ["Method ", "$0", " called on incompatible receiver ", "$1"],
     invalid_lhs_in_assignment      : ["Invalid left-hand side in assignment"],
