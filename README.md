@@ -71,13 +71,14 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Generators (kind of broken at the moment though)
 * Proxy and Reflect
 * Private Names
+* Typed Arrays
 
 ### Soon to be Implemented
 
 * Array Comprehensions
 * Default parameters
 * Tail call optimization
-* Binary data api
+* Binary data api (structs, etc.)
 
 
 # API Overview

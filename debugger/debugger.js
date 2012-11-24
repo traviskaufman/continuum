@@ -129,15 +129,6 @@ realm.on('ready', function(){
   }
 
   inspect(realm.evaluate('this')).expand();
-
-  var Buffer = global.Buffer || global.Uint8Array;
-
-  var $Buffer = continuum.createInterceptor('Buffer', function(size){
-    return new Buffer(size);
-  });
-
-  realm.evaluate('class Buffer { }');
-  continuum.brainTransplant(realm.global.get('Buffer'), $Buffer);
   realm.on('complete', inspect);
 
   setTimeout(function(){
