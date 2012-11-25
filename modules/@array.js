@@ -1,5 +1,5 @@
-import Iterator from '@iter';
-private @iterator = $__iterator;
+module iter = '@iter';
+symbol @iterator = iter.iterator;
 
 export function Array(...values){
   if (values.length === 1 && typeof values[0] === 'number') {
@@ -326,7 +326,7 @@ let kinds = {
   'sparse:key+value': 7
 };
 
-class ArrayIterator extends Iterator {
+class ArrayIterator extends iter.Iterator {
   private @array, @index, @kind;
   // @array = IteratedObject
   // @index = ArrayIteratorNextIndex

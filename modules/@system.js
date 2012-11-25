@@ -44,7 +44,9 @@
   };
 
   $__setupConstructor = function setupConstructor(ctor, proto){
-    $__define(ctor, 'prototype', proto, FROZEN);
+    if (proto) {
+      $__define(ctor, 'prototype', proto, FROZEN);
+    }
     $__define(ctor, 'length', 1, FROZEN);
     $__define(ctor.prototype, 'constructor', ctor, HIDDEN);
     $__SetInternal(ctor, 'Native', true);
@@ -94,7 +96,7 @@
     return o;
   };
 
-  private @toStringTag, @iterator;
+  symbol @toStringTag, @iterator;
   $__toStringTag = @toStringTag;
   $__iterator = @iterator;
 

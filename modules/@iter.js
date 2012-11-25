@@ -1,6 +1,6 @@
 import hasOwn from '@reflect';
 
-private @iterator = $__iterator;
+symbol @iterator = $__iterator;
 export let iterator = @iterator;
 
 export function Iterator(){}
