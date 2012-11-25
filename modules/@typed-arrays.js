@@ -340,6 +340,7 @@ function subarray(Type, instance, begin, end){
     }
     $__setupConstructor(Ctor, Ctor.prototype);
     $__SetBuiltinBrand(Ctor.prototype, 'Builtin'+Ctor.name);
+    $__hideEverything(Ctor);
   }
 
   setupArrayBuffer(ArrayBuffer);
