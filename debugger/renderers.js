@@ -562,7 +562,7 @@ var Preview = (function(){
   creator(Preview);
   inherit(Preview, Branch, [
     function createPreview(){
-      utility.iterate(this.mirror.list(false), function(key){
+      iterate(this.mirror.list(false), function(key){
         this.batchAppend(new PreviewProperty(this.mirror, key));
       }, this);
     },

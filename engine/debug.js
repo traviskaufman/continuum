@@ -432,21 +432,19 @@ var debug = (function(exports){
                 ? this.inheritedAttrs()
                 : this.getterAttrs(true);
 
-        for (var i=0; i < len; i++) {
-          indexes.push(i+'');
-        }
-        indexes.push('length');
 
         for (var k in props) {
           var prop = props[k];
           if (hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
-            if (k !== prop[0] || k !== 'length' && !(k >= 0 && k < len)) {
+            if (prop[0] >= 0 && prop[0] < len) {
+              indexes.push(prop[0]);
+            } else {
               keys.push(prop[0]);
             }
           }
         }
 
-        return indexes.concat(keys.sort());
+        return indexes.sort(function(a, b){ return +a > +b }).concat(keys.sort());
       }
     ]);
 
