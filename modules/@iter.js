@@ -7,7 +7,7 @@ export function Iterator(){}
 
 $__define(Iterator, 'prototype', Iterator.prototype, 0);
 $__define(Iterator.prototype, @iterator, function iterator(){ return this }, 0);
-$__SetNativeBrand(Iterator.prototype, 'NativeIterator');
+$__SetBuiltinBrand(Iterator.prototype, 'BuiltinIterator');
 
 
 export function keys(obj){

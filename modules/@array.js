@@ -15,7 +15,7 @@ $__setupConstructor(Array, $__ArrayProto);
 
 
 export function isArray(array){
-  return $__GetNativeBrand(array) === 'Array';
+  return $__GetBuiltinBrand(array) === 'Array';
 }
 
 export function from(iterable){

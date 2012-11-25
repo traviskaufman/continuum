@@ -11,14 +11,14 @@ $__setupConstructor(Boolean, $__BooleanProto);
 
 $__defineProps(Boolean.prototype, {
   toString(){
-    if ($__GetNativeBrand(this) === 'Boolean') {
+    if ($__GetBuiltinBrand(this) === 'Boolean') {
       return $__GetPrimitiveValue(this) ? 'true' : 'false';
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.toString']);
     }
   },
   valueOf(){
-    if ($__GetNativeBrand(this) === 'Boolean') {
+    if ($__GetBuiltinBrand(this) === 'Boolean') {
       return $__GetPrimitiveValue(this);
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);

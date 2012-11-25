@@ -49,7 +49,7 @@ function ensureArgs(o, name){
     throw $__Exception('apply_wrong_args', []);
   }
 
-  var brand = $__GetNativeBrand(o);
+  var brand = $__GetBuiltinBrand(o);
   return brand === 'Array' || brand === 'Arguments' ? o : [...o];
 }
 

@@ -10,14 +10,14 @@ $__defineMethods(Date, [now]);
 
 $__defineProps(Date.prototype, {
   toString(){
-    if ($__GetNativeBrand(this) === 'Date') {
+    if ($__GetBuiltinBrand(this) === 'Date') {
       return $__DateToString(this);
     } else {
       throw $__Exception('not_generic', ['Date.prototype.toString']);
     }
   },
   valueOf(){
-    if ($__GetNativeBrand(this) === 'Date') {
+    if ($__GetBuiltinBrand(this) === 'Date') {
       return $__DateToNumber(this);
     } else {
       throw $__Exception('not_generic', ['Date.prototype.valueOf']);

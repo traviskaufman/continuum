@@ -20,7 +20,7 @@ function J(value){
   indent += gap;
   stack.add(value);
 
-  if ($__GetNativeBrand(value) === 'Array') {
+  if ($__GetBuiltinBrand(value) === 'Array') {
     brackets = ['[', ']'];
 
     for (var i=0, len = value.length; i < len; i++) {
@@ -72,7 +72,7 @@ function Str(key, holder){
   }
 
   if ($__Type(v) === 'Object') {
-    var brand = $__GetNativeBrand(v);
+    var brand = $__GetBuiltinBrand(v);
     if (brand === 'Number') {
       v = $__ToNumber(v);
     } else if (brand === 'String') {
@@ -112,7 +112,7 @@ export function stringify(value, replacer, space){
   if ($__Type(replacer) === 'Object') {
     if (typeof replacer === 'function') {
       ReplacerFunction = replacer;
-    } else if ($__GetNativeBrand(replacer) === 'Array') {
+    } else if ($__GetBuiltinBrand(replacer) === 'Array') {
       let props = new Set;
 
       for (let v of replacer) {
@@ -124,7 +124,7 @@ export function stringify(value, replacer, space){
         } else if (type === 'Number') {
           item = v + '';
         } else if (type === 'Object') {
-          let brand = $__GetNativeBrand(v);
+          let brand = $__GetBuiltinBrand(v);
           if (brand === 'String' || brand === 'Number') {
             item = $__ToString(v);
           }

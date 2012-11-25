@@ -246,7 +246,7 @@ $__defineProps(String.prototype, {
     return $__CallNative(string, 'toLocaleUpperCase');
   },
   toString(){
-    if ($__GetNativeBrand(this) === 'String') {
+    if ($__GetBuiltinBrand(this) === 'String') {
       return $__GetPrimitiveValue(this);
     } else {
       throw $__exception('not_generic', ['String.prototype.toString']);
@@ -257,7 +257,7 @@ $__defineProps(String.prototype, {
     return $__StringTrim(string);
   },
   valueOf(){
-    if ($__GetNativeBrand(this) === 'String') {
+    if ($__GetBuiltinBrand(this) === 'String') {
       return $__GetPrimitiveValue(this);
     } else {
       throw $__Exception('not_generic', ['String.prototype.valueOf']);
@@ -280,7 +280,7 @@ function ToHTML(tag, content, attrName, attrVal){
 
 
 function isRegExp(subject){
-  return subject != null && typeof subject === 'object' && $__GetNativeBrand(subject) === 'RegExp';
+  return subject != null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';
 }
 
 function stringIndexOf(string, search, position){

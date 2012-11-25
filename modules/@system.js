@@ -230,7 +230,7 @@ export class Loader {
 
 
 export function Module(object){
-  if ($__GetNativeBrand(object) === 'Module') {
+  if ($__GetBuiltinBrand(object) === 'Module') {
     return object;
   }
   return $__ToModule($__ToObject(object));

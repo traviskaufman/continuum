@@ -376,7 +376,7 @@ export function seal(target){
   var success = $__PreventExtensions(target, false);
   if (!success) return success;
 
-  var props = $__Enumerate(target, false, false);
+  var props = $__Enumerate(target, false, false),
       len = props.length;
 
   for (var i = 0; i < len; i++) {
@@ -419,7 +419,7 @@ function ensureArgs(o, name){
     throw $__Exception('apply_wrong_args', []);
   }
 
-  var brand = $__GetNativeBrand(o);
+  var brand = $__GetBuiltinBrand(o);
   return brand === 'Array' || brand === 'Arguments' ? o : [...o];
 }
 

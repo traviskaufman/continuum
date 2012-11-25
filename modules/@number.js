@@ -59,7 +59,7 @@ $__defineConstants(Number, {
 
 $__defineProps(Number.prototype, {
   toString(radix){
-    if ($__GetNativeBrand(this) === 'Number') {
+    if ($__GetBuiltinBrand(this) === 'Number') {
       var number = $__GetPrimitiveValue(this);
       radix = $__ToInteger(radix);
       return $__NumberToString(number, radix);
@@ -68,7 +68,7 @@ $__defineProps(Number.prototype, {
     }
   },
   valueOf(){
-    if ($__GetNativeBrand(this) === 'Number') {
+    if ($__GetBuiltinBrand(this) === 'Number') {
       return $__GetPrimitiveValue(this);
     } else {
       throw $__Exception('not_generic', ['Number.prototype.valueOf']);

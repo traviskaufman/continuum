@@ -3,7 +3,7 @@ export function RegExp(pattern, flags){
     if (pattern === undefined) {
       pattern = '';
     } else if (typeof pattern === 'string') {
-    } else if (typeof pattern === 'object' && $__GetNativeBrand(pattern) === 'RegExp') {
+    } else if (typeof pattern === 'object' && $__GetBuiltinBrand(pattern) === 'RegExp') {
       if (flags !== undefined) {
         throw $__Exception('regexp_flags', []);
       }
@@ -13,7 +13,7 @@ export function RegExp(pattern, flags){
     return $__RegExpCreate(pattern, flags);
   } else {
     if (flags === undefined && pattern) {
-      if (typeof pattern === 'object' && $__GetNativeBrand(pattern) === 'RegExp') {
+      if (typeof pattern === 'object' && $__GetBuiltinBrand(pattern) === 'RegExp') {
         return pattern;
       }
     }
@@ -26,7 +26,7 @@ $__wrapRegExpMethods(RegExp.prototype);
 
 $__defineProps(RegExp.prototype, {
   toString(){
-    if ($__GetNativeBrand(this) === 'RegExp') {
+    if ($__GetBuiltinBrand(this) === 'RegExp') {
       return $__RegExpToString(this);
     } else {
       throw $__Exception('not_generic', ['RegExp.prototype.toString']);

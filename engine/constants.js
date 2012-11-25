@@ -61,6 +61,7 @@ var constants = (function(exports){
     BuiltinArrayIterator: new BuiltinBrand('ArrayIterator'),
     BuiltinArray        : new BuiltinBrand('Array'),
     BuiltinDate         : new BuiltinBrand('Date'),
+    BuiltinDataView     : new BuiltinBrand('DataView'),
     BuiltinError        : new BuiltinBrand('Error'),
     BuiltinFunction     : new BuiltinBrand('Function'),
     BuiltinIterator     : new BuiltinBrand('Iterator'),
