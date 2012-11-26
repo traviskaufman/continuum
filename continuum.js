@@ -227,7 +227,8 @@ parseYieldExpression: true
         NoUnintializedConst: 'Const must be initialized',
         ComprehensionRequiresBlock: 'Comprehension must have at least one block',
         ComprehensionError:  'Comprehension Error',
-        EachNotAllowed:  'Each is not supported'
+        EachNotAllowed:  'Each is not supported',
+        DefaultsNotLast: 'Default parameters must come last'
     };
 
     // See also tools/generate-unicode-regex.py.
@@ -1772,7 +1773,7 @@ parseYieldExpression: true
             type: Syntax.FunctionExpression,
             id: null,
             params: params,
-            defaults: [],
+            defaults: options.defaults || [],
             body: body,
             rest: options.rest || null,
             generator: options.generator,
@@ -1798,6 +1799,7 @@ parseYieldExpression: true
 
 
         method = parsePropertyFunction({
+            defaults: tmp.defaults,
             params: tmp.params,
             rest: tmp.rest,
             generator: options.generator
@@ -1858,14 +1860,13 @@ parseYieldExpression: true
                 };
             } else if (token.value === 'set' && !(match(':') || match('('))) {
                 key = parseObjectPropertyKey();
-                expect('(');
-                token = lookahead();
-                param = [ parseVariableIdentifier() ];
-                expect(')');
+                param = parseParams();
+                param.name = token;
+                param.generator = false;
                 return {
                     type: Syntax.Property,
                     key: key,
-                    value: parsePropertyFunction({ params: param, generator: false, name: token }),
+                    value: parsePropertyFunction(param),
                     kind: 'set'
                 };
             } else {
@@ -2704,7 +2705,7 @@ parseYieldExpression: true
             type: Syntax.ArrowFunctionExpression,
             id: null,
             params: options.params,
-            defaults: [],
+            defaults: options.defaults || [],
             body: body,
             rest: options.rest,
             generator: false,
@@ -4090,6 +4091,13 @@ parseYieldExpression: true
             return false;
         }
 
+        if (match('=')) {
+            lex();
+            options.defaults.push(parseAssignmentExpression());
+        } else if (options.defaults.length) {
+            throwError({}, Messages.DefaultsNotLast);
+        }
+
         options.params.push(param);
         return !match(')');
     }
@@ -4100,6 +4108,7 @@ parseYieldExpression: true
 
         options = {
             params: [],
+            defaults: [],
             rest: null,
             firstRestricted: firstRestricted
         }
@@ -4180,7 +4189,7 @@ parseYieldExpression: true
             type: Syntax.FunctionDeclaration,
             id: id,
             params: tmp.params,
-            defaults: [],
+            defaults: tmp.defaults,
             body: body,
             rest: tmp.rest,
             generator: generator,
@@ -4249,7 +4258,7 @@ parseYieldExpression: true
             type: Syntax.FunctionExpression,
             id: id,
             params: tmp.params,
-            defaults: [],
+            defaults: tmp.defaults,
             body: body,
             rest: tmp.rest,
             generator: generator,
@@ -4316,14 +4325,13 @@ parseYieldExpression: true
             };
         } else if (token.value === 'set' && !match('(')) {
             key = parseObjectPropertyKey();
-            expect('(');
-            token = lookahead();
-            param = [ parseVariableIdentifier() ];
-            expect(')');
+            param = parseParams();
+            param.name = token;
+            param.generator = false;
             return {
                 type: Syntax.MethodDefinition,
                 key: key,
-                value: parsePropertyFunction({ params: param, generator: false, name: token }),
+                value: parsePropertyFunction(param),
                 kind: 'set'
             };
         } else {
@@ -7292,11 +7300,11 @@ exports.HashMap = (function(module){
 
 
   var types = assign(new Hash, {
-    string: 'strings',
-    number: 'numbers',
-    undefined: 'others',
-    boolean: 'others',
-    object: 'others'
+    'string': 'strings',
+    'number': 'numbers',
+    'undefined': 'others',
+    'boolean': 'others',
+    'object': 'others'
   });
 
 
@@ -7421,11 +7429,11 @@ exports.HashSet = (function(module){
 
 
   var types = assign(new Hash, {
-    string: 'strings',
-    number: 'numbers',
-    undefined: 'others',
-    boolean: 'others',
-    object: 'others'
+    'string': 'strings',
+    'number': 'numbers',
+    'undefined': 'others',
+    'boolean': 'others',
+    'object': 'others'
   });
 
 
@@ -7844,7 +7852,7 @@ exports.buffers = (function(global, exports){
       pow = Math.pow,
       LN2 = Math.LN2,
       _slice = [].slice,
-      char = String.fromCharCode;
+      chr = String.fromCharCode;
 
   var endian = {
     little: { 1: [0],
@@ -7863,9 +7871,9 @@ exports.buffers = (function(global, exports){
 
   void function(i){
     for (i = 0; i < 0x100; ++i) {
-      chars[indices[i] = char(i)] = i;
+      chars[indices[i] = chr(i)] = i;
       if (i >= 0x80) {
-        chars[char(0xf700 + i)] = i;
+        chars[chr(0xf700 + i)] = i;
       }
     }
   }();
@@ -8007,7 +8015,7 @@ exports.buffers = (function(global, exports){
 
     function writeString(array){
       try {
-        return char.apply(null, array);
+        return chr.apply(null, array);
       } catch (err) {}
 
       var string = '',
@@ -8509,8 +8517,6 @@ exports.errors = (function(errors, messages, exports){
     strict_cannot_assign           : ["Cannot assign to read only '", "$0", "' in strict mode"],
     strict_poison_pill             : ["'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"],
     object_not_extensible          : ["Can't add property ", "$0", ", object is not extensible"],
-
-
     proxy_prototype_inconsistent        : ["cannot report a prototype value that is inconsistent with target prototype value"],
     proxy_extensibility_inconsistent    : ["cannot report a non-extensible object as extensible or vice versa"],
     proxy_configurability_inconsistent  : ["cannot report innacurate configurability for property '", "$0"],
@@ -8542,13 +8548,13 @@ exports.errors = (function(errors, messages, exports){
     non_object_property_load       : ["Cannot read property '", "$0", "' of ", "$1"],
     non_object_property_store      : ["Cannot set property '", "$0", "' of ", "$1"],
     non_object_property_call       : ["Cannot call method '", "$0", "' of ", "$1"],
-    no_setter_in_callback          : ["Cannot set property ", "$0", " of ", "$1", " which has only a getter"],
+    no_setter_in_callback          : ["Cannot set property ", "$0", " of ", "$1", " which has only a getter"]
   },
   RangeError: {
     invalid_array_length           : ["Invalid array length"],
     invalid_repeat_count           : ["Invalid repeat count"],
     stack_overflow                 : ["Maximum call stack size exceeded"],
-    invalid_time_value             : ["Invalid time value"],
+    invalid_time_value             : ["Invalid time value"]
   },
   SyntaxError : {
     multiple_defaults_in_switch    : ["More than one default clause in switch statement"],
@@ -8589,8 +8595,8 @@ exports.errors = (function(errors, messages, exports){
     strict_caller                  : ["Illegal access to a strict mode caller function."],
     const_assign                   : ["Assignment to constant variable."],
     invalid_module_path            : ["Module does not export '", "$0", "', or export is not itself a module"],
-    module_type_error              : ["Module '", "$0", "' used improperly"],
-  },
+    module_type_error              : ["Module '", "$0", "' used improperly"]
+  }
 }, typeof module !== 'undefined' ? module.exports : {});
 
 
@@ -8719,7 +8725,6 @@ exports.assembler = (function(exports){
 
 
 
-
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
@@ -8814,17 +8819,22 @@ exports.assembler = (function(exports){
     })();
 
     var Params = (function(){
-      function Params(params, node, rest){
+      function Params(node){
         this.length = 0;
-        if (params) {
-          pushAll(this, params)
-          this.BoundNames = BoundNames(params);
+        if (node.params) {
+          pushAll(this, node.params)
+          this.BoundNames = BoundNames(node.params);
         } else {
           this.BoundNames = [];
         }
         this.Rest = rest;
         this.ExpectedArgumentCount = this.BoundNames.length;
-        if (rest) this.BoundNames.push(rest.name);
+        if (node.rest) {
+          this.BoundNames.push(node.rest.name);
+        }
+        if (node.defaults) {
+          this.defaults = node.defaults;
+        }
       }
 
       define(Params, [
@@ -8896,10 +8906,10 @@ exports.assembler = (function(exports){
         this.ExportedNames = getExports(this.body);
         this.Strict = true;
       }
-      if (node.params) {
-        this.params = new Params(node.params, node, node.rest);
-      }
       this.ops = [];
+      if (node.params) {
+        this.params = new Params(node);
+      }
     }
 
 
@@ -8913,11 +8923,11 @@ exports.assembler = (function(exports){
       },
       function lookup(id){
         return id;
-        if (typeof id === 'number') {
-          return this.strings[id];
-        } else {
-          return id;
-        }
+        // if (typeof id === 'number') {
+        //   return this.strings[id];
+        // } else {
+        //   return id;
+        // }
       }
     ]);
 
@@ -9155,7 +9165,7 @@ exports.assembler = (function(exports){
       Program: walk.RECURSE,
       VariableDeclaration: lexical(function(node){
         return node.kind === 'const';
-      }),
+      })
     });
   })(function(isConst){
     if (typeof isConst !== 'function') {
@@ -9203,7 +9213,7 @@ exports.assembler = (function(exports){
       ModuleDeclaration  : 'id',
       VariableDeclarator : 'id',
       Glob               : true,
-      Identifier         : ['name'],
+      Identifier         : ['name']
     });
 
     return function getExports(node){
@@ -9455,7 +9465,7 @@ exports.assembler = (function(exports){
       function WithStatement(node){
         copyWrap(node, node.body);
         return RECURSE;
-      },
+      }
       //function YieldExpression(node){},
     ]);
 
@@ -9849,7 +9859,7 @@ exports.assembler = (function(exports){
                 type: 'VariableDeclarator',
                 id: decl,
                 init: null
-              }],
+              }]
             };
             lexicalDecl.BoundNames = BoundNames(lexicalDecl);
             recurse(decl);
@@ -10406,7 +10416,7 @@ exports.assembler = (function(exports){
       code: null,
       pending: null,
       jumps: null,
-      labels: null,
+      labels: null
     });
 
     define(Assembler.prototype, [
@@ -10450,6 +10460,10 @@ exports.assembler = (function(exports){
         if (lastCode) {
           this.code.derive(lastCode);
         }
+
+        //if (this.code.params && this.code.params.defaults) {
+        //}
+
         recurse(this.code.body);
 
         if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
@@ -10471,7 +10485,7 @@ exports.assembler = (function(exports){
       },
       function intern(name){
         return name;
-        if (name === '__proto__') {
+        /*if (name === '__proto__') {
           if (!this.hash[proto]) {
             var index = this.hash[proto] = this.strings.length;
             this.strings[index] = '__proto__';
@@ -10485,7 +10499,7 @@ exports.assembler = (function(exports){
           var index = this.hash[name] = this.strings.length;
           this.strings[index] = name;
           return index;
-        }
+        }*/
       },
       function earlyError(node, error){
         this.code.errors || (this.code.errors = []);
@@ -13081,7 +13095,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    for (i=0, decl; decl = decls[i]; i++) {
+    for (i=0; decl = decls[i]; i++) {
       if (decl.type === 'FunctionDeclaration') {
         env.InitializeBinding(decl.id.name, InstantiateFunctionDeclaration(decl, env));
       }
@@ -13245,9 +13259,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return status;
         }
       }
-    }
-
-    return object;
+      return object;
+    };
   }
 
 
@@ -14347,7 +14360,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         return ThrowException('cannot_convert_to_primitive', []);
-      },
+      }
       // function Keys(){
 
       // },
@@ -14684,7 +14697,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       ExecutionContext: null,
       Scope: null,
       Handler: null,
-      State: null,
+      State: null
     }, [
       function Send(value){
         if (this.State === EXECUTING) {
@@ -14767,7 +14780,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Date, $Object, {
-      BuiltinBrand: BRANDS.BuiltinDate,
+      BuiltinBrand: BRANDS.BuiltinDate
     });
 
     return $Date;
@@ -14853,7 +14866,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
-      PrimitiveValue: undefined,
+      PrimitiveValue: undefined
     });
 
     return $Number;
@@ -14872,7 +14885,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
-      PrimitiveValue: undefined,
+      PrimitiveValue: undefined
     });
 
     return $Boolean;
@@ -14925,7 +14938,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($WeakMap, $Object, {
-      BuiltinBrand: BRANDS.BuiltinWeakMap,
+      BuiltinBrand: BRANDS.BuiltinWeakMap
     });
 
     return $WeakMap;
@@ -15081,7 +15094,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($RegExp, $Object, {
       BuiltinBrand: BRANDS.BuiltinRegExp,
-      Match: null,
+      Match: null
     });
 
     return $RegExp;
@@ -15163,7 +15176,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function IsSealed(){
         return true;
-      },
+      }
     ]);
 
     return $Symbol;
@@ -15182,7 +15195,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Arguments, $Object, {
       BuiltinBrand: BRANDS.BuiltinArguments,
-      ParameterMap: null,
+      ParameterMap: null
     });
 
     return $Arguments;
@@ -15229,7 +15242,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($MappedArguments, $Arguments, {
-      ParameterMap: null,
+      ParameterMap: null
     }, [
       function Get(key){
         if (this.isMapped && this.ParameterMap.has(key)) {
@@ -16023,7 +16036,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($NativeFunction, $Function, {
-      Builtin: true,
+      Builtin: true
     }, [
       function Call(receiver, args){
         var result = this.call.apply(receiver, [].concat(args));
@@ -16262,7 +16275,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           options = {
             call: options,
             name: options.name,
-            length: options.length,
+            length: options.length
           }
         }
 
@@ -16659,14 +16672,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         BoundFunctionCreate: function(func, receiver, args){
           return new $BoundFunction(func, receiver, toInternalArray(args));
         },
-        BooleanCreate: function(boolean){
-          return new $Boolean(boolean);
+        BooleanCreate: function(v){
+          return new $Boolean(v);
         },
         DateCreate: function(args){
           return new $Date(applyNew(Date, toInternalArray(args)));
         },
-        NumberCreate: function(number){
-          return new $Number(number);
+        NumberCreate: function(v){
+          return new $Number(v);
         },
         ObjectCreate: function(proto){
           return new $Object(proto);
@@ -16688,8 +16701,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         SymbolCreate: function(name, isPublic){
           return new $Symbol(name, isPublic);
         },
-        StringCreate: function(string){
-          return new $String(string);
+        StringCreate: function(v){
+          return new $String(v);
         },
         TypedArrayCreate: function(type, buffer, byteLength, byteOffset){
           return new $TypedArray(type, buffer, byteLength, byteOffset);
@@ -16753,26 +16766,26 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
         },
 
-        CodeUnit: function(char){
-          return char.charCodeAt(0);
+        CodeUnit: function(v){
+          return v.charCodeAt(0);
         },
-        StringReplace: function(string, search, replace){
+        StringReplace: function(str, search, replace){
           if (typeof search !== 'string') {
             search = search.PrimitiveValue;
           }
-          return string.replace(search, replace);
+          return str.replace(search, replace);
         },
-        StringSplit: function(string, separator, limit){
+        StringSplit: function(str, separator, limit){
           if (typeof separator !== 'string') {
             separator = separator.PrimitiveValue;
           }
-          return fromInternalArray(string.split(separator, limit));
+          return fromInternalArray(str.split(separator, limit));
         },
-        StringSearch: function(regexp){
-          return string.search(regexp);
+        StringSearch: function(str, regexp){
+          return str.search(regexp);
         },
-        StringSlice: function(string, start, end){
-          return end === undefined ? string.slice(start) : string.slice(start, end);
+        StringSlice: function(str, start, end){
+          return end === undefined ? str.slice(start) : str.slice(start, end);
         },
         FromCharCode: String.fromCharCode,
         StringTrim: String.prototype.trim
@@ -17988,7 +18001,7 @@ exports.debug = (function(exports){
 
     inherit(MirrorFunction, MirrorObject, {
       type: 'function',
-      kind: 'Function',
+      kind: 'Function'
     }, [
       function getName(){
         return this.subject.get('name');
@@ -18040,7 +18053,7 @@ exports.debug = (function(exports){
           }
         });
         return props;
-      },
+      }
     ]);
 
     return MirrorFunction;
@@ -18119,7 +18132,7 @@ exports.debug = (function(exports){
             return this.getPrototype().get(key);
           }
         }
-      },
+      }
     ]);
 
     return MirrorModule;
@@ -18505,7 +18518,7 @@ exports.debug = (function(exports){
       },
       function propAttributes(key){
         return 1 | (this.isPropConfigurable(key) << 1) | (this.isPropWritable(key) << 2);
-      },
+      }
     ]);
 
     return MirrorScope;
@@ -18842,7 +18855,7 @@ exports.index = (function(exports){
 
 
       inherit($Exotic, Super, {
-        Native: true,
+        Native: true
       }, [
         function init(){},
         function remove(key){
@@ -18883,7 +18896,7 @@ exports.index = (function(exports){
           function construct(){},
           $NativeFunction.prototype.Call,
           $NativeFunction.prototype.Construct,
-          $NativeFunction.prototype.HasInstance,
+          $NativeFunction.prototype.HasInstance
         ]);
       }
 
@@ -18933,7 +18946,7 @@ exports.index = (function(exports){
   }
 
   inherit($IndexedInterceptor, builtins.$Object, {
-    indexAttribute: 5,
+    indexAttribute: 5
   }, [
     function remove(key){
       var index = +key;
