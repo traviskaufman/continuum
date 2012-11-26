@@ -5,6 +5,7 @@ var utility = continuum.utility,
     assign = utility.assign,
     define = utility.define,
     each = utility.each,
+    uid = utility.uid,
     Hash = utility.Hash;
 
 var DoublyLinkedList = utility.DoublyLinkedList;
@@ -450,7 +451,7 @@ var Component = (function(){
         'activate', 'afterupdate', 'beforeactivate', 'beforecopy', 'beforecut', 'beforedeactivate',
         'beforeeditfocus', 'beforepaste', 'beforeupdate', 'blur', 'cellchange', 'click', 'contextmenu',
         'controlselect', 'copy', 'dataavailable', 'datasetchanged', 'datasetcomplete', 'dblclick',
-        'deactivate', 'drag', 'dragend', 'dragenter', 'dragleave', 'dragover', 'dragstart', 'drop',
+        'deactivate', 'dragend', 'dragenter', 'dragleave', 'dragover', 'dragstart', //'drag',  'drop',
         'errorupdate', 'filterchange', 'focus', 'focusin', 'focusout', 'help', 'keydown', 'keyup',
         'losecapture', 'mousedown', 'mouseenter', 'mouseleave', 'mousemove', 'mouseout', 'mouseup',
         'mousewheel', 'move', 'moveend', 'movestart', 'paste', 'propertychange', 'readystatechange',
@@ -467,16 +468,17 @@ var Component = (function(){
             return listener.call(receiver, e);
           };
         } else {
+          var id = uid();
           var bound = function(e){
             e = e.srcElement.customEvent;
-            if (e && !e.expired && e.type === event) {
+            if (e && e.type === event && !e[id]) {
+              e[id] = true;
               return listener.call(receiver, e);
             }
           };
         }
 
-        event = real ? event : 'propertychange';
-        element.attachEvent('on'+event, bound);
+        element.attachEvent('on'+(real ? event : 'propertychange'), bound);
         return bound;
       }
 
@@ -485,13 +487,12 @@ var Component = (function(){
         element.detachEvent('on'+event, bound);
       }
 
-      publish = function(element, event){
-        if (event.type in realEvents) {
-          return element.fireEvent(event);
+      publish = function(element, e){
+        if (e.type in realEvents) {
+          return element.fireEvent(e);
         } else {
-          element.customEvent = event;
-          event.expired = true;
-          return event.returnValue === undefined ? true : event.returnValue;
+          element.customEvent = e;
+          return e.returnValue === undefined ? true : e.returnValue;
         }
       }
     }();
@@ -945,8 +946,10 @@ var Dragger = (function(){
     this.addClass('drag-helper');
     target.on('mousedown', this.grab, this);
     this.on('mousemove', this.drag);
+    target.on('mousemove', this.drag, this);
     target.on('mouseup', this.drop, this);
     this.on('mouseup', this.drop);
+
     if (bindings) {
       for (var k in bindings) {
         this.on(k, bindings[k]);
@@ -957,6 +960,7 @@ var Dragger = (function(){
   inherit(Dragger, Component, [
     function grab(e){
       body.append(this);
+      this.dragging = true;
       this.x = e.pageX;
       this.y = e.pageY;
       this.start = this.target.offset();
@@ -969,10 +973,13 @@ var Dragger = (function(){
       e.preventDefault();
     },
     function drag(e){
-      this.emit('drag', this.calculate(e));
+      if (this.dragging) {
+        this.emit('drag', this.calculate(e));
+      }
     },
     function drop(e){
       if (this.element.parentNode) {
+        this.dragging = false;
         body.remove(this);
         this.emit('drop', this.calculate(e));
       }
