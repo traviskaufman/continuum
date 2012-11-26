@@ -565,7 +565,7 @@ var debug = (function(exports){
 
     inherit(MirrorFunction, MirrorObject, {
       type: 'function',
-      kind: 'Function',
+      kind: 'Function'
     }, [
       function getName(){
         return this.subject.get('name');
@@ -617,7 +617,7 @@ var debug = (function(exports){
           }
         });
         return props;
-      },
+      }
     ]);
 
     return MirrorFunction;
@@ -696,7 +696,7 @@ var debug = (function(exports){
             return this.getPrototype().get(key);
           }
         }
-      },
+      }
     ]);
 
     return MirrorModule;
@@ -1082,7 +1082,7 @@ var debug = (function(exports){
       },
       function propAttributes(key){
         return 1 | (this.isPropConfigurable(key) << 1) | (this.isPropWritable(key) << 2);
-      },
+      }
     ]);
 
     return MirrorScope;

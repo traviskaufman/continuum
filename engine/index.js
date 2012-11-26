@@ -83,7 +83,7 @@ var index = (function(exports){
 
 
       inherit($Exotic, Super, {
-        Native: true,
+        Native: true
       }, [
         function init(){},
         function remove(key){
@@ -124,7 +124,7 @@ var index = (function(exports){
           function construct(){},
           $NativeFunction.prototype.Call,
           $NativeFunction.prototype.Construct,
-          $NativeFunction.prototype.HasInstance,
+          $NativeFunction.prototype.HasInstance
         ]);
       }
 
@@ -174,7 +174,7 @@ var index = (function(exports){
   }
 
   inherit($IndexedInterceptor, builtins.$Object, {
-    indexAttribute: 5,
+    indexAttribute: 5
   }, [
     function remove(key){
       var index = +key;

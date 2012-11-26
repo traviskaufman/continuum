@@ -122,7 +122,6 @@ var assembler = (function(exports){
 
 
 
-
   var ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
@@ -217,17 +216,22 @@ var assembler = (function(exports){
     })();
 
     var Params = (function(){
-      function Params(params, node, rest){
+      function Params(node){
         this.length = 0;
-        if (params) {
-          pushAll(this, params)
-          this.BoundNames = BoundNames(params);
+        if (node.params) {
+          pushAll(this, node.params)
+          this.BoundNames = BoundNames(node.params);
         } else {
           this.BoundNames = [];
         }
         this.Rest = rest;
         this.ExpectedArgumentCount = this.BoundNames.length;
-        if (rest) this.BoundNames.push(rest.name);
+        if (node.rest) {
+          this.BoundNames.push(node.rest.name);
+        }
+        if (node.defaults) {
+          this.defaults = node.defaults;
+        }
       }
 
       define(Params, [
@@ -299,10 +303,10 @@ var assembler = (function(exports){
         this.ExportedNames = getExports(this.body);
         this.Strict = true;
       }
-      if (node.params) {
-        this.params = new Params(node.params, node, node.rest);
-      }
       this.ops = [];
+      if (node.params) {
+        this.params = new Params(node);
+      }
     }
 
 
@@ -316,11 +320,11 @@ var assembler = (function(exports){
       },
       function lookup(id){
         return id;
-        if (typeof id === 'number') {
-          return this.strings[id];
-        } else {
-          return id;
-        }
+        // if (typeof id === 'number') {
+        //   return this.strings[id];
+        // } else {
+        //   return id;
+        // }
       }
     ]);
 
@@ -558,7 +562,7 @@ var assembler = (function(exports){
       Program: walk.RECURSE,
       VariableDeclaration: lexical(function(node){
         return node.kind === 'const';
-      }),
+      })
     });
   })(function(isConst){
     if (typeof isConst !== 'function') {
@@ -606,7 +610,7 @@ var assembler = (function(exports){
       ModuleDeclaration  : 'id',
       VariableDeclarator : 'id',
       Glob               : true,
-      Identifier         : ['name'],
+      Identifier         : ['name']
     });
 
     return function getExports(node){
@@ -858,7 +862,7 @@ var assembler = (function(exports){
       function WithStatement(node){
         copyWrap(node, node.body);
         return RECURSE;
-      },
+      }
       //function YieldExpression(node){},
     ]);
 
@@ -1252,7 +1256,7 @@ var assembler = (function(exports){
                 type: 'VariableDeclarator',
                 id: decl,
                 init: null
-              }],
+              }]
             };
             lexicalDecl.BoundNames = BoundNames(lexicalDecl);
             recurse(decl);
@@ -1809,7 +1813,7 @@ var assembler = (function(exports){
       code: null,
       pending: null,
       jumps: null,
-      labels: null,
+      labels: null
     });
 
     define(Assembler.prototype, [
@@ -1853,6 +1857,10 @@ var assembler = (function(exports){
         if (lastCode) {
           this.code.derive(lastCode);
         }
+
+        //if (this.code.params && this.code.params.defaults) {
+        //}
+
         recurse(this.code.body);
 
         if (this.code.ScopeType === SCOPE.GLOBAL || this.code.ScopeType === SCOPE.EVAL){
@@ -1874,7 +1882,7 @@ var assembler = (function(exports){
       },
       function intern(name){
         return name;
-        if (name === '__proto__') {
+        /*if (name === '__proto__') {
           if (!this.hash[proto]) {
             var index = this.hash[proto] = this.strings.length;
             this.strings[index] = '__proto__';
@@ -1888,7 +1896,7 @@ var assembler = (function(exports){
           var index = this.hash[name] = this.strings.length;
           this.strings[index] = name;
           return index;
-        }
+        }*/
       },
       function earlyError(node, error){
         this.code.errors || (this.code.errors = []);

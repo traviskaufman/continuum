@@ -150,8 +150,6 @@ var errors = (function(errors, messages, exports){
     strict_cannot_assign           : ["Cannot assign to read only '", "$0", "' in strict mode"],
     strict_poison_pill             : ["'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"],
     object_not_extensible          : ["Can't add property ", "$0", ", object is not extensible"],
-
-
     proxy_prototype_inconsistent        : ["cannot report a prototype value that is inconsistent with target prototype value"],
     proxy_extensibility_inconsistent    : ["cannot report a non-extensible object as extensible or vice versa"],
     proxy_configurability_inconsistent  : ["cannot report innacurate configurability for property '", "$0"],
@@ -183,13 +181,13 @@ var errors = (function(errors, messages, exports){
     non_object_property_load       : ["Cannot read property '", "$0", "' of ", "$1"],
     non_object_property_store      : ["Cannot set property '", "$0", "' of ", "$1"],
     non_object_property_call       : ["Cannot call method '", "$0", "' of ", "$1"],
-    no_setter_in_callback          : ["Cannot set property ", "$0", " of ", "$1", " which has only a getter"],
+    no_setter_in_callback          : ["Cannot set property ", "$0", " of ", "$1", " which has only a getter"]
   },
   RangeError: {
     invalid_array_length           : ["Invalid array length"],
     invalid_repeat_count           : ["Invalid repeat count"],
     stack_overflow                 : ["Maximum call stack size exceeded"],
-    invalid_time_value             : ["Invalid time value"],
+    invalid_time_value             : ["Invalid time value"]
   },
   SyntaxError : {
     multiple_defaults_in_switch    : ["More than one default clause in switch statement"],
@@ -230,7 +228,7 @@ var errors = (function(errors, messages, exports){
     strict_caller                  : ["Illegal access to a strict mode caller function."],
     const_assign                   : ["Assignment to constant variable."],
     invalid_module_path            : ["Module does not export '", "$0", "', or export is not itself a module"],
-    module_type_error              : ["Module '", "$0", "' used improperly"],
-  },
+    module_type_error              : ["Module '", "$0", "' used improperly"]
+  }
 }, typeof module !== 'undefined' ? module.exports : {});
 

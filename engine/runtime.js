@@ -730,7 +730,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    for (i=0, decl; decl = decls[i]; i++) {
+    for (i=0; decl = decls[i]; i++) {
       if (decl.type === 'FunctionDeclaration') {
         env.InitializeBinding(decl.id.name, InstantiateFunctionDeclaration(decl, env));
       }
@@ -894,9 +894,8 @@ var runtime = (function(GLOBAL, exports, undefined){
           return status;
         }
       }
-    }
-
-    return object;
+      return object;
+    };
   }
 
 
@@ -1996,7 +1995,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         return ThrowException('cannot_convert_to_primitive', []);
-      },
+      }
       // function Keys(){
 
       // },
@@ -2333,7 +2332,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       ExecutionContext: null,
       Scope: null,
       Handler: null,
-      State: null,
+      State: null
     }, [
       function Send(value){
         if (this.State === EXECUTING) {
@@ -2416,7 +2415,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Date, $Object, {
-      BuiltinBrand: BRANDS.BuiltinDate,
+      BuiltinBrand: BRANDS.BuiltinDate
     });
 
     return $Date;
@@ -2502,7 +2501,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
-      PrimitiveValue: undefined,
+      PrimitiveValue: undefined
     });
 
     return $Number;
@@ -2521,7 +2520,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
-      PrimitiveValue: undefined,
+      PrimitiveValue: undefined
     });
 
     return $Boolean;
@@ -2574,7 +2573,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($WeakMap, $Object, {
-      BuiltinBrand: BRANDS.BuiltinWeakMap,
+      BuiltinBrand: BRANDS.BuiltinWeakMap
     });
 
     return $WeakMap;
@@ -2730,7 +2729,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($RegExp, $Object, {
       BuiltinBrand: BRANDS.BuiltinRegExp,
-      Match: null,
+      Match: null
     });
 
     return $RegExp;
@@ -2812,7 +2811,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function IsSealed(){
         return true;
-      },
+      }
     ]);
 
     return $Symbol;
@@ -2831,7 +2830,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Arguments, $Object, {
       BuiltinBrand: BRANDS.BuiltinArguments,
-      ParameterMap: null,
+      ParameterMap: null
     });
 
     return $Arguments;
@@ -2878,7 +2877,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($MappedArguments, $Arguments, {
-      ParameterMap: null,
+      ParameterMap: null
     }, [
       function Get(key){
         if (this.isMapped && this.ParameterMap.has(key)) {
@@ -3672,7 +3671,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($NativeFunction, $Function, {
-      Builtin: true,
+      Builtin: true
     }, [
       function Call(receiver, args){
         var result = this.call.apply(receiver, [].concat(args));
@@ -3911,7 +3910,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           options = {
             call: options,
             name: options.name,
-            length: options.length,
+            length: options.length
           }
         }
 
@@ -4308,14 +4307,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         BoundFunctionCreate: function(func, receiver, args){
           return new $BoundFunction(func, receiver, toInternalArray(args));
         },
-        BooleanCreate: function(boolean){
-          return new $Boolean(boolean);
+        BooleanCreate: function(v){
+          return new $Boolean(v);
         },
         DateCreate: function(args){
           return new $Date(applyNew(Date, toInternalArray(args)));
         },
-        NumberCreate: function(number){
-          return new $Number(number);
+        NumberCreate: function(v){
+          return new $Number(v);
         },
         ObjectCreate: function(proto){
           return new $Object(proto);
@@ -4337,8 +4336,8 @@ var runtime = (function(GLOBAL, exports, undefined){
         SymbolCreate: function(name, isPublic){
           return new $Symbol(name, isPublic);
         },
-        StringCreate: function(string){
-          return new $String(string);
+        StringCreate: function(v){
+          return new $String(v);
         },
         TypedArrayCreate: function(type, buffer, byteLength, byteOffset){
           return new $TypedArray(type, buffer, byteLength, byteOffset);
@@ -4402,26 +4401,26 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         },
 
-        CodeUnit: function(char){
-          return char.charCodeAt(0);
+        CodeUnit: function(v){
+          return v.charCodeAt(0);
         },
-        StringReplace: function(string, search, replace){
+        StringReplace: function(str, search, replace){
           if (typeof search !== 'string') {
             search = search.PrimitiveValue;
           }
-          return string.replace(search, replace);
+          return str.replace(search, replace);
         },
-        StringSplit: function(string, separator, limit){
+        StringSplit: function(str, separator, limit){
           if (typeof separator !== 'string') {
             separator = separator.PrimitiveValue;
           }
-          return fromInternalArray(string.split(separator, limit));
+          return fromInternalArray(str.split(separator, limit));
         },
-        StringSearch: function(regexp){
-          return string.search(regexp);
+        StringSearch: function(str, regexp){
+          return str.search(regexp);
         },
-        StringSlice: function(string, start, end){
-          return end === undefined ? string.slice(start) : string.slice(start, end);
+        StringSlice: function(str, start, end){
+          return end === undefined ? str.slice(start) : str.slice(start, end);
         },
         FromCharCode: String.fromCharCode,
         StringTrim: String.prototype.trim
