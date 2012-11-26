@@ -1,5 +1,5 @@
 var utility = require('continuum').utility,
-    iterate = utility.iterate,
+    each = utility.each,
     map = utility.map,
     ownKeys = utility.keys,
     Hash = utility.Hash,
@@ -12,8 +12,8 @@ var utility = require('continuum').utility,
 
 var json = {};
 
-iterate(['dom4', 'html5', 'typedarray'], function(name){
-  iterate(require('./'+name), function(value, key){
+each(['typedarray'], function(name){
+  each(require('./'+name), function(value, key){
     json[key] = value;
   });
 });
@@ -240,7 +240,7 @@ function method(name, json, construct){
   var body = new ASTArray;
   var args = construct ? [IDENT(construct)] : [WRAPPED, name];
 
-  iterate(params, function(param){
+  each(params, function(param){
     var type = json.args[param];
     if (ordered[type] && ordered[type].type === 'dictionary') {
       args.push($('#new', $(type), [IDENT(param)]));
@@ -267,7 +267,7 @@ var types = {
   //callback: function(name, json){},
   enum: function(name, json){
     var values = $('#object');
-    iterate(json.values, function(item, i){
+    each(json.values, function(item, i){
       values.set(item, item);
     });
     var decl = $('#var', 'const');
@@ -290,16 +290,16 @@ var types = {
       body.append(method('constructor', json.construct, name));
     }
 
-    iterate(json.properties, function(item, key){
+    each(json.properties, function(item, key){
       body.append(GETTER(key, item));
       body.append(SETTER(key, item));
     });
 
-    iterate(json.readonly, function(item, key){
+    each(json.readonly, function(item, key){
       body.append(GETTER(key, item));
     });
 
-    iterate(json.methods, function(item, key){
+    each(json.methods, function(item, key){
       body.append(method(key, item));
     });
 
@@ -318,7 +318,7 @@ var types = {
       body.append($('super').call(DICT));
     }
 
-    iterate(json.defaults, function(item, key){
+    each(json.defaults, function(item, key){
       var init = TERNARY(IN(VALUE(key), DICT), DICT.get(key), VALUE(item));
       body.append(THIS.set(key, init));
     });
@@ -332,7 +332,7 @@ function orderDependencies(items){
   var out = new Hash,
       remaining = [];
 
-  iterate(items, function(item, key){
+  each(items, function(item, key){
     item.name = key;
     if (!item.inherits || !item.inherits.length || item.inherits[0] in out) {
       out[key] = item;
@@ -361,7 +361,7 @@ var out = $('#module', 'DOM', []);
 
 var ordered = orderDependencies(json);
 
-iterate(ordered, function(item, name){
+each(ordered, function(item, name){
   if (item.type in types) {
     out.append(types[item.type](name, item));
     if (item.constants) {
