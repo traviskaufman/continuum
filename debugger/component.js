@@ -322,6 +322,38 @@ var Component = (function(){
         this.element[textContent] = value;
         return this;
       }
+    },
+    function on(event, listener, receiver){
+      var bound = subscribe(this.element, event, listener, receiver || this);
+      define(listener, 'bound', bound);
+      return this;
+    },
+    function off(event, listener){
+      unsubscribe(this.element, event, listener.bound);
+      delete listener.bound;
+      return this;
+    },
+    function once(event, listener, receiver){
+      function one(e){
+        this.off(event, one);
+        return listener.call(receiver, e);
+      }
+      this.on(event, one, this);
+      return this;
+    },
+    function emit(event, data){
+      if (typeof event === 'string') {
+        var opts = data && data.bubbles === false ? noBubbleEventOptions : eventOptions;
+        event = new Event(event, opts);
+      }
+
+      if (data) {
+        for (var k in data) {
+          event[k] = data[k];
+        }
+      }
+
+      return publish(this.element, event);
     }
   ]);
 
@@ -390,58 +422,27 @@ var Component = (function(){
     }();
   }
 
+  var subscribe, unsubscribe, publish;
 
   if ('dispatchEvent' in document.body) {
-    define(Component.prototype, [
-      function on(event, listener, receiver){
-        if (typeof listener !== 'function') {
-          for (var k in listener) {
-            this.on(k, listener[k], receiver)
-          }
-          return this;
-        }
-
-        receiver || (receiver = this);
-
+    void function(){
+      subscribe = function(element, event, listener, receiver){
         function bound(e){
           return listener.call(receiver, e);
         }
 
-        define(listener, bound);
-        this.element.addEventListener(event, bound, false);
-        return this;
-      },
-      function off(event, listener){
-        this.element.removeEventListener(event, listener.bound, false);
-        delete listener.bound;
-        return this;
-      },
-      function once(event, listener, receiver){
-        receiver = receiver || this;
+        element.addEventListener(event, bound, false);
+        return bound;
+      };
 
-        function bound(e){
-          this.removeEventListener(event, bound, false);
-          return listener.call(receiver, e);
-        }
+      unsubscribe = function(element, event, bound){
+        element.removeEventListener(event, bound, false);
+      };
 
-        this.element.addEventListener(event, bound, false);
-        return this;
-      },
-      function emit(event, data){
-        if (typeof event === 'string') {
-          var opts = data && data.bubbles === false ? noBubbleEventOptions : eventOptions;
-          event = new Event(event, opts);
-        }
-        if (data) {
-          for (var k in data) {
-            if (k !== 'bubbles') {
-              event[k] = data[k];
-            }
-          }
-        }
-        return this.element.dispatchEvent(event);
-      }
-    ]);
+      publish = function(element, event){
+        return element.dispatchEvent(event);
+      };
+    }();
   } else {
     void function(){
       var realEvents = new Hash;
@@ -457,72 +458,42 @@ var Component = (function(){
         'scroll', 'selectstart'
       ], function(name){ realEvents[name] = true });
 
-      define(Component.prototype, [
-        function on(event, listener, receiver){
-          if (typeof listener !== 'function') {
-            for (var k in listener) {
-              this.on(k, listener[k], receiver)
-            }
-            return this;
-          }
 
-          receiver || (receiver = this);
+      subscribe = function(element, event, listener, receiver){
+        var real = event in realEvents;
 
-          var real = event in realEvents;
-
-          if (real) {
-            var bound = function(e){
-              return listener.call(receiver, e);
-            };
-          } else {
-            var bound = function(e){
-              e = e.srcElement.customEvent;
-              if (e && !e.expired && e.type === event) {
-                return listener.call(receiver, e);
-              }
-            };
-          }
-
-          define(listener, 'bound', bound);
-          event = real ? event : 'propertychange';
-          this.element.attachEvent('on'+event, bound);
-          return this;
-        },
-        function off(event, listener){
-          event = event in realEvents ? event : 'propertychange';
-          this.element.detachEvent('on'+event, listener.bound);
-          delete listener.bound;
-          return this;
-        },
-        function once(event, listener, receiver){
-          function one(e){
-            this.off(event, one);
+        if (real) {
+          var bound = function(e){
             return listener.call(receiver, e);
-          }
-          this.on(event, one, this);
-          return this;
-        },
-        function emit(event, data){
-          if (typeof event === 'string') {
-            var opts = data && data.bubbles === false ? noBubbleEventOptions : eventOptions;
-            event = new Event(event, opts);
-          }
-
-          if (data) {
-            for (var k in data) {
-              event[k] = data[k];
+          };
+        } else {
+          var bound = function(e){
+            e = e.srcElement.customEvent;
+            if (e && !e.expired && e.type === event) {
+              return listener.call(receiver, e);
             }
-          }
-
-          if (event in realEvents) {
-            return this.element.fireEvent(event);
-          } else {
-            this.element.customEvent = event;
-            event.expired = true;
-            return event.returnValue === undefined ? true : event.returnValue;
-          }
+          };
         }
-      ]);
+
+        event = real ? event : 'propertychange';
+        element.attachEvent('on'+event, bound);
+        return bound;
+      }
+
+      unsubscribe = function(element, event, bound){
+        event = event in realEvents ? event : 'propertychange';
+        element.detachEvent('on'+event, bound);
+      }
+
+      publish = function(element, event){
+        if (event.type in realEvents) {
+          return element.fireEvent(event);
+        } else {
+          element.customEvent = event;
+          event.expired = true;
+          return event.returnValue === undefined ? true : event.returnValue;
+        }
+      }
     }();
   }
 

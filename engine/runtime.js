@@ -1664,40 +1664,46 @@ var runtime = (function(GLOBAL, exports, undefined){
       BuiltinBrand: BRANDS.BuiltinObject
     });
 
-    define($Object.prototype, [
-      function has(key){
-        return this.properties.has(key);
-      },
-      function remove(key){
-        return this.properties.remove(key);
-      },
-      function describe(key){
-        return this.properties.getProperty(key);
-      },
-      (function(){
-        return function define(key, value, attrs){
-          return this.properties.set(key, value, attrs);
-        };
-      })(),
-      function get(key){
-        return this.properties.get(key);
-      },
-      function set(key, value){
-        if (this.properties.has(key)) {
-          this.properties.set(key, value);
-        } else {
-          this.properties.set(key, value, ECW);
+    void function(){
+      define($Object.prototype, [
+        function has(key){
+          return this.properties.has(key);
+        },
+        function remove(key){
+          return this.properties.remove(key);
+        },
+        function describe(key){
+          return this.properties.getProperty(key);
+        },
+        (function(){
+          return function define(key, value, attrs){
+            return this.properties.set(key, value, attrs);
+          };
+        })(),
+        function get(key){
+          return this.properties.get(key);
+        },
+        function set(key, value){
+          if (this.properties.has(key)) {
+            this.properties.set(key, value);
+          } else {
+            this.properties.set(key, value, ECW);
+          }
+        },
+        function query(key){
+          return this.properties.getAttribute(key);
+        },
+        function update(key, attr){
+          this.properties.setAttribute(key, attr);
+        },
+        function each(callback){
+          this.properties.forEach(callback, this);
         }
-      },
-      function query(key){
-        return this.properties.getAttribute(key);
-      },
-      function update(key, attr){
-        this.properties.setAttribute(key, attr);
-      },
-      function each(callback){
-        this.properties.forEach(callback, this);
-      },
+      ]);
+    }();
+
+
+    define($Object.prototype, [
       function GetInheritance(){
         return this.Prototype;
       },
@@ -3489,13 +3495,15 @@ var runtime = (function(GLOBAL, exports, undefined){
               return $Object.prototype.set.call(this, key, value);
             }
           },
-          function define(key, value, attr){
-            if (hasIndex(key, this.Length)) {
-              this.data[+key] = value;
-            } else {
-              return $Object.prototype.define.call(this, key, value, attr);
-            }
-          }
+          (function(){
+            return function define(key, value, attr){
+              if (hasIndex(key, this.Length)) {
+                this.data[+key] = value;
+              } else {
+                return $Object.prototype.define.call(this, key, value, attr);
+              }
+            };
+          })()
         ]);
       }();
     } else {
@@ -3534,13 +3542,15 @@ var runtime = (function(GLOBAL, exports, undefined){
               return $Object.prototype.set.call(this, key, value);
             }
           },
-          function define(key, value, attr){
-            if (hasIndex(key, this.Length)) {
-              this.data.set(key * this.bytesPer, value);
-            } else {
-              return $Object.prototype.define.call(this, key, value, attr);
-            }
-          }
+          (function(){
+            return function define(key, value, attr){
+              if (hasIndex(key, this.Length)) {
+                this.data.set(key * this.bytesPer, value);
+              } else {
+                return $Object.prototype.define.call(this, key, value, attr);
+              }
+            };
+          })()
         ]);
       }();
     }

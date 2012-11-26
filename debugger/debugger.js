@@ -82,6 +82,10 @@ function inspect(o){
   return tree;
 }
 
+inspector.on('dblclick', function(e){
+  e.preventDefault();
+});
+
 input.on('entry', function(evt){
   realm.evaluateAsync(evt.value);
 });
