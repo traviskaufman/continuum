@@ -12,7 +12,7 @@ var utility = require('continuum').utility,
 
 var json = {};
 
-each(['typedarray'], function(name){
+each(['dom4', 'html5'], function(name){
   each(require('./'+name), function(value, key){
     json[key] = value;
   });
@@ -371,3 +371,196 @@ each(ordered, function(item, name){
 });
 
 console.log(out.toSource());
+
+
+
+/*
+module DOM {
+  export class MutationObserver {
+    constructor(callback) {
+      this.@wrapped = CONSTRUCT(MutationObserver, CALLBACK(callback));
+    }
+    observe(target, options) {
+      CALL(this.@wrapped, 'observe', UNWRAP(target), new MutationObserverInit(options));
+    }
+    disconnect() {
+      CALL(this.@wrapped, 'disconnect');
+    }
+    takeRecords() {
+      return WRAP(CALL(this.@wrapped, 'takeRecords'));
+    }
+  }
+  class MutationObserverInit {
+    constructor(dict) {
+      dict = dict || EMPTY;
+      this.childList = 'childList' in dict ? dict.childList : false;
+      this.attributes = 'attributes' in dict ? dict.attributes : false;
+      this.characterData = 'characterData' in dict ? dict.characterData : false;
+      this.subtree = 'subtree' in dict ? dict.subtree : false;
+      this.attributeOldValue = 'attributeOldValue' in dict ? dict.attributeOldValue : false;
+      this.characterDataOldValue = 'characterDataOldValue' in dict ? dict.characterDataOldValue : false;
+      this.attributeFilter = 'attributeFilter' in dict ? dict.attributeFilter : {};
+    }
+  }
+  export class MutationRecord {
+    get type() {
+      return GET(this.@wrapped, 'type');
+    }
+    get target() {
+      return WRAP(GET(this.@wrapped, 'target'));
+    }
+    get addedNodes() {
+      return WRAP(GET(this.@wrapped, 'addedNodes'));
+    }
+    get removedNodes() {
+      return WRAP(GET(this.@wrapped, 'removedNodes'));
+    }
+    get previousSibling() {
+      return WRAP(GET(this.@wrapped, 'previousSibling'));
+    }
+    get nextSibling() {
+      return WRAP(GET(this.@wrapped, 'nextSibling'));
+    }
+    get attributeName() {
+      return GET(this.@wrapped, 'attributeName');
+    }
+    get attributeNamespace() {
+      return GET(this.@wrapped, 'attributeNamespace');
+    }
+    get oldValue() {
+      return GET(this.@wrapped, 'oldValue');
+    }
+  }
+  export class Node extends EventTarget {
+    get nodeValue() {
+      return GET(this.@wrapped, 'nodeValue');
+    }
+    set nodeValue(v) {
+      SET(this.@wrapped, 'nodeValue', '' + v);
+    }
+    get textContent() {
+      return GET(this.@wrapped, 'textContent');
+    }
+    set textContent(v) {
+      SET(this.@wrapped, 'textContent', '' + v);
+    }
+    get nodeType() {
+      return GET(this.@wrapped, 'nodeType');
+    }
+    get nodeName() {
+      return GET(this.@wrapped, 'nodeName');
+    }
+    get baseURI() {
+      return GET(this.@wrapped, 'baseURI');
+    }
+    get ownerDocument() {
+      return WRAP(GET(this.@wrapped, 'ownerDocument'));
+    }
+    get parentNode() {
+      return WRAP(GET(this.@wrapped, 'parentNode'));
+    }
+    get parentElement() {
+      return WRAP(GET(this.@wrapped, 'parentElement'));
+    }
+    get childNodes() {
+      return WRAP(GET(this.@wrapped, 'childNodes'));
+    }
+    get firstChild() {
+      return WRAP(GET(this.@wrapped, 'firstChild'));
+    }
+    get lastChild() {
+      return WRAP(GET(this.@wrapped, 'lastChild'));
+    }
+    get previousSibling() {
+      return WRAP(GET(this.@wrapped, 'previousSibling'));
+    }
+    get nextSibling() {
+      return WRAP(GET(this.@wrapped, 'nextSibling'));
+    }
+    hasChildNodes() {
+      return CALL(this.@wrapped, 'hasChildNodes');
+    }
+    insertBefore(node, child) {
+      return WRAP(CALL(this.@wrapped, 'insertBefore', UNWRAP(node), UNWRAP(child)));
+    }
+    appendChild(node) {
+      return WRAP(CALL(this.@wrapped, 'appendChild', UNWRAP(node)));
+    }
+    replaceChild(node, child) {
+      return WRAP(CALL(this.@wrapped, 'replaceChild', UNWRAP(node), UNWRAP(child)));
+    }
+    removeChild(child) {
+      return WRAP(CALL(this.@wrapped, 'removeChild', UNWRAP(child)));
+    }
+    normalize() {
+      CALL(this.@wrapped, 'normalize');
+    }
+    cloneNode(deep) {
+      return WRAP(CALL(this.@wrapped, 'cloneNode', !!deep));
+    }
+    isEqualNode(node) {
+      return CALL(this.@wrapped, 'isEqualNode', UNWRAP(node));
+    }
+    compareDocumentPosition(other) {
+      return CALL(this.@wrapped, 'compareDocumentPosition', UNWRAP(other));
+    }
+    contains(other) {
+      return CALL(this.@wrapped, 'contains', UNWRAP(other));
+    }
+    lookupPrefix(namespace) {
+      return CALL(this.@wrapped, 'lookupPrefix', '' + namespace);
+    }
+    lookupNamespaceURI(prefix) {
+      return CALL(this.@wrapped, 'lookupNamespaceURI', '' + prefix);
+    }
+    isDefaultNamespace(namespace) {
+      return CALL(this.@wrapped, 'isDefaultNamespace', '' + namespace);
+    }
+  }
+  constants(Node, {
+    ELEMENT_NODE: 1,
+    ATTRIBUTE_NODE: 2,
+    TEXT_NODE: 3,
+    CDATA_SECTION_NODE: 4,
+    ENTITY_REFERENCE_NODE: 5,
+    ENTITY_NODE: 6,
+    PROCESSING_INSTRUCTION_NODE: 7,
+    COMMENT_NODE: 8,
+    DOCUMENT_NODE: 9,
+    DOCUMENT_TYPE_NODE: 10,
+    DOCUMENT_FRAGMENT_NODE: 11,
+    NOTATION_NODE: 12,
+    DOCUMENT_POSITION_DISCONNECTED: 1,
+    DOCUMENT_POSITION_PRECEDING: 2,
+    DOCUMENT_POSITION_FOLLOWING: 4,
+    DOCUMENT_POSITION_CONTAINS: 8,
+    DOCUMENT_POSITION_CONTAINED_BY: 16,
+    DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC: 32
+  });
+  export class NodeIterator {
+    get root() {
+      return WRAP(GET(this.@wrapped, 'root'));
+    }
+    get referenceNode() {
+      return WRAP(GET(this.@wrapped, 'referenceNode'));
+    }
+    get pointerBeforeReferenceNode() {
+      return GET(this.@wrapped, 'pointerBeforeReferenceNode');
+    }
+    get whatToShow() {
+      return GET(this.@wrapped, 'whatToShow');
+    }
+    get filter() {
+      return WRAP(GET(this.@wrapped, 'filter'));
+    }
+    nextNode() {
+      return WRAP(CALL(this.@wrapped, 'nextNode'));
+    }
+    previousNode() {
+      return WRAP(CALL(this.@wrapped, 'previousNode'));
+    }
+    detach() {
+      CALL(this.@wrapped, 'detach');
+    }
+  }
+*/
