@@ -104,24 +104,67 @@ var utility = require('../lib/objects').assignAll({}, [
 
 var define = utility.define,
     inherit = utility.inherit,
+    create = utility.create,
     each = utility.each;
 
-function FixedStructure(data){
-  this.data = data;
-  this.offset = data.position;
-  data.position += this.bytes;
+
+
+function Reference(base, name){
+  this.base = base;
+  this.name = name;
 }
+
+define(Reference.prototype, [
+  function isResolved(){
+    return this.name in this.base;
+  },
+  function get(){
+    return this.base[this.name];
+  },
+  function set(value){
+    this.base[this.name] = value;
+  },
+  function valueOf(){
+    return this.base[this.name];
+  },
+  function toString(){
+    return ''+this.base[this.name];
+  }
+]);
 
 function Type(){}
 
 
-var types = Object.create(null);
+var types = create(null),
+    definitions = create(null);
+
+
+function getType(name){
+  if (name in types) {
+    return types[name];
+  } else if (name in definitions) {
+    var def = definitions[name];
+    if (def.kind in kinds) {
+      return types[name] = kinds[def.kind](def);
+    } else {
+      throw new TypeError('Unknown kind "'+def.kind+'"');
+    }
+  } else {
+    throw new TypeError('Unknown type "'+name+'"');
+  }
+}
+
+function register(types){
+  each(types, function(def){
+    definitions[def.id] = def;
+  });
+}
 
 function NumericType(name, bytes){
   var getter = 'get'+name,
       setter = 'set'+name;
 
-  var Numeric = function(data, offset, value){
+  var NumericT = function(data, offset, value){
     this.data = data;
     if (value !== undefined) {
       this.offset = offset;
@@ -132,7 +175,7 @@ function NumericType(name, bytes){
     data.position = this.offset + bytes;
   };
 
-  define(Numeric, [
+  define(NumericT, [
     function get(data, offset){
       return data[getter](offset, true);
     },
@@ -141,10 +184,10 @@ function NumericType(name, bytes){
     }
   ]);
 
-  Numeric.prototype = this;
+  NumericT.prototype = this;
 
   define(this, {
-    constructor: Numeric,
+    constructor: NumericT,
     bytes: bytes
   });
   define(this, [
@@ -156,23 +199,14 @@ function NumericType(name, bytes){
     }
   ]);
 
-  return types[name] = Numeric;
+  return types[name] = NumericT;
 }
 
 inherit(NumericType, Type);
 
-var int8    = new NumericType('Int8', 1),
-    uint8   = new NumericType('Uint8', 1),
-    int16   = new NumericType('Int16', 2),
-    uint16  = new NumericType('Uint16', 2),
-    int32   = new NumericType('Int32', 4),
-    uint32  = new NumericType('Uint32', 4),
-    float32 = new NumericType('Float32', 4),
-    float64 = new NumericType('Float64', 8);
-
 
 function StructType(name, fields){
-  var Struct = function(data, offset, value){
+  var StructT = function(data, offset, value){
     define(this, 'data', data);
     this.offset = offset == null ? data.position || 0 : offset;
     data.position = this.offset + this.bytes;
@@ -181,46 +215,43 @@ function StructType(name, fields){
     }
   };
 
-  define(Struct, [
+  define(StructT, [
     function get(data, offset){
-      return new Struct(data, offset).get();
+      return new StructT(data, offset).get();
     },
     function set(data, offset, value){
-      new Struct(data, offset, value);
+      new StructT(data, offset, value);
     }
   ]);
 
-  Struct.prototype = this;
-
+  StructT.prototype = this;
 
   var currentOffset = 0,
       names = [],
       getters = [],
       setters = [];
 
-  each(fields, function(field, name){
-    var cased = name[0].toUpperCase()+name.slice(1),
-        type = typeof field === 'string' ? types[field] : field,
+  each(fields, function(field){
+    var cased = field.name[0].toUpperCase() + field.name.slice(1),
+        Type = getType(field.type),
         offset = currentOffset;
 
-    currentOffset += type.prototype.bytes;
-    names.push(name);
+    currentOffset += Type.prototype.bytes;
+    names.push(field.name);
     getters.push('get'+cased);
     setters.push('set'+cased);
 
-    Struct.prototype['get'+cased] = function(){
-      return type.get(this.data, this.offset + offset);
+    StructT.prototype['get'+cased] = function(){
+      return Type.get(this.data, this.offset + offset);
     };
 
-    Struct.prototype['set'+cased] = function(value){
-      return type.set(this.data, this.offset + offset, value);
+    StructT.prototype['set'+cased] = function(value){
+      return Type.set(this.data, this.offset + offset, value);
     };
   });
 
-
-
   define(this, {
-    constructor: Struct,
+    constructor: StructT,
     bytes: currentOffset
   });
 
@@ -241,24 +272,209 @@ function StructType(name, fields){
     }
   ]);
 
-  return types[name] = Struct;
+  return types[name] = StructT;
 }
 
-var Location = new StructType('Location', {
-  line: Uint32,
-  column: Uint32
-});
+function ArrayType(name, Type, length){
+  Type = getType(Type);
+  var bytes = Type.prototype.bytes;
 
-var Range = new StructType('Range', {
-  start: Location,
-  end: Location
-});
+  var ArrayT = function(data, offset, value){
+    define(this, 'data', data);
+    this.offset = offset == null ? data.position || 0 : offset;
+    data.position = this.offset + this.bytes;
+    if (value !== undefined) {
+      this.set(value);
+    }
+  };
+
+  define(ArrayT, [
+    function get(data, offset){
+      return new ArrayT(data, offset).get();
+    },
+    function set(data, offset, value){
+      new ArrayT(data, offset, value);
+    }
+  ]);
+
+  ArrayT.prototype = this;
+
+  define(this, {
+    constructor: ArrayT,
+    bytes: bytes * length,
+  });
+
+  define(this, [
+    function getIndex(index){
+      return Type.get(this.data, this.offset + index * bytes);
+    },
+    function setIndex(index, value){
+      return Type.set(this.data, this.offset + index * bytes, value);
+    },
+    function get(){
+      var out = [];
+      for (var i=0; i < length; i++) {
+        out[i] = this.getIndex(i);
+      }
+      return out;
+    },
+    function set(value){
+      for (var i=0; i < value.length; i++) {
+        if (i in value) {
+          this.setIndex(i, value[i]);
+        }
+      }
+    }
+  ]);
+
+  return ArrayT;
+}
+
+function BitfieldType(name, fields, Type){
+  Type = getType(Type);
+  var bytes = Type.prototype.bytes;
+
+  var BitfieldT = function(data, offset, value){
+    define(this, 'data', data);
+    this.offset = offset == null ? data.position || 0 : offset;
+    data.position = this.offset + bytes;
+    if (value !== undefined) {
+      this.set(value);
+    }
+  };
+
+  define(BitfieldT, [
+    function get(data, offset){
+      return new BitfieldT(data, offset).get();
+    },
+    function set(data, offset, value){
+      new BitfieldT(data, offset, value);
+    }
+  ]);
+
+  BitfieldT.prototype = this;
+
+  var names = create(null),
+      flags = [];
+
+  each(fields, function(field){
+    var cased = field.name[0].toUpperCase() + field.name.slice(1),
+        flag = field.value;
+
+    names[field.name] = flag;
+
+    BitfieldT.prototype['get'+cased] = function(){
+      return (Type.get(this.data, this.offset) & flag) > 0;
+    };
+
+    BitfieldT.prototype['set'+cased] = function(value){
+      var val = Type.get(this.data, this.offset);
+      Type.set(this.data, this.offset, value ? val | flag : val & ~flag);
+    };
+  });
+
+  define(this, {
+    constructor: BitfieldT,
+    bytes: bytes
+  });
+
+  define(this, [
+    function get(){
+      var out = {},
+          value = Type.get(this.data, this.offset);
+
+      for (var k in names) {
+        out[k] = (value & names[k]) > 0
+      }
+      return out;
+    },
+    function set(value){
+      if (typeof value === 'number') {
+        var val = value;
+      } else {
+        var val = 0;
+        for (var k in names) {
+          if (k in value) {
+            value[k] ? (val |= names[k]) : (val &= ~names[k]);
+          }
+        }
+      }
+      Type.set(this.data, this.offset, val);
+    }
+  ]);
+
+  return BitfieldT;
+}
+
+var kinds = {
+  number: function(def){
+    return new NumericType(def.id[0].toUpperCase() + def.id.slice(1), def.bytes);
+  },
+  struct: function(def){
+    return new StructType(def.id, def.properties);
+  },
+  array: function(def){
+    return new ArrayType(def.id, def.elementType, def.length);
+  },
+  bitfield: function(def){
+    return new BitfieldType(def.id, def.fields, def.type)
+  }
+};
 
 
-var types = [
+
+register([
+  {
+    id: 'int8',
+    kind: 'number',
+    description: 'signed 8 bit integer',
+    bytes: 1
+  },
+  {
+    id: 'uint8',
+    kind: 'number',
+    description: 'unsigned 8 bit integer',
+    bytes: 1
+  },
+  {
+    id: 'int16',
+    kind: 'number',
+    description: 'signed 16 bit integer',
+    bytes: 2
+  },
+  {
+    id: 'uint16',
+    kind: 'number',
+    description: 'unsigned 16 bit integer',
+    bytes: 2
+  },
+  {
+    id: 'int32',
+    kind: 'number',
+    description: 'signed 32 bit integer',
+    bytes: 4
+  },
+  {
+    id: 'uint32',
+    kind: 'number',
+    description: 'unsigned 32 bit integer',
+    bytes: 4
+  },
+  {
+    id: 'float32',
+    kind: 'number',
+    description: '32 bit ieee754 float',
+    bytes: 4
+  },
+  {
+    id: 'float64',
+    kind: 'number',
+    description: '64 bit ieee754 double',
+    bytes: 8
+  },
   {
     id: 'SourceLocation',
-    type: 'struct',
+    kind: 'struct',
     description: 'A specific position in sourcecode.',
     properties: [
       { name: 'line', type: 'uint32' },
@@ -267,23 +483,57 @@ var types = [
   },
   {
     id: 'SourceRange',
-    type: 'struct',
+    kind: 'struct',
     description: 'A specific section of sourcecode.',
     properties: [
       { name: 'start', type: 'SourceLocation' },
       { name: 'end', type: 'SourceLocation' }
     ]
   },
-}
-
+  {
+    id: 'Descriptor',
+    kind: 'bitfield',
+    type: 'uint8',
+    fields: [
+      { name: 'enumerable', value: 1 },
+      { name: 'configurable', value: 2 },
+      { name: 'writable', value: 4 },
+      { name: 'accessor', value: 8 },
+    ]
+  },
+  {
+    id: 'CodeFlags',
+    kind: 'bitfield',
+    fields: [
+      { name: 'topLevel', value: 0x01 },
+      { name: 'strict', value: 0x02 },
+      { name: 'usesSuper', value: 0x04 },
+      { }
+    ]
+  },
+  {
+    id: 'Code',
+    kind: 'struct',
+    properties: [
+      { name: 'flags', type: 'CodeFlags' },
+      { name: 'loc', type: 'SourceRange' }
+    ]
+  }
+]);
 
 
 var data = new DataView(new ArrayBuffer(16));
 var buff = new Uint32Array(data.buffer);
 
-var x = new Range(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
-
+//var x = new (getType('SourceRange'))(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
+var Descriptor = getType('Descriptor');
+var z = new Descriptor(data, 0, { enumerable: true, configurable: true, accessor: true });
 console.log(buff);
+
+
+// var x = new Range(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
+
+// console.log(buff);
 
 
 /*
