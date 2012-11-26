@@ -4,7 +4,6 @@ var Component  = continuum.Component,
     utility    = continuum.utility,
     inherit    = utility.inherit,
     each       = utility.each,
-    iterate    = utility.iterate,
     inline     = continuum.inline,
     block      = continuum.block,
     introspect = continuum.introspect,
@@ -219,7 +218,7 @@ var Tree = (function(){
     },
     function refresh(){
       if (this.children) {
-        iterate(this.children, function(child){
+        each(this.children, function(child){
           child.refresh();
         });
       }
