@@ -24,7 +24,8 @@ export function Map(iterable){
 
 
 $__setupConstructor(Map, $__MapProto);
-{
+
+
 $__defineProps(Map.prototype, {
   clear(){
     ensureMap(this, 'clear');
@@ -69,65 +70,54 @@ $__set(Map.prototype.delete, 'name', 'delete');
 $__DefineOwnProperty(Map.prototype, 'size', {
   configurable: true,
   enumerable: false,
-  get: function(){
-    if (this === $__MapProto) {
-      return 0;
-    }
-    return $__MapSize(this);
+  get(){
+    return this === $__MapProto ? 0 : $__MapSize(this);
   },
   set: void 0
 });
 
-let MAP = 'Map',
-    KEY  = 'MapNextKey',
-    KIND  = 'MapIterationKind';
-
-let K = 0x01,
-    V = 0x02;
-
-let kinds = {
-  'key': 1,
-  'value': 2,
-  'key+value': 3
-};
 
 class MapIterator extends Iterator {
+  private @data, @key, @kind;
+
   constructor(map, kind){
-    map = $__ToObject(map);
-    $__SetInternal(this, MAP, map);
-    $__SetInternal(this, KEY,  $__MapSigil());
-    $__SetInternal(this, KIND, kinds[kind]);
+    this.@data = $__ToObject(map);
+    this.@key = $__MapSigil();
+    this.@kind = kind;
   }
 
   next(){
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
-    if (!$__HasInternal(this, MAP) || !$__HasInternal(this, KEY) || !$__HasInternal(this, KIND)) {
+    if (!($__has(this, @data) && $__has(this, @key) && $__has(this, @kind))) {
       throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
 
-    var map = $__GetInternal(this, MAP),
-        key = $__GetInternal(this, KEY),
-        kind = $__GetInternal(this, KIND);
+    var kind = this.@kind,
+        item = $__MapNext(this.@data, this.@key);
 
-    var item = $__MapNext(map, key);
-    $__SetInternal(this, KEY, item[0]);
+    if (!item) {
+      throw $__StopIteration;
+    }
 
-    if (kind & V) {
-      if (kind & K) {
-        return item;
-      }
+    this.@key = item[0];
+
+    if (kind === 'key+value') {
+      return item;
+    } else if (kind === 'key') {
+      return item[0];
+    } else {
       return item[1];
     }
-    return item[0];
   }
 }
 
+$__hideEverything(MapIterator);
 
 function ensureMap(o, name){
   if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {
     throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
   }
 }
-}
+

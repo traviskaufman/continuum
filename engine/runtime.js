@@ -358,6 +358,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   // ## Invoke
+  var emptyArgs = [];
+
   function Invoke(key, receiver, args){
     var obj = ToObject(receiver);
     if (obj && obj.Completion) {
@@ -372,7 +374,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (!IsCallable(func))
       return ThrowException('called_non_callable', key);
 
-    return func.Call(obj, args);
+    return func.Call(obj, args || emptyArgs);
   }
 
   // ## GetIdentifierReference
@@ -852,7 +854,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       }
 
-      var iterator = Invoke('iterator', iterable);
+      var iterator = Invoke(intrinsics.iterator, iterable);
 
       var adder = object.Get('set');
       if (adder && adder.Completion) {
@@ -1025,8 +1027,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (item && item.next !== this.guard) {
           this.lastLookup = item.next;
           return [item.next.key, item.next.value];
-        } else {
-          return ThrowStopIteration();
         }
       }
     ]);
@@ -2326,7 +2326,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.thunk = thunk;
 
       var self = this;
-      setFunction(this, 'iterator', function(){ return self });
+      setFunction(this, intrinsics.iterator, function(){ return self });
       setFunction(this, 'next',     function(){ return self.Send() });
       setFunction(this, 'close',    function(){ return self.Close() });
       setFunction(this, 'send',     function(v){ return self.Send(v) });
@@ -3517,27 +3517,27 @@ var runtime = (function(GLOBAL, exports, undefined){
           },
           function each(callback){
             for (var i=0; i < this.Length; i++) {
-              callback([i+'', this.data.get(i * this.bytesPer), 5]);
+              callback([i+'', this.data.get(i * this.bytesPer, true), 5]);
             }
             $Object.prototype.each.call(this, callback);
           },
           function get(key){
             if (hasIndex(key, this.Length)) {
-              return this.data.get(key * this.bytesPer);
+              return this.data.get(key * this.bytesPer, true);
             } else {
               return $Object.prototype.get.call(this, key);
             }
           },
           function describe(key){
             if (hasIndex(key, this.Length)) {
-              return [key, this.data.get(key * this.bytesPer), 5];
+              return [key, this.data.get(key * this.bytesPer, true), 5];
             } else {
               return $Object.prototype.describe.call(this, key);
             }
           },
           function set(key, value){
             if (hasIndex(key, this.Length)) {
-              this.data.set(key * this.bytesPer, value);
+              this.data.set(key * this.bytesPer, value, true);
             } else {
               return $Object.prototype.set.call(this, key, value);
             }
@@ -3545,7 +3545,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           (function(){
             return function define(key, value, attr){
               if (hasIndex(key, this.Length)) {
-                this.data.set(key * this.bytesPer, value);
+                this.data.set(key * this.bytesPer, value, true);
               } else {
                 return $Object.prototype.define.call(this, key, value, attr);
               }
