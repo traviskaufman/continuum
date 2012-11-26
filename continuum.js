@@ -5993,10 +5993,11 @@ exports.iteration = (function(exports){
   var objects   = require('./objects'),
       functions = require('./functions');
 
-  var define  = objects.define,
-      ownKeys = objects.keys,
-      call    = functions.call,
-      apply   = functions.apply;
+  var define   = objects.define,
+      ownKeys  = objects.keys,
+      isObject = objects.isObject,
+      call     = functions.call,
+      apply    = functions.apply;
 
 
   var StopIteration = exports.StopIteration = global.StopIteration || {};
@@ -6011,13 +6012,37 @@ exports.iteration = (function(exports){
 
   exports.Iterator = Iterator;
 
+  function Item(key, value){
+    this[0] = key;
+    this[1] = value;
+  }
+
+  exports.Item = Item;
+  define(Item.prototype, {
+    isItem: true,
+    length: 2
+  }, [
+    function toString(){
+      return this[0] + '';
+    },
+    function valueOf(){
+      return this[1];
+    }
+  ]);
+
+  function createItem(key, value){
+    return new Item(key, value);
+  }
+
+  exports.createItem = createItem;
+
 
   function iterate(o, callback, context){
     if (o == null) return;
     var type = typeof o;
     context = context || o;
     if (type === 'number' || type === 'boolean') {
-      callback.call(context, o, 0, o);
+      callback.call(context, new Item(0, o));
     } else {
       o = Object(o);
       var iterator = o.__iterator__ || o.iterator;
@@ -6025,7 +6050,6 @@ exports.iteration = (function(exports){
       if (typeof iterator === 'function') {
         var iter = iterator.call(o);
         if (iter && typeof iter.next === 'function') {
-          var i=0;
           try {
             while (1) callback.call(context, iter.next());
           } catch (e) {
@@ -6036,13 +6060,24 @@ exports.iteration = (function(exports){
       }
 
       if (type !== 'function' && o.length) {
-        for (var i=0; i < o.length; i++) {
-          callback.call(context, o[i], i, o);
+        try {
+          for (var i=0; i < o.length; i++) {
+            callback.call(context, new Item(i, o[i]));
+          }
+        } catch (e) {
+          if (e === StopIteration) return;
+          throw e;
         }
       } else {
         var keys = ownKeys(o);
-        for (var i=0; i < keys.length; i++) {
-          callback.call(context, o[keys[i]], keys[i], o);
+        try {
+          for (var i=0; i < keys.length; i++) {
+            var key = keys[i];
+            callback.call(context, new Item(key, o[key]));
+          }
+        } catch (e) {
+          if (e === StopIteration) return;
+          throw e;
         }
       }
     }
@@ -6050,19 +6085,70 @@ exports.iteration = (function(exports){
   exports.iterate = iterate;
 
 
-  function each(o, callback){
-    for (var i=0; i < o.length; i++) {
-      callback(o[i], i, o);
+  function each(o, callback, context){
+    if (!o) return;
+    if (context === undefined) {
+      if (typeof o === 'object' && 'length' in o) {
+        for (var i=0; i < o.length; i++) {
+          callback(o[i], i, o);
+        }
+      } else if (isObject(o)) {
+        var keys = ownKeys(o);
+        for (var i=0; i < keys.length; i++) {
+          var key = keys[i];
+          callback(o[key], key, o);
+        }
+      }
+    } else {
+      if (typeof o === 'object' && 'length' in o) {
+        for (var i=0; i < o.length; i++) {
+          callback.call(context, o[i], i, o);
+        }
+      } else if (isObject(o)) {
+        var keys = ownKeys(o);
+        for (var i=0; i < keys.length; i++) {
+          var key = keys[i];
+          callback.call(context, o[key], key, o);
+        }
+      }
     }
   }
   exports.each = each;
 
 
-  function map(o, callback){
-    var out = new Array(o.length);
-    for (var i=0; i < o.length; i++) {
-      out[i] = callback(o[i], i);
+  function map(o, callback, context){
+    if (context === undefined) {
+      if (typeof o === 'object' && 'length' in o) {
+        var out = new Array(o.length);
+
+        for (var i=0; i < o.length; i++) {
+          out[i] = callback(o[i], i, o);
+        }
+      } else if (isObject(o)) {
+        var out = ownKeys(o);
+
+        for (var i=0; i < out.length; i++) {
+          var key = out[i];
+          out[i] = callback(o[key], key, o);
+        }
+      }
+    } else {
+      if (typeof o === 'object' && 'length' in o) {
+        var out = new Array(o.length);
+
+        for (var i=0; i < o.length; i++) {
+          out[i] = callback.call(context, o[i], i, o);
+        }
+      } else if (isObject(o)) {
+        var out = ownKeys(o);
+
+        for (var i=0; i < out.length; i++) {
+          var key = out[i];
+          out[i] = callback.call(context, o[key], key, o);
+        }
+      }
     }
+
     return out;
   }
   exports.map = map;
@@ -6116,6 +6202,7 @@ exports.iteration = (function(exports){
     return out;
   }
   exports.generate = generate;
+
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
@@ -6329,17 +6416,25 @@ exports.traversal = (function(exports){
   var objects   = require('./objects'),
       functions = require('./functions'),
       utility   = require('./utility'),
-      Queue     = require('./Queue');
+      iteration = require('./iteration'),
+      Queue     = require('./Queue'),
+      Stack     = require('./Stack');
 
   var isObject       = objects.isObject,
       hasOwn         = objects.hasOwn,
       create         = objects.create,
+      define         = objects.define,
       ownKeys        = objects.keys,
       ownProperties  = objects.properties,
       getPrototypeOf = objects.getPrototypeOf,
       Hash           = objects.Hash,
+      each           = iteration.each,
+      iterate        = iteration.iterate,
+      Item           = iteration.Item,
+      StopIteration  = iteration.StopIteration,
       uid            = utility.uid,
-      toArray        = functions.toArray;
+      toArray        = functions.toArray,
+      fname          = functions.fname;
 
 
 
@@ -6362,10 +6457,9 @@ exports.traversal = (function(exports){
     function enqueue(o){
       var out = o instanceof Array ? [] : create(getPrototypeOf(o));
       tagged.push(o);
-      var keys = list(o);
-      for (var i=0; i < keys.length; i++) {
-        queue.push([o, out, keys[i]]);
-      }
+      each(list(o), function(item){
+        queue.push([o, out, item]);
+      });
       o[tag] = out;
       return out;
     }
@@ -6380,9 +6474,9 @@ exports.traversal = (function(exports){
       recurse.apply(this, queue.shift());
     }
 
-    for (var i=0; i < tagged.length; i++) {
-      delete tagged[tag];
-    }
+    each(tagged, function(item){
+      delete item[tag];
+    });
 
     return out;
   }
@@ -6397,17 +6491,12 @@ exports.traversal = (function(exports){
       recurse(queue.shift());
     }
 
-    for (var i=0; i < branded.length; i++) {
-      delete branded[i][tag];
-    }
+    each(branded, function(item){
+      delete item[tag];
+    });
 
     function recurse(node){
-      if (!isObject(node)) return;
-      var keys = ownKeys(node);
-      for (var i=0; i < keys.length; i++) {
-        var key = keys[i],
-            item = node[key];
-
+      each(node, function(item, key){
         if (isObject(item) && !hasOwn(item, tag)) {
           item[tag] = true;
           branded.push(item);
@@ -6415,17 +6504,18 @@ exports.traversal = (function(exports){
           if (result === walk.RECURSE) {
             queue.push(item);
           } else if (result === walk.BREAK) {
-            return queue.empty();
+            queue.empty();
+            throw StopIteration;
           }
         }
-      }
+      });
     }
   }
   exports.walk = walk;
 
-  var BREAK    = walk.BREAK    = new Number(1),
-      CONTINUE = walk.CONTINUE = new Number(2),
-      RECURSE  = walk.RECURSE  = new Number(3);
+  var BREAK    = walk.BREAK    = 0,
+      CONTINUE = walk.CONTINUE = 1,
+      RECURSE  = walk.RECURSE  = 2;
 
   exports.collector = (function(){
     function path(){
@@ -6496,8 +6586,7 @@ exports.traversal = (function(exports){
             if (item !== undefined) {
               items.push(item);
             }
-          } else
-
+          }
           return CONTINUE;
         }
 
@@ -6510,8 +6599,161 @@ exports.traversal = (function(exports){
     return collector;
   })();
 
+
+  function walk(root, callback){
+    var queue = new Queue([[root]]),
+        branded = [],
+        tag = uid();
+
+    try {
+      while (queue.length) {
+        recurse(queue.shift());
+      }
+    } catch (e) {
+      if (e !== StopIteration) throw e;
+    }
+
+    each(branded, function(item){
+      delete item[tag];
+    });
+
+    function recurse(node){
+      each(node, function(item, key){
+        if (isObject(item) && !hasOwn(item, tag)) {
+          item[tag] = true;
+          branded.push(item);
+          var result = callback(item, node);
+          if (result === walk.RECURSE) {
+            queue.push(item);
+          } else if (result === walk.BREAK) {
+            queue.empty();
+            throw StopIteration;
+          }
+        }
+      });
+    }
+  }
+
+  var Visitor = exports.Visitor = (function(){
+    function VisitorHandlers(handlers){
+      var self = this;
+      if (handlers instanceof Array) {
+        each(handlers, function(handler){
+          self[fname(handler)] = handler;
+        });
+      } else if (isObject(handlers)) {
+        each(handlers, function(handler, name){
+          self[name] = handler;
+        });
+      }
+    }
+
+    VisitorHandlers.prototype = create(null);
+
+    function VisitorState(handlers, root){
+      var stack = this.stack = new Stack([[root]]);
+      this.handlers = handlers;
+      this.branded = [];
+      this.tag = uid();
+      this.context = {
+        push: function push(node){
+          stack.push(node);
+        }
+      };
+    }
+
+    define(VisitorState.prototype, [
+      function cleanup(){
+        each(this.branded, function(item){
+          delete item[this.tag];
+        }, this);
+        this.branded = [];
+        this.tag = uid();
+      },
+      function next(node){
+        if (node instanceof Item) {
+          node = node[1];
+        }
+        if (isObject(node) && !hasOwn(node, this.tag)) {
+          define(node, this.tag, true);
+          this.branded.push(node);
+
+          if (node instanceof Array) {
+            each(node.slice().reverse(), this.context.push);
+          } else if (node.type) {
+            if (node.type in this.handlers) {
+              var result = this.handlers[node.type].call(this.context, node);
+            } else if (this.handlers.__noSuchHandler__) {
+              var result = this.handlers.__noSuchHandler__.call(this.context, node);
+            }
+
+            if (result == BREAK) {
+              throw StopIteration;
+            } else if (result === RECURSE) {
+              var temp = [];
+              iterate(node, temp.push, temp);
+              each(temp.reverse(), this.context.push);
+            }
+          }
+        }
+      }
+    ]);
+
+
+    function Visitor(handlers){
+      if (handlers instanceof VisitorHandlers) {
+        this.handlers = handlers;
+      } else {
+        this.handlers = new VisitorHandlers(handlers);
+      }
+    }
+
+
+    define(Visitor.prototype, [
+      function visit(root){
+        if (root instanceof VisitorState) {
+          var visitor = root;
+        } else {
+          var visitor = new VisitorState(this.handlers, root);
+        }
+
+        try {
+          while (visitor.stack.length) {
+            visitor.next(visitor.stack.pop());
+          }
+          visitor.cleanup();
+        } catch (e) {
+          if (e !== StopIteration) throw e;
+          var self = this;
+          var _resume = function(){
+            _resume = function(){};
+            return self.visit(visitor);
+          }
+          return function resume(){ return _resume() };
+        }
+      }
+    ]);
+
+
+    return Visitor;
+  })();
+
+
+  function createVisitor(handlers){
+    return new Visitor(handlers);
+  }
+  exports.createVisitor = createVisitor;
+
+
+  function visit(node, handlers){
+    return new Visitor(handlers).visit(node);
+  }
+  exports.visit = visit;
+
+
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
+
 
 
 exports.Emitter = (function(module){
@@ -8367,6 +8609,7 @@ exports.assembler = (function(exports){
 
   var walk      = traversal.walk,
       collector = traversal.collector,
+      Visitor   = traversal.Visitor,
       fname     = functions.fname,
       define    = objects.define,
       assign    = objects.assign,
@@ -8377,7 +8620,6 @@ exports.assembler = (function(exports){
       hasOwn    = objects.hasOwn,
       isObject  = objects.isObject,
       Hash      = objects.Hash,
-      iterate   = iteration.iterate,
       each      = iteration.each,
       repeat    = iteration.repeat,
       map       = iteration.map,
@@ -8466,9 +8708,9 @@ exports.assembler = (function(exports){
           return param;
         }
       }).join(', ') + ');';
-    }).join('\n  ');
+    }).join('');
 
-    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'}';
     var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
     func.params = func.length;
     func.opname = name;
@@ -8484,7 +8726,7 @@ exports.assembler = (function(exports){
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
       BLOCK            = new StandardOpCode(1, 'BLOCK'),
-      CALL             = new StandardOpCode(0, 'CALL'),
+      CALL             = new StandardOpCode(1, 'CALL'),
       CASE             = new StandardOpCode(1, 'CASE'),
       CLASS_DECL       = new StandardOpCode(1, 'CLASS_DECL'),
       CLASS_EXPR       = new StandardOpCode(1, 'CLASS_EXPR'),
@@ -8512,7 +8754,7 @@ exports.assembler = (function(exports){
       LOG              = new StandardOpCode(0, 'LOG'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
-      NATIVE_CALL      = new StandardOpCode(0, 'NATIVE_CALL'),
+      NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
       POP              = new StandardOpCode(0, 'POP'),
@@ -8622,16 +8864,17 @@ exports.assembler = (function(exports){
       define(this, {
         body: body,
         source: source == null ? context.code.source : source,
-        range: node.range,
-        loc: node.loc,
         children: [],
-        LexicalDeclarations: LexicalDeclarations(body),
         createDirective: function(opcode, args){
           var op = new Instruction(opcode, args);
           this.ops.push(op);
           return op;
         }
       });
+
+      this.range = node.range;
+      this.loc = node.loc;
+      this.LexicalDeclarations = LexicalDeclarations(body);
 
 
       if (node.id) {
@@ -9039,6 +9282,190 @@ exports.assembler = (function(exports){
   })();
 
 
+  var annotateTailPosition = (function(){
+    var RECURSE = walk.RECURSE;
+
+    function set(name, value){
+      return function(obj){
+        obj && (obj[name] = value);
+      };
+    }
+
+    function either(consequent, alternate){
+      return function(test){
+        return test ? consequent : alternate;
+      };
+    }
+
+    function copier(field){
+      return function(a, b){
+        a && b && (b[field] = a[field]);
+      };
+    }
+
+
+    var isWrapped = set('wrapped', true),
+        isntWrapped = set('wrapped', false),
+        isTail = set('tail', true),
+        isntTail = set('tail', false),
+        wrap = either(isWrapped, isntWrapped),
+        tail = either(isTail, isntTail),
+        copyWrap = copier('wrapped'),
+        copyTail = copier('tail');
+
+
+    var tailVisitor = new Visitor([
+      function __noSuchHandler__(node){
+        return RECURSE;
+      },
+      //function ArrayExpression(node){},
+      //function ArrayPattern(node){},
+      function ArrowFunctionExpression(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      //function AssignmentExpression(node){},
+      //function AtSymbol(node){},
+      //function BinaryExpression(node){},
+      function BlockStatement(node){
+        each(node.body, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function BreakStatement(node){},
+      //function CallExpression(node){},
+      function CatchClause(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function ClassBody(node){},
+      //function ClassDeclaration(node){},
+      //function ClassExpression(node){},
+      //function ClassHeritage(node){},
+      //function ComprehensionBlock(node){},
+      //function ComprehensionExpression(node){},
+      function ConditionalExpression(node){
+        each(node, tail(node.tail));
+        each(node, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function ContinueStatement(node){},
+      //function DebuggerStatement(node){},
+      function DoWhileStatement(node){
+        each(node, isntTail);
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function EmptyStatement(node){},
+      //function ExportDeclaration(node){},
+      //function ExportSpecifier(node){},
+      //function ExportSpecifierSet(node){},
+      function ExpressionStatement(node){
+        copyWrap(node, node.expression);
+        return RECURSE;
+      },
+      function ForInStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function ForOfStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function ForStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function FunctionDeclaration(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      function FunctionExpression(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      //function Glob(node){},
+      //function Identifier(node){},
+      function IfStatement(node){
+        copyWrap(node, node.consequent);
+        copyWrap(node, node.alternate);
+        return RECURSE;
+      },
+      //function ImportDeclaration(node){},
+      //function ImportSpecifier(node){},
+      function LabeledStatement(node){
+        copyWrap(node, node.statement);
+        return RECURSE;
+      },
+      //function Literal(node){},
+      //function LogicalExpression(node){},
+      //function MemberExpression(node){},
+      //function MethodDefinition(node){},
+      function ModuleDeclaration(node){
+        node.body && each(node.body, isntWrapped);
+        return RECURSE;
+      },
+      //function NewExpression(node){},
+      //function ObjectExpression(node){},
+      //function ObjectPattern(node){},
+      //function Path(node){},
+      function Program(node){
+        each(node.body, isntWrapped);
+        return RECURSE;
+      },
+      //function Property(node){},
+      function ReturnStatement(node){
+        tail(!node.wrapped)(node.argument);
+        return RECURSE;
+      },
+      function SequenceExpression(node){
+        each(node.expression, wrap(node.wrapped));
+        copyTail(node, node.expressions[node.expressions.length - 1]);
+        return RECURSE;
+      },
+      //function SpreadElement(node){},
+      function SwitchCase(node){
+        each(node.consequent, wrap(node.wrapped))
+        return RECURSE;
+      },
+      function SwitchStatement(node){
+        each(node.cases, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function SymbolDeclaration(node){},
+      //function SymbolDeclarator(node){},
+      //function TaggedTemplateExpression(node){},
+      //function TemplateElement(node){},
+      //function TemplateLiteral(node){},
+      //function ThisExpression(node){},
+      //function ThrowStatement(node){ },
+      function TryStatement(node){
+        isWrapped(node.block);
+        each(node.handlers, wrap(node.finalizer || node.wrapped));
+        isntWrapped(node.finalizer);
+        return RECURSE;
+      },
+      //function UnaryExpression(node){},
+      //function UpdateExpression(node){},
+      //function VariableDeclaration(node){},
+      //function VariableDeclarator(node){ },
+      function WhileStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function WithStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function YieldExpression(node){},
+    ]);
+
+    return function annotateTailPosition(node){
+      tailVisitor.visit(node);
+      return node;
+    };
+  })();
+
+
   function ReferencesSuper(node){
     var found = false;
     walk(node, function(node){
@@ -9316,7 +9743,7 @@ exports.assembler = (function(exports){
     DUP();
     GET();
     args(node.arguments);
-    node.callee.type === 'NativieIdentifier' ? NATIVE_CALL(): CALL();
+    (node.callee.type === 'NativieIdentifier' ? NATIVE_CALL : CALL)(!!node.tail);
   }
 
   function CatchClause(node){
@@ -11116,7 +11543,7 @@ exports.thunk = (function(exports){
       var args     = stack[--sp],
           receiver = stack[--sp],
           func     = stack[--sp],
-          result   = context.callFunction(func, receiver, args);
+          result   = context.callFunction(func, receiver, args, ops[ip][0]);
 
       if (result && result.Completion) {
         if (result.Abrupt) {
@@ -11955,7 +12382,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
       each          = iteration.each,
-      iterate       = iteration.iterate,
       numbers       = utility.numbers,
       nextTick      = utility.nextTick,
       unique        = utility.unique;
@@ -13065,7 +13491,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
   }
 
-  function EvaluateCall(ref, func, args){
+  function EvaluateCall(ref, func, args, tail){
     if (typeof func !== 'object' || !IsCallable(func)) {
       return ThrowException('called_non_callable', [ref && ref.name]);
     }
@@ -13073,6 +13499,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     if (ref instanceof Reference) {
       var receiver = IsPropertyReference(ref) ? GetThisValue(ref) : ref.base.WithBaseObject();
     }
+
+    // if (tail) {
+    //   var leafContext = context;
+    //   leafContext.pop();
+    // }
 
     return func.Call(receiver, args);
   }
@@ -15652,6 +16083,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       isGlobal: false,
       strict: false,
       isEval: false,
+      constructFunction: EvaluateConstruct,
+      callFunction: EvaluateCall,
+      spreadArguments: SpreadArguments,
+      spreadArray: SpreadInitialization,
+      defineMethod: PropertyDefinitionEvaluation
     });
 
     define(ExecutionContext.prototype, [
@@ -15677,9 +16113,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
         this.LexicalEnvironment.withEnvironment = true;
         return obj;
-      },
-      function defineMethod(kind, obj, key, code){
-        return PropertyDefinitionEvaluation(kind, obj, key, code);
       },
       function createClass(def, superclass){
         this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
@@ -15714,12 +16147,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function createRegExp(regex){
         return new $RegExp(regex);
       },
-      function constructFunction(func, args){
-        return EvaluateConstruct(func, args);
-      },
-      function callFunction(thisRef, func, args){
-        return EvaluateCall(thisRef, func, args);
-      },
       function getPropertyReference(name, obj){
         return Element(this, name, obj);
       },
@@ -15734,12 +16161,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function getThis(){
         return ThisResolution(this);
-      },
-      function spreadArguments(precedingArgs, obj){
-        return SpreadArguments(precedingArgs, obj);
-      },
-      function spreadArray(array, offset, obj){
-        return SpreadInitialization(array, offset, obj);
       },
       function destructureSpread(target, index){
         return SpreadDestructuring(this, target, index);
@@ -16758,7 +17179,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           if (imported.name) {
             scope.SetMutableBinding(imported.name, module);
           } else if (imported.specifiers) {
-            iterate(imported.specifiers, function(path, name){
+            each(imported.specifiers, function(path, name){
               if (name === '*') {
                 module.each(function(prop){
                   scope.SetMutableBinding(prop[0], module.Get(prop[0]));
