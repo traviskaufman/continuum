@@ -224,7 +224,7 @@ var assembler = (function(exports){
         } else {
           this.BoundNames = [];
         }
-        this.Rest = rest;
+        this.Rest = node.rest;
         this.ExpectedArgumentCount = this.BoundNames.length;
         if (node.rest) {
           this.BoundNames.push(node.rest.name);
