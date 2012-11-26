@@ -7132,8 +7132,12 @@ exports.DoublyLinkedList = (function(module){
       return this;
     },
     function unlink(){
-      this.next.prev = this.prev;
-      this.prev.next = this.next;
+      if (this.next) {
+        this.next.prev = this.prev;
+      }
+      if (this.prev) {
+        this.prev.next = this.next;
+      }
       this.prev = this.next = null;
       return this;
     },
