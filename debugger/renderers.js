@@ -219,7 +219,7 @@ var Tree = (function(){
     },
     function refresh(){
       if (this.children) {
-        each(this.children, function(child){
+        iterate(this.children, function(child){
           child.refresh();
         });
       }
@@ -401,7 +401,7 @@ var Branch = (function(){
       if (!this.tree.initialized) {
         this.tree.initialized = true;
         this.keys = this.mirror.list(true);
-        iterate(this.keys, function(key){
+        each(this.keys, function(key){
           this.tree.batchAppend(new Property(this.mirror, key));
         }, this);
         this.tree.batchAppend(new Proto(this.mirror));
@@ -495,7 +495,7 @@ var ScopeBranch = (function(){
       if (!this.tree.initialized) {
         this.tree.initialized = true;
         this.keys = this.mirror.list(true);
-        iterate(this.keys, function(key){
+        each(this.keys, function(key){
           this.tree.batchAppend(new Property(this.mirror, key));
         }, this);
         if (this.mirror.subject.outer) {
@@ -562,7 +562,7 @@ var Preview = (function(){
   creator(Preview);
   inherit(Preview, Branch, [
     function createPreview(){
-      iterate(this.mirror.list(false), function(key){
+      each(this.mirror.list(false), function(key){
         this.batchAppend(new PreviewProperty(this.mirror, key));
       }, this);
     },

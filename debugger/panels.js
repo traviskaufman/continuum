@@ -3,6 +3,7 @@ var Component = continuum.Component,
     constants = continuum.constants,
     utility   = continuum.utility,
     inherit   = utility.inherit,
+    iterate   = utility.iterate,
     isObject  = utility.isObject,
     each      = utility.each,
     inline    = continuum.inline,
@@ -24,7 +25,7 @@ var Editor = (function(commands, Pass){
     throw Pass;
   }
 
-  utility.iterate(CodeMirror.keyNames, function(name){
+  each(CodeMirror.keyNames, function(name){
     if (!(name in paging)) {
       paging[name] = cancelPaging;
     }
@@ -327,7 +328,7 @@ var Inspector = (function(){
     },
     function refresh(){
       if (this.children) {
-        each(this.children, function(child){
+        iterate(this.children, function(child){
           child.refresh();
         });
       }

@@ -12,6 +12,7 @@ var assembler = (function(exports){
 
   var walk      = traversal.walk,
       collector = traversal.collector,
+      Visitor   = traversal.Visitor,
       fname     = functions.fname,
       define    = objects.define,
       assign    = objects.assign,
@@ -22,7 +23,6 @@ var assembler = (function(exports){
       hasOwn    = objects.hasOwn,
       isObject  = objects.isObject,
       Hash      = objects.Hash,
-      iterate   = iteration.iterate,
       each      = iteration.each,
       repeat    = iteration.repeat,
       map       = iteration.map,
@@ -111,9 +111,9 @@ var assembler = (function(exports){
           return param;
         }
       }).join(', ') + ');';
-    }).join('\n  ');
+    }).join('');
 
-    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'\n}';
+    var src = 'return function '+name+'('+params.join(', ')+'){'+body+'}';
     var func = Function.apply(null, map(ops, function(op){ return op.opname }).concat(src)).apply(null, ops);
     func.params = func.length;
     func.opname = name;
@@ -129,7 +129,7 @@ var assembler = (function(exports){
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
       BLOCK            = new StandardOpCode(1, 'BLOCK'),
-      CALL             = new StandardOpCode(0, 'CALL'),
+      CALL             = new StandardOpCode(1, 'CALL'),
       CASE             = new StandardOpCode(1, 'CASE'),
       CLASS_DECL       = new StandardOpCode(1, 'CLASS_DECL'),
       CLASS_EXPR       = new StandardOpCode(1, 'CLASS_EXPR'),
@@ -157,7 +157,7 @@ var assembler = (function(exports){
       LOG              = new StandardOpCode(0, 'LOG'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
-      NATIVE_CALL      = new StandardOpCode(0, 'NATIVE_CALL'),
+      NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
       POP              = new StandardOpCode(0, 'POP'),
@@ -267,16 +267,17 @@ var assembler = (function(exports){
       define(this, {
         body: body,
         source: source == null ? context.code.source : source,
-        range: node.range,
-        loc: node.loc,
         children: [],
-        LexicalDeclarations: LexicalDeclarations(body),
         createDirective: function(opcode, args){
           var op = new Instruction(opcode, args);
           this.ops.push(op);
           return op;
         }
       });
+
+      this.range = node.range;
+      this.loc = node.loc;
+      this.LexicalDeclarations = LexicalDeclarations(body);
 
 
       if (node.id) {
@@ -684,6 +685,190 @@ var assembler = (function(exports){
   })();
 
 
+  var annotateTailPosition = (function(){
+    var RECURSE = walk.RECURSE;
+
+    function set(name, value){
+      return function(obj){
+        obj && (obj[name] = value);
+      };
+    }
+
+    function either(consequent, alternate){
+      return function(test){
+        return test ? consequent : alternate;
+      };
+    }
+
+    function copier(field){
+      return function(a, b){
+        a && b && (b[field] = a[field]);
+      };
+    }
+
+
+    var isWrapped = set('wrapped', true),
+        isntWrapped = set('wrapped', false),
+        isTail = set('tail', true),
+        isntTail = set('tail', false),
+        wrap = either(isWrapped, isntWrapped),
+        tail = either(isTail, isntTail),
+        copyWrap = copier('wrapped'),
+        copyTail = copier('tail');
+
+
+    var tailVisitor = new Visitor([
+      function __noSuchHandler__(node){
+        return RECURSE;
+      },
+      //function ArrayExpression(node){},
+      //function ArrayPattern(node){},
+      function ArrowFunctionExpression(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      //function AssignmentExpression(node){},
+      //function AtSymbol(node){},
+      //function BinaryExpression(node){},
+      function BlockStatement(node){
+        each(node.body, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function BreakStatement(node){},
+      //function CallExpression(node){},
+      function CatchClause(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function ClassBody(node){},
+      //function ClassDeclaration(node){},
+      //function ClassExpression(node){},
+      //function ClassHeritage(node){},
+      //function ComprehensionBlock(node){},
+      //function ComprehensionExpression(node){},
+      function ConditionalExpression(node){
+        each(node, tail(node.tail));
+        each(node, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function ContinueStatement(node){},
+      //function DebuggerStatement(node){},
+      function DoWhileStatement(node){
+        each(node, isntTail);
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function EmptyStatement(node){},
+      //function ExportDeclaration(node){},
+      //function ExportSpecifier(node){},
+      //function ExportSpecifierSet(node){},
+      function ExpressionStatement(node){
+        copyWrap(node, node.expression);
+        return RECURSE;
+      },
+      function ForInStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function ForOfStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function ForStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function FunctionDeclaration(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      function FunctionExpression(node){
+        isntWrapped(node.body);
+        this.push(node.body);
+      },
+      //function Glob(node){},
+      //function Identifier(node){},
+      function IfStatement(node){
+        copyWrap(node, node.consequent);
+        copyWrap(node, node.alternate);
+        return RECURSE;
+      },
+      //function ImportDeclaration(node){},
+      //function ImportSpecifier(node){},
+      function LabeledStatement(node){
+        copyWrap(node, node.statement);
+        return RECURSE;
+      },
+      //function Literal(node){},
+      //function LogicalExpression(node){},
+      //function MemberExpression(node){},
+      //function MethodDefinition(node){},
+      function ModuleDeclaration(node){
+        node.body && each(node.body, isntWrapped);
+        return RECURSE;
+      },
+      //function NewExpression(node){},
+      //function ObjectExpression(node){},
+      //function ObjectPattern(node){},
+      //function Path(node){},
+      function Program(node){
+        each(node.body, isntWrapped);
+        return RECURSE;
+      },
+      //function Property(node){},
+      function ReturnStatement(node){
+        tail(!node.wrapped)(node.argument);
+        return RECURSE;
+      },
+      function SequenceExpression(node){
+        each(node.expression, wrap(node.wrapped));
+        copyTail(node, node.expressions[node.expressions.length - 1]);
+        return RECURSE;
+      },
+      //function SpreadElement(node){},
+      function SwitchCase(node){
+        each(node.consequent, wrap(node.wrapped))
+        return RECURSE;
+      },
+      function SwitchStatement(node){
+        each(node.cases, wrap(node.wrapped));
+        return RECURSE;
+      },
+      //function SymbolDeclaration(node){},
+      //function SymbolDeclarator(node){},
+      //function TaggedTemplateExpression(node){},
+      //function TemplateElement(node){},
+      //function TemplateLiteral(node){},
+      //function ThisExpression(node){},
+      //function ThrowStatement(node){ },
+      function TryStatement(node){
+        isWrapped(node.block);
+        each(node.handlers, wrap(node.finalizer || node.wrapped));
+        isntWrapped(node.finalizer);
+        return RECURSE;
+      },
+      //function UnaryExpression(node){},
+      //function UpdateExpression(node){},
+      //function VariableDeclaration(node){},
+      //function VariableDeclarator(node){ },
+      function WhileStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      function WithStatement(node){
+        copyWrap(node, node.body);
+        return RECURSE;
+      },
+      //function YieldExpression(node){},
+    ]);
+
+    return function annotateTailPosition(node){
+      tailVisitor.visit(node);
+      return node;
+    };
+  })();
+
+
   function ReferencesSuper(node){
     var found = false;
     walk(node, function(node){
@@ -961,7 +1146,7 @@ var assembler = (function(exports){
     DUP();
     GET();
     args(node.arguments);
-    node.callee.type === 'NativieIdentifier' ? NATIVE_CALL(): CALL();
+    (node.callee.type === 'NativieIdentifier' ? NATIVE_CALL : CALL)(!!node.tail);
   }
 
   function CatchClause(node){

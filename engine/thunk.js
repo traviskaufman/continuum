@@ -215,7 +215,7 @@ var thunk = (function(exports){
       var args     = stack[--sp],
           receiver = stack[--sp],
           func     = stack[--sp],
-          result   = context.callFunction(func, receiver, args);
+          result   = context.callFunction(func, receiver, args, ops[ip][0]);
 
       if (result && result.Completion) {
         if (result.Abrupt) {

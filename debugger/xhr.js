@@ -1,6 +1,5 @@
 (function(global, continuum){
 var utility = continuum.utility,
-    iterate = continuum.iterate,
     create = utility.create,
     assign = utility.assign,
     define = utility.define,
@@ -29,7 +28,7 @@ function extension(path){
 function serialize(o){
   var out = [];
 
-  iterate(o, function(value, key){
+  each(o, function(value, key){
     return encodeURIComponent(key) + '=' + encodeURIComponent(value);
   });
 
@@ -95,7 +94,7 @@ define(XHR.prototype, [
       xhr.withCredentials = true;
     }
 
-    iterate(this.headers, function(value, key){
+    each(this.headers, function(value, key){
       xhr.setRequestHeader(key, value);
     });
 

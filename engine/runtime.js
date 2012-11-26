@@ -31,7 +31,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
       each          = iteration.each,
-      iterate       = iteration.iterate,
       numbers       = utility.numbers,
       nextTick      = utility.nextTick,
       unique        = utility.unique;
@@ -1141,7 +1140,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
   }
 
-  function EvaluateCall(ref, func, args){
+  function EvaluateCall(ref, func, args, tail){
     if (typeof func !== 'object' || !IsCallable(func)) {
       return ThrowException('called_non_callable', [ref && ref.name]);
     }
@@ -1149,6 +1148,11 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (ref instanceof Reference) {
       var receiver = IsPropertyReference(ref) ? GetThisValue(ref) : ref.base.WithBaseObject();
     }
+
+    // if (tail) {
+    //   var leafContext = context;
+    //   leafContext.pop();
+    // }
 
     return func.Call(receiver, args);
   }
@@ -3728,6 +3732,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       isGlobal: false,
       strict: false,
       isEval: false,
+      constructFunction: EvaluateConstruct,
+      callFunction: EvaluateCall,
+      spreadArguments: SpreadArguments,
+      spreadArray: SpreadInitialization,
+      defineMethod: PropertyDefinitionEvaluation
     });
 
     define(ExecutionContext.prototype, [
@@ -3753,9 +3762,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
         this.LexicalEnvironment.withEnvironment = true;
         return obj;
-      },
-      function defineMethod(kind, obj, key, code){
-        return PropertyDefinitionEvaluation(kind, obj, key, code);
       },
       function createClass(def, superclass){
         this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
@@ -3790,12 +3796,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       function createRegExp(regex){
         return new $RegExp(regex);
       },
-      function constructFunction(func, args){
-        return EvaluateConstruct(func, args);
-      },
-      function callFunction(thisRef, func, args){
-        return EvaluateCall(thisRef, func, args);
-      },
       function getPropertyReference(name, obj){
         return Element(this, name, obj);
       },
@@ -3810,12 +3810,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function getThis(){
         return ThisResolution(this);
-      },
-      function spreadArguments(precedingArgs, obj){
-        return SpreadArguments(precedingArgs, obj);
-      },
-      function spreadArray(array, offset, obj){
-        return SpreadInitialization(array, offset, obj);
       },
       function destructureSpread(target, index){
         return SpreadDestructuring(this, target, index);
@@ -4834,7 +4828,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (imported.name) {
             scope.SetMutableBinding(imported.name, module);
           } else if (imported.specifiers) {
-            iterate(imported.specifiers, function(path, name){
+            each(imported.specifiers, function(path, name){
               if (name === '*') {
                 module.each(function(prop){
                   scope.SetMutableBinding(prop[0], module.Get(prop[0]));
