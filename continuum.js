@@ -13143,7 +13143,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     proto.Brand = new Brand(brand);
 
     each(methods, function(method){
-      console.log(method);
       PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
     });
 
@@ -16925,27 +16924,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return obj.GetP(receiver, key);
         },
 
-        parseInt: function(value, radix){
-          return parseInt(ToPrimitive(value), ToNumber(radix));
-        },
-        parseFloat: function(value){
-          return parseFloat(ToPrimitive(value));
-        },
-        decodeURI: function(value){
-          return decodeURI(ToString(value));
-        },
-        decodeURIComponent: function(value){
-          return decodeURIComponent(ToString(value));
-        },
-        encodeURI: function(value){
-          return encodeURI(ToString(value));
-        },
-        encodeURIComponent: function(value){
-          return encodeURIComponent(ToString(value));
-        },
-        escape: function(value){
-          return escape(ToString(value));
-        },
+        parseInt: parseInt,
+        parseFloat: parseFloat,
+        decodeURI: decodeURI,
+        decodeURIComponent: decodeURIComponent,
+        encodeURI: encodeURI,
+        encodeURIComponent: encodeURIComponent,
+        escape: escape,
+        unescape: unescape,
         SetTimer: function(f, time, repeating){
           if (typeof f === 'string') {
             f = natives.FunctionCreate(f);
@@ -17017,7 +17003,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
           if (/^[\],:{}\s]*$/.test(test)) {
             var json = realm.evaluate('('+source+')');
-            return IsCallable(reviver) ? walk({ '': json }, '') : json;
+            var wrapper = new $Object;
+            wrapper.set('', json);
+            return IsCallable(reviver) ? walk(wrapper, '') : json;
           }
 
           return ThrowException('invalid_json', source);
@@ -19188,7 +19176,7 @@ exports.modules["@error"] = "export function Error(message){\n  this.message = m
 
 exports.modules["@function"] = "export function Function(...args){\n  return $__FunctionCreate(args);\n}\n\n$__setupConstructor(Function, $__FunctionProto);\n$__define(Function.prototype, 'name', '', 0);\n\n\nexport function apply(func, receiver, args){\n  ensureFunction(func, '@function.apply');\n  return $__CallFunction(func, receiver, ensureArgs(args));\n}\n\nexport function bind(func, receiver, ...args){\n  ensureFunction(func, '@function.bind');\n  return $__BoundFunctionCreate(func, receiver, args);\n}\n\nexport function call(func, receiver, ...args){\n  ensureFunction(func, '@function.call');\n  return $__CallFunction(func, receiver, args);\n}\n\n$__setupFunctions(apply, bind, call);\n\n\n$__defineProps(Function.prototype, {\n  apply(receiver, args){\n    ensureFunction(this, 'Function.prototype.apply');\n    return $__CallFunction(this, receiver, ensureArgs(args));\n  },\n  bind(receiver, ...args){\n    ensureFunction(this, 'Function.prototype.bind');\n    return $__BoundFunctionCreate(this, receiver, args);\n  },\n  call(receiver, ...args){\n    ensureFunction(this, 'Function.prototype.call');\n    return $__CallFunction(this, receiver, args);\n  },\n  toString(){\n    ensureFunction(this, 'Function.prototype.toString');\n    return $__FunctionToString(this);\n  }\n});\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = $__GetBuiltinBrand(o);\n  return brand === 'Array' || brand === 'Arguments' ? o : [...o];\n}\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n";
 
-exports.modules["@globals"] = "let decodeURI          = $__decodeURI,\n    decodeURIComponent = $__decodeURIComponent,\n    encodeURI          = $__encodeURI,\n    encodeURIComponent = $__encodeURIComponent,\n    escape             = $__escape,\n    eval               = $__eval,\n    parseInt           = $__parseInt,\n    parseFloat         = $__parseFloat;\n\nfunction isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nfunction isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\n\n$__setupFunctions(isFinite, isNaN);\n\n\nexport decodeURI, decodeURIComponent, encodeURI, encodeURIComponent,\n       escape, eval, parseInt, parseFloat, isFinite, isNaN;\n";
+exports.modules["@globals"] = "let Infinity = 1 / 0;\n\nexport function decodeURI(value){\n  return $__decodeURI('' + value);\n}\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent('' + value);\n}\n\nexport function encodeURI(value){\n  return $__encodeURI('' + value);\n}\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent('' + value);\n}\n\nexport function escape(value){\n  return $__escape('' + value);\n}\n\nexport function unescape(value){\n  return $__unescape('' + value);\n}\n\nexport function isFinite(number){\n  number = +number;\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nexport function isNaN(number){\n  number = +number;\n  return number !== number;\n}\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\n\n$__setupFunctions(decodeURI, decodeURIComponent, encodeURI, encodeURIComponent,\n                  escape, isFinite, isNaN, parseInt, parseFloat);\n\n";
 
 exports.modules["@iter"] = "import hasOwn from '@reflect';\n\nsymbol @iterator = $__iterator;\nexport let iterator = @iterator;\n\nexport function Iterator(){}\n\n$__define(Iterator, 'prototype', Iterator.prototype, 0);\n$__define(Iterator.prototype, @iterator, function iterator(){ return this }, 0);\n$__SetBuiltinBrand(Iterator.prototype, 'BuiltinIterator');\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (hasOwn(obj, x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (hasOwn(obj, x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (hasOwn(obj, x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n";
 
