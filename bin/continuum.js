@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var fs = require('fs'),
+    inspect = require('util').inspect,
     continuum = require('continuum'),
     args = process.argv.slice(2);
 
@@ -12,6 +13,10 @@ if (!args.length) {
   console.log('  contiuum -b <file1.js> <file2.js> ...');
   console.log('  contiuum -b <code>');
   process.exit(1);
+}
+
+function log(o){
+  console.log(inspect(o, null, 10));
 }
 
 var bytecode = false,
@@ -42,12 +47,12 @@ var scripts = args.filter(function(arg){
 if (execute) {
   var realm = continuum.createRealm();
   scripts.forEach(function(script){
-    console.log(realm.evaluate(script));
+    log(realm.evaluate(script));
     console.log('');
   });
 } else if (bytecode) {
   scripts.forEach(function(script){
-    console.log(continuum.createCode(script));
+    log(continuum.createCode(script));
     console.log('');
   });
 }
