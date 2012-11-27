@@ -76,7 +76,10 @@
   };
 
   $__hideEverything = function hideEverything(o){
-    if (!o || typeof o !== 'object') return o;
+    var type = typeof o;
+    if (type === 'object' ? o === null : type !== 'function') {
+      return o;
+    }
 
     var keys = $__Enumerate(o, false, true),
         i = keys.length;

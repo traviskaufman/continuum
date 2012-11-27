@@ -56,7 +56,6 @@ export class ArrayBuffer {
 }
 
 
-
 export class DataView {
   constructor(buffer, byteOffset, byteLength){
     buffer = $__ToObject(buffer);
@@ -334,25 +333,25 @@ function subarray(Type, instance, begin, end){
 
 
 {
-  function setupArrayBuffer(Ctor, bytes){
+  function setupClass(Ctor, bytes){
     if (bytes) {
       $__defineConstants(Ctor, { BYTES_PER_ELEMENT: bytes });
     }
+    $__hideEverything(Ctor);
     $__setupConstructor(Ctor, Ctor.prototype);
     $__SetBuiltinBrand(Ctor.prototype, 'Builtin'+Ctor.name);
-    $__hideEverything(Ctor);
   }
 
-  setupArrayBuffer(ArrayBuffer);
-  setupArrayBuffer(DataView);
-  setupArrayBuffer(Int8Array, 1);
-  setupArrayBuffer(Uint8Array, 1);
-  setupArrayBuffer(Int16Array, 2);
-  setupArrayBuffer(Uint16Array, 2);
-  setupArrayBuffer(Int32Array, 4);
-  setupArrayBuffer(Uint32Array, 4);
-  setupArrayBuffer(Float32Array, 4);
-  setupArrayBuffer(Float64Array, 8);
+  setupClass(ArrayBuffer);
+  setupClass(DataView);
+  setupClass(Int8Array, 1);
+  setupClass(Uint8Array, 1);
+  setupClass(Int16Array, 2);
+  setupClass(Uint16Array, 2);
+  setupClass(Int32Array, 4);
+  setupClass(Uint32Array, 4);
+  setupClass(Float32Array, 4);
+  setupClass(Float64Array, 8);
 }
 
 $__ArrayBufferProto = ArrayBuffer.prototype;
