@@ -29,7 +29,7 @@ In the browser, use the combined continuum.js or continuum.min.js. In node
 # Quickstart Usage Overview
 In the browser an object named `continuum` is added to the window, or in node it's the object returned by `require('continuum')`.
 
-Usage of continuum is quite simple and can basically be treated like using `eval` or node's `vm.runInContext`. Supply the code, get the result. In ES6 a "Realm" is basically the container for a context. A Realm has a 'global' property which is its global object, and a number of properties that specific to each Realm instance, such as the list of builtins like Array, Function, Object, etc.
+Usage of continuum is quite simple and can basically be treated like using `eval` in iframe or node's `vm.runInContext`. Supply the code, get the result. In ES6 a "Realm" is basically the container for a context. A Realm has a 'global' property which is its global object, and a number of properties that specific to each Realm instance, such as the list of builtins like Array, Function, Object, etc.
 
     var realm = continuum.createRealm();
 
@@ -69,7 +69,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Module system with imports and exports
 * builtin '@std' modules `module std = '@std'` or `import call from '@function'`
 * Generators (kind of broken at the moment though)
-* Proxy and Reflect
+* Proxy and Reflect (also buggy)
 * Private Names
 * Typed Arrays
 
@@ -191,22 +191,16 @@ Below is all most of the functions you can override, and their default implement
 var $MyObjectType = continuum.createExotic('Object', [
   // delete a property
   function remove(key){
-    if (this.properties.has(key)) {
-      return this.properties.remove(key);
-    }
+    return this.properties.remove(key);
   },
   function describe(key){
     // properties are stored as arrays with 3 fields [key, value, attributes]
     // describe is a request for one of these property arrays
-    if (this.properties.has(key)) {
-      return this.properties.getProperty(key);
-    }
+    return this.properties.getProperty(key);
   },
   function define(key, value, attrs){
-    // define sets both a the value and the attrs at the same time
-    if (this.properties.has(key)) {
-      return this.properties.set(key, value, attrs);
-    }
+    // define sets both the value and the attributes at the same time
+    return this.properties.set(key, value, attrs);
   },
   function has(key){
     // hasOwnProperty
@@ -214,31 +208,23 @@ var $MyObjectType = continuum.createExotic('Object', [
   },
   function each(callback){
     // `each` is the only way the API exposes to get a list of all the properties
-    this.properties.forEach(callback);
+    this.properties.forEach(callback, this);
   },
   function get(key){
-    //  retrieve value
-    if (this.properties.has(key)) {
-      return this.properties.get(key);
-    }
+    // retrieve value
+    return this.properties.get(key);
   },
   function set(key, value){
-    // store value
-    if (this.properties.has(key)) {
-      return this.properties.set(key, value);
-    }
+    // store value, using default attributes if property is new
+    return this.properties.set(key, value);
   },
   function query(key){
     // retrieve attributes
-    if (this.properties.has(key)) {
-      return this.properties.getAttribute(key);
-    }
+    return this.properties.getAttribute(key);
   },
   function update(key, attr){
     // store attributes
-    if (this.properties.has(key)) {
-      return this.properties.setAttribute(key, attr);
-    }
+    return this.properties.setAttribute(key, attr);
   }
 ]);
 ```
