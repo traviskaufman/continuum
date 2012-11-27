@@ -20,6 +20,8 @@ export function escape(value){
   return $__escape('' + value);
 }
 
+export let eval = $__eval;
+
 export function unescape(value){
   return $__unescape('' + value);
 }
@@ -43,5 +45,5 @@ export function parseInt(value, radix){
 
 
 $__setupFunctions(decodeURI, decodeURIComponent, encodeURI, encodeURIComponent,
-                  escape, isFinite, isNaN, parseInt, parseFloat);
+                  escape, isFinite, isNaN, parseInt, parseFloat, unescape);
 
