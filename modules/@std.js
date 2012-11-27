@@ -53,6 +53,8 @@ import Math from '@math';
 import Symbol from '@symbol';
 import Iterator from '@iter';
 
+import console from '@console';
+
 let StopIteration = $__StopIteration
 
 
@@ -60,6 +62,6 @@ export Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, 
        Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
        decodeURI, decodeURIComponent, encodeURI, encodeURIComponent, eval, isFinite, isNaN,
        parseFloat, parseInt, clearInterval, clearTimeout, setInterval, setTimeout,
-       StopIteration, JSON, Math, NaN, Infinity, undefined;
+       console, StopIteration, JSON, Math, NaN, Infinity, undefined;
 
 
