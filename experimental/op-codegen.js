@@ -224,10 +224,20 @@ function StructType(name, fields){
 
   define(StructT, [
     function get(data, offset){
-      return new StructT(data, offset).get();
+      var out = {};
+      each(fields, function(field){
+        var Type = getType(field.type);
+        out[field.name] = Type.get(data, offset);
+        offset += Type.sizeof(out[field.name]);
+      });
+      return out;
     },
     function set(data, offset, value){
-      new StructT(data, offset, value);
+      each(fields, function(field){
+        var Type = getType(field.type);
+        Type.set(data, offset, value[field.name]);
+        offset += Type.sizeof(value[field.name]);
+      });
     },
     function sizeof(value){
       return currentOffset;
@@ -304,10 +314,22 @@ var ArrayType = (function(){
 
     define(ArrayT, [
       function get(data, offset){
-        return new ArrayT(data, offset).get();
+        var len = LengthType.get(data, offset),
+            out = new Array(len);
+
+        for (var i=0; i < len; i++) {
+          out[i] = ElementType.get(data, offset + lengthBytes + i * elementBytes);
+        }
+        return out;
       },
       function set(data, offset, value){
-        new ArrayT(data, offset, value);
+        LengthType.set(data, offset, value.length);
+        value = Object(value);
+        for (var i=0; i < value.length; i++) {
+          if (i in value) {
+            ElementType.set(data, offset + lengthBytes + i * elementBytes, value[i]);
+          }
+        }
       },
       function sizeof(value){
         return value.length * elementBytes + lengthBytes;
@@ -340,7 +362,13 @@ var ArrayType = (function(){
       },
       function getItem(index){
         return new ElementType(this.data, this.offset + lengthBytes + index * elementBytes);
-      }
+      },
+      function get(){
+        return ArrayT.get(this.data, this.offset);
+      },
+      function set(value){
+        return ArrayT.set(this.data, this.offset, value);
+      },
     ]);
 
 
@@ -348,23 +376,6 @@ var ArrayType = (function(){
   }
 
   define(ArrayType.prototype, [
-    function get(){
-      var len = this.getLength(),
-          out = new Array(len);
-
-      for (var i=0; i < len; i++) {
-        out[i] = this.getIndex(i);
-      }
-      return out;
-    },
-    function set(value){
-      this.setLength(value.length);
-      for (var i=0; i < value.length; i++) {
-        if (i in value) {
-          this.setIndex(i, value[i]);
-        }
-      }
-    },
     function forEach(callback, context){
       var len = this.getLength();
       context = context || this;
@@ -420,10 +431,25 @@ function BitfieldType(name, fields, Type){
 
   define(BitfieldT, [
     function get(data, offset){
-      return new BitfieldT(data, offset).get();
+      var out = {},
+          value = Type.get(data, offset);
+      for (var k in names) {
+        out[k] = (value & names[k]) > 0
+      }
+      return out;
     },
     function set(data, offset, value){
-      new BitfieldT(data, offset, value);
+      if (typeof value === 'number') {
+        var val = value;
+      } else {
+        var val = 0;
+        for (var k in names) {
+          if (k in value) {
+            value[k] ? (val |= names[k]) : (val &= ~names[k]);
+          }
+        }
+      }
+      Type.set(data, offset, val);
     },
     function sizeof(value){
       return bytes;
@@ -459,26 +485,10 @@ function BitfieldType(name, fields, Type){
 
   define(this, [
     function get(){
-      var out = {},
-          value = Type.get(this.data, this.offset);
-
-      for (var k in names) {
-        out[k] = (value & names[k]) > 0
-      }
-      return out;
+      return BitfieldT.get(this.data, this.offset);
     },
     function set(value){
-      if (typeof value === 'number') {
-        var val = value;
-      } else {
-        var val = 0;
-        for (var k in names) {
-          if (k in value) {
-            value[k] ? (val |= names[k]) : (val &= ~names[k]);
-          }
-        }
-      }
-      Type.set(this.data, this.offset, val);
+      BitfieldT.set(this.data, this.offset, value);
     }
   ]);
 
@@ -491,10 +501,10 @@ function PointerType(name, PointeeType, alloc){
 
   PointeeType = getType(PointeeType);
 
-  alloc = alloc || function(pointer, value){
-    var address = pointer.data.position || 0;
-    AddressType.set(pointer.data, pointer.offset, address);
-    pointer.data.position += PointeeType.sizeof(value);
+  alloc = alloc || function(data, offset, value){
+    var address = data.position || 0;
+    AddressType.set(data, offset, address);
+    data.position += PointeeType.sizeof(value);
     return address;
   };
 
@@ -508,10 +518,12 @@ function PointerType(name, PointeeType, alloc){
 
   define(PointerT, [
     function get(data, offset){
-      return new PointerT(data, offset).get();
+      var address = AddressType.get(data, offset);
+      return PointeeType.get(data, address);
     },
     function set(data, offset, value){
-      new PointerT(data, offset, value);
+      var address = AddressType.get(data, offset) || alloc(data, offset, value);
+      PointeeType.set(data, address, value);
     },
     function sizeof(value){
       return addressSize;
@@ -538,7 +550,7 @@ function PointerType(name, PointeeType, alloc){
       return PointeeType.get(this.data, this.getAddress());
     },
     function set(value){
-      var address = this.getAddress() || alloc(this, value);
+      var address = this.getAddress() || alloc(this.data, this.offset, value);
       PointeeType.set(this.data, address, value);
     }
   ]);
@@ -574,6 +586,56 @@ function PointerType(name, PointeeType, alloc){
   return PointerT;
 }
 
+function EnumType(name, values){
+  var IndexType = getType('uint8'),
+      indexSize = IndexType.prototype.bytes;
+
+  var indices = create(null);
+
+  each(values, function(value, i){
+    indices[value] = i;
+  });
+
+  var EnumT = function(data, offset, value){
+    define(this, 'data', data);
+    this.offset = offset == null ? data.position || 0 : offset;
+    if (value !== undefined) {
+      this.set(value);
+    }
+  };
+
+  define(EnumT, [
+    function get(data, offset){
+      return values[IndexType.get(data, offset)];
+    },
+    function set(data, offset, value){
+      IndexType.set(data, offset, indices[value]);
+    },
+    function sizeof(value){
+      return indexSize;
+    }
+  ]);
+
+  EnumT.prototype = this;
+
+  define(this, {
+    constructor: EnumT,
+    bytes: indexSize
+  });
+
+  define(this, [
+    function get(){
+      return values[IndexType.get(this.data, this.offset)];
+    },
+    function set(data, offset, value){
+      IndexType.set(this.data, this.offset, indices[value]);
+    },
+  ]);
+
+
+  return EnumT;
+}
+
 var kinds = {
   number: function(def){
     return new NumericType(def.id[0].toUpperCase() + def.id.slice(1), def.bytes);
@@ -589,6 +651,9 @@ var kinds = {
   },
   pointer: function(def){
     return new PointerType(def.id, def.pointeeType);
+  },
+  'enum': function(def){
+    return new EnumType(def.id, def.values);
   }
 };
 
@@ -652,9 +717,14 @@ register([
     pointeeType: 'string'
   },
   {
-    id: 'Strings',
+    id: 'strings',
     kind: 'array',
     elementType: 'String'
+  },
+  {
+    id: 'Strings',
+    kind: 'pointer',
+    pointeeType: 'strings'
   },
   {
     id: 'SourceLocation',
@@ -686,13 +756,41 @@ register([
     ]
   },
   {
+    id: 'Descriptors',
+    kind: 'array',
+    elementType: 'Descriptor'
+  },
+  {
+    id: 'BinaryOp',
+    kind: 'enum',
+    values: ['instanceof', 'in', '==', '!=', '===', '!==', '<', '>', '<=', '>=',
+             '*', '/','%', '+', '-', '<<', '>>', '>>>', '|', '&', '^', 'string+']
+  },
+  {
+    id: 'UnaryOp',
+    kind: 'enum',
+    values: ['delete', 'void', 'typeof', '+', '-', '~', '!']
+  },
+  {
+    id: 'ScopeType',
+    kind: 'enum',
+    values: ['global', 'eval', 'function',  'module']
+  },
+  {
+    id: 'LexicalType',
+    kind: 'enum',
+    values: ['normal', 'method', 'arrow' ]
+  },
+  {
     id: 'CodeFlags',
     kind: 'bitfield',
+    type: 'uint8',
     fields: [
       { name: 'topLevel', value: 0x01 },
       { name: 'strict', value: 0x02 },
       { name: 'usesSuper', value: 0x04 },
-      { }
+      { name: 'generator', value: 0x08 },
+      { name: 'writableName', value: 0x10 }
     ]
   },
   {
@@ -700,32 +798,28 @@ register([
     kind: 'struct',
     properties: [
       { name: 'flags', type: 'CodeFlags' },
-      { name: 'loc', type: 'SourceRange' }
+      { name: 'loc', type: 'SourceRange' },
+      { name: 'scopeType', type: 'ScopeType' },
+      { name: 'lexicalType', type: 'LexicalType' },
+      { name: 'varDecls', type: 'Strings' },
+      { name: 'exportedNames', type: 'Strings' }
     ]
   },
-  {
-    id: 'Descriptors',
-    kind: 'array',
-    elementType: 'Descriptor'
-  },
-  {
-
-
-  }
 ]);
+
 
 void function(){
   var string = getType('string'),
-      getter = string.prototype.get,
-      setter = string.prototype.set,
+      getter = string.get,
+      setter = string.set,
       charCode = String.fromCharCode;
 
-  define(string.prototype, [
-    function get(){
-      return charCode.apply(null, getter.call(this));
+  define(string, [
+    function get(data, offset){
+      return charCode.apply(null, getter(data, offset));
     },
-    function set(value){
-      return setter.call(this, map(new String(value), function(chr){
+    function set(data, offset, value){
+      return setter(data, offset, map(new String(value), function(chr){
         return chr.charCodeAt(0);
       }));
     }
@@ -733,17 +827,28 @@ void function(){
 }();
 
 
-var data = new DataView(new ArrayBuffer(1600));
+var data = new DataView(new ArrayBuffer(80));
 var buff = new Uint32Array(data.buffer);
 
-var Strings = getType('Strings');
+var Code = getType('Code');
 
-var x = new Strings(data, 0, Object.keys(global));
-
-x.forEach(function(v){
-  console.log(v.getAddress());
+var x = new Code(data, 0, {
+  flags: {
+    topLevel: true,
+    strict: false,
+    usesSuper: false
+  },
+  loc: {
+    start: { line: 1, column: 0 },
+    end: { line: 1, column: 15 }
+  },
+  scopeType: 'global',
+  lexicalType: 'normal',
+  varDecls: ['xyz', 'abc'],
+  exportedNames: []
 });
 
+console.log(data);
 
 // var x = new Range(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
 
