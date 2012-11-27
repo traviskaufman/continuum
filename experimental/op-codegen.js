@@ -105,6 +105,10 @@ var utility = require('../lib/objects').assignAll({}, [
 var define = utility.define,
     inherit = utility.inherit,
     create = utility.create,
+    iterate = utility.iterate,
+    getProperties = utility.getProperties,
+    StopIteration = utility.StopIteration,
+    map = utility.map,
     each = utility.each;
 
 
@@ -181,6 +185,9 @@ function NumericType(name, bytes){
     },
     function set(data, offset, value){
       return data[setter](offset, value, true);
+    },
+    function sizeof(value){
+      return bytes;
     }
   ]);
 
@@ -221,6 +228,9 @@ function StructType(name, fields){
     },
     function set(data, offset, value){
       new StructT(data, offset, value);
+    },
+    function sizeof(value){
+      return currentOffset;
     }
   ]);
 
@@ -275,60 +285,125 @@ function StructType(name, fields){
   return types[name] = StructT;
 }
 
-function ArrayType(name, Type, length){
-  Type = getType(Type);
-  var bytes = Type.prototype.bytes;
 
-  var ArrayT = function(data, offset, value){
-    define(this, 'data', data);
-    this.offset = offset == null ? data.position || 0 : offset;
-    data.position = this.offset + this.bytes;
-    if (value !== undefined) {
-      this.set(value);
-    }
-  };
+var ArrayType = (function(){
+  function ArrayType(name, ElementType){
+    ElementType = getType(ElementType);
+    var LengthType = getType('uint32'),
+        elementBytes = ElementType.prototype.bytes,
+        lengthBytes = LengthType.prototype.bytes;
 
-  define(ArrayT, [
-    function get(data, offset){
-      return new ArrayT(data, offset).get();
-    },
-    function set(data, offset, value){
-      new ArrayT(data, offset, value);
-    }
-  ]);
+    var ArrayT = function(data, offset, value){
+      define(this, 'data', data);
+      this.offset = offset == null ? data.position || 0 : offset;
+      if (value !== undefined) {
+        data.position = this.offset + ArrayT.sizeof(value);
+        this.set(value);
+      }
+    };
 
-  ArrayT.prototype = this;
+    define(ArrayT, [
+      function get(data, offset){
+        return new ArrayT(data, offset).get();
+      },
+      function set(data, offset, value){
+        new ArrayT(data, offset, value);
+      },
+      function sizeof(value){
+        return value.length * elementBytes + lengthBytes;
+      }
+    ]);
 
-  define(this, {
-    constructor: ArrayT,
-    bytes: bytes * length,
-  });
+    define(ArrayT, 'ElementType', ElementType);
 
-  define(this, [
-    function getIndex(index){
-      return Type.get(this.data, this.offset + index * bytes);
-    },
-    function setIndex(index, value){
-      return Type.set(this.data, this.offset + index * bytes, value);
-    },
+    ArrayT.prototype = this;
+
+    define(this, {
+      constructor: ArrayT
+    });
+
+    define(this, [
+      function getSize(){
+        return this.getLength() * elementBytes + lengthBytes;
+      },
+      function setLength(len){
+        return LengthType.set(this.data, this.offset, len);
+      },
+      function getLength(){
+        return LengthType.get(this.data, this.offset);
+      },
+      function getIndex(index){
+        return ElementType.get(this.data, this.offset + lengthBytes + index * elementBytes);
+      },
+      function setIndex(index, value){
+        return ElementType.set(this.data, this.offset + lengthBytes + index * elementBytes, value);
+      },
+      function getItem(index){
+        return new ElementType(this.data, this.offset + lengthBytes + index * elementBytes);
+      }
+    ]);
+
+
+    return ArrayT;
+  }
+
+  define(ArrayType.prototype, [
     function get(){
-      var out = [];
-      for (var i=0; i < length; i++) {
+      var len = this.getLength(),
+          out = new Array(len);
+
+      for (var i=0; i < len; i++) {
         out[i] = this.getIndex(i);
       }
       return out;
     },
     function set(value){
+      this.setLength(value.length);
       for (var i=0; i < value.length; i++) {
         if (i in value) {
           this.setIndex(i, value[i]);
         }
       }
+    },
+    function forEach(callback, context){
+      var len = this.getLength();
+      context = context || this;
+      for (var i=0; i < len; i++) {
+        callback.call(context, this.setIndex(i), i, this);
+      }
+    },
+    function __iterator__(type){
+      return new ArrayTypeIterator(this, type || 'item');
     }
   ]);
 
-  return ArrayT;
-}
+  function ArrayTypeIterator(array, kind){
+    define(this, {
+      length: array.getLength(),
+      index: 0,
+      array: array,
+      kind: kind
+    });
+  }
+
+  define(ArrayTypeIterator.prototype, [
+    function next(){
+      if (this.index >= this.length) {
+        throw StopIteration;
+      }
+      if (this.kind === 'value') {
+        return this.array.getIndex(this.index++);
+      } else if (this.kind === 'item') {
+        return this.array.getItem(this.index++);
+      } else {
+        return [this.index, this.array.getIndex(this.index++)];
+      }
+    }
+  ]);
+
+  return ArrayType;
+})();
+
 
 function BitfieldType(name, fields, Type){
   Type = getType(Type);
@@ -349,6 +424,9 @@ function BitfieldType(name, fields, Type){
     },
     function set(data, offset, value){
       new BitfieldT(data, offset, value);
+    },
+    function sizeof(value){
+      return bytes;
     }
   ]);
 
@@ -372,6 +450,7 @@ function BitfieldType(name, fields, Type){
       Type.set(this.data, this.offset, value ? val | flag : val & ~flag);
     };
   });
+
 
   define(this, {
     constructor: BitfieldT,
@@ -406,6 +485,95 @@ function BitfieldType(name, fields, Type){
   return BitfieldT;
 }
 
+function PointerType(name, PointeeType, alloc){
+  var AddressType = getType('uint32'),
+      addressSize = AddressType.prototype.bytes;
+
+  PointeeType = getType(PointeeType);
+
+  alloc = alloc || function(pointer, value){
+    var address = pointer.data.position || 0;
+    AddressType.set(pointer.data, pointer.offset, address);
+    pointer.data.position += PointeeType.sizeof(value);
+    return address;
+  };
+
+  var PointerT = function(data, offset, value){
+    define(this, 'data', data);
+    this.offset = offset == null ? data.position || 0 : offset;
+    if (value !== undefined) {
+      this.set(value);
+    }
+  };
+
+  define(PointerT, [
+    function get(data, offset){
+      return new PointerT(data, offset).get();
+    },
+    function set(data, offset, value){
+      new PointerT(data, offset, value);
+    },
+    function sizeof(value){
+      return addressSize;
+    }
+  ]);
+
+  define(PointerT, 'PointeeType', PointeeType);
+
+  PointerT.prototype = this;
+
+  define(this, {
+    constructor: PointerT,
+    bytes: addressSize
+  });
+
+  define(this, [
+    function getAddress(){
+      return AddressType.get(this.data, this.offset);
+    },
+    function setAddress(value){
+      return AddressType.set(this.data, this.offset, value);
+    },
+    function get(){
+      return PointeeType.get(this.data, this.getAddress());
+    },
+    function set(value){
+      var address = this.getAddress() || alloc(this, value);
+      PointeeType.set(this.data, address, value);
+    }
+  ]);
+
+  if (PointeeType instanceof ArrayType) {
+    var ElementType = PointeeType.elementType,
+        elementSize = ElementType.prototype.bytes,
+        LengthType = getType('uint32'),
+        lengthBytes = LengthType.prototype.byte;
+
+    define(this, [
+      function getSize(){
+        return this.getLength() * elementSize + lengthBytes;
+      },
+      function setLength(len){
+        return LengthType.set(this.data, this.getAddress(), len);
+      },
+      function getLength(){
+        return LengthType.get(this.data, this.getAddress());
+      },
+      function getIndex(index){
+        return ElementType.get(this.data, this.getAddress() + lengthBytes + index * elementSize);
+      },
+      function setIndex(index, value){
+        return ElementType.set(this.data, this.getAddress() + lengthBytes + index * elementSize, value);
+      },
+      function getItem(index){
+        return new ElementType(this.data, this.getAddress() + lengthBytes + index * elementSize);
+      }
+    ]);
+  }
+
+  return PointerT;
+}
+
 var kinds = {
   number: function(def){
     return new NumericType(def.id[0].toUpperCase() + def.id.slice(1), def.bytes);
@@ -414,14 +582,15 @@ var kinds = {
     return new StructType(def.id, def.properties);
   },
   array: function(def){
-    return new ArrayType(def.id, def.elementType, def.length);
+    return new ArrayType(def.id, def.elementType);
   },
   bitfield: function(def){
     return new BitfieldType(def.id, def.fields, def.type)
+  },
+  pointer: function(def){
+    return new PointerType(def.id, def.pointeeType);
   }
 };
-
-
 
 register([
   {
@@ -473,6 +642,21 @@ register([
     bytes: 8
   },
   {
+    id: 'string',
+    kind: 'array',
+    elementType: 'uint16'
+  },
+  {
+    id: 'String',
+    kind: 'pointer',
+    pointeeType: 'string'
+  },
+  {
+    id: 'Strings',
+    kind: 'array',
+    elementType: 'String'
+  },
+  {
     id: 'SourceLocation',
     kind: 'struct',
     description: 'A specific position in sourcecode.',
@@ -495,10 +679,10 @@ register([
     kind: 'bitfield',
     type: 'uint8',
     fields: [
-      { name: 'enumerable', value: 1 },
-      { name: 'configurable', value: 2 },
-      { name: 'writable', value: 4 },
-      { name: 'accessor', value: 8 },
+      { name: 'enumerable', value: 0x01 },
+      { name: 'configurable', value: 0x02 },
+      { name: 'writable', value: 0x04 },
+      { name: 'accessor', value: 0x08 },
     ]
   },
   {
@@ -518,17 +702,47 @@ register([
       { name: 'flags', type: 'CodeFlags' },
       { name: 'loc', type: 'SourceRange' }
     ]
+  },
+  {
+    id: 'Descriptors',
+    kind: 'array',
+    elementType: 'Descriptor'
+  },
+  {
+
+
   }
 ]);
 
+void function(){
+  var string = getType('string'),
+      getter = string.prototype.get,
+      setter = string.prototype.set,
+      charCode = String.fromCharCode;
 
-var data = new DataView(new ArrayBuffer(16));
+  define(string.prototype, [
+    function get(){
+      return charCode.apply(null, getter.call(this));
+    },
+    function set(value){
+      return setter.call(this, map(new String(value), function(chr){
+        return chr.charCodeAt(0);
+      }));
+    }
+  ]);
+}();
+
+
+var data = new DataView(new ArrayBuffer(1600));
 var buff = new Uint32Array(data.buffer);
 
-//var x = new (getType('SourceRange'))(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
-var Descriptor = getType('Descriptor');
-var z = new Descriptor(data, 0, { enumerable: true, configurable: true, accessor: true });
-console.log(buff);
+var Strings = getType('Strings');
+
+var x = new Strings(data, 0, Object.keys(global));
+
+x.forEach(function(v){
+  console.log(v.getAddress());
+});
 
 
 // var x = new Range(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
