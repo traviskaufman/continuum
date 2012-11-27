@@ -99,17 +99,11 @@ var ops = new Feeder(function(op){
 var realm = window.realm = continuum.createRealmAsync();
 
 realm.on('throw', inspect);
-
-realm.on('write', function(args){
-  stdout.write.apply(stdout, args);
-});
-
-realm.on('clear', function(){
-  stdout.clear();
-});
-
-realm.on('backspace', function(n){
-  stdout.backspace(n);
+realm.on('write', stdout.write, stdout);
+realm.on('clear', stdout.clear, stdout);
+realm.on('backspace', stdout.backspace, stdout);
+realm.on('inspect', function(obj){
+  inspect(obj).expand();
 });
 
 realm.on('pause', function(){

@@ -4245,14 +4245,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return MakeException(type, toInternalArray(args));
         },
         Signal: function(name, value){
-          if (isObject(value)) {
-            if (value instanceof $Array) {
-              value = toInternalArray(value);
-            } else {
-              throw new Error('NYI');
-            }
-          }
-          realm.emit(name, value);
+          realm.emit.apply(realm, arguments);
         },
         wrapDateMethods: function(target){
           wrapBuiltins(Date.prototype, target);

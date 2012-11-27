@@ -9,12 +9,12 @@ export class Console {
 
   @write(value, color){
     color || (color = '#fff');
-    this.@output.signal('write', ['' + value, '' + color]);
+    this.@output.signal('write', '' + value, '' + color);
   }
 
   @writeln(value, color){
     color || (color = '#fff');
-    this.@output.signal('write', [value + '\n', '' + color]);
+    this.@output.signal('write', value + '\n', '' + color);
   }
 
   assert(expression, ...values){
@@ -37,8 +37,8 @@ export class Console {
     this.@writeln(join(values));
   }
 
-  dir(){
-    // TODO
+  dir(object){
+    this.@output.signal('inspect', object);
   }
 
   dirxml(){

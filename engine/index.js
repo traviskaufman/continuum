@@ -302,6 +302,7 @@ var index = (function(exports){
       require('../lib/Emitter'),
       require('../lib/Feeder'),
       require('../lib/HashMap'),
+      require('../lib/ObjectMap'),
       require('../lib/HashSet'),
       require('../lib/LinkedList'),
       require('../lib/PropertyList'),
