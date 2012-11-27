@@ -22,9 +22,40 @@ export function RegExp(pattern, flags){
 }
 
 $__setupConstructor(RegExp, $__RegExpProto);
-$__wrapRegExpMethods(RegExp.prototype);
+
+
+export function exec(regexp, string){
+  if ($__GetBuiltinBrand(regexp) === 'RegExp') {
+    return $__RegExpExec(regexp, '' + string);
+  } else {
+    throw $__Exception('not_generic', ['@regexp.exec']);
+  }
+}
+
+export function test(regexp, string){
+  if ($__GetBuiltinBrand(regexp) === 'RegExp') {
+    return $__RegExpTest(regexp, '' + string);
+  } else {
+    throw $__Exception('not_generic', ['@regexp.test']);
+  }
+}
+
 
 $__defineProps(RegExp.prototype, {
+  exec(string){
+    if ($__GetBuiltinBrand(this) === 'RegExp') {
+      return $__RegExpExec(this, '' + string);
+    } else {
+      throw $__Exception('not_generic', ['RegExp.prototype.exec']);
+    }
+  },
+  test(string){
+    if ($__GetBuiltinBrand(this) === 'RegExp') {
+      return $__RegExpTest(this, '' + string);
+    } else {
+      throw $__Exception('not_generic', ['RegExp.prototype.test']);
+    }
+  },
   toString(){
     if ($__GetBuiltinBrand(this) === 'RegExp') {
       return $__RegExpToString(this);
@@ -33,3 +64,4 @@ $__defineProps(RegExp.prototype, {
     }
   }
 });
+

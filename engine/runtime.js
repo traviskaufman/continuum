@@ -2736,17 +2736,72 @@ var runtime = (function(GLOBAL, exports, undefined){
         $Object.call(this, intrinsics.RegExpProto);
       }
       this.PrimitiveValue = primitive;
-      this.define('global', primitive.global, ___);
-      this.define('ignoreCase', primitive.ignoreCase, ___);
-      this.define('lastIndex', primitive.lastIndex, __W);
-      this.define('multiline', primitive.multiline, ___);
-      this.define('source', primitive.source, ___);
     }
+
+    var reflected = assign(new Hash, {
+      global:     ['global', false, ___],
+      ignoreCase: ['ignoreCase', false, ___],
+      lastIndex:  ['lastIndex', 0, __W],
+      multiline:  ['multiline', false, ___],
+      source:     ['source', '', ___]
+    });
 
     inherit($RegExp, $Object, {
       BuiltinBrand: BRANDS.BuiltinRegExp,
       Match: null
-    });
+    }, [
+      function describe(key){
+        if (key in reflected) {
+          var prop = reflected[key];
+          prop[1] = this.PrimitiveValue[key];
+          return prop;
+        }
+        return this.properties.getProperty(key);
+      },
+      function define(key, value, attr){
+        if (key in reflected) {
+          if (key === 'lastIndex') {
+            this.PrimitiveValue.lastIndex = value;
+          }
+        } else {
+          this.properties.set(key, value, attr);
+        }
+      },
+      function get(key){
+        if (key in reflected) {
+          return this.PrimitiveValue[key];
+        }
+        return this.properties.get(key);
+      },
+      function set(key, value){
+        if (key in reflected) {
+          if (key === 'lastIndex') {
+            this.PrimitiveValue.lastIndex = value;
+          }
+        } else {
+          this.properties.set(key, value);
+        }
+      },
+      function query(key){
+        if (key in reflected) {
+          return reflected[key][2];
+        }
+        return this.properties.getAttribute(key);
+      },
+      function update(key, attr){
+        if (!(key in reflected)) {
+          return this.properties.setAttribute(key, attr);
+        }
+      },
+      function each(callback){
+        for (var k in reflected) {
+          var prop = reflected[k];
+          prop[1] = this.PrimitiveValue[k];
+          callback(prop);
+        }
+        this.properties.forEach(callback);
+      }
+    ]);
 
     return $RegExp;
   })();
@@ -4234,10 +4289,11 @@ var runtime = (function(GLOBAL, exports, undefined){
           } else {
             switch (typeof o) {
               case 'undefined': return 'Undefined';
-              case 'number':    return 'Number';
-              case 'string':    return 'String';
-              case 'boolean':   return 'Boolean';
+              case 'function':
               case 'object':    return 'Object';
+              case 'string':    return 'String';
+              case 'number':    return 'Number';
+              case 'boolean':   return 'Boolean';
             }
           }
         },
@@ -4249,9 +4305,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         wrapDateMethods: function(target){
           wrapBuiltins(Date.prototype, target);
-        },
-        wrapRegExpMethods: function(target){
-          wrapBuiltins(RegExp.prototype, target);
         },
         now: Date.now || function(){ return +new Date },
 
@@ -4399,6 +4452,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         RegExpToString: function(object){
           return ''+object.PrimitiveValue;
+        },
+        RegExpExec: function(object, str){
+          var result = object.PrimitiveValue.exec(str);
+          if (result) {
+            var array = fromInternalArray(result);
+            array.set('index', result.index);
+            array.set('input', str);
+            return array;
+          }
+          return result;
+        },
+        RegExpTest: function(object, str){
+          return object.PrimitiveValue.test(str);
         },
         DateToNumber: function(object){
           return +object.PrimitiveValue;
