@@ -434,6 +434,7 @@ var assembler = (function(exports){
   })();
 
 
+
   function isSuperReference(node) {
     return !!node && node.type === 'Identifier' && node.name === 'super';
   }
@@ -508,46 +509,8 @@ var assembler = (function(exports){
     FunctionDeclaration: 'id',
     ClassDeclaration   : 'id'
   });
-/*
-  function LexicallyDeclaredNames(){
-    LinkedHashMap.call(this);
-  }
-
-  inherit(LexicallyDeclaredNames, LinkedHashMap, [
-    function add()
-  ]);
 
 
-  function StaticScope(node){
-    this.node = node;
-  }
-
-
-
-  function GlobalScope(){
-    this.LexicallyDeclaredNames = new LinkedHashMap;
-    this.VarDeclaredNames = new LinkedHashMap;
-    this.VarScopedDeclarations = new LinkedHashMap;
-  }
-
-  inherit(GlobalScope, StaticScope, [
-    function enqueue(node){
-
-    }
-  ]);
-
-  function FunctionScope(node){
-    this.node = node;
-    this.
-  }
-
-  inherit(FunctionScope, StaticScope, [
-    function enqueue(node){
-
-    }
-  ]);
-
-*/
   function BoundNames(node){
     return boundNamesCollector(node);
   }
@@ -579,7 +542,57 @@ var assembler = (function(exports){
     };
   });
 
+  var varDecls = collector({
+    VariableDeclaration: function(node){
+      if (node.type === 'var') {
+        return node;
+      }
+    },
+    BlockStatement: walk.RECURSE,
+    IfStatement: walk.RECURSE,
+    ForStatement: walk.RECURSE,
+    ForOfStatement: walk.RECURSE,
+    ForInStatement: walk.RECURSE,
+    DoWhileStatement: walk.RECURSE,
+    WhileStatement: walk.RECURSE,
+    ExportDeclaration: walk.RECURSE,
+    CatchClause: walk.RECURSE,
+    SwitchCase: walk.RECURSE,
+    SwitchStatement: walk.RECURSE,
+    TryStatement: walk.RECURSE,
+    WithStatement: walk.RECURSE
+  });
 
+  function VarScopedDeclarations(node){
+    var decls = varDecls(node);
+    each(node.body, function(statement){
+      if (statement.type === 'FunctionDeclaration') {
+        decls.push(statement);
+      }
+    });
+
+    return decls;
+  }
+
+
+  function FunctionDeclarationInstantiation(code){
+    var varDeclarations = VarScopedDeclarations(code.body),
+        len = varDeclarations.length,
+        argumentsObjectNotNeeded = false
+
+    while (len--) {
+      var decl = varDeclarations[len];
+      if (decl.type === 'FunctionDeclaration') {
+        decl.BoundNames || (decl.BoundNames = BoundNames(decl));
+        var name = decl.BoundNames[0];
+        if (name === 'arguments') {
+          argumentsObjectNotNeeded = true;
+        }
+
+      }
+
+    }
+  }
 
   var getExports = (function(){
     var collectExportDecls = collector({
@@ -686,6 +699,54 @@ var assembler = (function(exports){
 
       return imported;
     };
+  })();
+
+
+  var reducer = (function(){
+    function convert(node){
+      var handler = handlers[node.type];
+      if (handler) return handler(node);
+    }
+    var handlers = {
+      ArrayPattern: function(node){
+        return map(node.elements, convert);
+      },
+      Identifier: function(node){
+        return node.name;
+      },
+      Literal: function(node){
+        return node.value;
+      },
+      ObjectPattern: function(node){
+        var out = {};
+        each(node.properties, function(prop){
+          out[convert(prop.key)] = convert(prop.value);
+        });
+        return out;
+      },
+      FunctionDeclaration: function(node){
+        return map(node.params, convert);
+      },
+      Program: function(node){
+        var out = {
+          functions: [],
+          vars: []
+        };
+        each(node.body, function(node){
+          if (node.type === 'FunctionDeclaration') {
+            out.functions.push({ name: convert(node.id), params: convert(node) });
+          } else if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+            each(node.declarations, function(decl){
+
+              out.vars.push(convert(decl.id));
+            });
+          }
+        });
+        return out;
+      }
+    };
+
+    return convert;
   })();
 
 
