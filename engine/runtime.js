@@ -450,11 +450,11 @@ var runtime = (function(GLOBAL, exports, undefined){
     function makeDefiner(constructs, field, desc){
       return function(obj, key, code) {
 
-        var sup = code.NeedsSuperBinding,
+        var sup = code.flags.usesSuper,
             lex = context.LexicalEnvironment,
             home = sup ? obj : undefined,
-            $F = code.generator ? $GeneratorFunction : $Function,
-            func = new $F(METHOD, key, code.params, code, lex, code.Strict, undefined, home, sup);
+            $F = code.flags.generator ? $GeneratorFunction : $Function,
+            func = new $F(METHOD, key, code.params, code, lex, code.flags.strict, undefined, home, sup);
 
         constructs && MakeConstructor(func);
         desc[field] = func;
@@ -514,8 +514,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
-        configurable = code.ScopeType === SCOPE.EVAL,
-        decls = code.LexicalDeclarations;
+        configurable = code.scopeType === SCOPE.EVAL,
+        decls = code.lexicalDecls;
 
     var desc = configurable ? mutable : immutable;
 
@@ -533,15 +533,15 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         }
 
-        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.Strict);
+        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.flags.strict);
       }
     }
 
-    for (var i=0; i < code.VarDeclaredNames.length; i++) {
-      var name = code.VarDeclaredNames[i];
+    for (var i=0; i < code.varDecls.length; i++) {
+      var name = code.varDecls[i];
       if (!env.HasBinding(name)) {
         env.CreateMutableBinding(name, configurable);
-        env.SetMutableBinding(name, undefined, code.Strict);
+        env.SetMutableBinding(name, undefined, code.flags.strict);
       } else if (env === realm.globalEnv) {
         var existing = global.GetOwnProperty(name);
         if (!existing) {
@@ -556,7 +556,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function FunctionDeclarationInstantiation(func, args, env){
     var formals = func.FormalParameters,
-        params = formals.BoundNames;
+        params = formals.boundNames;
 
     for (var i=0; i < params.length; i++) {
       if (!env.HasBinding(params[i])) {
@@ -565,10 +565,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var decls = func.Code.LexicalDeclarations;
+    var decls = func.code.lexicalDecls;
 
     for (var i=0, decl; decl = decls[i]; i++) {
-      var names = decl.BoundNames;
+      var names = decl.boundNames;
       for (var j=0; j < names.length; j++) {
         if (!env.HasBinding(names[j])) {
           if (decl.IsConstantDeclaration) {
@@ -580,8 +580,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    if (func.Strict) {
-      var ao = new $StrictArguments(args);
+    if (func.strict) {
+      var ao = new $strictArguments(args);
       var status = ArgumentBindingInitialization(formals, ao, env);
     } else {
       var ao = env.arguments = new $MappedArguments(params, env, args, func);
@@ -593,7 +593,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     if (!env.HasBinding('arguments')) {
-      if (func.Strict) {
+      if (func.strict) {
         env.CreateImmutableBinding('arguments');
       } else {
         env.CreateMutableBinding('arguments');
@@ -602,7 +602,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
 
-    var vardecls = func.Code.VarDeclaredNames;
+    var vardecls = func.code.varDecls;
     for (var i=0; i < vardecls.length; i++) {
       if (!env.HasBinding(vardecls[i])) {
         env.CreateMutableBinding(vardecls[i]);
@@ -629,6 +629,16 @@ var runtime = (function(GLOBAL, exports, undefined){
     this.name = name;
   }
 
+  function getKey(v){
+    if (!v || typeof v === 'string') {
+      return v;
+    }
+    if (v[0] !== '@') {
+      return v[1];
+    }
+
+    return context.getSymbol(v[1]);
+  }
   // ## ClassDefinitionEvaluation
 
   function ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
@@ -680,7 +690,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     if (!constructorCode) {
-      constructorCode = intrinsics.EmptyClass.Code;
+      constructorCode = intrinsics.EmptyClass.code;
     }
 
     var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
@@ -701,9 +711,10 @@ var runtime = (function(GLOBAL, exports, undefined){
     proto.IsClassProto = true;
     proto.Brand = new Brand(brand);
 
-    for (var i=0, method; method = methods[i]; i++) {
-      PropertyDefinitionEvaluation(method.kind, proto, method.name, method.code);
-    }
+    each(methods, function(method){
+      console.log(method);
+      PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
+    });
 
     return ctor;
   }
@@ -711,9 +722,9 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ## InstantiateFunctionDeclaration
 
   function InstantiateFunctionDeclaration(decl, env){
-    var code = decl.Code;
+    var code = decl.code;
     var $F = code.generator ? $GeneratorFunction : $Function;
-    var func = new $F(NORMAL, decl.id.name, code.params, code, env, code.Strict);
+    var func = new $F(NORMAL, decl.id.name, code.params, code, env, code.flags.strict);
     MakeConstructor(func);
     return func;
   }
@@ -723,7 +734,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function BlockDeclarationInstantiation(decls, env){
     for (var i=0, decl; decl = decls[i]; i++) {
-      for (var j=0, name; name = decl.BoundNames[j]; j++) {
+      for (var j=0, name; name = decl.boundNames[j]; j++) {
         if (decl.IsConstantDeclaration) {
           env.CreateImmutableBinding(name);
         } else {
@@ -1081,7 +1092,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (name.Abrupt) return name; else name = name.value;
     }
 
-    return new Reference(base, name, context.Strict);
+    return new Reference(base, name, context.strict);
   }
 
   function SuperReference(context, prop){
@@ -1108,7 +1119,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var ref = new Reference(baseValue, key, context.Strict);
+    var ref = new Reference(baseValue, key, context.strict);
     ref.thisValue = env.GetThisBinding();
     return ref;
   }
@@ -2084,15 +2095,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, proto);
       this.FormalParameters = params;
       this.ThisMode = kind === ARROW ? 'lexical' : strict ? 'strict' : 'global';
-      this.Strict = !!strict;
+      this.strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
-      this.Code = code;
+      this.code = code;
       if (holder !== undefined) {
         this.HomeObject = holder;
       }
       if (method) {
-        this.MethodName = name;
+        this.MethodName = getKey(name);
       }
 
       if (strict) {
@@ -2104,7 +2115,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       this.define('length', params ? params.ExpectedArgumentCount : 0, ___);
-      this.define('name', code.name || '', code.name && !code.writableName ? ___ : __W);
+      this.define('name', getKey(code.name), code.name && !code.flags.writableName ? ___ : __W);
     }
 
     inherit($Function, $Object, {
@@ -2112,7 +2123,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       FormalParameters: null,
       Code: null,
       Scope: null,
-      Strict: false,
+      strict: false,
       ThisMode: 'global',
       Realm: null
     }, [
@@ -2138,7 +2149,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var caller = context ? context.callee : null;
 
-        ExecutionContext.push(new ExecutionContext(context, local, realm, this.Code, this, isConstruct));
+        ExecutionContext.push(new ExecutionContext(context, local, realm, this.code, this, isConstruct));
         var status = FunctionDeclarationInstantiation(this, args, local);
         if (status && status.Abrupt) {
           ExecutionContext.pop();
@@ -2146,11 +2157,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         if (!this.thunk) {
-          this.thunk = new Thunk(this.Code);
+          this.thunk = new Thunk(this.code);
           hide(this, 'thunk');
         }
 
-        if (!this.Strict) {
+        if (!this.strict) {
           this.define('arguments', local.arguments, ___);
           this.define('caller', caller, ___);
           local.arguments = null;
@@ -2158,7 +2169,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var result = this.thunk.run(context);
 
-        if (!this.Strict) {
+        if (!this.strict) {
           this.define('arguments', null, ___);
           this.define('caller', null, ___);
         }
@@ -2279,7 +2290,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnvironmentRecord(receiver, this);
         }
 
-        var ctx = new ExecutionContext(context, local, this.Realm, this.Code, this);
+        var ctx = new ExecutionContext(context, local, this.Realm, this.code, this);
         ExecutionContext.push(ctx);
 
         var status = FunctionDeclarationInstantiation(this, args, local);
@@ -2289,7 +2300,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         if (!this.thunk) {
-          this.thunk = new Thunk(this.Code);
+          this.thunk = new Thunk(this.code);
           hide(this, 'thunk');
         }
 
@@ -2320,7 +2331,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this);
       this.Realm = realm;
       this.Scope = scope;
-      this.Code = thunk.code;
+      this.code = thunk.code;
       this.ExecutionContext = ctx;
       this.State = NEWBORN;
       this.thunk = thunk;
@@ -2367,7 +2378,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
         if (this.State === NEWBORN) {
           this.State = CLOSED;
-          this.Code = null;
+          this.code = null;
           return new AbruptCompletion(Throw, value);
         }
 
@@ -2383,7 +2394,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         if (state === NEWBORN) {
           this.State = CLOSED;
-          this.Code = null;
+          this.code = null;
           return;
         }
 
@@ -2843,8 +2854,8 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $StrictArguments = (function(){
-    function $StrictArguments(args){
+  var $strictArguments = (function(){
+    function $strictArguments(args){
       $Arguments.call(this, args.length);
       for (var i=0; i < args.length; i++) {
         this.define(i+'', args[i], ECW);
@@ -2854,9 +2865,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.define('caller', intrinsics.ThrowTypeError, __A);
     }
 
-    inherit($StrictArguments, $Arguments);
+    inherit($strictArguments, $Arguments);
 
-    return $StrictArguments;
+    return $strictArguments;
   })();
 
 
@@ -2890,7 +2901,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
-          if (key === 'caller' && IsCallable(val) && val.Strict) {
+          if (key === 'caller' && IsCallable(val) && val.strict) {
             return ThrowException('strict_poison_pill');
           }
           return val;
@@ -3708,10 +3719,10 @@ var runtime = (function(GLOBAL, exports, undefined){
     function ExecutionContext(caller, local, realm, code, func, isConstruct){
       this.caller = caller;
       this.Realm = realm;
-      this.Code = code;
+      this.code = code;
       this.LexicalEnvironment = local;
       this.VariableEnvironment = local;
-      this.Strict = code.Strict;
+      this.strict = code.flags.strict;
       this.isConstruct = !!isConstruct;
       this.callee = func && !func.Builtin ? func : caller ? caller.callee : null;
     }
@@ -3787,9 +3798,9 @@ var runtime = (function(GLOBAL, exports, undefined){
           env.CreateImmutableBinding(name);
         }
 
-        var func = new $F(code.Type, name, code.params, code, env, code.Strict);
+        var func = new $F(code.lexicalType, name, code.params, code, env, code.flags.strict);
 
-        if (code.Type !== ARROW) {
+        if (code.lexicalType !== ARROW) {
           MakeConstructor(func);
           name && env.InitializeBinding(name, func);
         }
@@ -4077,7 +4088,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
-      thrower.Strict = true;
+      thrower.strict = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);
     }
@@ -4384,7 +4395,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (func.Proxy) {
             func = func.ProxyTarget;
           }
-          var code = func.Code;
+          var code = func.code;
           if (func.Builtin || !code) {
             return nativeCode[0] + func.get('name') + nativeCode[1];
           } else {
@@ -4776,12 +4787,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
 
         each(code.imports, function(imported){
-          if (imported.specifiers && imported.specifiers.Code) {
-            var code = imported.specifiers.Code,
+          if (imported.specifiers && imported.specifiers.code) {
+            var code = imported.specifiers.code,
                 sandbox = createSandbox(global);
 
             runScript({ bytecode: code }, sandbox, errback.Call, function(){
-              var module = new $Module(sandbox.globalEnv, code.ExportedNames);
+              var module = new $Module(sandbox.globalEnv, code.exportedNames);
               module.mrl = code.name;
               callback.Call(null, [module]);
             });
@@ -4883,7 +4894,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       var sandbox = createSandbox(global);
 
       runScript(script, sandbox, function(){
-        Ω(new $Module(sandbox.globalEnv, script.bytecode.ExportedNames));
+        Ω(new $Module(sandbox.globalEnv, script.bytecode.exportedNames));
       }, ƒ);
     }
 

@@ -265,7 +265,7 @@ var thunk = (function(exports){
         }
       }
 
-      var result = context.initializeBinding(def.name, ctor);
+      var result = context.initializeBinding(getKey(def.name), ctor);
       if (result && result.Abrupt) {
         error = result;
         return unwind;
@@ -773,7 +773,6 @@ var thunk = (function(exports){
 
     function TEMPLATE(){
       stack[sp++] = context.getTemplateCallSite(ops[ip][0]);
-      console.log(stack, sp);
       return cmds[++ip];
     }
 

@@ -572,8 +572,8 @@ var debug = (function(exports){
       },
       function getParams(){
         var params = this.subject.FormalParameters;
-        if (params && params.BoundNames) {
-          var names = params.BoundNames.slice();
+        if (params && params.boundNames) {
+          var names = params.boundNames.slice();
           if (params.Rest) {
             names.rest = true;
           }
@@ -605,7 +605,7 @@ var debug = (function(exports){
         return introspect(this.subject.Scope);
       },
       function isStrict(){
-        return !!this.subject.Strict;
+        return !!this.subject.strict;
       },
       function ownAttrs(props){
         var strict = this.isStrict();
