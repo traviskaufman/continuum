@@ -712,7 +712,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     proto.Brand = new Brand(brand);
 
     each(methods, function(method){
-      console.log(method);
       PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
     });
 
@@ -4494,27 +4493,14 @@ var runtime = (function(GLOBAL, exports, undefined){
           return obj.GetP(receiver, key);
         },
 
-        parseInt: function(value, radix){
-          return parseInt(ToPrimitive(value), ToNumber(radix));
-        },
-        parseFloat: function(value){
-          return parseFloat(ToPrimitive(value));
-        },
-        decodeURI: function(value){
-          return decodeURI(ToString(value));
-        },
-        decodeURIComponent: function(value){
-          return decodeURIComponent(ToString(value));
-        },
-        encodeURI: function(value){
-          return encodeURI(ToString(value));
-        },
-        encodeURIComponent: function(value){
-          return encodeURIComponent(ToString(value));
-        },
-        escape: function(value){
-          return escape(ToString(value));
-        },
+        parseInt: parseInt,
+        parseFloat: parseFloat,
+        decodeURI: decodeURI,
+        decodeURIComponent: decodeURIComponent,
+        encodeURI: encodeURI,
+        encodeURIComponent: encodeURIComponent,
+        escape: escape,
+        unescape: unescape,
         SetTimer: function(f, time, repeating){
           if (typeof f === 'string') {
             f = natives.FunctionCreate(f);
@@ -4586,7 +4572,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           if (/^[\],:{}\s]*$/.test(test)) {
             var json = realm.evaluate('('+source+')');
-            return IsCallable(reviver) ? walk({ '': json }, '') : json;
+            var wrapper = new $Object;
+            wrapper.set('', json);
+            return IsCallable(reviver) ? walk(wrapper, '') : json;
           }
 
           return ThrowException('invalid_json', source);

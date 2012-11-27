@@ -1,25 +1,47 @@
-let decodeURI          = $__decodeURI,
-    decodeURIComponent = $__decodeURIComponent,
-    encodeURI          = $__encodeURI,
-    encodeURIComponent = $__encodeURIComponent,
-    escape             = $__escape,
-    eval               = $__eval,
-    parseInt           = $__parseInt,
-    parseFloat         = $__parseFloat;
+let Infinity = 1 / 0;
 
-function isFinite(number){
-  number = $__ToNumber(number);
+export function decodeURI(value){
+  return $__decodeURI('' + value);
+}
+
+export function decodeURIComponent(value){
+  return $__decodeURIComponent('' + value);
+}
+
+export function encodeURI(value){
+  return $__encodeURI('' + value);
+}
+
+export function encodeURIComponent(value){
+  return $__encodeURIComponent('' + value);
+}
+
+export function escape(value){
+  return $__escape('' + value);
+}
+
+export function unescape(value){
+  return $__unescape('' + value);
+}
+
+export function isFinite(number){
+  number = +number;
   return number === number && number !== Infinity && number !== -Infinity;
 }
 
-function isNaN(number){
-  number = $__ToNumber(number);
+export function isNaN(number){
+  number = +number;
   return number !== number;
+}
+export function parseFloat(value){
+  return $__parseFloat($__ToPrimitive(value));
+}
+
+export function parseInt(value, radix){
+  return $__parseInt($__ToPrimitive(value), +radix);
 }
 
 
-$__setupFunctions(isFinite, isNaN);
+$__setupFunctions(decodeURI, decodeURIComponent, encodeURI, encodeURIComponent,
+                  escape, isFinite, isNaN, parseInt, parseFloat);
 
-
-export decodeURI, decodeURIComponent, encodeURI, encodeURIComponent,
-       escape, eval, parseInt, parseFloat, isFinite, isNaN;
