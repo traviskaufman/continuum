@@ -388,44 +388,31 @@ h1, h2
 .ƒ_CA > .ƒFunction > .ƒFunctionName  { color: #868 }
 .ƒECA > .ƒFunction > .ƒFunctionName  { color: #fc0 }
 
-.ƒECW.ƒSymbol { color: #8fc }
-.ƒ_CW.ƒSymbol { color: #8fc }
-.ƒE_W.ƒSymbol { color: #9ef }
-.ƒ__W.ƒSymbol { color: #9ef }
-.ƒEC_.ƒSymbol { color: #afa }
-.ƒ_C_.ƒSymbol { color: #afa }
-.ƒE__.ƒSymbol { color: #1fa }
-.ƒ___.ƒSymbol { color: #1fa }
-.ƒE_A.ƒSymbol { color: #8da }
-.ƒ__A.ƒSymbol { color: #8da }
-.ƒECA.ƒSymbol { color: #af0 }
-.ƒ_CA.ƒSymbol { color: #af0 }
+.ƒECW.ƒSymbol, .ƒECW > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #8fc }
+.ƒ_CW.ƒSymbol, .ƒE_W > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #8fc }
+.ƒE_W.ƒSymbol, .ƒ__W > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #9ef }
+.ƒ__W.ƒSymbol, .ƒ_CW > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #9ef }
+.ƒEC_.ƒSymbol, .ƒEC_ > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #afa }
+.ƒ_C_.ƒSymbol, .ƒE__ > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #afa }
+.ƒE__.ƒSymbol, .ƒ_C_ > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #1fa }
+.ƒ___.ƒSymbol, .ƒ___ > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #1fa }
+.ƒE_A.ƒSymbol, .ƒ__A > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #8da }
+.ƒ__A.ƒSymbol, .ƒE_A > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #8da }
+.ƒECA.ƒSymbol, .ƒ_CA > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #af0 }
+.ƒ_CA.ƒSymbol, .ƒECA > .ƒFunction > .ƒSymbol.ƒFunctionName  { color: #af0 }
 
-.ƒECW.ƒPrivateSymbol { color: #7b8 }
-.ƒ_CW.ƒPrivateSymbol { color: #7b8 }
-.ƒE_W.ƒPrivateSymbol { color: #8dc }
-.ƒ__W.ƒPrivateSymbol { color: #8dc }
-.ƒEC_.ƒPrivateSymbol { color: #493 }
-.ƒ_C_.ƒPrivateSymbol { color: #493 }
-.ƒE__.ƒPrivateSymbol { color: #0a6 }
-.ƒ___.ƒPrivateSymbol { color: #0a6 }
-.ƒE_A.ƒPrivateSymbol { color: #6a0 }
-.ƒ__A.ƒPrivateSymbol { color: #6a0 }
-.ƒECA.ƒPrivateSymbol { color: #683 }
-.ƒ_CA.ƒPrivateSymbol { color: #683 }
-
-.ƒECW > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #8fc }
-.ƒE_W > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #9ef }
-.ƒ__W > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #8dc }
-.ƒ_CW > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #7b8 }
-.ƒEC_ > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #afa }
-.ƒE__ > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #1fa }
-.ƒ_C_ > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #493 }
-.ƒ___ > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #0a6 }
-.ƒ__A > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #6a0 }
-.ƒE_A > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #8da }
-.ƒ_CA > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #683 }
-.ƒECA > .ƒFunction > .ƒSymbol.ƒFunctionName { color: #af0 }
+.ƒECW.ƒPrivateSymbol, .ƒECW > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #7b8 }
+.ƒ_CW.ƒPrivateSymbol, .ƒE_W > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #7b8 }
+.ƒE_W.ƒPrivateSymbol, .ƒ__W > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #8dc }
+.ƒ__W.ƒPrivateSymbol, .ƒ_CW > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #8dc }
+.ƒEC_.ƒPrivateSymbol, .ƒEC_ > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #493 }
+.ƒ_C_.ƒPrivateSymbol, .ƒE__ > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #493 }
+.ƒE__.ƒPrivateSymbol, .ƒ_C_ > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #0a6 }
+.ƒ___.ƒPrivateSymbol, .ƒ___ > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #0a6 }
+.ƒE_A.ƒPrivateSymbol, .ƒ__A > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #6a0 }
+.ƒ__A.ƒPrivateSymbol, .ƒE_A > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #6a0 }
+.ƒECA.ƒPrivateSymbol, .ƒ_CA > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #683 }
+.ƒ_CA.ƒPrivateSymbol, .ƒECA > .ƒFunction > .ƒPrivateSymbol.ƒFunctionName  { color: #683 }
 
 .ƒPrivateSymbol { font-style: italic; }
 .ƒParams    { font-style: italic }
