@@ -6,23 +6,4 @@ export function Symbol(name, isPublic){
 }
 
 $__setupConstructor(Symbol, $__SymbolProto);
-
-$__defineProps(Symbol.prototype, {
-  valueOf(){
-    if ($__GetBuiltinBrand(this) === 'Symbol') {
-      return $__GetInternal(this, 'Label');
-    } else {
-      throw $__Exception('not_generic', ['Symbol.prototype.toString']);
-    }
-  },
-  toString(){
-    if ($__GetBuiltinBrand(this) === 'Symbol') {
-      return $__GetInternal(this, 'Label');
-    } else {
-      throw $__Exception('not_generic', ['Symbol.prototype.toString']);
-    }
-  }
-});
-
-$__DefineOwnProperty(Symbol.prototype, 'constructor', { configurable: false, writable: false });
-$__PreventExtensions(Symbol.prototype, false);
+$__remove(Symbol.prototype, 'constructor');
