@@ -8370,6 +8370,10 @@ exports.buffers = (function(global, exports){
 })(this, typeof module !== 'undefined' ? exports : {});
 
 
+
+//v=1+(v=(v=(v=(v=--v|v>>1)|v>>2)|v>>4)|v>>8)|v>>16;
+
+
 exports.constants = (function(exports){
   var objects = require('../lib/objects');
 
@@ -8762,27 +8766,29 @@ exports.assembler = (function(exports){
       Stack     = require('../lib/Stack'),
       HashMap   = require('../lib/HashMap');
 
-  var walk      = traversal.walk,
-      collector = traversal.collector,
-      Visitor   = traversal.Visitor,
-      fname     = functions.fname,
-      define    = objects.define,
-      assign    = objects.assign,
-      create    = objects.create,
-      copy      = objects.copy,
-      inherit   = objects.inherit,
-      ownKeys   = objects.keys,
-      hasOwn    = objects.hasOwn,
-      isObject  = objects.isObject,
-      Hash      = objects.Hash,
-      each      = iteration.each,
-      repeat    = iteration.repeat,
-      map       = iteration.map,
-      fold      = iteration.fold,
-      generate  = iteration.generate,
-      quotes    = utility.quotes,
-      uid       = utility.uid,
-      pushAll   = utility.pushAll;
+  var walk          = traversal.walk,
+      collector     = traversal.collector,
+      Visitor       = traversal.Visitor,
+      fname         = functions.fname,
+      define        = objects.define,
+      assign        = objects.assign,
+      create        = objects.create,
+      copy          = objects.copy,
+      inherit       = objects.inherit,
+      ownKeys       = objects.keys,
+      hasOwn        = objects.hasOwn,
+      isObject      = objects.isObject,
+      Hash          = objects.Hash,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration,
+      each          = iteration.each,
+      repeat        = iteration.repeat,
+      map           = iteration.map,
+      fold          = iteration.fold,
+      generate      = iteration.generate,
+      quotes        = utility.quotes,
+      uid           = utility.uid,
+      pushAll       = utility.pushAll;
 
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.hash,
@@ -8874,7 +8880,8 @@ exports.assembler = (function(exports){
 
 
 
-  var ARRAY            = new StandardOpCode(0, 'ARRAY'),
+  var AND              = new StandardOpCode(1, 'AND'),
+      ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
@@ -8897,12 +8904,18 @@ exports.assembler = (function(exports){
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(2, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
-      IFEQ             = new StandardOpCode(2, 'IFEQ'),
-      IFNE             = new StandardOpCode(2, 'IFNE'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
+      JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
+      JFALSE           = new StandardOpCode(1, 'JFALSE'),
+      JLT              = new StandardOpCode(2, 'JLT'),
+      JLTE             = new StandardOpCode(2, 'JLTE'),
+      JGT              = new StandardOpCode(2, 'JGT'),
+      JGTE             = new StandardOpCode(2, 'JGTE'),
+      JNEQ_NULL        = new StandardOpCode(1, 'JNEQ_NULL'),
+      JTRUE            = new StandardOpCode(1, 'JTRUE'),
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
       LOG              = new StandardOpCode(0, 'LOG'),
@@ -8911,6 +8924,7 @@ exports.assembler = (function(exports){
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
+      OR               = new StandardOpCode(1, 'OR'),
       POP              = new StandardOpCode(0, 'POP'),
       POPN             = new StandardOpCode(1, 'POPN'),
       PROPERTY         = new InternedOpCode(1, 'PROPERTY'),
@@ -8967,8 +8981,22 @@ exports.assembler = (function(exports){
       return Directive;
     })();
 
-    var Params = (function(){
-      function Params(node){
+    var Parameters = (function(){
+      function ParametersIterator(params){
+        this.params = params;
+        this.index = 0;
+      }
+
+      inherit(Parameters, Iterator, [
+        function next(){
+          if (this.index >= this.params.length) {
+            throw StopIteration;
+          }
+          return this.params[this.index++];
+        }
+      ]);
+
+      function Parameters(node){
         this.length = 0;
         if (node.params) {
           pushAll(this, node.params)
@@ -8981,18 +9009,17 @@ exports.assembler = (function(exports){
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
-        if (node.defaults) {
-          this.defaults = node.defaults;
-        }
+        this.defaults = node.defaults || [];
       }
 
-      define(Params, [
-        function add(items){
-
+      define(Parameters, [
+        function __iterator__(){
+          return new ParametersIterator(this);
         }
       ]);
-      return Params;
+      return Parameters;
     })();
+
 
     function Code(node, source, type, scope, strict){
       function Instruction(opcode, args){
@@ -9045,7 +9072,6 @@ exports.assembler = (function(exports){
         this.flags.generator = true;
       }
 
-
       this.transfers = [];
       this.scopeType = scope;
       this.lexicalType = type || FUNCTYPE.NORMAL;
@@ -9058,7 +9084,7 @@ exports.assembler = (function(exports){
       }
       this.ops = [];
       if (node.params) {
-        this.params = new Params(node);
+        this.params = new Parameters(node);
       }
     }
 
@@ -9334,6 +9360,8 @@ exports.assembler = (function(exports){
         len = varDeclarations.length,
         argumentsObjectNotNeeded = false
 
+    RESET(A);
+
     while (len--) {
       var decl = varDeclarations[len];
       if (decl.type === 'FunctionDeclaration') {
@@ -9342,10 +9370,48 @@ exports.assembler = (function(exports){
         if (name === 'arguments') {
           argumentsObjectNotNeeded = true;
         }
+        HAS_BINDING(name);
+        var jump = JTRUE(0);
+        CREATE_BINDING(name, false);
+        ACCUM(A, name);
+        adjust(jump);
+      }
+    }
+
+    each(code.params.boundNames, function(name){
+      if (name === 'arguments') {
+        argumentsObjectNotNeeded = true;
+      }
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      CREATE_BINDING(name, false);
+      UNDEFINED();
+      VAR(name);
+      adjust(jump);
+    });
+
+    if (!argumentsObjectNotNeeded) {
+      CREATE_BINDING('arguments', code.strict);
+    }
+
+    each(code.varNames, function(name){
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      CREATE_BINDING(name, false);
+      adjust(jump);
+    });
+
+    each(lexicalDecls(code.body), function(decl){
+      each(decl.boundNames, function(name){
+        CREATE_BINDING(name, decl.IsConstantDeclaration);
+      });
+    });
+
+    each(varDeclarations, function(decl){
+      if (decl.type === 'FunctionDeclaration') {
 
       }
-
-    }
+    });
   }
 
   var getExports = (function(){
@@ -9540,47 +9606,28 @@ exports.assembler = (function(exports){
       function __noSuchHandler__(node){
         return RECURSE;
       },
-      //function ArrayExpression(node){},
-      //function ArrayPattern(node){},
       function ArrowFunctionExpression(node){
         isntWrapped(node.body);
         this.push(node.body);
       },
-      //function AssignmentExpression(node){},
-      //function AtSymbol(node){},
-      //function BinaryExpression(node){},
       function BlockStatement(node){
         each(node.body, wrap(node.wrapped));
         return RECURSE;
       },
-      //function BreakStatement(node){},
-      //function CallExpression(node){},
       function CatchClause(node){
         copyWrap(node, node.body);
         return RECURSE;
       },
-      //function ClassBody(node){},
-      //function ClassDeclaration(node){},
-      //function ClassExpression(node){},
-      //function ClassHeritage(node){},
-      //function ComprehensionBlock(node){},
-      //function ComprehensionExpression(node){},
       function ConditionalExpression(node){
         each(node, tail(node.tail));
         each(node, wrap(node.wrapped));
         return RECURSE;
       },
-      //function ContinueStatement(node){},
-      //function DebuggerStatement(node){},
       function DoWhileStatement(node){
         each(node, isntTail);
         copyWrap(node, node.body);
         return RECURSE;
       },
-      //function EmptyStatement(node){},
-      //function ExportDeclaration(node){},
-      //function ExportSpecifier(node){},
-      //function ExportSpecifierSet(node){},
       function ExpressionStatement(node){
         copyWrap(node, node.expression);
         return RECURSE;
@@ -9604,37 +9651,23 @@ exports.assembler = (function(exports){
       function FunctionExpression(node){
         isntWrapped(node.body);
         this.push(node.body);
-      },
-      //function Glob(node){},
-      //function Identifier(node){},
-      function IfStatement(node){
+      },      function IfStatement(node){
         copyWrap(node, node.consequent);
         copyWrap(node, node.alternate);
         return RECURSE;
       },
-      //function ImportDeclaration(node){},
-      //function ImportSpecifier(node){},
       function LabeledStatement(node){
         copyWrap(node, node.statement);
         return RECURSE;
       },
-      //function Literal(node){},
-      //function LogicalExpression(node){},
-      //function MemberExpression(node){},
-      //function MethodDefinition(node){},
       function ModuleDeclaration(node){
         node.body && each(node.body, isntWrapped);
         return RECURSE;
       },
-      //function NewExpression(node){},
-      //function ObjectExpression(node){},
-      //function ObjectPattern(node){},
-      //function Path(node){},
       function Program(node){
         each(node.body, isntWrapped);
         return RECURSE;
       },
-      //function Property(node){},
       function ReturnStatement(node){
         tail(!node.wrapped)(node.argument);
         return RECURSE;
@@ -9644,7 +9677,6 @@ exports.assembler = (function(exports){
         copyTail(node, node.expressions[node.expressions.length - 1]);
         return RECURSE;
       },
-      //function SpreadElement(node){},
       function SwitchCase(node){
         each(node.consequent, wrap(node.wrapped))
         return RECURSE;
@@ -9653,23 +9685,12 @@ exports.assembler = (function(exports){
         each(node.cases, wrap(node.wrapped));
         return RECURSE;
       },
-      //function SymbolDeclaration(node){},
-      //function SymbolDeclarator(node){},
-      //function TaggedTemplateExpression(node){},
-      //function TemplateElement(node){},
-      //function TemplateLiteral(node){},
-      //function ThisExpression(node){},
-      //function ThrowStatement(node){ },
       function TryStatement(node){
         isWrapped(node.block);
         each(node.handlers, wrap(node.finalizer || node.wrapped));
         isntWrapped(node.finalizer);
         return RECURSE;
       },
-      //function UnaryExpression(node){},
-      //function UpdateExpression(node){},
-      //function VariableDeclaration(node){},
-      //function VariableDeclarator(node){ },
       function WhileStatement(node){
         copyWrap(node, node.body);
         return RECURSE;
@@ -10005,7 +10026,7 @@ exports.assembler = (function(exports){
   function ConditionalExpression(node){
     recurse(node.test);
     GET();
-    var test = IFEQ(0, false);
+    var test = JFALSE(0);
     recurse(node.consequent)
     GET();
     var alt = JUMP(0);
@@ -10026,7 +10047,7 @@ exports.assembler = (function(exports){
       var cond = current();
       recurse(node.test);
       GET();
-      IFEQ(start, true);
+      JTRUE(start);
       return cond;
     });
   }
@@ -10087,7 +10108,7 @@ exports.assembler = (function(exports){
         if (node.test) {
           recurse(node.test);
           GET();
-          var op = IFEQ(0, false);
+          var op = JFALSE(0);
         }
 
         var update = current();
@@ -10196,7 +10217,7 @@ exports.assembler = (function(exports){
   function IfStatement(node){
     recurse(node.test);
     GET();
-    var test = IFEQ(0, false);
+    var test = JFALSE(0);
     recurse(node.consequent);
 
     if (node.alternate) {
@@ -10237,7 +10258,7 @@ exports.assembler = (function(exports){
   function LogicalExpression(node){
     recurse(node.left);
     GET();
-    var op = IFNE(0, node.operator === '||');
+    var op = node.operator === '||' ? OR(0) : AND(0);
     recurse(node.right);
     GET();
     adjust(op);
@@ -10530,7 +10551,7 @@ exports.assembler = (function(exports){
       var start = current();
       recurse(node.test);
       GET();
-      var op = IFEQ(0, false)
+      var op = JFALSE(0)
       recurse(node.body);
       JUMP(start);
       adjust(op);
@@ -10660,28 +10681,26 @@ exports.assembler = (function(exports){
         this.queue(code);
 
         while (this.pending.length) {
-          this.process();
+          this.process(this.pending.pop(), this.code);
         }
 
         return code;
       },
-      function process(){
-        var lastCode = this.code;
-        this.code = this.pending.pop();
+      function process(code, parent){
+        this.code = code;
         this.code.filename = this.filename;
-        if (lastCode) {
-          this.code.derive(lastCode);
+        parent && code.derive(parent);
+
+        if (code.params) {
+
         }
 
-        //if (this.code.params && this.code.params.defaults) {
-        //}
+        recurse(code.body);
 
-        recurse(this.code.body);
-
-        if (this.code.scopeType === SCOPE.GLOBAL || this.code.scopeType === SCOPE.EVAL){
+        if (code.scopeType === SCOPE.GLOBAL || code.scopeType === SCOPE.EVAL){
           COMPLETE();
         } else {
-          if (this.code.lexicalType === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
+          if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
             GET();
           } else {
             UNDEFINED();
@@ -11646,13 +11665,15 @@ exports.thunk = (function(exports){
 
 
   function Thunk(code){
-    var opcodes = [ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
-      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, IFEQ, IFNE, INC, INDEX, ITERATE, JUMP, LET,
-      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, POP,
+      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
+      JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
+      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP,
       POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
       SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
       THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+
 
     var thunk = this,
         ops = code.ops,
@@ -11718,6 +11739,16 @@ exports.thunk = (function(exports){
     }
 
 
+
+    function AND(){
+      if (stack[sp - 1]) {
+        sp--;
+        return cmds[++ip];
+      } else {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+    }
 
     function ARGS(){
       stack[sp++] = [];
@@ -11977,24 +12008,6 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function IFEQ(){
-      if (ops[ip][1] === !!stack[--sp]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function IFNE(){
-      if (ops[ip][1] === !!stack[sp - 1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      } else {
-        sp--;
-      }
-      return cmds[++ip];
-    }
-
     function INC(){
       stack[sp - 1]++;
       return cmds[++ip];
@@ -12024,6 +12037,78 @@ exports.thunk = (function(exports){
     function JUMP(){
       ip = ops[ip][0];
       return cmds[ip];
+    }
+
+    function JTRUE(){
+      var cmp = stack[--sp];
+      if (cmp) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JFALSE(){
+      var cmp = stack[--sp];
+      if (!cmp) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JEQ_NULL(){
+      var cmp = stack[--sp];
+      if (cmp === null) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JNEQ_NULL(){
+      var cmp = stack[--sp];
+      if (cmp !== null) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JLT(){
+      var cmp = stack[--sp];
+      if (cmp < ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JLTE(){
+      var cmp = stack[--sp];
+      if (cmp <= ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JGT(){
+      var cmp = stack[--sp];
+      if (cmp > ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JGTE(){
+      var cmp = stack[--sp];
+      if (cmp >= ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
     }
 
     function LET(){
@@ -12114,6 +12199,16 @@ exports.thunk = (function(exports){
     function OBJECT(){
       stack[sp++] = context.createObject();
       return cmds[++ip];
+    }
+
+    function OR(){
+      if (stack[sp - 1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      } else {
+        sp--;
+        return cmds[++ip];
+      }
     }
 
     function POP(){
@@ -19405,7 +19500,7 @@ exports.modules["@std"] = "// standard constants\nconst NaN       = +'NaN';\ncon
 
 exports.modules["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp from '@regexp';\n\n\nexport function String(string){\n  string = arguments.length ? $__ToString(string) : '';\n  if ($__IsConstructCall()) {\n    return $__StringCreate(string);\n  } else {\n    return string;\n  }\n}\n\n$__setupConstructor(String, $__StringProto);\n\nexport function fromCharCode(...codeUnits){\n  var length = codeUnits.length,\n      str = '';\n  for (var i=0; i < length; i++) {\n    str += $__FromCharCode($__ToUint16(codeUnits[i]));\n  }\n  return str;\n}\n\nexport function trim(str){\n  return $__StringTrim(ensureCoercible(string, 'trim'));\n}\n\n$__defineMethods(String, [fromCharCode]);\n\n\n{\n$__defineProps(String.prototype, {\n  anchor(name){\n    var string = ensureCoercible(this, 'anchor');\n    return ToHTML('a', string, 'name', name);\n  },\n  big(){\n    var string = ensureCoercible(this, 'big');\n    return ToHTML('big', string);\n  },\n  blink(){\n    var string = ensureCoercible(this, 'blink');\n    return ToHTML('blink', string);\n  },\n  bold(){\n    var string = ensureCoercible(this, 'bold');\n    return ToHTML('b', string);\n  },\n  fixed(){\n    var string = ensureCoercible(this, 'fixed');\n    return ToHTML('fixed', string);\n  },\n  fontcolor(color){\n    var string = ensureCoercible(this, 'fontcolor');\n    return ToHTML('font', string, 'color', color);\n  },\n  fontsize(size){\n    var string = ensureCoercible(this, 'fontsize');\n    return ToHTML('font', string, 'size', size);\n  },\n  italics(){\n    var string = ensureCoercible(this, 'italics');\n    return ToHTML('i', string);\n  },\n  link(href){\n    var string = ensureCoercible(this, 'link');\n    return ToHTML('a', string, 'href', href);\n  },\n  small(){\n    var string = ensureCoercible(this, 'small');\n    return ToHTML('small', string);\n  },\n  strike(){\n    var string = ensureCoercible(this, 'strike');\n    return ToHTML('s', string);\n  },\n  sub(){\n    var string = ensureCoercible(this, 'sub');\n    return ToHTML('sub', string);\n  },\n  sup(){\n    var string = ensureCoercible(this, 'sup');\n    return ToHTML('sup', string);\n  },\n  charAt(position){\n    var string = ensureCoercible(this, 'charAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? '' : string[position];\n  },\n  charCodeAt(position){\n    var string = ensureCoercible(this, 'charCodeAt');\n    position = $__ToInteger(position);\n    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);\n  },\n  concat(...args){\n    var string = ensureCoercible(this, 'concat');\n    for (var i=0; i < args.length; i++) {\n      string += $__ToString(args[i]);\n    }\n    return string;\n  },\n  indexOf(search){\n    var string = ensureCoercible(this, 'indexOf');\n    return stringIndexOf(string, search, arguments[1]);\n  },\n  lastIndexOf(search){\n    var string = ensureCoercible(this, 'lastIndexOf'),\n        len = string.length,\n        position = $__ToNumber(arguments[1]);\n\n    search = $__ToString(search);\n    var searchLen = search.length;\n\n    position = position !== position ? Infinity : $__ToInteger(position);\n    position -= searchLen;\n\n    var i = position > 0 ? position < len ? position : len : 0;\n\n    while (i--) {\n      var j = 0;\n      while (j < searchLen && search[j] === string[i + j]) {\n        if (j++ === searchLen - 1) {\n          return i;\n        }\n      }\n    }\n    return -1;\n  },\n  localeCompare(){\n    var string = ensureCoercible(this, 'localeCompare');\n  },\n  match(regexp){\n    var string = ensureCoercible(this, 'match');\n    return stringMatch(string, regexp);\n  },\n  repeat(count){\n    var string = ensureCoercible(this, 'repeat'),\n        n = $__ToInteger(count),\n        o = '';\n\n    if (n <= 1 || n === Infinity || n === -Infinity) {\n      throw $__Exception('invalid_repeat_count', []);\n    }\n\n    while (n > 0) {\n      n & 1 && (o += string);\n      n >>= 1;\n      string += string;\n    }\n\n    return o;\n  },\n  replace(search, replace){\n    var string = ensureCoercible(this, 'replace');\n\n    if (typeof replace === 'function') {\n      var match, count;\n      if (isRegExp(search)) {\n        match = stringMatch(string, search);\n        count = matches.length;\n      } else {\n        match = stringIndexOf(string, $__ToString(search));\n        count = 1;\n      }\n      //TODO\n    } else {\n      replace = $__ToString(replace);\n      if (!isRegExp(search)) {\n        search = $__ToString(search);\n      }\n      return $__StringReplace(string, search, replace);\n    }\n  },\n  search(regexp){\n    var string = ensureCoercible(this, 'search');\n    if (!isRegExp(regexp)) {\n      regexp = new RegExp(regexp);\n    }\n    return $__StringSearch(string, regexp);\n  },\n  slice(start, end){\n    var string = ensureCoercible(this, 'slice');\n    start = $__ToInteger(start);\n    if (end === undefined) {\n      return $__StringSlice(string, start);\n    } else {\n      return $__StringSlice(string, start, $__ToInteger(end));\n    }\n  },\n  split(separator, limit){\n    var string = ensureCoercible(this, 'split');\n    limit = limit === undefined ? MAX_INTEGER - 1 : $__ToInteger(limit);\n    separator = isRegExp(separator) ? separator : $__ToString(separator);\n    return $__StringSplit(string, separator, limit);\n  },\n  substr(start, length){\n    var string = ensureCoercible(this, 'substr'),\n        start = $__ToInteger(start),\n        chars = string.length;\n\n    length = length === undefined ? Infinity : $__ToInteger(length);\n\n    if (start < 0) {\n      start += chars;\n      if (start < 0) start = 0;\n    }\n    if (length < 0) {\n      length = 0;\n    }\n    if (length > chars - start) {\n      length = chars - start;\n    }\n\n    return length <= 0 ? '' : $__StringSlice(string, start, start + length);\n  },\n  substring(start, end){\n    var string = ensureCoercible(this, 'substring'),\n        start = $__ToInteger(start),\n        len = string.length;\n\n    end = end === undefined ? len : $__ToInteger(end);\n\n    start = start > 0 ? start < len ? start : len : 0;\n    end = end > 0 ? end < len ? end : len : 0;\n\n    var from = start < end ? start : end,\n        to = start > end ? start : end;\n\n    return $__StringSlice(string, from, to);\n  },\n  toLowerCase(){\n    var string = ensureCoercible(this, 'toLowerCase');\n    return $__CallNative(string, 'toLowerCase');\n  },\n  toLocaleLowerCase(){\n    var string = ensureCoercible(this, 'toLocaleLowerCase');\n    return $__CallNative(string, 'toLocaleLowerCase');\n  },\n  toUpperCase(){\n    var string = ensureCoercible(this, 'toUpperCase');\n    return $__CallNative(string, 'toUpperCase');\n  },\n  toLocaleUpperCase(){\n    var string = ensureCoercible(this, 'toLocaleUpperCase');\n    return $__CallNative(string, 'toLocaleUpperCase');\n  },\n  toString(){\n    if ($__GetBuiltinBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__exception('not_generic', ['String.prototype.toString']);\n    }\n  },\n  trim(){\n    var string = ensureCoercible(this, 'trim');\n    return $__StringTrim(string);\n  },\n  valueOf(){\n    if ($__GetBuiltinBrand(this) === 'String') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['String.prototype.valueOf']);\n    }\n  }\n});\n\nfunction ensureCoercible(target, method){\n  if (target === null || target === undefined) {\n    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);\n  }\n  return $__ToString(target);\n}\n\nfunction ToHTML(tag, content, attrName, attrVal){\n  attrVal = $__ToString(attrVal);\n  var attr = attrName === undefined ? '' : ' '+attrName+'=\"'+$__StringReplace(attrVal, '\"', '&quot;')+'\"';\n  return '<'+tag+attr+'>'+content+'</'+tag+'>';\n}\n\n\nfunction isRegExp(subject){\n  return subject != null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';\n}\n\nfunction stringIndexOf(string, search, position){\n  search = $__ToString(search);\n  position = $__ToInteger(position);\n\n  var len = string.length,\n      searchLen = search.length,\n      i = position > 0 ? position < len ? position : len : 0,\n      maxLen = len - searchLen;\n\n  while (i < maxLen) {\n    var j = 0;\n    while (j < searchLen && search[j] === string[i + j]) {\n      if (j++ === searchLen - 1) {\n        return i;\n      }\n    }\n  }\n  return -1;\n}\n\nfunction stringMatch(string, regexp){\n  if (!isRegExp(regexp)) {\n    regexp = new RegExp(regexp);\n  }\n  if (!regexp.global) {\n    return regexp.exec(string);\n  }\n  regexp.lastIndex = 0;\n  var array = [],\n      previous = 0,\n      lastMatch = true,\n      n = 0;\n\n  while (lastMatch) {\n    var result = regexp.exec(string);\n    if (result === null) {\n      lastMatch = false;\n    } else {\n      var thisIndex = regexp.lastIndex;\n      if (thisIndex === lastIndex) {\n        previous = regexp.lastIndex = thisIndex + 1;\n      } else {\n        previous = thisIndex;\n      }\n      array[n++] = result[0];\n    }\n  }\n\n  return n === 0 ? null : array;\n}\n}\n";
 
-exports.modules["@symbol"] = "export function Symbol(name, isPublic){\n  if (name == null) {\n    throw $__Exception('unnamed_symbol', []);\n  }\n  return $__SymbolCreate(name, !!isPublic);\n}\n\n$__setupConstructor(Symbol, $__SymbolProto);\n\n$__defineProps(Symbol.prototype, {\n  valueOf(){\n    if ($__GetBuiltinBrand(this) === 'Symbol') {\n      return $__GetInternal(this, 'Label');\n    } else {\n      throw $__Exception('not_generic', ['Symbol.prototype.toString']);\n    }\n  },\n  toString(){\n    if ($__GetBuiltinBrand(this) === 'Symbol') {\n      return $__GetInternal(this, 'Label');\n    } else {\n      throw $__Exception('not_generic', ['Symbol.prototype.toString']);\n    }\n  }\n});\n\n$__DefineOwnProperty(Symbol.prototype, 'constructor', { configurable: false, writable: false });\n$__PreventExtensions(Symbol.prototype, false);\n";
+exports.modules["@symbol"] = "export function Symbol(name, isPublic){\n  if (name == null) {\n    throw $__Exception('unnamed_symbol', []);\n  }\n  return $__SymbolCreate(name, !!isPublic);\n}\n\n$__setupConstructor(Symbol, $__SymbolProto);\n$__remove(Symbol.prototype, 'constructor');\n";
 
 exports.modules["@system"] = "{\n  let HIDDEN = 6,\n      FROZEN = 0;\n\n  $__defineMethods = function defineMethods(obj, props){\n    for (var i=0; i < props.length; i++) {\n      $__SetInternal(props[i], 'Native', true);\n      $__define(obj, props[i].name, props[i], HIDDEN);\n      $__remove(props[i], 'prototype');\n    }\n    return obj;\n  };\n\n  $__defineProps = function defineProps(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      var name = keys[i],\n          prop = props[name];\n\n      $__define(obj, name, prop, HIDDEN);\n\n      if (typeof prop === 'function') {\n        $__SetInternal(prop, 'Native', true);\n        $__define(prop, 'name', name, FROZEN);\n        $__remove(prop, 'prototype');\n      }\n    }\n    return obj;\n  };\n\n  $__setupFunctions = function setupFunctions(...funcs){\n    var len = funcs.length;\n    for (var i=0; i < len; i++) {\n      $__SetInternal(funcs[i], 'Native', true);\n      $__remove(funcs[i], 'prototype');\n    }\n  };\n\n  $__defineConstants = function defineConstants(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      $__define(obj, keys[i], props[keys[i]], FROZEN);\n    }\n  };\n\n  $__setupConstructor = function setupConstructor(ctor, proto){\n    if (proto) {\n      $__define(ctor, 'prototype', proto, FROZEN);\n    }\n    $__define(ctor, 'length', 1, FROZEN);\n    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);\n    $__SetInternal(ctor, 'Native', true);\n    $__SetInternal(ctor, 'NativeConstructor', true);\n  };\n\n\n  $__setLength = function setLength(f, length){\n    if (typeof length === 'string') {\n      $__set(f, 'length', length);\n    } else {\n      var keys = $__Enumerate(length, false, false);\n      for (var i=0; i < keys.length; i++) {\n        var key = keys[i];\n        $__set(f[key], 'length', length[key]);\n      }\n    }\n  };\n\n  $__setProperty = function setProperty(key, object, values){\n    var keys = $__Enumerate(values, false, false),\n        i = keys.length;\n\n    while (i--) {\n      $__define(object[keys[i]], key, values[keys[i]], FROZEN);\n    }\n  };\n\n  $__hideEverything = function hideEverything(o){\n    var type = typeof o;\n    if (type === 'object' ? o === null : type !== 'function') {\n      return o;\n    }\n\n    var keys = $__Enumerate(o, false, true),\n        i = keys.length;\n\n    while (i--) {\n      if (typeof o[keys[i]] === 'number') {\n        $__update(o, keys[i], 0);\n      } else {\n        $__update(o, keys[i], 6);\n      }\n    }\n\n    if (typeof o === 'function') {\n      hideEverything(o.prototype);\n    }\n\n    return o;\n  };\n\n  symbol @toStringTag, @iterator;\n  $__toStringTag = @toStringTag;\n  $__iterator = @iterator;\n\n  $__EmptyClass = function(...args){ super(...args) };\n  $__define($__EmptyClass, 'name', '', FROZEN);\n}\n\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {\n      $__SetInternal(module, 'loader', loader);\n      $__SetInternal(module, 'resolved', this.@resolved);\n      $__SetInternal(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.translate;\n    this.@resolve   = options.resolve   || parent.resolve;\n    this.@fetch     = options.fetch     || parent.fetch;\n    this.@global    = options.global    || $__global;\n    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');\n  }\n\n  get global(){\n    return this.@global;\n  }\n\n  get baseURL(){\n    return this.@baseURL;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.@baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(src, this.@global, this.@baseURL);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.@global);\n    for (var k in std) {\n      desc.value = std[k];\n      $__DefineOwnProperty(object, k, desc);\n    }\n\n    return object;\n  }\n}\n\n\nexport function Module(object){\n  if ($__GetBuiltinBrand(object) === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\n$__remove(Module, 'prototype');\n\n\nlet System = $__System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\nexport System;\n\n\nSystem.@strict = false;\nlet std = System.eval(`\n  module std = '@std';\n  export std;\n`).std;\nSystem.@strict = true;\n";
 
