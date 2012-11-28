@@ -10,27 +10,29 @@ var assembler = (function(exports){
       Stack     = require('../lib/Stack'),
       HashMap   = require('../lib/HashMap');
 
-  var walk      = traversal.walk,
-      collector = traversal.collector,
-      Visitor   = traversal.Visitor,
-      fname     = functions.fname,
-      define    = objects.define,
-      assign    = objects.assign,
-      create    = objects.create,
-      copy      = objects.copy,
-      inherit   = objects.inherit,
-      ownKeys   = objects.keys,
-      hasOwn    = objects.hasOwn,
-      isObject  = objects.isObject,
-      Hash      = objects.Hash,
-      each      = iteration.each,
-      repeat    = iteration.repeat,
-      map       = iteration.map,
-      fold      = iteration.fold,
-      generate  = iteration.generate,
-      quotes    = utility.quotes,
-      uid       = utility.uid,
-      pushAll   = utility.pushAll;
+  var walk          = traversal.walk,
+      collector     = traversal.collector,
+      Visitor       = traversal.Visitor,
+      fname         = functions.fname,
+      define        = objects.define,
+      assign        = objects.assign,
+      create        = objects.create,
+      copy          = objects.copy,
+      inherit       = objects.inherit,
+      ownKeys       = objects.keys,
+      hasOwn        = objects.hasOwn,
+      isObject      = objects.isObject,
+      Hash          = objects.Hash,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration,
+      each          = iteration.each,
+      repeat        = iteration.repeat,
+      map           = iteration.map,
+      fold          = iteration.fold,
+      generate      = iteration.generate,
+      quotes        = utility.quotes,
+      uid           = utility.uid,
+      pushAll       = utility.pushAll;
 
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.hash,
@@ -122,7 +124,8 @@ var assembler = (function(exports){
 
 
 
-  var ARRAY            = new StandardOpCode(0, 'ARRAY'),
+  var AND              = new StandardOpCode(1, 'AND'),
+      ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
@@ -145,12 +148,18 @@ var assembler = (function(exports){
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(2, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
-      IFEQ             = new StandardOpCode(2, 'IFEQ'),
-      IFNE             = new StandardOpCode(2, 'IFNE'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
+      JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
+      JFALSE           = new StandardOpCode(1, 'JFALSE'),
+      JLT              = new StandardOpCode(2, 'JLT'),
+      JLTE             = new StandardOpCode(2, 'JLTE'),
+      JGT              = new StandardOpCode(2, 'JGT'),
+      JGTE             = new StandardOpCode(2, 'JGTE'),
+      JNEQ_NULL        = new StandardOpCode(1, 'JNEQ_NULL'),
+      JTRUE            = new StandardOpCode(1, 'JTRUE'),
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
       LOG              = new StandardOpCode(0, 'LOG'),
@@ -159,6 +168,7 @@ var assembler = (function(exports){
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
+      OR               = new StandardOpCode(1, 'OR'),
       POP              = new StandardOpCode(0, 'POP'),
       POPN             = new StandardOpCode(1, 'POPN'),
       PROPERTY         = new InternedOpCode(1, 'PROPERTY'),
@@ -215,8 +225,22 @@ var assembler = (function(exports){
       return Directive;
     })();
 
-    var Params = (function(){
-      function Params(node){
+    var Parameters = (function(){
+      function ParametersIterator(params){
+        this.params = params;
+        this.index = 0;
+      }
+
+      inherit(Parameters, Iterator, [
+        function next(){
+          if (this.index >= this.params.length) {
+            throw StopIteration;
+          }
+          return this.params[this.index++];
+        }
+      ]);
+
+      function Parameters(node){
         this.length = 0;
         if (node.params) {
           pushAll(this, node.params)
@@ -229,18 +253,17 @@ var assembler = (function(exports){
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
-        if (node.defaults) {
-          this.defaults = node.defaults;
-        }
+        this.defaults = node.defaults || [];
       }
 
-      define(Params, [
-        function add(items){
-
+      define(Parameters, [
+        function __iterator__(){
+          return new ParametersIterator(this);
         }
       ]);
-      return Params;
+      return Parameters;
     })();
+
 
     function Code(node, source, type, scope, strict){
       function Instruction(opcode, args){
@@ -293,7 +316,6 @@ var assembler = (function(exports){
         this.flags.generator = true;
       }
 
-
       this.transfers = [];
       this.scopeType = scope;
       this.lexicalType = type || FUNCTYPE.NORMAL;
@@ -306,7 +328,7 @@ var assembler = (function(exports){
       }
       this.ops = [];
       if (node.params) {
-        this.params = new Params(node);
+        this.params = new Parameters(node);
       }
     }
 
@@ -582,6 +604,8 @@ var assembler = (function(exports){
         len = varDeclarations.length,
         argumentsObjectNotNeeded = false
 
+    RESET(A);
+
     while (len--) {
       var decl = varDeclarations[len];
       if (decl.type === 'FunctionDeclaration') {
@@ -590,10 +614,48 @@ var assembler = (function(exports){
         if (name === 'arguments') {
           argumentsObjectNotNeeded = true;
         }
+        HAS_BINDING(name);
+        var jump = JTRUE(0);
+        CREATE_BINDING(name, false);
+        ACCUM(A, name);
+        adjust(jump);
+      }
+    }
+
+    each(code.params.boundNames, function(name){
+      if (name === 'arguments') {
+        argumentsObjectNotNeeded = true;
+      }
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      CREATE_BINDING(name, false);
+      UNDEFINED();
+      VAR(name);
+      adjust(jump);
+    });
+
+    if (!argumentsObjectNotNeeded) {
+      CREATE_BINDING('arguments', code.strict);
+    }
+
+    each(code.varNames, function(name){
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      CREATE_BINDING(name, false);
+      adjust(jump);
+    });
+
+    each(lexicalDecls(code.body), function(decl){
+      each(decl.boundNames, function(name){
+        CREATE_BINDING(name, decl.IsConstantDeclaration);
+      });
+    });
+
+    each(varDeclarations, function(decl){
+      if (decl.type === 'FunctionDeclaration') {
 
       }
-
-    }
+    });
   }
 
   var getExports = (function(){
@@ -788,47 +850,28 @@ var assembler = (function(exports){
       function __noSuchHandler__(node){
         return RECURSE;
       },
-      //function ArrayExpression(node){},
-      //function ArrayPattern(node){},
       function ArrowFunctionExpression(node){
         isntWrapped(node.body);
         this.push(node.body);
       },
-      //function AssignmentExpression(node){},
-      //function AtSymbol(node){},
-      //function BinaryExpression(node){},
       function BlockStatement(node){
         each(node.body, wrap(node.wrapped));
         return RECURSE;
       },
-      //function BreakStatement(node){},
-      //function CallExpression(node){},
       function CatchClause(node){
         copyWrap(node, node.body);
         return RECURSE;
       },
-      //function ClassBody(node){},
-      //function ClassDeclaration(node){},
-      //function ClassExpression(node){},
-      //function ClassHeritage(node){},
-      //function ComprehensionBlock(node){},
-      //function ComprehensionExpression(node){},
       function ConditionalExpression(node){
         each(node, tail(node.tail));
         each(node, wrap(node.wrapped));
         return RECURSE;
       },
-      //function ContinueStatement(node){},
-      //function DebuggerStatement(node){},
       function DoWhileStatement(node){
         each(node, isntTail);
         copyWrap(node, node.body);
         return RECURSE;
       },
-      //function EmptyStatement(node){},
-      //function ExportDeclaration(node){},
-      //function ExportSpecifier(node){},
-      //function ExportSpecifierSet(node){},
       function ExpressionStatement(node){
         copyWrap(node, node.expression);
         return RECURSE;
@@ -852,37 +895,23 @@ var assembler = (function(exports){
       function FunctionExpression(node){
         isntWrapped(node.body);
         this.push(node.body);
-      },
-      //function Glob(node){},
-      //function Identifier(node){},
-      function IfStatement(node){
+      },      function IfStatement(node){
         copyWrap(node, node.consequent);
         copyWrap(node, node.alternate);
         return RECURSE;
       },
-      //function ImportDeclaration(node){},
-      //function ImportSpecifier(node){},
       function LabeledStatement(node){
         copyWrap(node, node.statement);
         return RECURSE;
       },
-      //function Literal(node){},
-      //function LogicalExpression(node){},
-      //function MemberExpression(node){},
-      //function MethodDefinition(node){},
       function ModuleDeclaration(node){
         node.body && each(node.body, isntWrapped);
         return RECURSE;
       },
-      //function NewExpression(node){},
-      //function ObjectExpression(node){},
-      //function ObjectPattern(node){},
-      //function Path(node){},
       function Program(node){
         each(node.body, isntWrapped);
         return RECURSE;
       },
-      //function Property(node){},
       function ReturnStatement(node){
         tail(!node.wrapped)(node.argument);
         return RECURSE;
@@ -892,7 +921,6 @@ var assembler = (function(exports){
         copyTail(node, node.expressions[node.expressions.length - 1]);
         return RECURSE;
       },
-      //function SpreadElement(node){},
       function SwitchCase(node){
         each(node.consequent, wrap(node.wrapped))
         return RECURSE;
@@ -901,23 +929,12 @@ var assembler = (function(exports){
         each(node.cases, wrap(node.wrapped));
         return RECURSE;
       },
-      //function SymbolDeclaration(node){},
-      //function SymbolDeclarator(node){},
-      //function TaggedTemplateExpression(node){},
-      //function TemplateElement(node){},
-      //function TemplateLiteral(node){},
-      //function ThisExpression(node){},
-      //function ThrowStatement(node){ },
       function TryStatement(node){
         isWrapped(node.block);
         each(node.handlers, wrap(node.finalizer || node.wrapped));
         isntWrapped(node.finalizer);
         return RECURSE;
       },
-      //function UnaryExpression(node){},
-      //function UpdateExpression(node){},
-      //function VariableDeclaration(node){},
-      //function VariableDeclarator(node){ },
       function WhileStatement(node){
         copyWrap(node, node.body);
         return RECURSE;
@@ -1253,7 +1270,7 @@ var assembler = (function(exports){
   function ConditionalExpression(node){
     recurse(node.test);
     GET();
-    var test = IFEQ(0, false);
+    var test = JFALSE(0);
     recurse(node.consequent)
     GET();
     var alt = JUMP(0);
@@ -1274,7 +1291,7 @@ var assembler = (function(exports){
       var cond = current();
       recurse(node.test);
       GET();
-      IFEQ(start, true);
+      JTRUE(start);
       return cond;
     });
   }
@@ -1335,7 +1352,7 @@ var assembler = (function(exports){
         if (node.test) {
           recurse(node.test);
           GET();
-          var op = IFEQ(0, false);
+          var op = JFALSE(0);
         }
 
         var update = current();
@@ -1444,7 +1461,7 @@ var assembler = (function(exports){
   function IfStatement(node){
     recurse(node.test);
     GET();
-    var test = IFEQ(0, false);
+    var test = JFALSE(0);
     recurse(node.consequent);
 
     if (node.alternate) {
@@ -1485,7 +1502,7 @@ var assembler = (function(exports){
   function LogicalExpression(node){
     recurse(node.left);
     GET();
-    var op = IFNE(0, node.operator === '||');
+    var op = node.operator === '||' ? OR(0) : AND(0);
     recurse(node.right);
     GET();
     adjust(op);
@@ -1778,7 +1795,7 @@ var assembler = (function(exports){
       var start = current();
       recurse(node.test);
       GET();
-      var op = IFEQ(0, false)
+      var op = JFALSE(0)
       recurse(node.body);
       JUMP(start);
       adjust(op);
@@ -1908,28 +1925,26 @@ var assembler = (function(exports){
         this.queue(code);
 
         while (this.pending.length) {
-          this.process();
+          this.process(this.pending.pop(), this.code);
         }
 
         return code;
       },
-      function process(){
-        var lastCode = this.code;
-        this.code = this.pending.pop();
+      function process(code, parent){
+        this.code = code;
         this.code.filename = this.filename;
-        if (lastCode) {
-          this.code.derive(lastCode);
+        parent && code.derive(parent);
+
+        if (code.params) {
+
         }
 
-        //if (this.code.params && this.code.params.defaults) {
-        //}
+        recurse(code.body);
 
-        recurse(this.code.body);
-
-        if (this.code.scopeType === SCOPE.GLOBAL || this.code.scopeType === SCOPE.EVAL){
+        if (code.scopeType === SCOPE.GLOBAL || code.scopeType === SCOPE.EVAL){
           COMPLETE();
         } else {
-          if (this.code.lexicalType === FUNCTYPE.ARROW && this.code.body.type !== 'BlockStatement') {
+          if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
             GET();
           } else {
             UNDEFINED();

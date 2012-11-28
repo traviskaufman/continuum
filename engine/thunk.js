@@ -92,13 +92,15 @@ var thunk = (function(exports){
 
 
   function Thunk(code){
-    var opcodes = [ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
-      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, IFEQ, IFNE, INC, INDEX, ITERATE, JUMP, LET,
-      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, POP,
+      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
+      JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
+      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP,
       POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
       SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
       THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+
 
     var thunk = this,
         ops = code.ops,
@@ -164,6 +166,16 @@ var thunk = (function(exports){
     }
 
 
+
+    function AND(){
+      if (stack[sp - 1]) {
+        sp--;
+        return cmds[++ip];
+      } else {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+    }
 
     function ARGS(){
       stack[sp++] = [];
@@ -423,24 +435,6 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function IFEQ(){
-      if (ops[ip][1] === !!stack[--sp]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function IFNE(){
-      if (ops[ip][1] === !!stack[sp - 1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      } else {
-        sp--;
-      }
-      return cmds[++ip];
-    }
-
     function INC(){
       stack[sp - 1]++;
       return cmds[++ip];
@@ -470,6 +464,78 @@ var thunk = (function(exports){
     function JUMP(){
       ip = ops[ip][0];
       return cmds[ip];
+    }
+
+    function JTRUE(){
+      var cmp = stack[--sp];
+      if (cmp) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JFALSE(){
+      var cmp = stack[--sp];
+      if (!cmp) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JEQ_NULL(){
+      var cmp = stack[--sp];
+      if (cmp === null) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JNEQ_NULL(){
+      var cmp = stack[--sp];
+      if (cmp !== null) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JLT(){
+      var cmp = stack[--sp];
+      if (cmp < ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JLTE(){
+      var cmp = stack[--sp];
+      if (cmp <= ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JGT(){
+      var cmp = stack[--sp];
+      if (cmp > ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JGTE(){
+      var cmp = stack[--sp];
+      if (cmp >= ops[ip][1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
     }
 
     function LET(){
@@ -560,6 +626,16 @@ var thunk = (function(exports){
     function OBJECT(){
       stack[sp++] = context.createObject();
       return cmds[++ip];
+    }
+
+    function OR(){
+      if (stack[sp - 1]) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      } else {
+        sp--;
+        return cmds[++ip];
+      }
     }
 
     function POP(){
