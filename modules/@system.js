@@ -242,7 +242,7 @@ export function Module(object){
 $__remove(Module, 'prototype');
 
 
-let System = $__System = new Loader(null, {
+export let System = $__System = new Loader(null, {
   fetch(relURL, baseURL, request, resolved) {
     var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;
 
@@ -262,7 +262,6 @@ let System = $__System = new Loader(null, {
   }
 });
 
-export System;
 
 
 System.@strict = false;
