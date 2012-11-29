@@ -106,7 +106,7 @@ h1, h2
       { top: 8px; }
 
 .ƒtree
-{ width: 90%;  padding: 0 0 0 15px; margin: 0 0 0 10px; list-style: none; position: relative; display: inline-block; }
+{ width: 90%; padding: 0 0 0 15px; margin: 0 0 0 10px; list-style: none; position: relative; display: inline-block; }
 
   .ƒproperty
   { padding-right: 15px }
@@ -170,7 +170,7 @@ h1, h2
 
 .ƒbutton
 { border: 0; background: none; -webkit-appearence: none; -moz-appearence: none; font-family: 'Hammersmith One';
-  font-weight: bold; appearence: none; display: inline-block; cursor: pointer ;}
+  font-weight: bold; appearence: none; display: inline-block; cursor: pointer ; }
 
 .ƒunpause
 { position: absolute; top: 50px; right: 50px; padding: .3em 1em;
@@ -192,8 +192,8 @@ h1, h2
 
 
 
-.ƒrow-resize { cursor: row-resize }
-.ƒcol-resize { cursor: col-resize }
+.ƒrow-resize { cursor: ns-resize }
+.ƒcol-resize { cursor: ew-resize }
 .ƒpointer { cursor: pointer }
 
 .ƒdrag-helper
@@ -203,10 +203,10 @@ h1, h2
 .ƒsplitter
 { position: absolute; z-index: 1001; border: 0 solid #068; }
 .ƒsplitter-vertical
-{ top: 0; left: 0; right: 19px; height: 3px; cursor: row-resize; border-top-width: 1px;
+{ top: 0; left: 0; right: 19px; height: 3px; cursor: ns-resize; border-top-width: 1px;
   box-shadow: 1px 3px 5px 0 rgba(0,0,0,.6); }
 .ƒsplitter-horizontal
-{ top: 0; left: 0; width: 3px; height: 100%; cursor: col-resize; border-left-width: 1px;
+{ top: 0; left: 0; width: 3px; height: 100%; cursor: ew-resize; border-left-width: 1px;
   box-shadow: 3px 1px 5px 0 rgba(0,0,0,.6); }
 
 .ƒsplitter-vertical
