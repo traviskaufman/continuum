@@ -79,6 +79,7 @@ var thunk = (function(exports){
     var out = [];
     for (var i=0; i < ops.length; i++) {
       out[i] = opcodes[+ops[i].op];
+      out[i].ip = i;
       if (out[i].name === 'LOG') {
         out.log = true;
       }
@@ -87,7 +88,7 @@ var thunk = (function(exports){
   }
 
 
-  function Thunk(code){
+  function Thunk(code, instrumented){
     var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
@@ -903,8 +904,13 @@ var thunk = (function(exports){
       error = completion = stacktrace = yielded = undefined;
       log = log || cmds.log;
       context = newContext;
-      history = [];
-      execute = context.Realm.quiet ? normalExecute : instrumentedExecute;
+      var realm = context.Realm;
+      if (!realm.quiet && !code.natives || realm.debugBuiltins) {
+        history = context.history = [];
+        execute = instrumentedExecute;
+      } else {
+        execute = normalExecute;
+      }
     }
 
     function normalCleanup(){
@@ -918,30 +924,23 @@ var thunk = (function(exports){
         prepare = v.prepare;
         execute = v.execute;
         cleanup = v.cleanup;
-        history = v.history;
         completion = v.completion;
         stacktrace = v.stacktrace;
         context = v.context;
         log = v.log;
         ctx = v.ctx;
         yielded = v.yielded;
+        if (context) {
+          history = context.history;
+        }
       }
       return result;
     }
 
 
     function normalExecute(){
-      var f = cmds[ip],
-          ips = 0;
-      if (false) {
-        history = [];
-        while (f) {
-          history[ips++] = [ip, ops[ip]];
-          f = f();
-        }
-      } else {
-        while (f) f = f();
-      }
+      var f = cmds[ip];
+      while (f) f = f();
     }
 
     function instrumentedExecute(){
@@ -950,8 +949,8 @@ var thunk = (function(exports){
           realm = context.Realm;
 
       while (f) {
-        history[ips++] = [ip, ops[ip]];
-        realm.emit('op', [ops[ip], stack[sp - 1]]);
+        history[ips++] = ops[ip];
+        realm.emit('op', ops[ip], stack[sp - 1]);
         f = f();
       }
     }
@@ -1003,11 +1002,10 @@ var thunk = (function(exports){
 
     var executing = false, thunkStack = [];
 
+
     var prepare = normalPrepare,
         execute = normalExecute,
         cleanup = normalCleanup;
-
-    instrumentedExecute = normalExecute;
 
     this.run = run;
     this.send = send;

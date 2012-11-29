@@ -130,8 +130,8 @@ realm.on('ready', function(){
   realm.on('complete', inspect);
 
   setTimeout(function(){
-    realm.on('op', function(op){
-      ops.push(op);
+    realm.on('op', function(op, tos){
+      ops.push([op, tos]);
     });
   }, 100);
 });

@@ -283,18 +283,12 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ## IsEquivalentDescriptor
 
   function IsEquivalentDescriptor(a, b) {
-    if (a && a.Completion) {
-      if (a.Abrupt) return a; else a = a.value;
-    }
-    if (b && b.Completion) {
-      if (b.Abrupt) return b; else b = b.value;
-    }
-    return is(a.Get, b.Get) &&
-           is(a.Set, b.Set) &&
-           is(a.Value, b.Value) &&
-           is(a.Writable, b.Writable) &&
-           is(a.Enumerable, b.Enumerable) &&
-           is(a.Configurable, b.Configurable);
+    return is(a.Value, b.Value) &&
+           a.Get === b.Get &&
+           a.Set === b.Set &&
+           a.Writable === b.Writable &&
+           a.Enumerable === b.Enumerable &&
+           a.Configurable === b.Configurable;
   }
 
   // ## IsCallable
@@ -1316,7 +1310,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     var changeRecord = new $Object;
     changeRecord.define('type', type, E__);
     changeRecord.define('object', object, E__);
-    changeRecord.define('name', name, E__);
+    if (name !== null) {
+      changeRecord.define('name', name, E__);
+    }
     if (IsDataDescriptor(oldDesc)) {
       changeRecord.define('oldValue', oldDesc.Value, E__);
     }
@@ -1802,9 +1798,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (this.Notifier) {
             var changeObservers = this.Notifier.ChangeObservers;
             if (changeObservers.size) {
-              var record = CreateChangeRecord('prototype', this, '', this.Prototype);
-              record.remove('');
-              EnqueueChangeRecord(record, changeObservers);
+              EnqueueChangeRecord(CreateChangeRecord('prototype', this, null, { Value: this.GetInheritance() }), changeObservers);
             }
           }
           this.Prototype = value;
@@ -1947,7 +1941,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else {
           var rejected = false;
           if (IsEmptyDescriptor(desc) || IsEquivalentDescriptor(desc, current)) {
-            return;
+            return true;
           }
 
           if (!current.Configurable) {
@@ -2013,6 +2007,7 @@ var runtime = (function(GLOBAL, exports, undefined){
               EnqueueChangeRecord(CreateChangeRecord(changeType, this, key, current), changeObservers);
             }
           }
+
           return true;
         }
       },
@@ -5299,7 +5294,3 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   return exports;
 })((0,eval)('this'), typeof module !== 'undefined' ? module.exports : {});
-
-
-
-
