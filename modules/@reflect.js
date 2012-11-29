@@ -155,7 +155,7 @@ export class Handler {
       return desc.value;
     }
     var getter = desc.get;
-    return getter === undefined ? undefined : $__CallFunction(getter, receiver, []);
+    return getter === undefined ? undefined : $__Call(getter, receiver, []);
   }
 
   set(target, name, value, receiver){
@@ -165,7 +165,7 @@ export class Handler {
       if ('get' in ownDesc || 'set' in ownDesc) {
         var setter = ownDesc.set;
         if (setter === undefined) return false;
-        $__CallFunction(setter, receiver, [value]);
+        $__Call(setter, receiver, [value]);
         return true;
       }
 
@@ -238,7 +238,7 @@ export class Handler {
 
 export function apply(target, thisArg, args){
   ensureFunction(target, '@Reflect.apply');
-  return $__CallFunction(target, thisArg, ensureArgs(args));
+  return $__Call(target, thisArg, ensureArgs(args));
 }
 
 export function construct(target, args){

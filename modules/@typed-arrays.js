@@ -3,7 +3,7 @@ private @get, @set;
 var indexDesc = { configurable: false,
                   enumerable: true,
                   writable: true,
-                  value: void 1337 };
+                  value: void 0 };
 
 
 

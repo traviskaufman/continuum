@@ -63,12 +63,12 @@ function Str(key, holder){
   if ($__Type(v) === 'Object') {
     var toJSON = v.toJSON;
     if (typeof toJSON === 'function') {
-      v = $__CallFunction(toJSON, v, [key]);
+      v = $__Call(toJSON, v, [key]);
     }
   }
 
   if (ReplacerFunction) {
-    v = $__CallFunction(ReplacerFunction, holder, [key, v]);
+    v = $__Call(ReplacerFunction, holder, [key, v]);
   }
 
   if ($__Type(v) === 'Object') {

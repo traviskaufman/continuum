@@ -8,7 +8,7 @@ $__define(Function.prototype, 'name', '', 0);
 
 export function apply(func, receiver, args){
   ensureFunction(func, '@function.apply');
-  return $__CallFunction(func, receiver, ensureArgs(args));
+  return $__Call(func, receiver, ensureArgs(args));
 }
 
 export function bind(func, receiver, ...args){
@@ -18,7 +18,7 @@ export function bind(func, receiver, ...args){
 
 export function call(func, receiver, ...args){
   ensureFunction(func, '@function.call');
-  return $__CallFunction(func, receiver, args);
+  return $__Call(func, receiver, args);
 }
 
 $__setupFunctions(apply, bind, call);
@@ -27,7 +27,7 @@ $__setupFunctions(apply, bind, call);
 $__defineProps(Function.prototype, {
   apply(receiver, args){
     ensureFunction(this, 'Function.prototype.apply');
-    return $__CallFunction(this, receiver, ensureArgs(args));
+    return $__Call(this, receiver, ensureArgs(args));
   },
   bind(receiver, ...args){
     ensureFunction(this, 'Function.prototype.bind');
@@ -35,7 +35,7 @@ $__defineProps(Function.prototype, {
   },
   call(receiver, ...args){
     ensureFunction(this, 'Function.prototype.call');
-    return $__CallFunction(this, receiver, args);
+    return $__Call(this, receiver, args);
   },
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
