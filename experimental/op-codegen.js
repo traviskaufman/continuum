@@ -445,7 +445,7 @@ function BitfieldType(name, fields, Type){
         var val = 0;
         for (var k in names) {
           if (k in value) {
-            value[k] ? (val |= names[k]) : (val &= ~names[k]);
+            value[k] ^= (-value ^ value[k]) & names[k];
           }
         }
       }
@@ -745,7 +745,7 @@ register([
     ]
   },
   {
-    id: 'Descriptor',
+    id: 'PropertyDescriptor',
     kind: 'bitfield',
     type: 'uint8',
     fields: [
@@ -754,11 +754,6 @@ register([
       { name: 'writable', value: 0x04 },
       { name: 'accessor', value: 0x08 },
     ]
-  },
-  {
-    id: 'Descriptors',
-    kind: 'array',
-    elementType: 'Descriptor'
   },
   {
     id: 'BinaryOp',
@@ -801,8 +796,7 @@ register([
       { name: 'loc', type: 'SourceRange' },
       { name: 'scopeType', type: 'ScopeType' },
       { name: 'lexicalType', type: 'LexicalType' },
-      { name: 'varDecls', type: 'Strings' },
-      { name: 'exportedNames', type: 'Strings' }
+      { name: 'varDecls', type: 'Strings' }
     ]
   },
 ]);
@@ -819,12 +813,16 @@ void function(){
       return charCode.apply(null, getter(data, offset));
     },
     function set(data, offset, value){
-      return setter(data, offset, map(new String(value), function(chr){
+      setter(data, offset, map(new String(value), function(chr){
         return chr.charCodeAt(0);
       }));
     }
   ]);
 }();
+
+var continuum = require('continuum');
+
+
 
 
 var data = new DataView(new ArrayBuffer(80));
@@ -832,23 +830,9 @@ var buff = new Uint32Array(data.buffer);
 
 var Code = getType('Code');
 
-var x = new Code(data, 0, {
-  flags: {
-    topLevel: true,
-    strict: false,
-    usesSuper: false
-  },
-  loc: {
-    start: { line: 1, column: 0 },
-    end: { line: 1, column: 15 }
-  },
-  scopeType: 'global',
-  lexicalType: 'normal',
-  varDecls: ['xyz', 'abc'],
-  exportedNames: []
-});
+var x = new Code(data, 0, continuum.createCode('function y(){}'));
 
-console.log(data);
+console.log(x.get());
 
 // var x = new Range(data, 0, { start: { line: 1, column: 0 }, end: { line: 1, column: 15 } });
 
