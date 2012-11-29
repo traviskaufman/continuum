@@ -663,14 +663,14 @@ var VerticalScrollbar = function(){
       speed = speed || 300;
       self.repeating = true;
 
-      body.once('mouseup', function(){
+      win.once('mouseup', function(){
         if (self.repeating) {
           self.repeating = false;
           self.emit('scroll-end')
         }
       });
 
-      body.once('click', function(){
+      win.once('click', function(){
         if (self.repeating) {
           self.repeating = false;
           self.emit('scroll-end')
@@ -945,9 +945,9 @@ var Dragger = (function(){
     this.target = target;
     this.addClass('drag-helper');
     target.on('mousedown', this.grab, this);
-    this.on('mousemove', this.drag);
     target.on('mousemove', this.drag, this);
     target.on('mouseup', this.drop, this);
+    this.on('mousemove', this.drag);
     this.on('mouseup', this.drop);
 
     if (bindings) {
