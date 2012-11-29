@@ -581,7 +581,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     if (func.strict) {
-      var ao = new $strictArguments(args);
+      var ao = new $StrictArguments(args);
       var status = ArgumentBindingInitialization(formals, ao, env);
     } else {
       var ao = env.arguments = new $MappedArguments(params, env, args, func);
@@ -2148,7 +2148,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var caller = context ? context.callee : null;
 
-        ExecutionContext.push(new ExecutionContext(context, local, realm, this.code, this, isConstruct));
+        ExecutionContext.push(new ExecutionContext(context, local, realm, this.code, this, args, isConstruct));
         var status = FunctionDeclarationInstantiation(this, args, local);
         if (status && status.Abrupt) {
           ExecutionContext.pop();
@@ -2269,7 +2269,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($GeneratorFunction, $Function, [
-      function Call(receiver, args){
+      function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
         }
@@ -2289,7 +2289,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnvironmentRecord(receiver, this);
         }
 
-        var ctx = new ExecutionContext(context, local, this.Realm, this.code, this);
+        var ctx = new ExecutionContext(context, local, this.Realm, this.code, this, args, isConstruct);
         ExecutionContext.push(ctx);
 
         var status = FunctionDeclarationInstantiation(this, args, local);
@@ -3770,13 +3770,14 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var ExecutionContext = (function(){
-    function ExecutionContext(caller, local, realm, code, func, isConstruct){
+    function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
       this.caller = caller;
       this.Realm = realm;
       this.code = code;
       this.LexicalEnvironment = local;
       this.VariableEnvironment = local;
       this.strict = code.flags.strict;
+      this.args = args || [];
       this.isConstruct = !!isConstruct;
       this.callee = func && !func.Builtin ? func : caller ? caller.callee : null;
     }
