@@ -11684,6 +11684,7 @@ exports.thunk = (function(exports){
     var out = [];
     for (var i=0; i < ops.length; i++) {
       out[i] = opcodes[+ops[i].op];
+      out[i].ip = i;
       if (out[i].name === 'LOG') {
         out.log = true;
       }
@@ -11692,7 +11693,7 @@ exports.thunk = (function(exports){
   }
 
 
-  function Thunk(code){
+  function Thunk(code, instrumented){
     var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
@@ -12508,8 +12509,13 @@ exports.thunk = (function(exports){
       error = completion = stacktrace = yielded = undefined;
       log = log || cmds.log;
       context = newContext;
-      history = [];
-      execute = context.Realm.quiet ? normalExecute : instrumentedExecute;
+      var realm = context.Realm;
+      if (!realm.quiet && !code.natives || realm.debugBuiltins) {
+        history = context.history = [];
+        execute = instrumentedExecute;
+      } else {
+        execute = normalExecute;
+      }
     }
 
     function normalCleanup(){
@@ -12523,30 +12529,23 @@ exports.thunk = (function(exports){
         prepare = v.prepare;
         execute = v.execute;
         cleanup = v.cleanup;
-        history = v.history;
         completion = v.completion;
         stacktrace = v.stacktrace;
         context = v.context;
         log = v.log;
         ctx = v.ctx;
         yielded = v.yielded;
+        if (context) {
+          history = context.history;
+        }
       }
       return result;
     }
 
 
     function normalExecute(){
-      var f = cmds[ip],
-          ips = 0;
-      if (false) {
-        history = [];
-        while (f) {
-          history[ips++] = [ip, ops[ip]];
-          f = f();
-        }
-      } else {
-        while (f) f = f();
-      }
+      var f = cmds[ip];
+      while (f) f = f();
     }
 
     function instrumentedExecute(){
@@ -12555,8 +12554,8 @@ exports.thunk = (function(exports){
           realm = context.Realm;
 
       while (f) {
-        history[ips++] = [ip, ops[ip]];
-        realm.emit('op', [ops[ip], stack[sp - 1]]);
+        history[ips++] = ops[ip];
+        realm.emit('op', ops[ip], stack[sp - 1]);
         f = f();
       }
     }
@@ -12608,11 +12607,10 @@ exports.thunk = (function(exports){
 
     var executing = false, thunkStack = [];
 
+
     var prepare = normalPrepare,
         execute = normalExecute,
         cleanup = normalCleanup;
-
-    instrumentedExecute = normalExecute;
 
     this.run = run;
     this.send = send;
@@ -12913,18 +12911,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ## IsEquivalentDescriptor
 
   function IsEquivalentDescriptor(a, b) {
-    if (a && a.Completion) {
-      if (a.Abrupt) return a; else a = a.value;
-    }
-    if (b && b.Completion) {
-      if (b.Abrupt) return b; else b = b.value;
-    }
-    return is(a.Get, b.Get) &&
-           is(a.Set, b.Set) &&
-           is(a.Value, b.Value) &&
-           is(a.Writable, b.Writable) &&
-           is(a.Enumerable, b.Enumerable) &&
-           is(a.Configurable, b.Configurable);
+    return is(a.Value, b.Value) &&
+           a.Get === b.Get &&
+           a.Set === b.Set &&
+           a.Writable === b.Writable &&
+           a.Enumerable === b.Enumerable &&
+           a.Configurable === b.Configurable;
   }
 
   // ## IsCallable
@@ -13946,7 +13938,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     var changeRecord = new $Object;
     changeRecord.define('type', type, E__);
     changeRecord.define('object', object, E__);
-    changeRecord.define('name', name, E__);
+    if (name !== null) {
+      changeRecord.define('name', name, E__);
+    }
     if (IsDataDescriptor(oldDesc)) {
       changeRecord.define('oldValue', oldDesc.Value, E__);
     }
@@ -14432,9 +14426,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           if (this.Notifier) {
             var changeObservers = this.Notifier.ChangeObservers;
             if (changeObservers.size) {
-              var record = CreateChangeRecord('prototype', this, '', this.Prototype);
-              record.remove('');
-              EnqueueChangeRecord(record, changeObservers);
+              EnqueueChangeRecord(CreateChangeRecord('prototype', this, null, { Value: this.GetInheritance() }), changeObservers);
             }
           }
           this.Prototype = value;
@@ -14577,7 +14569,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         } else {
           var rejected = false;
           if (IsEmptyDescriptor(desc) || IsEquivalentDescriptor(desc, current)) {
-            return;
+            return true;
           }
 
           if (!current.Configurable) {
@@ -14643,6 +14635,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
               EnqueueChangeRecord(CreateChangeRecord(changeType, this, key, current), changeObservers);
             }
           }
+
           return true;
         }
       },
@@ -17929,10 +17922,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   return exports;
 })((0,eval)('this'), typeof module !== 'undefined' ? module.exports : {});
-
-
-
-
 
 
 exports.debug = (function(exports){
