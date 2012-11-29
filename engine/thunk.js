@@ -64,12 +64,8 @@ var thunk = (function(exports){
 
 
   function DefineProperty(obj, key, val) {
-    if (val && val.Completion) {
-      if (val.Abrupt) {
-        return val;
-      } else {
-        val = val.value;
-      }
+    if (val && val.Abrupt) {
+      return val;
     }
 
     return obj.DefineOwnProperty(key, new Desc(val), false);
@@ -205,13 +201,9 @@ var thunk = (function(exports){
           left   = stack[--sp],
           result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -229,13 +221,9 @@ var thunk = (function(exports){
           func     = stack[--sp],
           result   = context.callFunction(func, receiver, args, ops[ip][0]);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -245,16 +233,12 @@ var thunk = (function(exports){
     function CASE(){
       var result = STRICT_EQUAL(stack[--sp], stack[sp - 1]);
 
-      if (result && result.Completion) {
+
+      if (result) {
         if (result.Abrupt) {
           error = result;
           return unwind;
-        } else {
-          result = result.value;
         }
-      }
-
-      if (result) {
         sp--;
         ip = ops[ip][0];
         return cmds[ip];
@@ -266,18 +250,14 @@ var thunk = (function(exports){
     function CLASS_DECL(){
       var def  = ops[ip][0],
           sup  = def.superClass ? stack[--sp] : undefined,
-          ctor = context.createClass(def, sup);
+          result = context.createClass(def, sup);
 
-      if (ctor && ctor.Completion) {
-        if (ctor.Abrupt) {
-          error = ctor;
-          return unwind;
-        } else {
-          ctor = ctor.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
-      var result = context.initializeBinding(getKey(def.name), ctor);
+      result = context.initializeBinding(getKey(def.name), result);
       if (result && result.Abrupt) {
         error = result;
         return unwind;
@@ -289,18 +269,14 @@ var thunk = (function(exports){
     function CLASS_EXPR(){
       var def  = ops[ip][0],
           sup  = def.superClass ? stack[--sp] : undefined,
-          ctor = context.createClass(def, sup);
+          result = context.createClass(def, sup);
 
-      if (ctor && ctor.Completion) {
-        if (ctor.Abrupt) {
-          error = ctor;
-          return unwind;
-        } else {
-          ctor = ctor.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
-      stack[sp++] = ctor;
+      stack[sp++] = result;
       return cmds[++ip];
     }
 
@@ -318,13 +294,9 @@ var thunk = (function(exports){
           func   = stack[--sp],
           result = context.constructFunction(func, args);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
       stack[sp++] = result;
       return cmds[++ip];
@@ -350,13 +322,9 @@ var thunk = (function(exports){
           obj    = stack[sp - 2],
           result = obj.DefineOwnProperty(key, new D[attrs](val));
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -373,13 +341,9 @@ var thunk = (function(exports){
           key    = stack[--sp],
           result = context.getPropertyReference(obj, key);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -422,13 +386,9 @@ var thunk = (function(exports){
     function GET(){
       var result = GetValue(stack[--sp]);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -558,13 +518,9 @@ var thunk = (function(exports){
       }
 
       var result = context.getPropertyReference(key, obj);
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -721,13 +677,9 @@ var thunk = (function(exports){
           index  = ops[ip][0],
           result = context.destructureSpread(obj, index);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -771,13 +723,9 @@ var thunk = (function(exports){
     function SUPER_CALL(){
       var result = context.getSuperReference(false);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -787,13 +735,9 @@ var thunk = (function(exports){
     function SUPER_ELEMENT(){
       var result = context.getSuperReference(stack[--sp]);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -809,13 +753,9 @@ var thunk = (function(exports){
       }
       var result = context.getSuperReference(key);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -829,8 +769,9 @@ var thunk = (function(exports){
 
       if (hasInit) {
         var init = stack[--sp];
-        if (init && init.Completion) {
-          if (init.Abrupt) { error = init; return unwind; } else init = init.value;
+        if (init && init.Abrupt) {
+          error = init;
+          return unwind;
         }
       } else {
         var init = context.createSymbol(name, isPublic);
@@ -855,13 +796,9 @@ var thunk = (function(exports){
     function THIS(){
       var result = context.getThis();
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -876,13 +813,9 @@ var thunk = (function(exports){
     function UNARY(){
       var result = UnaryOp(UNARYOPS[ops[ip][0]], stack[--sp]);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -900,13 +833,9 @@ var thunk = (function(exports){
       var update = updaters[ops[ip][0]],
           result = update(stack[--sp]);
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       stack[sp++] = result;
@@ -926,13 +855,9 @@ var thunk = (function(exports){
     function WITH(){
       var result = ToObject(GetValue(stack[--sp]));
 
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        } else {
-          result = result.value;
-        }
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
       }
 
       context.pushWith(result);
@@ -1008,7 +933,7 @@ var thunk = (function(exports){
     function normalExecute(){
       var f = cmds[ip],
           ips = 0;
-      if (log) {
+      if (false) {
         history = [];
         while (f) {
           history[ips++] = [ip, ops[ip]];
@@ -1081,6 +1006,8 @@ var thunk = (function(exports){
     var prepare = normalPrepare,
         execute = normalExecute,
         cleanup = normalCleanup;
+
+    instrumentedExecute = normalExecute;
 
     this.run = run;
     this.send = send;

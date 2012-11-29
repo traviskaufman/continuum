@@ -34,36 +34,30 @@ var operators = (function(exports){
   // ## GetValue
 
   function GetValue(v){
-    if (v && v.Completion) {
-      if (v.Abrupt) {
-        return v;
-      } else {
-        v = v.value;
-      }
-    }
-    if (!v || !v.Reference) {
-      return v;
-    } else if (v.base === undefined) {
+    if (!v || !v.Reference || v.Abrupt) return v;
+    var base = v.base;
+
+    if (base == null) {
       return ThrowException('not_defined', [v.name]);
     } else {
-      var base = v.base;
+      var type = typeof base;
 
-      if (HasPrimitiveBase(v)) {
-        if (typeof base === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
+      if (type !== OBJECT) {
+        if (type === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
           return base[v.name];
         }
-        base = new exports.$PrimitiveBase(base);
+        base = exports.ToObject(base);
       }
 
-      if (exports.IsPropertyReference(v)) {
-        if (base.Get) {
-          if ('thisValue' in v) {
-            return base.GetP(GetThisValue(v), v.name);
-          } else {
-            return base.Get(v.name);
-          }
+      if (base.Get) {
+        if ('thisValue' in v) {
+          return base.GetP(GetThisValue(v), v.name);
+        } else {
+          return base.Get(v.name);
         }
-      } else if (base.GetBindingValue) {
+      }
+
+      if (base.GetBindingValue) {
         return base.GetBindingValue(v.name, v.strict);
       }
     }
