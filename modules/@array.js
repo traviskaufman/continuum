@@ -18,20 +18,36 @@ export function isArray(array){
   return $__GetBuiltinBrand(array) === 'Array';
 }
 
-export function from(iterable){
-  var out = [];
-  iterable = $__ToObject(iterable);
+export function from(arrayLike){
+  arrayLike = $__ToObject(arrayLike);
+  var len = $__ToUint32(arrayLike.length);
+      Ctor = $__IsConstructor(this) ? this : Array,
+      out = new Ctor(len);
 
-  for (var i = 0, len = iterable.length >>> 0; i < len; i++) {
-    if (i in iterable) {
-      out[i] = iterable[i];
+  for (var i = 0; i < len; i++) {
+    if (i in arrayLike) {
+      out[i] = arrayLike[i];
     }
   }
 
+  out.length = len;
   return out;
 }
 
-$__defineMethods(Array, [isArray, from]);
+export function of(...items){
+  var len = $__ToInteger(items.length);
+      Ctor = $__IsConstructor(this) ? this : Array,
+      out = new Ctor(len);
+
+  for (var i=0; i < len; i++) {
+    out[i] = items[i];
+  }
+
+  out.length = len;
+  return out;
+}
+
+$__defineMethods(Array, [isArray, from, of]);
 
 
 {
@@ -46,7 +62,7 @@ $__defineProps(Array.prototype, {
     }
 
     for (var i = 0; i < len; i++) {
-      if (i in array && !$__CallFunction(callback, context, [array[i], i, array])) {
+      if (i in array && !$__Call(callback, context, [array[i], i, array])) {
         return false;
       }
     }
@@ -66,7 +82,7 @@ $__defineProps(Array.prototype, {
     for (var i = 0; i < len; i++) {
       if (i in array) {
         var element = array[i];
-        if ($__CallFunction(callback, context, [element, i, array])) {
+        if ($__Call(callback, context, [element, i, array])) {
           result[count++] = element;
         }
       }
@@ -84,7 +100,7 @@ $__defineProps(Array.prototype, {
 
     for (var i=0; i < len; i++) {
       if (i in array) {
-        $__CallFunction(callback, context, [array[i], i, this]);
+        $__Call(callback, context, [array[i], i, this]);
       }
     }
   },
@@ -153,7 +169,7 @@ $__defineProps(Array.prototype, {
 
     for (var i=0; i < len; i++) {
       if (i in array) {
-        result[i] = $__CallFunction(callback, context, [array[i], i, this]);
+        result[i] = $__Call(callback, context, [array[i], i, this]);
       }
     }
     return result;
@@ -193,7 +209,7 @@ $__defineProps(Array.prototype, {
 
     for (; i < len; i++) {
       if (i in array) {
-        initial = $__CallFunction(callback, this, [initial, array[i], array]);
+        initial = $__Call(callback, this, [initial, array[i], array]);
       }
     }
     return initial;
@@ -215,7 +231,7 @@ $__defineProps(Array.prototype, {
 
     for (; i >= 0; i--) {
       if (i in array) {
-        initial = $__CallFunction(callback, this, [initial, array[i], array]);
+        initial = $__Call(callback, this, [initial, array[i], array]);
       }
     }
     return initial;
@@ -258,7 +274,7 @@ $__defineProps(Array.prototype, {
     }
 
     for (var i = 0; i < len; i++) {
-      if (i in array && $__CallFunction(callback, context, [array[i], i, array])) {
+      if (i in array && $__Call(callback, context, [array[i], i, array])) {
         return true;
       }
     }
@@ -327,10 +343,9 @@ let kinds = {
 };
 
 class ArrayIterator extends iter.Iterator {
-  private @array, @index, @kind;
-  // @array = IteratedObject
-  // @index = ArrayIteratorNextIndex
-  // @kind  = ArrayIterationKind
+  private @array, // IteratedObject
+          @index, // ArrayIteratorNextIndex
+          @kind;  // ArrayIterationKind
 
   constructor(array, kind){
     this.@array = $__ToObject(array);
