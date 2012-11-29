@@ -946,6 +946,15 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.others = create(null);
         this.lastLookup = this.guard.next = this.guard.previous = this.guard;
       },
+      function forEach(callback, context){
+        var item = this.guard.next;
+        context = context || this;
+
+        while (item !== this.guard) {
+          callback.call(context, item.value, item.key);
+          item = item.next;
+        }
+      },
       function clear(){
         var next, item = this.guard.next;
 
@@ -1262,6 +1271,69 @@ var runtime = (function(GLOBAL, exports, undefined){
     return array;
   }
 
+  function EnqueueChangeRecord(record, changeObservers){
+    changeObservers.forEach(function(callback){
+      var changeRecords = callback.PendingChangeRecords || (callback.PendingChangeRecords = []);
+      changeRecords.push(record);
+    });
+  }
+
+  function DeliverChangeRecords(callback){
+    var changeRecords = callback.PendingChangeRecords;
+    if (changeRecords && changeRecords.length) {
+      var array = fromInternalArray(changeRecords);
+      changeRecords.length = 0;
+      var result = callback.Call(undefined, [array]);
+      if (result && result.Abrupt) {
+        return result;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function DeliverAllChangeRecords(){
+    var anyWorkDone = false,
+        callbacks = intrinsics.ObserverCallbacks,
+        errors = [];
+
+    if (callbacks && callbacks.size) {
+      callbacks.forEach(function(callback){
+        var result = DeliverChangeRecords(callback);
+        if (result) {
+          anyWorkDone = true;
+          if (result && result.Abrupt) {
+            errors.push(result);
+          }
+        }
+      });
+    }
+
+    return errors.length ? errors : anyWorkDone;
+  }
+
+  function CreateChangeRecord(type, object, name, oldDesc){
+    var changeRecord = new $Object;
+    changeRecord.define('type', type, E__);
+    changeRecord.define('object', object, E__);
+    changeRecord.define('name', name, E__);
+    if (IsDataDescriptor(oldDesc)) {
+      changeRecord.define('oldValue', oldDesc.Value, E__);
+    }
+    changeRecord.PreventExtensions();
+    return changeRecord;
+  }
+
+  function GetNotifier(object){
+    var notifier = object.Notifier;
+    if (!notifier) {
+      notifier = object.Notifier = new $Object(intrinsics.NotifierProto);
+      notifier.Target = object;
+      notifier.ChangeObservers = new MapData;
+    }
+    return notifier;
+  }
+
 
   // ###########################
   // ###########################
@@ -1394,6 +1466,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     function EnvironmentRecord(bindings, outer){
       this.bindings = bindings;
       this.outer = outer;
+      this.refs = create(null);
+      hide(this, 'refs');
     }
 
     define(EnvironmentRecord.prototype, {
@@ -1651,6 +1725,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Prototype = proto;
       this.properties = new PropertyList;
       this.storage = create(null);
+      this.refs = create(null);
       $Object.tag(this);
       if (proto === null) {
         this.properties.setProperty(['__proto__', null, 6, Proto]);
@@ -1658,6 +1733,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       hide(this, 'storage');
       hide(this, 'Prototype');
+      hide(this, 'refs');
       hide(this, 'Realm');
     }
 
@@ -1722,7 +1798,15 @@ var runtime = (function(GLOBAL, exports, undefined){
             }
             proto = proto.GetInheritance();
           }
-          this.BuiltinBrand = this.BuiltinBrand;
+
+          if (this.Notifier) {
+            var changeObservers = this.Notifier.ChangeObservers;
+            if (changeObservers.size) {
+              var record = CreateChangeRecord('prototype', this, '', this.Prototype);
+              record.remove('');
+              EnqueueChangeRecord(record, changeObservers);
+            }
+          }
           this.Prototype = value;
           return true;
         } else {
@@ -1839,7 +1923,8 @@ var runtime = (function(GLOBAL, exports, undefined){
             ? function(e, a){ return ThrowException(e, a) }
             : function(e, a){ return false };
 
-        var current = this.GetOwnProperty(key);
+        var current = this.GetOwnProperty(key),
+            changeType = 'reconfigured';
 
         if (current === undefined) {
           if (!this.IsExtensible()) {
@@ -1849,6 +1934,13 @@ var runtime = (function(GLOBAL, exports, undefined){
               this.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
             } else {
               this.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | A);
+            }
+
+            if (this.Notifier) {
+              var changeObservers = this.Notifier.ChangeObservers;
+              if (changeObservers.size) {
+                EnqueueChangeRecord(CreateChangeRecord('new', this, key), changeObservers);
+              }
             }
             return true;
           }
@@ -1865,15 +1957,17 @@ var runtime = (function(GLOBAL, exports, undefined){
               var currentIsData = IsDataDescriptor(current),
                   descIsData = IsDataDescriptor(desc);
 
-              if (currentIsData !== descIsData)
+              if (currentIsData !== descIsData) {
                 return reject('redefine_disallowed', []);
-              else if (currentIsData && descIsData)
-                if (!current.Writable && 'Value' in desc && desc.Value !== current.Value)
+              } else if (currentIsData && descIsData) {
+                if (!current.Writable && 'Value' in desc && desc.Value !== current.Value) {
                   return reject('redefine_disallowed', []);
-              else if ('Set' in desc && desc.Set !== current.Set)
+                }
+              } else if ('Set' in desc && desc.Set !== current.Set) {
                 return reject('redefine_disallowed', []);
-              else if ('Get' in desc && desc.Get !== current.Get)
+              } else if ('Get' in desc && desc.Get !== current.Get) {
                 return reject('redefine_disallowed', []);
+              }
             }
           }
 
@@ -1906,12 +2000,19 @@ var runtime = (function(GLOBAL, exports, undefined){
               current.Writable = true;
             }
             'Writable' in desc || (desc.Writable = current.Writable);
-            if ('Value' in desc) {
-              this.set(key, desc.Value)
-            }
             this.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+            if ('Value' in desc) {
+              this.set(key, desc.Value);
+              changeType = 'updated';
+            }
           }
 
+          if (this.Notifier) {
+            var changeObservers = this.Notifier.ChangeObservers;
+            if (changeObservers.size) {
+              EnqueueChangeRecord(CreateChangeRecord(changeType, this, key, current), changeObservers);
+            }
+          }
           return true;
         }
       },
@@ -1934,6 +2035,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (!this.has(key)) {
           return true;
         } else if (this.query(key) & C) {
+          if (this.Notifier) {
+            var changeObservers = this.Notifier.ChangeObservers;
+            if (changeObservers.size) {
+              EnqueueChangeRecord(CreateChangeRecord('deleted', this, key, this.GetOwnProperty(key)), changeObservers);
+            }
+          }
           this.remove(key);
           return true;
         } else if (strict) {
@@ -3717,10 +3824,16 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-
-
   var $NativeFunction = (function(){
     function $NativeFunction(options){
+      if (typeof options === 'function') {
+        options = {
+          call: options,
+          name: fname(options),
+          length: options.length,
+          proto: intrinsics.FunctionProto
+        };
+      }
       if (options.proto === undefined) {
         options.proto = intrinsics.FunctionProto;
       }
@@ -3901,6 +4014,36 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return ExecutionContext;
   })();
+
+
+
+
+  function notify(changeRecord){
+    if (!('ChangeObservers' in this)) {
+      return ThrowException('called_on_incompatible_object', ['Notifier.prototype.notify']);
+    }
+
+    changeRecord = ToObject(changeRecord);
+    var type = changeRecord.Get('type');
+    if (typeof type !== 'string') {
+      return  ThrowException('changerecord_type', [typeof type]);
+    }
+
+    var changeObservers = this.ChangeObservers;
+    if (changeObservers.size) {
+      var target = this.Target,
+          newRecord = new $Object,
+          keys = changeRecord.Enumerate(true, true);
+
+      newRecord.define('object', target, 1);
+      for (var i=0; i < keys.length; i++) {
+        newRecord.define(keys[i], changeRecord.Get(keys[i]), 1);
+      }
+
+      newRecord.PreventExtensions();
+      EnqueueChangeRecord(newRecord, changeObservers);
+    }
+  }
 
 
   var Intrinsics = (function(){
@@ -4256,7 +4399,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         Construct: function(func, args){
           return func.Construct(toInternalArray(args));
         },
-
+        GetNotifier: GetNotifier,
+        EnqueueChangeRecord: EnqueueChangeRecord,
+        DeliverChangeRecords: DeliverChangeRecords,
         GetBuiltinBrand: function(object){
           return object.BuiltinBrand.name;
         },
@@ -4571,6 +4716,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           timers[id] = setTimeout(function trigger(){
             if (timers[id]) {
               f.Call(global, []);
+              deliverChangeRecordsAndReportErrors();
               if (repeating) {
                 timers[id] = setTimeout(trigger, time);
               } else {
@@ -4693,6 +4839,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         WeakMapHas: function(map, key){
           return map.WeakMapData.has(key);
         },
+        AddObserver: function(data, callback){
+          data.set(callback, callback);
+        },
+        RemoveObserver: function(data, callback){
+          data.remove(callback);
+        },
         readFile: function(path, callback){
           require('fs').readFile(path, 'utf8', function(err, file){
             callback.Call(undefined, [file]);
@@ -4720,6 +4872,14 @@ var runtime = (function(GLOBAL, exports, undefined){
       };
     })();
 
+    function deliverChangeRecordsAndReportErrors(){
+      var observerResults = DeliverAllChangeRecords();
+      if (observerResults && observerResults instanceof Array) {
+        each(observerResults, function(error){
+          realm.emit('throw', error);
+        });
+      }
+    }
 
     var initGlobals = new Script({
       scope: SCOPE.GLOBAL,
@@ -4777,6 +4937,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         realm.state = 'paused';
         realm.emit('pause', realm.resume);
       } else {
+        deliverChangeRecordsAndReportErrors();
         realm.executing = null;
         realm.state = 'idle';
         return result;
@@ -4796,6 +4957,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (toggle) {
           ExecutionContext.push(realm.mutationScope);
         } else {
+          deliverChangeRecordsAndReportErrors();
           ExecutionContext.pop();
         }
       }
@@ -4965,15 +5127,18 @@ var runtime = (function(GLOBAL, exports, undefined){
       activate(this);
       this.natives = new Intrinsics(this);
       intrinsics = this.intrinsics = this.natives.bindings;
-      intrinsics.global = global = operators.global = this.global = new $Object(new $Object(this.intrinsics.ObjectProto));
-      this.global.BuiltinBrand = BRANDS.GlobalObject;
-      this.globalEnv = new GlobalEnvironmentRecord(this.global);
+      intrinsics.global = global = operators.global = this.global = new $Object(new $Object(intrinsics.ObjectProto));
+      global.BuiltinBrand = BRANDS.GlobalObject;
+      this.globalEnv = new GlobalEnvironmentRecord(global);
       this.globalEnv.Realm = this;
 
-      this.intrinsics.FunctionProto.Scope = this.globalEnv;
-      this.intrinsics.FunctionProto.Realm = this;
-      this.intrinsics.ThrowTypeError = CreateThrowTypeError(this);
-      hide(this.intrinsics.FunctionProto, 'Scope');
+      intrinsics.FunctionProto.Scope = this.globalEnv;
+      intrinsics.FunctionProto.Realm = this;
+      intrinsics.ThrowTypeError = CreateThrowTypeError(this);
+      intrinsics.ObserverCallbacks = new MapData;
+      intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
+      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify));
+      hide(intrinsics.FunctionProto, 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
       hide(this, 'active');

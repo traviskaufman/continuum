@@ -1,3 +1,5 @@
+import Set from '@set';
+
 export function Object(value){
   if ($__IsConstructCall()) {
     return {};
@@ -189,9 +191,51 @@ export function seal(object){
 }
 
 
-$__defineProps(Object, { assign, create, defineProperty, defineProperties, freeze,
-  getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor, getPropertyNames,
-  getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, preventExtensions, seal });
+export function observe(object, callback){
+  ensureObject(object, 'Object.observe');
+  ensureFunction(callback, 'Object.observe');
+  if (isFrozen(callback)) {
+
+  }
+
+  var notifier = $__GetNotifier(object),
+      changeObservers = $__GetInternal(notifier, 'ChangeObservers');
+
+  $__AddObserver(changeObservers, callback);
+  $__AddObserver($__ObserverCallbacks, callback);
+  return object;
+}
+
+export function unobserve(object, callback){
+  ensureObject(object, 'Object.unobserve');
+  ensureFunction(callback, 'Object.unobserve');
+
+  var notifier = $__GetNotifier(object),
+      changeObservers = $__GetInternal(notifier, 'ChangeObservers');
+
+  $__RemoveObserver(changeObservers, callback);
+  return object;
+}
+
+export function deliverChangeRecords(callback){
+  ensureFunction(callback, 'Object.deliverChangeRecords');
+  $__DeliverChangeRecords(callback);
+}
+
+export function getNotifier(object){
+  ensureObject(object, 'Object.getNotifier');
+  if (isFrozen(object)) {
+    return null;
+  }
+  return $__GetNotifier(object);
+}
+
+
+
+
+$__defineProps(Object, { assign, create, defineProperty, defineProperties, deliverChangeRecords, freeze,
+  getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor, getPropertyNames,
+  getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe, preventExtensions, seal, unobserve });
 
 
 export function isPrototypeOf(object, prototype){
@@ -265,5 +309,11 @@ function ensureObject(o, name){
 function ensureDescriptor(o){
   if (o === null || typeof o !== 'object') {
     throw $__Exception('property_desc_object', [typeof o])
+  }
+}
+
+function ensureFunction(o, name){
+  if (typeof o !== 'function') {
+    throw $__Exception('called_on_non_function', [name]);
   }
 }
