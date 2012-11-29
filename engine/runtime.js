@@ -2908,8 +2908,8 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $strictArguments = (function(){
-    function $strictArguments(args){
+  var $StrictArguments = (function(){
+    function $StrictArguments(args){
       $Arguments.call(this, args.length);
       for (var i=0; i < args.length; i++) {
         this.define(i+'', args[i], ECW);
@@ -2919,9 +2919,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.define('caller', intrinsics.ThrowTypeError, __A);
     }
 
-    inherit($strictArguments, $Arguments);
+    inherit($StrictArguments, $Arguments);
 
-    return $strictArguments;
+    return $StrictArguments;
   })();
 
 
