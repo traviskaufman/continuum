@@ -1,57 +1,145 @@
+
 private @get, @set;
 
-var indexDesc = { configurable: false,
-                  enumerable: true,
-                  writable: true,
-                  value: void 0 };
+function wrappingClamp(number, min, max){
+  if (number < min) {
+    number += max;
+  }
+  return number < min ? min : number > max ? max : number;
+}
+
+
+function createArrayBuffer(nativeBuffer, byteLength){
+  var buffer = $__ObjectCreate($__ArrayBufferProto);
+  $__define(buffer, 'byteLength', byteLength, 0);
+  $__SetInternal(buffer, 'NativeBuffer', nativeBuffer);
+  $__SetInternal(buffer, 'ConstructorName', 'ArrayBuffer');
+  $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');
+  return buffer;
+}
+
+
+function createTypedArray(Type, buffer, byteOffset, length){
+  if (typeof buffer === 'number') {
+    length = $__ToUint32(buffer);
+    var byteLength = length * Type.BYTES_PER_ELEMENT;
+    byteOffset = 0;
+    buffer = new ArrayBuffer(byteLength);
+    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+
+  } else {
+    buffer = $__ToObject(buffer);
+
+    if ($__GetBuiltinBrand(buffer) === 'ArrayBuffer') {
+      byteOffset = $__ToUint32(byteOffset);
+      if (byteOffset % Type.BYTES_PER_ELEMENT) {
+        throw $__Exception('buffer_unaligned_offset', [Type.name]);
+      }
+
+      var bufferLength = buffer.byteLength,
+          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;
+
+      if (byteOffset + byteLength > bufferLength) {
+        throw $__Exception('buffer_out_of_bounds', [Type.name]);
+      }
+
+      length = byteLength / Type.BYTES_PER_ELEMENT;
+
+      if ($__ToInteger(length) !== length) {
+        throw $__Exception('buffer_unaligned_length', [Type.name]);
+      }
+
+      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+
+    } else {
+      length = $__ToUint32(buffer.length);
+      var byteLength = length * Type.BYTES_PER_ELEMENT;
+      byteOffset = 0;
+      buffer = new ArrayBuffer(length);
+
+      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+
+      for (var i=0; i < length; i++) {
+        typedArray[i] = buffer[i];
+      }
+
+      return typedArray;
+    }
+  }
+}
+
+function set(Type, instance, array, offset){
+  if ($__GetBuiltinBrand(instance) !== Type.name) {
+    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);
+  }
+
+  offset = $__ToUint32(offset);
+  array = $__ToObject(array);
+  var srcLength = $__ToUint32(array.length),
+      targetLength = instance.length;
+
+  if (srcLength + offset > targetLength) {
+    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);
+  }
+
+  var temp = new Type(srcLength),
+      k = 0;
+
+  while (k < srcLength) {
+    temp[k] = array[k];
+  }
+
+  k = offset;
+  while (k < targetLength) {
+    instance[k] = temp[k - offset];
+  }
+}
+
+function subarray(Type, instance, begin, end){
+  if ($__GetBuiltinBrand(instance) !== Type.name) {
+    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);
+  }
+
+  var srcLength = instance.length;
+
+  begin = $__ToInt32(begin);
+  end = end === undefined ? srcLength : $__ToInt32(end);
+
+  begin = wrappingClamp(begin, 0, srcLength);
+  end = wrappingClamp(end, 0, srcLength);
+
+  if (end < begin) {
+    [begin, end] = [end, begin];
+  }
+
+  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);
+}
 
 
 
 export class ArrayBuffer {
-  constructor(len){
-    if (!$__IsConstructCall()) {
-      return new ArrayBuffer(len);
-    }
-    $__define(this, 'byteLength', len >>> 0, 0);
-    $__SetInternal(this, 'NativeBuffer', $__NativeBufferCreate(len));
-    $__SetBuiltinBrand(this, 'BuiltinArrayBuffer');
+  constructor(byteLength){
+    byteLength = $__ToUint32(byteLength);
+    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);
   }
+
   slice(begin, end){
     var sourceBuffer = $__ToObject(this),
-        origin = $__GetInternal(this, 'NativeBuffer');
+        sourceNativeBuffer = $__GetInternal(sourceBuffer, 'NativeBuffer');
 
-    if (!origin) {
+    if (!sourceNativeBuffer) {
       throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);
     }
 
-    var byteLength = this.byteLength;
+    var byteLength = sourceBuffer.byteLength;
 
-    begin >>= 0;
-    if (begin < 0) {
-      begin += byteLength;
-      if (begin < 0) begin = 0;
-    } else if (begin >= byteLength) {
-      begin = byteLength;
-    }
+    begin = $__ToInt32(begin);
+    end = end === undefined ? byteLength : $__ToInt32(end);
 
+    begin = wrappingClamp(begin, 0, byteLength);
+    end = wrappingClamp(end, 0, byteLength);
 
-    if (end == null) {
-      end = byteLength;
-    } else {
-      end >>= 0;
-      if (end < 0) {
-        end += byteLength;
-        if (end < 0) end = 0;
-      } else if (end >= byteLength) {
-        end = byteLength;
-      }
-    }
-
-    var buffer = $__ObjectCreate($__ArrayBufferProto);
-    $__define(buffer, 'byteLength', end - begin, 0);
-    $__SetInternal(buffer, 'NativeBuffer', $__NativeBufferSlice(origin, begin, end));
-    $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');
-    return buffer;
+    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);
   }
 }
 
@@ -63,9 +151,9 @@ export class DataView {
       throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);
     }
 
-    byteOffset >>>= 0;
+    byteOffset = $__ToUint32(byteOffset);
     var bufferLength = buffer.byteLength,
-        byteLength = byteLength === undefined ? bufferLength - byteOffset : byteLength >>> 0;
+        byteLength = byteLength === undefined ? bufferLength - byteOffset : $__ToUint32(byteLength);
 
     if (byteOffset + byteLength > bufferLength) {
       throw $__Exception('buffer_out_of_bounds', ['DataView']);
@@ -129,8 +217,6 @@ export class DataView {
 
 DataView.prototype.@get = $__DataViewGet
 DataView.prototype.@set = $__DataViewSet
-
-
 
 
 export class Float64Array {
@@ -230,107 +316,6 @@ export class Uint8Array {
 }
 
 
-function createTypedArray(Type, buffer, byteOffset, length){
-  var byteLength;
-  if (typeof buffer === 'number') {
-
-    length = buffer >>> 0;
-    byteLength = length * Type.BYTES_PER_ELEMENT;
-    byteOffset = 0;
-    buffer = new ArrayBuffer(byteLength);
-
-    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset)
-  } else {
-    buffer = $__ToObject(buffer);
-
-    if ($__GetBuiltinBrand(buffer) === 'ArrayBuffer') {
-
-      byteOffset >>>= 0;
-      if (byteOffset % Type.BYTES_PER_ELEMENT) {
-        throw $__Exception('buffer_unaligned_offset', [Type.name]);
-      }
-
-      var bufferLength = buffer.byteLength,
-          byteLength = length === undefined ? bufferLength - byteOffset : (length >>> 0) * Type.BYTES_PER_ELEMENT;
-
-      if (byteOffset + byteLength > bufferLength) {
-        throw $__Exception('buffer_out_of_bounds', [Type.name]);
-      }
-
-      length = byteLength / Type.BYTES_PER_ELEMENT;
-
-      if ((length >>> 0) !== length) {
-        throw $__Exception('buffer_unaligned_length', [Type.name]);
-      }
-
-      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset)
-    } else {
-
-      length = buffer.length >>> 0;
-      byteLength = length * Type.BYTES_PER_ELEMENT;
-      byteOffset = 0;
-      buffer = new ArrayBuffer(length);
-
-      var object = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
-
-      for (var i=0; i < length; i++) {
-        object[i] = buffer[i];
-      }
-
-      return object;
-    }
-  }
-}
-
-function set(Type, instance, array, offset){
-  if ($__GetBuiltinBrand(instance) !== Type.name) {
-    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);
-  }
-
-  offset >>>= 0;
-  array = $__ToObject(array);
-  var srcLength = array.length,
-      targetLength = instance.length;
-
-  if (srcLength + offset > targetLength) {
-    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);
-  }
-
-  var temp = new Type(srcLength),
-      k = 0;
-
-  while (k < srcLength) {
-    temp[k] = array[k];
-  }
-  k = offset;
-  while (k < targetLength) {
-    instance[k] = temp[k - offset];
-  }
-}
-
-function subarray(Type, instance, begin, end){
-  if ($__GetBuiltinBrand(instance) !== Type.name) {
-    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);
-  }
-
-  var srcLength = instance.length;
-
-  begin >>= 0;
-  if (begin < 0) begin += srcLength;
-  end = end === undefined ? srcLength : end >> 0;
-  if (end < 0) end += srcLength;
-
-  if (begin < 0) begin = 0;
-  if (end < 0) end = 0;
-  if (begin >= srcLength) begin = srcLength;
-  if (end >= srcLength) end = srcLength;
-  if (end < begin) [begin, end] = [end, begin];
-
-
-  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);
-}
-
-
 
 {
   function setupClass(Ctor, bytes){
@@ -352,6 +337,7 @@ function subarray(Type, instance, begin, end){
   setupClass(Uint32Array, 4);
   setupClass(Float32Array, 4);
   setupClass(Float64Array, 8);
+
 }
 
 $__ArrayBufferProto = ArrayBuffer.prototype;

@@ -201,7 +201,7 @@ h1, h2
 
 
 .ƒsplitter
-{ position: absolute; z-index: 999; border: 0 solid #068; }
+{ position: absolute; z-index: 1001; border: 0 solid #068; }
 .ƒsplitter-vertical
 { top: 0; left: 0; right: 19px; height: 3px; cursor: row-resize; border-top-width: 1px;
   box-shadow: 1px 3px 5px 0 rgba(0,0,0,.6); }
@@ -320,6 +320,7 @@ h1, h2
 
 .ƒArguments      { color: #ff0 } /* hsl( 60, 100%, 50%) */
 .ƒArray          { color: #f68 } /* hsl(347, 100%, 70%) */
+.ƒArrayBuffer    { color: #f3a }
 .ƒBoolean        { color: #af6 } /* hsl( 93, 100%, 70%) */
 .ƒDate           { color: #0a0 } /* hsl(120, 100%, 33%) */
 .ƒError          { color: #f06 } /* hsl(336, 100%, 50%) */
