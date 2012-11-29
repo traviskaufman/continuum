@@ -57,15 +57,15 @@ var debug = (function(exports){
     inheritedAttrs: alwaysCall(create, [null]),
     ownAttrs: alwaysCall(create, [null]),
     getterAttrs: alwaysCall(create, [null]),
-    isPropExtensible: always(null),
-    isPropEnumerable: always(null),
-    isPropConfigurable: always(null),
+    isExtensible: always(null),
+    isEnumerable: always(null),
+    isConfigurable: always(null),
     getOwnDescriptor: always(null),
     getDescriptor: always(null),
-    getProperty: always(null),
-    isPropAccessor: always(null),
-    isPropWritable: always(null),
-    propAttributes: always(null)
+    describe: always(null),
+    isAccessor: always(null),
+    isWritable: always(null),
+    query: always(null)
   });
 
   function MirrorValue(subject, label){
@@ -193,8 +193,8 @@ var debug = (function(exports){
       props: null
     }, [
       function get(key){
-        if (this.isPropAccessor(key)) {
-          var prop = this.getProperty(key),
+        if (this.isAccessor(key)) {
+          var prop = this.describe(key),
               accessor = prop[1] || prop[3];
 
           if (!this.accessors[key]) {
@@ -214,8 +214,8 @@ var debug = (function(exports){
           }
         }
       },
-      function getProperty(key){
-        return this.subject.describe(key) || this.getPrototype().getProperty(key);
+      function describe(key){
+        return this.subject.describe(key) || this.getPrototype().describe(key);
       },
       function isClass(){
         return !!this.subject.Class;
@@ -237,18 +237,11 @@ var debug = (function(exports){
       },
       function set(key, value){
         var ret;
-        realm().enterMutationContext();
-        ret = this.subject.Put(key, value, false);
-        realm().exitMutationContext();
+        ret = this.subject.sut(key, value);
         return ret;
       },
-      function setAttribute(key, attr){
-        var prop = this.subject.describe(key);
-        if (prop) {
-          prop[2] = attr;
-          return true;
-        }
-        return false;
+      function update(key, attr){
+        return this.subject.update(key, attr);
       },
       function defineProperty(key, desc){
         desc = Object(desc);
@@ -317,26 +310,26 @@ var debug = (function(exports){
       function getInternal(name){
         return this.subject[name];
       },
-      function isPropEnumerable(key){
-        return (this.propAttributes(key) & ENUMERABLE) > 0;
+      function isEnumerable(key){
+        return (this.query(key) & ENUMERABLE) > 0;
       },
-      function isPropConfigurable(key){
-        return (this.propAttributes(key) & CONFIGURABLE) > 0;
+      function isConfigurable(key){
+        return (this.query(key) & CONFIGURABLE) > 0;
       },
-      function isPropAccessor(key){
-        return (this.propAttributes(key) & ACCESSOR) > 0;
+      function isAccessor(key){
+        return (this.query(key) & ACCESSOR) > 0;
       },
-      function isPropWritable(key){
-        var prop = this.subject.get(key);
+      function isWritable(key){
+        var prop = this.subject.describe(key);
         if (prop) {
           return !!(prop[2] & ACCESSOR ? prop[1].Set : prop[2] & WRITABLE);
         } else {
           return this.subject.IsExtensible();
         }
       },
-      function propAttributes(key){
-        var prop = this.subject.describe(key);
-        return prop ? prop[2] : this.getPrototype().propAttributes(key);
+      function query(key){
+        var attrs = this.subject.query(key);
+        return attrs === null ? this.getPrototype().query(key) : attrs;
       },
       function label(){
         var brand = this.subject.Brand || this.subject.BuiltinBrand;
@@ -400,18 +393,6 @@ var debug = (function(exports){
   })();
 
 
-  var MirrorArguments = (function(){
-    function MirrorArguments(subject){
-      MirrorObject.call(this, subject);
-    }
-
-    inherit(MirrorArguments, MirrorObject, {
-      kind: 'Arguments'
-    });
-
-    return MirrorArguments;
-  })();
-
 
   var MirrorArray = (function(){
 
@@ -444,12 +425,26 @@ var debug = (function(exports){
           }
         }
 
-        return indexes.sort(function(a, b){ return +a > +b }).concat(keys.sort());
+        return indexes.concat(keys.sort());
       }
     ]);
 
     return MirrorArray;
   })();
+
+
+  var MirrorArguments = (function(){
+    function MirrorArguments(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorArguments, MirrorArray, {
+      kind: 'Arguments'
+    });
+
+    return MirrorArguments;
+  })();
+
 
   var MirrorArrayBufferView = (function(){
     function MirrorArrayBufferView(subject){
@@ -484,9 +479,19 @@ var debug = (function(exports){
   })();
 
 
-
-
   var MirrorDate = (function(){
+    var formatDate = (function(){
+      if ('toJSON' in Date.prototype) {
+        return function formatDate(date){
+          var json = date.toJSON();
+          return json.slice(0, 10) + ' ' + json.slice(11, 19);
+        };
+      }
+      return function formateDate(date){
+        return ''+date;
+      };
+    })();
+
     function MirrorDate(subject){
       MirrorObject.call(this, subject);
     }
@@ -499,8 +504,7 @@ var debug = (function(exports){
         if (!date || date === Date.prototype || ''+date === 'Invalid Date') {
           return 'Invalid Date';
         } else {
-          var json = date.toJSON();
-          return json.slice(0, 10) + ' ' + json.slice(11, 19);
+          return formatDate(date);
         }
       }
     ]);
@@ -677,9 +681,9 @@ var debug = (function(exports){
       kind: 'Module'
     }, [
       function get(key){
-        if (this.isPropAccessor(key)) {
+        if (this.isAccessor(key)) {
           if (!this.accessors[key]) {
-            var prop = this.getProperty(key),
+            var prop = this.describe(key),
                 accessor = prop[1] || prop[3];
 
             realm().enterMutationContext();
@@ -689,12 +693,7 @@ var debug = (function(exports){
 
           return this.accessors[key];
         } else {
-          var prop = this.subject.describe(key);
-          if (prop) {
-            return introspect(prop[1]);
-          } else {
-            return this.getPrototype().get(key);
-          }
+          return introspect(this.subject.get(key));
         }
       }
     ]);
@@ -774,11 +773,11 @@ var debug = (function(exports){
 
         return props;
       },
-      function propAttributes(key){
+      function query(key){
         if (key < this.subject.get('length') && key >= 0) {
           return 1;
         } else {
-          return MirrorObject.prototype.propAttributes.call(this, key);
+          return MirrorObject.prototype.query.call(this, key);
         }
       },
       function label(){
@@ -946,23 +945,23 @@ var debug = (function(exports){
       function has(key){
         return this.subject.HasProperty(key);
       },
-      function isPropEnumerable(key){
+      function isEnumerable(key){
         var desc = this.subject.GetOwnProperty(key);
         return !!(desc && desc.Enumerable);
       },
-      function isPropConfigurable(key){
+      function isConfigurable(key){
         var desc = this.subject.GetOwnProperty(key);
         return !!(desc && desc.Configurable);
       },
-      function isPropAccessor(key){
+      function isAccessor(key){
         var desc = this.subject.GetOwnProperty(key);
         return !!(desc && desc.Get || desc.Set);
       },
-      function isPropWritable(key){
+      function isWritable(key){
         var desc = this.subject.GetOwnProperty(key);
         return !!(desc && desc.Writable);
       },
-      function propAttributes(key){
+      function query(key){
         var desc = this.subject.GetOwnProperty(key);
         if (desc) {
           return descToAttrs(desc);
@@ -1005,11 +1004,11 @@ var debug = (function(exports){
       type: 'scope',
       parentLabel: '[[outer]]',
       isExtensible: always(true),
-      isPropEnumerable: always(true),
-      isPropAccessor: always(false)
+      isEnumerable: always(true),
+      isAccessor: always(false)
     }, [
-      function isPropAccessor(key){
-        return this.getPrototype().isPropAccessor(key) || false;
+      function isAccessor(key){
+        return this.getPrototype().isAccessor(key) || false;
       },
       function getPrototype(){
         return introspect(this.subject.outer);
@@ -1060,28 +1059,28 @@ var debug = (function(exports){
 
         return keys.sort();
       },
-      function isPropConfigurable(key){
+      function isConfigurable(key){
         return !(this.subject.deletables && key in this.subject.deletables);
       },
-      function isPropWritable(key){
+      function isWritable(key){
         return !(this.subject.consts && key in this.subject.consts);
       },
       function getOwnDescriptor(key){
         if (this.hasOwn(key)) {
-          return { configurable: this.isPropConfigurable(key),
+          return { configurable: this.isConfigurable(key),
                    enumerable: true,
-                   writable: this.isPropWritable(key),
+                   writable: this.isWritable(key),
                    value: this.get(key)   };
         }
       },
       function getDescriptor(key){
         return this.getOwnDescriptor(key) || this.getPrototype().getDescriptor(key);
       },
-      function getProperty(key){
-        return [this.subject.GetBindingValue(key), value, this.propAttributes(key)];
+      function describe(key){
+        return [this.subject.GetBindingValue(key), value, this.query(key)];
       },
-      function propAttributes(key){
-        return 1 | (this.isPropConfigurable(key) << 1) | (this.isPropWritable(key) << 2);
+      function query(key){
+        return 1 | (this.isConfigurable(key) << 1) | (this.isWritable(key) << 2);
       }
     ]);
 
@@ -1100,23 +1099,23 @@ var debug = (function(exports){
       function isExtensible(){
         return this.global.isExtensible();
       },
-      function isPropEnumerable(key){
-        return this.global.isPropEnumerable(key);
+      function isEnumerable(key){
+        return this.global.isEnumerable(key);
       },
-      function isPropConfigurable(key){
-        return this.global.isPropConfigurable(key);
+      function isConfigurable(key){
+        return this.global.isConfigurable(key);
       },
-      function isPropWritable(key){
-        return this.global.isPropWritable(key);
+      function isWritable(key){
+        return this.global.isWritable(key);
       },
-      function isPropAccessor(key){
-        return this.global.isPropAccessor(key);
+      function isAccessor(key){
+        return this.global.isAccessor(key);
       },
-      function propAttributes(key){
-        return this.global.propAttributes(key);
+      function query(key){
+        return this.global.query(key);
       },
-      function getProperty(key){
-        return this.global.getProperty(key);
+      function describe(key){
+        return this.global.describe(key);
       },
       function getDescriptor(key){
         return this.global.getDescriptor(key);

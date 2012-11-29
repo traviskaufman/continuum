@@ -46,7 +46,7 @@ var Property = (function(){
     valueRenderer: 'normal'
   }, [
     function getAttributes(){
-      return this.attrs = attributes[this.mirror.propAttributes(this.name)];
+      return this.attrs = attributes[this.mirror.query(this.name)];
     },
     function createKey(){
       if (typeof this.name === 'string') {
@@ -68,7 +68,7 @@ var Property = (function(){
       this.append(this.value.createTree());
     },
     function refresh(){
-      var attrs = attributes[this.mirror.propAttributes(this.name)];
+      var attrs = attributes[this.mirror.query(this.name)];
       if (attrs !== this.attrs) {
         this.key.removeClass(this.attrs);
         this.key.addClass(attrs);

@@ -793,7 +793,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       if (len > 0) {
         for (var i=0; i < len; i++) {
-          array.define(i, args.get(params.length + i));
+          array.set(i, args.get(params.length + i));
         }
         array.define('length', len, 4);
       }
@@ -1201,7 +1201,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (value.Abrupt) return value; else value = value.value;
       }
 
-      array.define(offset++, value, ECW);
+      array.set(offset++, value);
     }
 
     array.define('length', offset, _CW);
@@ -1255,7 +1255,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (value && value.Completion) {
         if (value.Abrupt) return value; else value = value.value;
       }
-      array.define(i, value, ECW);
+      array.set(i, value);
     }
 
     array.define('length', i, _CW);
@@ -1683,31 +1683,27 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this.properties.remove(key);
         },
         function describe(key){
-          return this.properties.getProperty(key);
+          return this.properties.describe(key);
         },
-        (function(){
+        (function(){ // IE6-8 leaks function expression names to surrounding scope
           return function define(key, value, attrs){
-            return this.properties.set(key, value, attrs);
+            return this.properties.define(key, value, attrs);
           };
         })(),
         function get(key){
           return this.properties.get(key);
         },
         function set(key, value){
-          if (this.properties.has(key)) {
-            this.properties.set(key, value);
-          } else {
-            this.properties.set(key, value, ECW);
-          }
+          this.properties.set(key, value);
         },
         function query(key){
-          return this.properties.getAttribute(key);
+          return this.properties.query(key);
         },
         function update(key, attr){
-          this.properties.setAttribute(key, attr);
+          this.properties.update(key, attr);
         },
         function each(callback){
-          this.properties.forEach(callback, this);
+          this.properties.each(callback, this);
         }
       ]);
     }();
@@ -2756,7 +2752,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           prop[1] = this.PrimitiveValue[key];
           return prop;
         }
-        return this.properties.getProperty(key);
+        return this.properties.describe(key);
       },
       function define(key, value, attr){
         if (key in reflected) {
@@ -2764,7 +2760,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             this.PrimitiveValue.lastIndex = value;
           }
         } else {
-          this.properties.set(key, value, attr);
+          this.properties.define(key, value, attr);
         }
       },
       function get(key){
@@ -2786,20 +2782,20 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (key in reflected) {
           return reflected[key][2];
         }
-        return this.properties.getAttribute(key);
+        return this.properties.query(key);
       },
       function update(key, attr){
         if (!(key in reflected)) {
-          return this.properties.setAttribute(key, attr);
+          return this.properties.update(key, attr);
         }
       },
       function each(callback){
         for (var k in reflected) {
           var prop = reflected[k];
           prop[1] = this.PrimitiveValue[k];
-          callback(prop);
+          callback.call(this, prop);
         }
-        this.properties.forEach(callback);
+        this.properties.each(callback, this);
       }
     ]);
 
@@ -3535,37 +3531,37 @@ var runtime = (function(GLOBAL, exports, undefined){
           },
           function each(callback){
             for (var i=0; i < this.Length; i++) {
-              callback([i+'', this.data[i], 5]);
+              callback.call(this, [i+'', this.data[i], 5]);
             }
-            $Object.prototype.each.call(this, callback);
+             this.properties.each(callback, this);
           },
           function get(key){
             if (hasIndex(key, this.Length)) {
               return this.data[+key];
             } else {
-              return $Object.prototype.get.call(this, key);
+              return this.properties.get(key);
             }
           },
           function describe(key){
             if (hasIndex(key, this.Length)) {
               return [key, this.data[+key], 5];
             } else {
-              return $Object.prototype.describe.call(this, key);
+              return this.properties.describe(key);
             }
           },
           function set(key, value){
             if (hasIndex(key, this.Length)) {
               this.data[+key] = value;
             } else {
-              return $Object.prototype.set.call(this, key, value);
+              return this.properties.set(key, value);
             }
           },
-          (function(){
+          (function(){ // IE6-8 leaks function expression names to surrounding scope
             return function define(key, value, attr){
               if (hasIndex(key, this.Length)) {
                 this.data[+key] = value;
               } else {
-                return $Object.prototype.define.call(this, key, value, attr);
+                return this.properties.define(key, value, attr);
               }
             };
           })()
@@ -3582,37 +3578,37 @@ var runtime = (function(GLOBAL, exports, undefined){
           },
           function each(callback){
             for (var i=0; i < this.Length; i++) {
-              callback([i+'', this.data.get(i * this.bytesPer, true), 5]);
+              callback.call(this, [i+'', this.data.get(i * this.bytesPer, true), 5]);
             }
-            $Object.prototype.each.call(this, callback);
+            this.properties.each(callback, this);
           },
           function get(key){
             if (hasIndex(key, this.Length)) {
               return this.data.get(key * this.bytesPer, true);
             } else {
-              return $Object.prototype.get.call(this, key);
+              return this.properties.get(key);
             }
           },
           function describe(key){
             if (hasIndex(key, this.Length)) {
               return [key, this.data.get(key * this.bytesPer, true), 5];
             } else {
-              return $Object.prototype.describe.call(this, key);
+              return this.properties.describe(key);
             }
           },
           function set(key, value){
             if (hasIndex(key, this.Length)) {
               this.data.set(key * this.bytesPer, value, true);
             } else {
-              return $Object.prototype.set.call(this, key, value);
+              return this.properties.set(key, value);
             }
           },
-          (function(){
+          (function(){ // IE6-8 leaks function expression names to surrounding scope
             return function define(key, value, attr){
               if (hasIndex(key, this.Length)) {
                 this.data.set(key * this.bytesPer, value, true);
               } else {
-                return $Object.prototype.define.call(this, key, value, attr);
+                return this.properties.define(key, value, attr);
               }
             };
           })()
@@ -4245,9 +4241,22 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           return new $Module(obj, obj.Enumerate(false, false));
         },
+        IsObject: function(object){
+          return object instanceof $Object;
+        },
+        IsConstructor: function(obj){
+          return !!(obj && obj.Construct);
+        },
         IsConstructCall: function(){
           return context.isConstruct;
         },
+        Call: function(func, receiver, args){
+          return func.Call(receiver, toInternalArray(args));
+        },
+        Construct: function(func, args){
+          return func.Construct(toInternalArray(args));
+        },
+
         GetBuiltinBrand: function(object){
           return object.BuiltinBrand.name;
         },
@@ -4266,9 +4275,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         GetPrimitiveValue: function(object){
           return object ? object.PrimitiveValue : undefined;
-        },
-        IsObject: function(object){
-          return object instanceof $Object;
         },
         SetInternal: function(object, key, value){
           object[key] = value;
@@ -4309,10 +4315,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         now: Date.now || function(){ return +new Date },
 
-
-        CallFunction: function(func, receiver, args){
-          return func.Call(receiver, toInternalArray(args));
-        },
 
         Fetch: function(name, callback){
           var result = require('../modules')[name];
@@ -4541,7 +4543,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         },
         GetPropertyAttributes: function(obj, key){
-          return obj.properties.getAttribute(key);
+          return obj.properties.query(key);
         },
         HasOwnProperty: function(obj, key){
           return obj.HasOwnProperty(key);
