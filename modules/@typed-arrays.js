@@ -115,7 +115,7 @@ function subarray(Type, instance, begin, end){
   return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);
 }
 
-
+$__setupFunctions([wrappingClamp, createArrayBuffer, createTypedArray, set])
 
 export class ArrayBuffer {
   constructor(byteLength){

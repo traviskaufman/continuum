@@ -30,9 +30,11 @@
 
   $__setupFunctions = function setupFunctions(...funcs){
     var len = funcs.length;
-    for (var i=0; i < len; i++) {
-      $__SetInternal(funcs[i], 'Native', true);
-      $__remove(funcs[i], 'prototype');
+    if (len) {
+      for (var i=0; i < len; i++) {
+        $__SetInternal(funcs[i], 'Native', true);
+        $__remove(funcs[i], 'prototype');
+      }
     }
   };
 

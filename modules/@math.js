@@ -319,6 +319,12 @@ export var Math = {
   cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,
   min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc
 };
+for (let k in Math) {
+  if (typeof Math[k] === 'function') {
+    $__setupFunctions([Math[k]]);
+    $__remove(Math[k], 'prototype');
+  }
+}
 
 $__set(min, 'length', 2);
 $__set(max, 'length', 2);
