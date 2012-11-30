@@ -9163,10 +9163,10 @@ exports.assembler = (function(exports){
         }
       });
 
-      if (node.superClass) {
+      this.hasSuper = !!node.superClass;
+      if (this.hasSuper) {
         recurse(node.superClass);
         GET();
-        this.superClass = node.superClass.name;
       }
     }
 
@@ -11833,7 +11833,7 @@ exports.thunk = (function(exports){
 
     function CLASS_DECL(){
       var def  = ops[ip][0],
-          sup  = def.superClass ? stack[--sp] : undefined,
+          sup  = def.hasSuper ? stack[--sp] : undefined,
           result = context.createClass(def, sup);
 
       if (result && result.Abrupt) {
@@ -11852,7 +11852,7 @@ exports.thunk = (function(exports){
 
     function CLASS_EXPR(){
       var def  = ops[ip][0],
-          sup  = def.superClass ? stack[--sp] : undefined,
+          sup  = def.hasSuper ? stack[--sp] : undefined,
           result = context.createClass(def, sup);
 
       if (result && result.Abrupt) {
