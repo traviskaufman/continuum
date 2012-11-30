@@ -214,16 +214,16 @@ var Component = (function(){
     },
     function width(value){
       if (value === undefined) {
-        //return this.element.offsetWidth;
-        return this.element.getBoundingClientRect().width;
+        return this.element.offsetWidth;
+        //return this.element.getBoundingClientRect().width;
       } else {
         this.styles.width = value + 'px';
       }
     },
     function height(value){
       if (value === undefined) {
-        //return this.element.offsetHeight;
-        return this.element.getBoundingClientRect().height;
+        return this.element.offsetHeight;
+        //return this.element.getBoundingClientRect().height;
       } else {
         this.styles.height = value + 'px';
       }

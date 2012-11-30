@@ -739,9 +739,11 @@ var assembler = (function(exports){
           scope = scope.outer;
         }
       },
-      function create(type, outer){
-        return new types[type](outer);
-      }
+      (function(){
+        return function create(type, outer){
+          return new types[type](outer);
+        };
+      })()
     ]);
   })();
 
