@@ -6440,87 +6440,6 @@ exports.Queue = (function(module){
 })(typeof module !== 'undefined' ? module : {});
 
 
-exports.Stack = (function(module){
-  var objects   = require('./objects'),
-      functions = require('./functions'),
-      iteration = require('./iteration');
-
-  var define        = objects.define,
-      inherit       = objects.inherit,
-      toArray       = functions.toArray,
-      iterate       = iteration.iterate,
-      Iterator      = iteration.Iterator,
-      StopIteration = iteration.StopIteration;
-
-
-  function StackIterator(stack){
-    this.stack = stack;
-    this.index = stack.length;
-  }
-
-  inherit(StackIterator, Iterator, [
-    function next(){
-      if (!this.index) {
-        throw StopIteration;
-      }
-      return this.stack[--this.index];
-    }
-  ]);
-
-  function Stack(iterable){
-    this.empty();
-    if (iterable != null) {
-      iterate(iterable, this.push, this);
-    }
-  }
-
-  define(Stack.prototype, [
-    function push(item){
-      this.items.push(item);
-      this.length++;
-      this.top = item;
-      return this;
-    },
-    function pop(){
-      this.length--;
-      this.top = this.items[this.length - 1];
-      return this.items.pop();
-    },
-    function empty(){
-      this.length = 0;
-      this.items = [];
-      this.top = undefined;
-    },
-    function first(callback, context){
-      var i = this.length;
-      context || (context = this);
-      while (i--)
-        if (callback.call(context, this[i], i, this))
-          return this[i];
-    },
-    function filter(callback, context){
-      var i = this.length,
-          out = new Stack;
-
-      context || (context = this);
-
-      for (var i=0; i < this.length; i++) {
-        if (callback.call(context, this[i], i, this)) {
-          out.push(this[i]);
-        }
-      }
-
-      return out;
-    },
-    function __iterator__(){
-      return new StackIterator(this);
-    }
-  ]);
-
-  return module.exports = Stack;
-})(typeof module !== 'undefined' ? module : {});
-
-
 exports.traversal = (function(exports){
   var objects   = require('./objects'),
       functions = require('./functions'),
@@ -6858,6 +6777,87 @@ exports.traversal = (function(exports){
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
 
+
+
+exports.Stack = (function(module){
+  var objects   = require('./objects'),
+      functions = require('./functions'),
+      iteration = require('./iteration');
+
+  var define        = objects.define,
+      inherit       = objects.inherit,
+      toArray       = functions.toArray,
+      iterate       = iteration.iterate,
+      Iterator      = iteration.Iterator,
+      StopIteration = iteration.StopIteration;
+
+
+  function StackIterator(stack){
+    this.stack = stack;
+    this.index = stack.length;
+  }
+
+  inherit(StackIterator, Iterator, [
+    function next(){
+      if (!this.index) {
+        throw StopIteration;
+      }
+      return this.stack[--this.index];
+    }
+  ]);
+
+  function Stack(iterable){
+    this.empty();
+    if (iterable != null) {
+      iterate(iterable, this.push, this);
+    }
+  }
+
+  define(Stack.prototype, [
+    function push(item){
+      this.items.push(item);
+      this.length++;
+      this.top = item;
+      return this;
+    },
+    function pop(){
+      this.length--;
+      this.top = this.items[this.length - 1];
+      return this.items.pop();
+    },
+    function empty(){
+      this.length = 0;
+      this.items = [];
+      this.top = undefined;
+    },
+    function first(callback, context){
+      var i = this.length;
+      context || (context = this);
+      while (i--)
+        if (callback.call(context, this[i], i, this))
+          return this[i];
+    },
+    function filter(callback, context){
+      var i = this.length,
+          out = new Stack;
+
+      context || (context = this);
+
+      for (var i=0; i < this.length; i++) {
+        if (callback.call(context, this[i], i, this)) {
+          out.push(this[i]);
+        }
+      }
+
+      return out;
+    },
+    function __iterator__(){
+      return new StackIterator(this);
+    }
+  ]);
+
+  return module.exports = Stack;
+})(typeof module !== 'undefined' ? module : {});
 
 
 exports.LinkedList = (function(module){
@@ -10866,46 +10866,34 @@ exports.operators = (function(exports){
   // ## PutValue
 
   function PutValue(v, w){
-    if (v && v.Completion) {
-      if (v.Abrupt) {
-        return v;
-      } else {
-        v = v.value;
-      }
-    }
-    if (w && w.Completion) {
-      if (w.Abrupt) {
-        return w;
-      } else {
-        w = w.value;
-      }
-    }
     if (!v) {
       return ThrowException('non_object_property_store', ['undefined', 'undefined']);
     } else if (!v.Reference) {
       return ThrowException('non_object_property_store', [v.name, v.base]);
-    } else if (v.base === undefined) {
-      if (v.strict) {
-        return ThrowException('not_defined', [v.name, v.base]);
-      } else {
-        return exports.global.Put(v.name, w, false);
-      }
-    } else {
-      var base = v.base;
-
-      if (exports.IsPropertyReference(v)) {
-        if (HasPrimitiveBase(v)) {
-          base = new exports.$PrimitiveBase(base);
-        }
-        if ('thisValue' in v) {
-          return base.SetP(GetThisValue(v), v.name, w, v.strict);
-        } else {
-          return base.Put(v.name, w, v.strict);
-        }
-      } else {
-        return base.SetMutableBinding(v.name, w, v.strict);
-      }
     }
+    if (v.Abrupt) return v;
+    if (w && w.Abrupt) return w;
+
+    var base = v.base;
+
+    if (base === undefined) {
+      if (v.strict) {
+        return ThrowException('not_defined', [v.name, base]);
+      }
+      return exports.global.Put(v.name, w, false);
+    }
+
+    if (typeof base !== OBJECT) {
+      base = exports.ToObject(base);
+    }
+
+    if (base.Get) {
+      if ('thisValue' in v) {
+        return base.SetP(GetThisValue(v), v.name, w, v.strict);
+      }
+      return base.Put(v.name, w, v.strict);
+    }
+    return base.SetMutableBinding(v.name, w, v.strict);
   }
   exports.PutValue = PutValue;
 
@@ -11060,18 +11048,12 @@ exports.operators = (function(exports){
   // ## ToPropertyName
 
   function ToPropertyName(argument){
-    if (argument && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      } else {
-        argument = argument.value;
-      }
-    }
-    if (argument && typeof argument === OBJECT && argument.BuiltinBrand === BuiltinSymbol) {
+    if (!argument) return argument + '';
+    var type = typeof argument;
+    if (type === STRING || type === OBJECT && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
-    } else {
-      return ToString(argument);
     }
+    return ToString(argument);
   }
   exports.ToPropertyName = ToPropertyName;
 
@@ -11484,12 +11466,8 @@ exports.operators = (function(exports){
     }
 
     lval = ToPropertyName(lval);
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
+    if (lval && lval.Abrupt) {
+      return lval;
     }
 
     return rval.HasProperty(lval);
@@ -11769,7 +11747,6 @@ exports.thunk = (function(exports){
           }
         }
       }
-      console.log(error);
 
       completion = error;
       return false;
@@ -16231,7 +16208,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     function hasIndex(key, max){
       var index = +key;
-      return index >= 0 && index < max && (index | 0) === index;
+      return index < max && (index >>> 0) === index;
     }
 
 
@@ -16271,7 +16248,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             for (var i=0; i < this.Length; i++) {
               callback.call(this, [i+'', this.data[i], 5]);
             }
-             this.properties.each(callback, this);
+            this.properties.each(callback, this);
           },
           function get(key){
             if (hasIndex(key, this.Length)) {
@@ -16355,13 +16332,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
 
-    define($TypedArray.prototype [
+    define($TypedArray.prototype, [
       function has(key){
         if (hasIndex(key, this.Length)) {
           return true;
         }
 
-        return $Object.prototype.has.call(this, key);
+        return this.properties.has(key);
       },
       function GetOwnProperty(key){
         if (hasIndex(key, this.Length)) {
@@ -16393,65 +16370,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, intrinsics.DataViewProto);
       this.view = new DataView(buffer.NativeBuffer);
     }
-  })();
-
-  var $PrimitiveBase = (function(){
-    function $PrimitiveBase(value){
-      this.PrimitiveValue = value;
-      switch (typeof value) {
-        case 'string':
-          $Object.call(this, intrinsics.StringProto);
-          this.BuiltinBrand = BRANDS.StringWrapper;
-          break;
-        case 'number':
-          $Object.call(this, intrinsics.NumberProto);
-          this.BuiltinBrand = BRANDS.NumberWrapper;
-          break;
-        case 'boolean':
-          $Object.call(this, intrinsics.BooleanProto);
-          this.BuiltinBrand = BRANDS.BooleanWrapper;
-          break;
-      }
-    }
-
-    operators.$PrimitiveBase = $PrimitiveBase;
-
-    inherit($PrimitiveBase, $Object, [
-      function SetP(receiver, key, value, strict){
-        var object = this;
-        while (object && !object.has(key)) {
-          object = object.GetInheritance();
-        }
-        if (object) {
-          var prop = object.describe(key);
-          if (prop[2] & A) {
-            var setter = prop[1].Set;
-            if (IsCallable(setter)) {
-              return setter.Call(receiver, [value]);
-            }
-          }
-        }
-      },
-      function GetP(receiver, key) {
-        var object = this;
-        while (object && !object.has(key)) {
-          object = object.GetInheritance();
-        }
-        if (object) {
-          var prop = object.describe(key);
-          if (prop[2] & A) {
-            var getter = prop[1].Get;
-            if (IsCallable(getter)) {
-              return getter.Call(receiver, []);
-            }
-          } else {
-            return prop[1];
-          }
-        }
-      }
-    ]);
-
-    return $PrimitiveBase;
   })();
 
 
