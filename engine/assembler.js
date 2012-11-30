@@ -374,10 +374,10 @@ var assembler = (function(exports){
         }
       });
 
-      if (node.superClass) {
+      this.hasSuper = !!node.superClass;
+      if (this.hasSuper) {
         recurse(node.superClass);
         GET();
-        this.superClass = node.superClass.name;
       }
     }
 

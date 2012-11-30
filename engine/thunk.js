@@ -250,7 +250,7 @@ var thunk = (function(exports){
 
     function CLASS_DECL(){
       var def  = ops[ip][0],
-          sup  = def.superClass ? stack[--sp] : undefined,
+          sup  = def.hasSuper ? stack[--sp] : undefined,
           result = context.createClass(def, sup);
 
       if (result && result.Abrupt) {
@@ -269,7 +269,7 @@ var thunk = (function(exports){
 
     function CLASS_EXPR(){
       var def  = ops[ip][0],
-          sup  = def.superClass ? stack[--sp] : undefined,
+          sup  = def.hasSuper ? stack[--sp] : undefined,
           result = context.createClass(def, sup);
 
       if (result && result.Abrupt) {
