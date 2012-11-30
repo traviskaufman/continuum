@@ -68,46 +68,34 @@ var operators = (function(exports){
   // ## PutValue
 
   function PutValue(v, w){
-    if (v && v.Completion) {
-      if (v.Abrupt) {
-        return v;
-      } else {
-        v = v.value;
-      }
-    }
-    if (w && w.Completion) {
-      if (w.Abrupt) {
-        return w;
-      } else {
-        w = w.value;
-      }
-    }
     if (!v) {
       return ThrowException('non_object_property_store', ['undefined', 'undefined']);
     } else if (!v.Reference) {
       return ThrowException('non_object_property_store', [v.name, v.base]);
-    } else if (v.base === undefined) {
-      if (v.strict) {
-        return ThrowException('not_defined', [v.name, v.base]);
-      } else {
-        return exports.global.Put(v.name, w, false);
-      }
-    } else {
-      var base = v.base;
-
-      if (exports.IsPropertyReference(v)) {
-        if (HasPrimitiveBase(v)) {
-          base = new exports.$PrimitiveBase(base);
-        }
-        if ('thisValue' in v) {
-          return base.SetP(GetThisValue(v), v.name, w, v.strict);
-        } else {
-          return base.Put(v.name, w, v.strict);
-        }
-      } else {
-        return base.SetMutableBinding(v.name, w, v.strict);
-      }
     }
+    if (v.Abrupt) return v;
+    if (w && w.Abrupt) return w;
+
+    var base = v.base;
+
+    if (base === undefined) {
+      if (v.strict) {
+        return ThrowException('not_defined', [v.name, base]);
+      }
+      return exports.global.Put(v.name, w, false);
+    }
+
+    if (typeof base !== OBJECT) {
+      base = exports.ToObject(base);
+    }
+
+    if (base.Get) {
+      if ('thisValue' in v) {
+        return base.SetP(GetThisValue(v), v.name, w, v.strict);
+      }
+      return base.Put(v.name, w, v.strict);
+    }
+    return base.SetMutableBinding(v.name, w, v.strict);
   }
   exports.PutValue = PutValue;
 
@@ -262,18 +250,12 @@ var operators = (function(exports){
   // ## ToPropertyName
 
   function ToPropertyName(argument){
-    if (argument && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      } else {
-        argument = argument.value;
-      }
-    }
-    if (argument && typeof argument === OBJECT && argument.BuiltinBrand === BuiltinSymbol) {
+    if (!argument) return argument + '';
+    var type = typeof argument;
+    if (type === STRING || type === OBJECT && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
-    } else {
-      return ToString(argument);
     }
+    return ToString(argument);
   }
   exports.ToPropertyName = ToPropertyName;
 
@@ -686,12 +668,8 @@ var operators = (function(exports){
     }
 
     lval = ToPropertyName(lval);
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
+    if (lval && lval.Abrupt) {
+      return lval;
     }
 
     return rval.HasProperty(lval);
