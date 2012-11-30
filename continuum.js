@@ -59,7 +59,6 @@ parseYieldExpression: true
         factory((window.esprima = {}));
     }
 }(function (exports) {
-    'use strict';
 
     var Token,
         TokenName,
