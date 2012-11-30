@@ -31,6 +31,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
       each          = iteration.each,
+      map           = iteration.map,
       numbers       = utility.numbers,
       nextTick      = utility.nextTick,
       unique        = utility.unique;
@@ -382,6 +383,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       return GetIdentifierReference(lex.outer, name, strict);
     }
   }
+
 
   function GetSymbol(context, name){
     var env = context.LexicalEnvironment;
@@ -924,7 +926,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     function MapData(){
-      this.id = uid++ + '';
+      $Object.tag(this);
       this.guard = create(LinkedItem.prototype);
       this.guard.key = {};
       this.reset();
@@ -933,6 +935,30 @@ var runtime = (function(GLOBAL, exports, undefined){
     MapData.sigil = create(null);
 
     define(MapData.prototype, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: 'MapData',
+          size: this.size,
+          items: []
+        });
+        this.forEach(function(value, key){
+          serialized.items.push(map([key, value], function(item){
+            if (isObject(item)) {
+              serializer.add(item);
+              return item.id;
+            } else {
+              item = serializer.serialize(item);
+              return typeof item === 'number' ? [item] : item;
+            }
+          }));
+        });
+        return serialized;
+      },
       function reset(){
         this.size = 0;
         this.strings = create(null);
@@ -1050,10 +1076,20 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var WeakMapData = (function(){
     function WeakMapData(){
-      this.id = uid++ + '';
+      $Object.tag(this);
     }
 
     define(WeakMapData.prototype, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        return serializer.set(this.id, {
+          type: 'WeakMapData'
+        });
+      },
       function set(key, value){
         if (value === undefined) {
           value = Empty;
@@ -1426,15 +1462,18 @@ var runtime = (function(GLOBAL, exports, undefined){
   function Accessor(get, set){
     this.Get = get;
     this.Set = set;
+    $Object.tag(this);
   }
 
   define(Accessor.prototype, {
+    type: 'Accessor',
     Get: undefined,
     Set: undefined
   });
 
 
   function BuiltinAccessor(get, set){
+    $Object.tag(this);
     if (get) this.Get = { Call: get };
     if (set) this.Set = { Call: set };
   }
@@ -1444,10 +1483,12 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function ArgAccessor(name, env){
     this.name = name;
+    $Object.tag(this);
     define(this, { env: env  });
   }
 
   inherit(ArgAccessor, Accessor, {
+    type: 'ArgAccessor',
     Get: { Call: function(){ return this.env.GetBindingValue(this.name) } },
     Set: { Call: function(v){ this.env.SetMutableBinding(this.name, v) } }
   });
@@ -1462,18 +1503,42 @@ var runtime = (function(GLOBAL, exports, undefined){
     function EnvironmentRecord(bindings, outer){
       this.bindings = bindings;
       this.outer = outer;
-      this.refs = create(null);
-      hide(this, 'refs');
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     define(EnvironmentRecord.prototype, {
       bindings: null,
       withBase: undefined,
-      type: 'Environment',
+      type: 'Env',
       Environment: true
     });
 
     define(EnvironmentRecord.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: this.type
+        });
+
+        if (this.outer) {
+          serializer.add(this.outer);
+          serialized.outer = this.outer.id;
+        }
+
+        if (this.symbols) {
+          serialized.symbols = {};
+          each(this.symbols, function(symbol, name){
+            serializer.add(symbol);
+            serialized.symbols[name] = symbol.id;
+          });
+        }
+
+        return serialized;
+      },
       function EnumerateBindings(){},
       function HasBinding(name){},
       function GetBindingValue(name, strict){},
@@ -1522,14 +1587,42 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var DeclarativeEnvironmentRecord = (function(){
     function DeclarativeEnvironmentRecord(outer){
-      EnvironmentRecord.call(this, new Hash, outer);
+      this.outer = outer;
+      this.bindings = new Hash;
       this.consts = new Hash;
       this.deletables = new Hash;
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     inherit(DeclarativeEnvironmentRecord, EnvironmentRecord, {
-      type: 'Declarative Env'
+      type: 'DeclarativeEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serialized.bindings = {};
+        each(this.bindings, function(binding, name){
+          if (isObject(binding) && 'id' in binding) {
+            serializer.add(binding);
+            serialized.bindings[name] = binding.id;
+          } else {
+            serialized.bindings[name] = serializer.serialize(binding);
+          }
+        });
+        var deletables = ownKeys(this.deletables);
+        if (deletables.length) {
+          serialized.deletables = deletables;
+        }
+        var consts = ownKeys(this.consts);
+        if (deletables.length) {
+          serialized.consts = consts;
+        }
+        return serialized;
+      },
       function EnumerateBindings(){
         return ownKeys(this.bindings);
       },
@@ -1592,12 +1685,25 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var ObjectEnvironmentRecord = (function(){
     function ObjectEnvironmentRecord(object, outer){
-      EnvironmentRecord.call(this, object, outer);
+      this.bindings = object;
+      this.outer = outer;
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     inherit(ObjectEnvironmentRecord, EnvironmentRecord, {
-      type: 'Object Env'
+      type: 'ObjectEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serializer.add(this.bindings);
+        serialized.bindings = this.bindings.id;
+        return serialized;
+      },
       function EnumerateBindings(){
         return this.bindings.Enumerate(false, false);
       },
@@ -1632,18 +1738,41 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var FunctionEnvironmentRecord = (function(){
     function FunctionEnvironmentRecord(receiver, method){
-      DeclarativeEnvironmentRecord.call(this, method.Scope);
+      this.outer = method.Scope;
+      this.bindings = new Hash;
+      this.consts = new Hash;
+      this.deletables = new Hash;
+      this.cache = new Hash;
       this.thisValue = receiver;
       this.HomeObject = method.HomeObject;
       this.MethodName = method.MethodName;
+      $Object.tag(this);
     }
 
     inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
       HomeObject: undefined,
       MethodName: undefined,
       thisValue: undefined,
-      type: 'Function Env'
+      type: 'FunctionEnv'
     }, [
+      function save(serializer){
+        var serialized = DeclarativeEnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        if (isObject(this.thisValue)) {
+          serializer.add(this.thisValue);
+          serialized.thisValue = this.thisValue.id;
+        }
+        if (this.HomeObject) {
+          serializer.add(this.HomeObject);
+          serialized.HomeObject =this.HomeObject.id;
+        }
+        if (this.MethodName) {
+          serialized.MethodName = serializer.serialize(this.MethodName);
+        }
+        return serialized;
+      },
       function HasThisBinding(){
         return true;
       },
@@ -1668,16 +1797,28 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var GlobalEnvironmentRecord = (function(){
     function GlobalEnvironmentRecord(global){
-      ObjectEnvironmentRecord.call(this, global);
-      this.thisValue = this.bindings;
+      this.thisValue = this.bindings = global;
+      this.outer = null;
+      this.cache = new Hash;
       global.env = this;
       hide(global, 'env');
+      $Object.tag(this);
     }
 
     inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {
       outer: null,
-      type: 'Global Env'
+      type: 'GlobalEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = ObjectEnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serializer.add(this.bindings.Realm.natives);
+        serialized.natives = this.bindings.Realm.natives.id;
+        return serialized;
+      },
       function GetThisBinding(){
         return this.bindings;
       },
@@ -1692,6 +1833,81 @@ var runtime = (function(GLOBAL, exports, undefined){
     return GlobalEnvironmentRecord;
   })();
 
+  function Serializer(){
+    this.cache = new Hash;
+    this.repo = new Hash;
+  }
+
+  define(Serializer.prototype, [
+    function ident(obj){
+      if (isObject(obj)) {
+        if ('id' in obj) {
+          if (typeof obj.id !== 'number') {
+            delete obj.id;
+            $Object.tag(obj);
+          }
+        } else {
+          $Object.tag(obj);
+        }
+      }
+    },
+    function serialize(value){
+      if (!isObject(value)) {
+        if (value !== value) {
+          return ['NaN'];
+        } else if (value === Infinity) {
+          return ['Infinity'];
+        } else if (value === -Infinity) {
+          return ['-Infinity'];
+        } else if (value === 0) {
+          return 1 / value === -Infinity ? ['-0'] : 0;
+        } else if (value === undefined) {
+          return ['undefined'];
+        } else {
+          return value;
+        }
+      }
+      if (value.save) {
+        return value.save(this);
+      }
+      if ('Get' in value || 'Set' in value) {
+        var ret = { type: value.type || 'Accessor' };
+        if (value.Get) {
+          ret.Get = this.serialize(value.Get);
+        }
+        if (value.Set) {
+          ret.Set = this.serialize(value.Set);
+        }
+        return ret;
+      }
+      if (value instanceof Array) {
+        return map(value, serialize, this);
+      }
+      if (typeof value === 'function' && value.name) {
+        value = value.name;
+      } else if (value && value.constructor && value.constructor.name) {
+        value = value.constructor.name;
+      }
+      return ['unhandled object '+value];
+    },
+    function has(id){
+      return id in this.cache;
+    },
+    function set(id, value){
+      this.cache[id] = value;
+      value.id = id;
+      if (!(id in this.repo)) {
+        this.repo[id] = value;
+      }
+      return value;
+    },
+    function get(id){
+      return this.cache[id];
+    },
+    function add(obj){
+      this.repo[obj.id] = obj.id in this.cache ? this.cache[obj.id] : this.serialize(obj);
+    }
+  ]);
 
 
   // ###############
@@ -1721,7 +1937,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Prototype = proto;
       this.properties = new PropertyList;
       this.storage = create(null);
-      this.refs = create(null);
       $Object.tag(this);
       if (proto === null) {
         this.properties.setProperty(['__proto__', null, 6, Proto]);
@@ -1729,7 +1944,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       hide(this, 'storage');
       hide(this, 'Prototype');
-      hide(this, 'refs');
       hide(this, 'Realm');
     }
 
@@ -1776,6 +1990,105 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         function each(callback){
           this.properties.each(callback, this);
+        },
+        function save(serializer){
+          if (!serializer) {
+            var returnRepo = true;
+            serializer = new Serializer;
+          }
+
+          if (serializer.has(this.id)) {
+            return this.id
+          }
+
+          var serialized = serializer.set(this.id, {
+            type: this.constructor.name,
+            BuiltinBrand: this.BuiltinBrand.name
+          });
+
+          if (IsCallable(this)) {
+            var name = this.get('name');
+            if (name && typeof name === 'string') {
+              serialized.name = name;
+            }
+            if (this.strict) {
+              serialized.Strict = this.strict;
+            }
+            serialized.Parameters = null;
+          }
+
+          if (!this.IsExtensible()) {
+            serialized.Extensible = false;
+          }
+
+          if (this.ConstructorName) {
+            serialized.ConstructorName = this.ConstructorName;
+          }
+
+          each(['MapData', 'SetData', 'WeakMapData'], function(data){
+            if (this[data]) {
+              serializer.add(this[data]);
+              serialized[data] = this[data].id;
+            }
+          }, this);
+
+          var objects = [],
+              functions = [],
+              self = this,
+              isFunction = IsCallable(this);
+
+          var props = [];
+          this.properties.each(function(prop){
+            if (isFunction) {
+              if (prop[0] === 'arguments' || prop[0] === 'caller') {
+                if (prop[1] === null || self.strict) {
+                  return;
+                }
+              } else if (prop[0] === 'length') {
+                return;
+              }
+            }
+            if (typeof prop[0] === 'string') {
+              var key = prop[0];
+            } else {
+              serializer.add(prop[0]);
+              var key = prop[0].id;
+            }
+            prop = [key, prop[2], 0, prop[1]];
+            props.push(prop);
+            if (isObject(prop[3])) {
+              if (prop[3].Scope) {
+                functions.push(prop);
+              } else {
+                objects.push(prop);
+              }
+            } else {
+              prop[3] = serializer.serialize(prop[3]);
+            }
+          });
+
+          each(objects, function(prop){
+            serializer.add(prop[3]);
+            prop[3] = prop[3].id;
+            prop[2] = 1;
+          });
+
+          var proto = this.GetInheritance();
+          if (proto) {
+            serializer.add(proto);
+            serialized.Prototype = proto.id;
+          } else {
+            serialized.Prototype = null;
+          }
+
+          each(functions, function(prop){
+            serializer.add(prop[3]);
+            prop[3] = prop[3].id;
+            prop[2] = 2;
+          });
+
+          serialized.properties = props;
+          return returnRepo ? serializer.repo : serialized;
         }
       ]);
     }();
@@ -2196,6 +2509,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Realm = realm;
       this.Scope = scope;
       this.code = code;
+      $Object.tag(code);
       if (holder !== undefined) {
         this.HomeObject = holder;
       }
@@ -2224,6 +2538,35 @@ var runtime = (function(GLOBAL, exports, undefined){
       ThisMode: 'global',
       Realm: null
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serialized.Strict = this.strict;
+        serialized.ThisMode = this.ThisMode;
+        if (this.Scope) {
+          serializer.add(this.Scope);
+          serialized.Scope = this.Scope.id;
+        }
+        if (this.code) {
+          serializer.add(this.code);
+          serialized.Code = this.code.id;
+          var code = serializer.repo[this.code.id];
+          serialized.Parameters = code.params;
+          delete code.params;
+        }
+        if (this.HomeObject) {
+          serializer.add(this.HomeObject);
+          serialized.HomeObject = this.HomeObject.id;
+        }
+        if (this.MethodName) {
+          serialized.MethodName = serializer.serialize(this.MethodName);
+        }
+
+        return serialized;
+      },
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
@@ -2328,7 +2671,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
       $Object.call(this, intrinsics.FunctionProto);
-      this.ProxyTargetFunction = target;
+      this.TargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
@@ -2337,24 +2680,56 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($BoundFunction, $Function, {
-      ProxyTargetFunction: null,
+      TargetFunction: null,
       BoundThis: null,
-      BoundArguments: null
+      BoundArgs: null
     }, [
+      function save(serializer){
+        if (!serializer) {
+          var returnRepo = true;
+          serializer = new Serializer;
+        }
+
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        delete serialized.Parameters;
+        if (isObject(this.TargetFunction)) {
+          serializer.add(this.TargetFunction);
+          serialized.TargetFunction = this.TargetFunction.id;
+        }
+        if (isObject(this.BoundThis)) {
+          serializer.add(this.BoundThis);
+          serialized.BoundThis = this.BoundThis.id;
+        } else {
+          serialized.BoundThis = serializer.serialize(this.BoundThis);
+        }
+        serialized.BoundArgs = map(this.BoundArgs, function(arg){
+          if (isObject(arg)) {
+            serializer.add(arg);
+            return arg.id;
+          } else {
+            return serializer.serialize(arg);
+          }
+        });
+
+        return returnRepo ? serializer.repo : serialized;
+      },
       function Call(_, newArgs){
-        return this.ProxyTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
+        return this.TargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.ProxyTargetFunction.Construct) {
-          return ThrowException('not_constructor', this.ProxyTargetFunction.name);
+        if (!this.TargetFunction.Construct) {
+          return ThrowException('not_constructor', this.TargetFunction.name);
         }
-        return this.ProxyTargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        return this.TargetFunction.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.ProxyTargetFunction.HasInstance) {
-          return ThrowException('instanceof_function_expected', this.ProxyTargetFunction.name);
+        if (!this.TargetFunction.HasInstance) {
+          return ThrowException('instanceof_function_expected', this.TargetFunction.name);
         }
-        return This.ProxyTargetFunction.HasInstance(arg);
+        return This.TargetFunction.HasInstance(arg);
       }
     ]);
 
@@ -2515,7 +2890,18 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  var primitiveWrapperSave = (function(){
+    return function save(serializer){
+      serializer || (serializer = new Serializer);
+      var serialized = $Object.prototype.save.call(this, serializer);
+      if (typeof serialized === 'number') {
+        return serialized;
+      }
 
+      serialized.PrimitiveValue = this.PrimitiveValue;
+      return serialized;
+    };
+  })();
 
 
   // #############
@@ -2530,7 +2916,11 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Date, $Object, {
       BuiltinBrand: BRANDS.BuiltinDate
-    });
+    }, [
+      function save(serializer){
+        return +primitiveWrapperSave.call(this, serializer);
+      }
+    ]);
 
     return $Date;
   })();
@@ -2552,6 +2942,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       BuiltinBrand: BRANDS.StringWrapper,
       PrimitiveValue: undefined
     }, [
+      primitiveWrapperSave,
       function GetOwnProperty(key){
         var desc = $Object.prototype.GetOwnProperty.call(this, key);
         if (desc) {
@@ -2616,7 +3007,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
       PrimitiveValue: undefined
-    });
+    }, [primitiveWrapperSave]);
 
     return $Number;
   })();
@@ -2635,7 +3026,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
       PrimitiveValue: undefined
-    });
+    }, [primitiveWrapperSave]);
 
     return $Boolean;
   })();
@@ -2910,24 +3301,34 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var seed = Math.random() * 4294967296 | 0;
-
-
     var iterator = new $Enumerator([]);
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
-      this.Symbol = seed++;
       this.Name = name;
       this.Private = !isPublic;
     }
 
     inherit($Symbol, $Object, {
       BuiltinBrand: BRANDS.BuiltinSymbol,
-      Extensible: false
+      Extensible: false,
+      Private: true,
+      Name: null
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        return serializer.set(this.id, {
+          type: '$Symbol',
+          Name: this.Name,
+          Private: this.Private
+        });
+      },
       function toString(){
-        return this.Symbol;
+        return this.id;
       },
       function GetInheritance(){
         return null;
@@ -3135,10 +3536,48 @@ var runtime = (function(GLOBAL, exports, undefined){
       });
     }
 
+    var fakeProps = { each: function(){} };
+
     inherit($Module, $Object, {
       BuiltinBrand: BRANDS.BuiltinModule,
       Extensible: false
-    });
+    }, [
+      function save(serializer){
+        var props = this.properties;
+        this.properties = fakeProps;
+
+        serializer || (serializer = new Serializer);
+        var serialized = $Object.prototype.save.call(this, serializer);
+        this.properties = props;
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+
+        delete serialized.properties;
+        delete serialized.Prototype;
+        delete serialized.Extensible;
+        serialized.exports = [];
+
+
+        this.properties.each(function(prop){
+          var value = prop[1].Get.Call();
+
+          if (isObject(value)) {
+            serializer.add(value);
+            value = value.id;
+          } else {
+            value = serializer.serialize(value);
+            if (typeof value === 'number') {
+              value = [value];
+            }
+          }
+
+          serialized.exports.push(value);
+        });
+
+        return serialized;
+      },
+    ]);
 
     return $Module;
   })();
@@ -3793,6 +4232,14 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($NativeFunction, $Function, {
       Builtin: true
     }, [
+      function save(serializer){
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        delete serialized.Parameters;
+        return serialized;
+      },
       function Call(receiver, args){
         var result = this.call.apply(receiver, [].concat(args));
         return result && result.type === Return ? result.value : result;
@@ -3866,6 +4313,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
+      function createBinding(name, immutable){
+        if (immutable) {
+          return this.LexicalEnvironment.CreateImmutableBinding(name);
+        } else {
+          return this.LexicalEnvironment.CreateMutableBinding(name, false);
+        }
+      },
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
@@ -3889,11 +4343,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
         return ctor;
       },
-      function createFunction(name, code){
+      function createFunction(isExpression, name, code){
         var $F = code.generator ? $GeneratorFunction : $Function,
             env = this.LexicalEnvironment;
 
-        if (name) {
+        if (isExpression && name) {
           env = new DeclarativeEnvironmentRecord(env);
           env.CreateImmutableBinding(name);
         }
@@ -3902,7 +4356,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         if (code.lexicalType !== ARROW) {
           MakeConstructor(func);
-          name && env.InitializeBinding(name, func);
+          isExpression && name && env.InitializeBinding(name, func);
         }
 
         return func;
@@ -3920,7 +4374,20 @@ var runtime = (function(GLOBAL, exports, undefined){
         return Element(this, name, obj);
       },
       function getReference(name){
-        return IdentifierResolution(this, name);
+        var origin = this.LexicalEnvironment;
+        if (name in origin.cache) {
+          return origin.cache[name];
+        }
+
+        var lex = origin,
+            strict = this.strict;
+
+        do {
+          if (lex.HasBinding(name)) {
+            return origin.cache[name] = new Reference(lex, name, strict);
+          }
+        } while (lex = lex.outer)
+        return origin.cache[name] = new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
         return SuperReference(this, name);
@@ -4055,7 +4522,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       bindings.ErrorProto.define('message', '', _CW);
     }
 
-    inherit(Intrinsics, DeclarativeEnvironmentRecord, [
+    inherit(Intrinsics, DeclarativeEnvironmentRecord, {
+      type: 'Intrinsics',
+    }, [
       function binding(options){
         if (typeof options === 'function') {
           options = {
@@ -4120,9 +4589,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     var parseOptions = {
       loc    : true,
       range  : true,
-      raw    : false,
+      raw    : true,
       tokens : false,
-      comment: false
+      comment: true
     }
 
     function parse(src, origin, type, options){
@@ -4199,6 +4668,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.filename = options.filename || '';
       if (this.ast) {
         this.bytecode = assemble(this);
+        $Object.tag(this.bytecode);
         this.thunk = new Thunk(this.bytecode);
       }
       return this;
@@ -5035,9 +5505,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         scope: SCOPE.MODULE
       });
 
+
       if (script.error) {
         return ƒ(script.error);
       }
+
+      realm.scripts.push(script);
 
       var sandbox = createSandbox(global);
 
@@ -5073,7 +5546,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       intrinsics.ThrowTypeError = CreateThrowTypeError(this);
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
-      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify));
+      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
       hide(intrinsics.FunctionProto, 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
