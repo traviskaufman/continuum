@@ -1,5 +1,5 @@
 module iter = '@iter';
-symbol @iterator = iter.iterator;
+symbol @iterator = $__iterator;
 
 export function Array(...values){
   if (values.length === 1 && typeof values[0] === 'number') {
@@ -301,8 +301,7 @@ $__setLength(Array.prototype, {
   map: 1,
   reduce: 1,
   reduceRight: 1,
-  some: 1,
-  reduce: 1
+  some: 1
 });
 
 function joinArray(array, separator){
