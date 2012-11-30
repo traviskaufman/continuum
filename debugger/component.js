@@ -214,14 +214,16 @@ var Component = (function(){
     },
     function width(value){
       if (value === undefined) {
-        return this.element.offsetWidth;
+        //return this.element.offsetWidth;
+        return this.element.getBoundingClientRect().width;
       } else {
         this.styles.width = value + 'px';
       }
     },
     function height(value){
       if (value === undefined) {
-        return this.element.offsetHeight;
+        //return this.element.offsetHeight;
+        return this.element.getBoundingClientRect().height;
       } else {
         this.styles.height = value + 'px';
       }
@@ -707,24 +709,22 @@ var VerticalScrollbar = function(){
       this.percent(this.percent() + percent);
     },
     function resize(){
-      this.refresh();
+      //this.refresh();
     },
     function thumbTop(){
       var el = this.container.element;
-      return el.scrollTop / el.scrollHeight * this.track.height() + .5 | 0;
+      return el.scrollTop / el.scrollHeight * this.trackHeight() + .5 | 0;
     },
     function thumbBottom(){
       var el = this.container.element,
-          height = this.track.height();
+          height = this.trackHeight();
       return height - (el.clientHeight + el.scrollTop) / el.scrollHeight * height + .5 | 0;
     },
     function trackHeight(){
       var self = this;
       if (!this._trackHeight) {
         this._trackHeight = this.track.height();
-        setTimeout(function(){
-          this._trackHeight = 0;
-        }, 10);
+        setTimeout(function(){ self._trackHeight = 0 }, 10);
       }
       return this._trackHeight;
     },
@@ -882,7 +882,7 @@ var Panel = function(){
     function resize(){
       if (this.content) {
         //this.content.width(this.content.calcWidth);
-        this.content.height(this.content.calcHeight);
+        //this.content.height(this.content.calcHeight);
         this.content.resize && this.content.resize();
       } else if (this.orient === 'vertical') {
         this.top.height(this.top.calcHeight);
