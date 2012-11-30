@@ -42,6 +42,10 @@ var assembler = (function(exports){
       AST       = constants.AST,
       FUNCTYPE  = constants.FUNCTYPE.hash;
 
+  var CONTINUE = walk.CONTINUE,
+      RECURSE  = walk.RECURSE,
+      BREAK    = walk.BREAK;
+
   var proto = Math.random().toString(36).slice(2),
       context,
       opcodes = 0;
@@ -518,9 +522,9 @@ var assembler = (function(exports){
     ObjectPattern      : 'properties',
     ArrayPattern       : 'elements',
     VariableDeclaration: 'declarations',
-    BlockStatement     : walk.RECURSE,
-    Program            : walk.RECURSE,
-    ForStatement       : walk.RECURSE,
+    BlockStatement     : RECURSE,
+    Program            : RECURSE,
+    ForStatement       : RECURSE,
     Property           : 'value',
     ExportDeclaration  : 'declaration',
     ExportSpecifierSet : 'specifiers',
@@ -544,9 +548,9 @@ var assembler = (function(exports){
     return collector({
       ClassDeclaration: lexical(false),
       FunctionDeclaration: lexical(false),
-      ExportDeclaration: walk.RECURSE,
-      SwitchCase: walk.RECURSE,
-      Program: walk.RECURSE,
+      ExportDeclaration: RECURSE,
+      SwitchCase: RECURSE,
+      Program: RECURSE,
       VariableDeclaration: lexical(function(node){
         return node.kind === 'const';
       })
@@ -572,19 +576,19 @@ var assembler = (function(exports){
         return node;
       }
     },
-    BlockStatement: walk.RECURSE,
-    IfStatement: walk.RECURSE,
-    ForStatement: walk.RECURSE,
-    ForOfStatement: walk.RECURSE,
-    ForInStatement: walk.RECURSE,
-    DoWhileStatement: walk.RECURSE,
-    WhileStatement: walk.RECURSE,
-    ExportDeclaration: walk.RECURSE,
-    CatchClause: walk.RECURSE,
-    SwitchCase: walk.RECURSE,
-    SwitchStatement: walk.RECURSE,
-    TryStatement: walk.RECURSE,
-    WithStatement: walk.RECURSE
+    BlockStatement: RECURSE,
+    IfStatement: RECURSE,
+    ForStatement: RECURSE,
+    ForOfStatement: RECURSE,
+    ForInStatement: RECURSE,
+    DoWhileStatement: RECURSE,
+    WhileStatement: RECURSE,
+    ExportDeclaration: RECURSE,
+    CatchClause: RECURSE,
+    SwitchCase: RECURSE,
+    SwitchStatement: RECURSE,
+    TryStatement: RECURSE,
+    WithStatement: RECURSE
   });
 
   function VarScopedDeclarations(node){
@@ -660,19 +664,19 @@ var assembler = (function(exports){
 
   var getExports = (function(){
     var collectExportDecls = collector({
-      Program          : 'body',
-      BlockStatement   : 'body',
+      Program          : RECURSE,
+      BlockStatement   : RECURSE,
       ExportDeclaration: true
     });
 
     var getExportedDecls = collector({
       ClassDeclaration   : true,
-      ExportDeclaration  : walk.RECURSE,
+      ExportDeclaration  : RECURSE,
       ExportSpecifier    : true,
-      ExportSpecifierSet : walk.RECURSE,
+      ExportSpecifierSet : RECURSE,
       FunctionDeclaration: true,
       ModuleDeclaration  : true,
-      VariableDeclaration: walk.RECURSE,
+      VariableDeclaration: RECURSE,
       VariableDeclarator : true
     });
 
@@ -698,8 +702,8 @@ var assembler = (function(exports){
 
   var getImports = (function(){
     var collectImportDecls = collector({
-      Program          : 'body',
-      BlockStatement   : 'body',
+      Program          : RECURSE,
+      BlockStatement   : RECURSE,
       ImportDeclaration: true,
       ModuleDeclaration: true
     });
@@ -815,8 +819,6 @@ var assembler = (function(exports){
 
 
   var annotateTailPosition = (function(){
-    var RECURSE = walk.RECURSE;
-
     function set(name, value){
       return function(obj){
         obj && (obj[name] = value);
@@ -953,32 +955,36 @@ var assembler = (function(exports){
   })();
 
 
-  function ReferencesSuper(node){
-    var found = false;
-    walk(node, function(node){
-      switch (node.type) {
-        case 'MemberExpression':
-          if (isSuperReference(node.object)) {
-            found = true;
-            return walk.BREAK;
-          }
-          return walk.RECURSE;
-        case 'CallExpression':
-          if (isSuperReference(node.callee)) {
-            found = true;
-            return walk.BREAK;
-          }
-          return walk.RECURSE;
-        case 'FunctionExpression':
-        case 'FunctionDeclaration':
-        case 'ArrowFunctionExpression':
-          return walk.CONTINUE;
-        default:
-          return walk.RECURSE;
+  var ReferencesSuper = (function(){
+    var found;
+
+    function nodeReferencesSuper(node){
+      if (node.type === 'MemberExpression') {
+        if (isSuperReference(node.object)) {
+          found = true;
+          return BREAK;
+        }
+        return RECURSE;
+      } else if (node.type === 'CallExpression') {
+        if (isSuperReference(node.callee)) {
+          found = true;
+          return BREAK;
+        }
+        return RECURSE;
+      } else if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') {
+        return CONTINUE;
+      } else {
+        return RECURSE;
       }
-    });
-    return found;
-  }
+    }
+
+    return function ReferencesSuper(node){
+      found = false;
+      walk(node, nodeReferencesSuper);
+      return found;
+    };
+  })()
+
 
 
 
@@ -1454,8 +1460,16 @@ var assembler = (function(exports){
 
   function Glob(node){}
 
+  var nativeMatch = /^\$__/;
+
   function Identifier(node){
-    REF(node.name);
+    if (context.code.natives && nativeMatch.test(node.name)) {
+      node.type = 'NativeIdentifier';
+      node.name = node.name.slice(3);
+      NATIVE_REF(node.name);
+    } else {
+      REF(node.name);
+    }
   }
 
   function IfStatement(node){
@@ -1850,7 +1864,7 @@ var assembler = (function(exports){
         if (isObject(node) && parent) {
           define(node, 'parent', parent);
         }
-        return walk.RECURSE;
+        return RECURSE;
       });
     }
 
@@ -1860,7 +1874,7 @@ var assembler = (function(exports){
           node.type = 'NativeIdentifier';
           node.name = node.name.slice(3);
         } else {
-          return walk.RECURSE;
+          return RECURSE;
         }
       });
     }
@@ -1918,10 +1932,8 @@ var assembler = (function(exports){
 
         if (this.options.natives) {
           code.natives = true;
-          reinterpretNatives(node);
         }
 
-        annotateParent(node);
         this.queue(code);
 
         while (this.pending.length) {
