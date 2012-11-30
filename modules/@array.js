@@ -20,7 +20,7 @@ export function isArray(array){
 
 export function from(arrayLike){
   arrayLike = $__ToObject(arrayLike);
-  var len = $__ToUint32(arrayLike.length);
+  var len = $__ToUint32(arrayLike.length),
       Ctor = $__IsConstructor(this) ? this : Array,
       out = new Ctor(len);
 
@@ -35,7 +35,7 @@ export function from(arrayLike){
 }
 
 export function of(...items){
-  var len = $__ToInteger(items.length);
+  var len = $__ToInteger(items.length),
       Ctor = $__IsConstructor(this) ? this : Array,
       out = new Ctor(len);
 
