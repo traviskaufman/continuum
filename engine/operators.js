@@ -70,11 +70,13 @@ var operators = (function(exports){
   function PutValue(v, w){
     if (!v) {
       return ThrowException('non_object_property_store', ['undefined', 'undefined']);
+    } else if (v.Abrupt) {
+      return v;
     } else if (!v.Reference) {
       return ThrowException('non_object_property_store', [v.name, v.base]);
+    } else if (w && w.Abrupt) {
+      return w;
     }
-    if (v.Abrupt) return v;
-    if (w && w.Abrupt) return w;
 
     var base = v.base;
 
@@ -102,26 +104,17 @@ var operators = (function(exports){
   // ## GetThisValue
 
   function GetThisValue(v){
-    if (v && v.Completion) {
-      if (v.Abrupt) {
-        return v;
-      } else {
-        v = v.value;
-      }
-    }
-    if (!v || !v.Reference) {
+    if (!v || v.Abrupt || !v.Reference) {
       return v;
     }
 
-    if (v.base === undefined) {
-      return ThrowException('non_object_property_load', [v.name, v.base]);
+    var base = v.base;
+
+    if (base === undefined) {
+      return ThrowException('non_object_property_load', [v.name, base]);
     }
 
-    if ('thisValue' in v) {
-      return v.thisValue;
-    }
-
-    return v.base;
+    return 'thisValue' in v ? v.thisValue : base;
   }
   exports.GetThisValue = GetThisValue;
 
