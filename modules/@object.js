@@ -1,5 +1,3 @@
-import Set from '@set';
-
 export function Object(value){
   if ($__IsConstructCall()) {
     return {};
