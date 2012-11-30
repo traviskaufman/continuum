@@ -8836,6 +8836,7 @@ exports.assembler = (function(exports){
 
   var proto = Math.random().toString(36).slice(2),
       context,
+      _push = [].push,
       opcodes = 0;
 
   function StandardOpCode(params, name){
@@ -8848,6 +8849,13 @@ exports.assembler = (function(exports){
   }
 
   define(StandardOpCode.prototype, [
+    function save(serializer){
+      var out = [this.name];
+      for (var i=0; i < this.params; i++) {
+        out[i+1] = serializer.serialize(this.params[i]);
+      }
+      return out;
+    },
     function creator(){
       var opcode = this;
       return function(){
@@ -8922,6 +8930,7 @@ exports.assembler = (function(exports){
       ARGS             = new StandardOpCode(0, 'ARGS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
+      BINDING          = new StandardOpCode(2, 'BINDING'),
       BLOCK            = new StandardOpCode(1, 'BLOCK'),
       CALL             = new StandardOpCode(1, 'CALL'),
       CASE             = new StandardOpCode(1, 'CASE'),
@@ -8938,7 +8947,7 @@ exports.assembler = (function(exports){
       ENUM             = new StandardOpCode(0, 'ENUM'),
       EXTENSIBLE       = new StandardOpCode(1, 'EXTENSIBLE'),
       FLIP             = new StandardOpCode(1, 'FLIP'),
-      FUNCTION         = new StandardOpCode(2, 'FUNCTION'),
+      FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
@@ -8992,6 +9001,20 @@ exports.assembler = (function(exports){
 
   var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
+  function serializeLocation(loc){
+    if (loc) {
+      if (loc.start) {
+        if (loc.start.line === loc.end.line) {
+          return [loc.start.line, loc.start.column, loc.end.column];
+        } else {
+          return [loc.start.line, loc.start.column, loc.end.line, loc.end.column];
+        }
+      } else if (loc.line) {
+        return [loc.line, loc.column];
+      }
+    }
+    return [];
+  }
 
   var Code = exports.code = (function(){
     var Directive = (function(){
@@ -9005,6 +9028,25 @@ exports.assembler = (function(exports){
       }
 
       define(Directive.prototype, [
+        function save(serializer){
+          var serialized = [this.op.name]//, serializeLocation(this.loc)];
+          if (this.op.params) {
+            var params = serialized[2] = [];
+            for (var i=0; i < this.op.params; i++) {
+              if (this[i] && this[i].id) {
+                serializer.add(this[i]);
+                params[i] = this[i].id;
+              } else if (this[i] instanceof Code) {
+                serializer.ident(this[i]);
+                serializer.add(this[i]);
+                params[i] = this[i].id;
+              } else {
+                params[i] = serializer.serialize(this[i]);
+              }
+            }
+          }
+          return serialized;
+        },
         function inspect(){
           var out = [];
           for (var i=0; i < this.op.params; i++) {
@@ -9023,7 +9065,7 @@ exports.assembler = (function(exports){
         this.index = 0;
       }
 
-      inherit(Parameters, Iterator, [
+      inherit(ParametersIterator, Iterator, [
         function next(){
           if (this.index >= this.params.length) {
             throw StopIteration;
@@ -9035,9 +9077,11 @@ exports.assembler = (function(exports){
       function Parameters(node){
         this.length = 0;
         if (node.params) {
-          pushAll(this, node.params)
+          pushAll(this, node.params);
           this.boundNames = boundNames(node.params);
+          this.reduced = reducer(node);
         } else {
+          this.reduced = [];
           this.boundNames = [];
         }
         this.Rest = node.rest;
@@ -9048,16 +9092,27 @@ exports.assembler = (function(exports){
         this.defaults = node.defaults || [];
       }
 
-      define(Parameters, [
+      define(Parameters.prototype, [
+        function save(serializer){
+          var serialized = {
+            formals: this.reduced,
+            count: this.ExpectedArgumentCount
+          };
+          if (this.Rest) {
+            serialized.rest = reducer(this.Rest);
+          }
+          return serialized;
+        },
         function __iterator__(){
           return new ParametersIterator(this);
         }
       ]);
+
       return Parameters;
     })();
 
 
-    function Code(node, source, type, scope, strict){
+    function Code(node, source, lexicalType, scopeType, strict){
       function Instruction(opcode, args){
         Directive.call(this, opcode, args);
       }
@@ -9072,12 +9127,16 @@ exports.assembler = (function(exports){
       if (node.type === 'Program') {
         this.flags.topLevel = true;
         this.imports = getImports(node);
+        this.scope = scope.create('global');
       } else {
         this.flags.topLevel = false;
         body = body.body;
         if (node.type === 'ModuleDeclaration') {
           this.imports = getImports(body);
+          this.scope = scope.create('module', context.currentScope)
           body = body.body;
+        } else {
+          this.scope = scope.create('normal', context.currentScope);
         }
       }
 
@@ -9109,23 +9168,76 @@ exports.assembler = (function(exports){
       }
 
       this.transfers = [];
-      this.scopeType = scope;
-      this.lexicalType = type || FUNCTYPE.NORMAL;
+      this.scopeType = scopeType;
+      this.lexicalType = lexicalType || FUNCTYPE.NORMAL;
       this.varDecls = [];
       this.flags.usesSuper = ReferencesSuper(this.body);
       this.flags.strict = strict || (context.code && context.code.flags.strict) || isstrict(this.body);
-      if (scope === SCOPE.MODULE) {
+      if (scopeType === SCOPE.MODULE) {
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
       }
       this.ops = [];
       if (node.params) {
         this.params = new Parameters(node);
+        this.scope.varDeclare('arguments', 'arguments');
+        each(this.params.boundNames, function(name){
+          this.varDeclare(name, 'param');
+        }, this.scope);
       }
     }
 
 
     define(Code.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: 'Code',
+          varDecls: this.varDecls,
+          flags: this.flags,
+          range: this.range,
+          loc: serializeLocation(this.loc)
+        });
+        if (this.classDefinition) {
+          if (!this.classDefinition.id) {
+            serializer.ident(this.classDefinition);
+          }
+          serializer.add(this.classDefinition);
+          this.classDefinition = this.classDefinition.id;
+        }
+        if (this.scopeType !== undefined) {
+          serialized.scopeType = constants.SCOPE.array[this.scopeType].toLowerCase();
+        }
+        if (this.lexicalType !== undefined) {
+          serialized.lexicalType = constants.FUNCTYPE.array[this.lexicalType].toLowerCase();
+        }
+
+        if (this.transfers.length) {
+          serialized.transfers = [];
+          each(this.transfers, function(transfer){
+            serialized.transfers.push(serializer.serialize(transfer));
+          })
+        }
+
+        if (this.exportedNames) {
+          serialized.exports = this.exportedNames;
+        }
+
+        if (this.imports) {
+          serialized.imports = this.imports;
+        }
+
+        if (this.params) {
+          serialized.params = serializer.serialize(this.params);
+        }
+
+        serialized.ops = map(this.ops, serializer.serialize, serializer);
+
+        return serialized;
+      },
       function derive(code){
         if (code) {
           this.strings = code.strings;
@@ -9153,6 +9265,8 @@ exports.assembler = (function(exports){
       this.name = node.id ? node.id.name : null;
       this.methods = [];
       this.symbols = [[], []];
+      this.scope = scope.create('normal', context.currentScope);
+      this.name && this.scope.varDeclare(this.name);
 
       each(node.body.body, function(node){
         if (node.type === 'SymbolDeclaration') {
@@ -9170,6 +9284,59 @@ exports.assembler = (function(exports){
     }
 
     define(ClassDefinition.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+        var serialized = serializer.set(this.id, {
+          type: 'ClassDefinition',
+        });
+
+        if (this.name) {
+          serialized.name = serializer.serialize(this.name);
+        }
+        if (this.hasSuper) {
+          serializer.hasSuper = true;
+        }
+        var methods = {
+          method: [],
+          get: [],
+          set: []
+        };
+
+        each(this.methods, function(method){
+          serializer.add(method.code);
+          methods[method.kind].push([serializer.serialize(method.name), method.code.id]);
+        });
+        if (methods.method.length) {
+          serialized.methods = methods.method;
+        }
+        if (methods.get.length) {
+          serialized.getters = methods.get;
+        }
+        if (methods.set.length) {
+          serialized.setters = methods.set;
+        }
+        if (this.symbols[0].length) {
+          var privates = [],
+              publics = [];
+          each(this.symbols[0], function(symbol, i){
+            if (this.symbols[1][i]) {
+              publics.push(symbol);
+            } else {
+              privates.push(symbol);
+            }
+          }, this);
+          if (privates.length) {
+            serialized.privateSymbols = privates;
+          }
+          if (publics.length) {
+            serialized.publicSymbols = publics;
+          }
+        }
+
+        return serialized;
+      },
       function defineSymbols(node){
         var isPublic = node.kind !== 'private',
             self = this;
@@ -9183,6 +9350,7 @@ exports.assembler = (function(exports){
       function defineMethod(node){
         var code = new Code(node.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.flags.strict),
             name = code.name = symbol(node.key);
+        code.scope.outer = this.scope;
 
         context.queue(code);
         code.displayName = this.name ? this.name+'#'+name.join('') : name.join('');
@@ -9191,6 +9359,7 @@ exports.assembler = (function(exports){
 
         if (name === 'constructor') {
           this.ctor = code;
+          code.classDefinition = this;
         } else {
           this.methods.push({
             kind: node.kind,
@@ -9212,7 +9381,7 @@ exports.assembler = (function(exports){
     }
 
     define(Unwinder.prototype, [
-      function toJSON(){
+      function save(serializer){
         return [this.type, this.begin, this.end];
       }
     ]);
@@ -9249,6 +9418,120 @@ exports.assembler = (function(exports){
     return ControlTransfer;
   })();
 
+
+  var scope = (function(){
+    var types = create(null);
+
+    var Scope = types.normal = (function(){
+      function Scope(outer){
+        this.varNames = create(null);
+        this.lexNames = create(null);
+        this.outer = outer;
+      }
+
+      define(Scope.prototype, [
+        function varDeclare(name, type){
+          this.varNames[name] = type;
+        },
+        function lexDeclare(name, type){
+          if (type === 'function') {
+            this.varNames[name] = type;
+          } else {
+            this.lexNames[name] = type;
+          }
+        },
+        function has(name){
+          return name in this.varNames || name in this.lexNames;
+        },
+        function pop(){
+          if (this === context.currentScope) {
+            context.currentScope = this.outer;
+          }
+        }
+      ]);
+
+      return Scope;
+    })();
+
+
+    var BlockScope = types.block = (function(){
+      function BlockScope(outer){
+        this.lexNames = create(null);
+        this.outer = outer;
+      }
+
+      inherit(BlockScope, Scope, [
+        function varDeclare(name, type){
+          this.outer.varDeclare(name, type);
+        },
+        function lexDeclare(name, type){
+          this.lexNames[name] = type;
+        },
+        function has(name){
+          return name in this.lexNames;
+        }
+      ]);
+
+      return BlockScope;
+    })();
+
+
+    var GlobalScope = types.global = (function(){
+      function GlobalScope(){
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(GlobalScope, Scope, [
+
+      ]);
+
+      return GlobalScope;
+    })();
+
+    var ModuleScope = types.module = (function(){
+      function ModuleScope(outer){
+        this.outer = outer;
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(ModuleScope, GlobalScope, [
+
+      ]);
+
+      return ModuleScope;
+    })();
+
+
+    var EvalScope = types.eval = (function(){
+      function EvalScope(outer){
+        this.outer = outer;
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(EvalScope, Scope, [
+
+      ]);
+
+      return EvalScope;
+    })();
+
+    return define({}, [
+      function resolve(scope, name){
+        while (scope) {
+          if (scope.has(name)) {
+            return scope;
+          }
+          scope = scope.outer;
+        }
+      },
+      function create(type, outer){
+        return new types[type](outer);
+      }
+    ]);
+  })();
 
 
   function isSuperReference(node) {
@@ -9583,6 +9866,12 @@ exports.assembler = (function(exports){
       FunctionDeclaration: function(node){
         return map(node.params, convert);
       },
+      FunctionExpression: function(node){
+        return map(node.params, convert);
+      },
+      ArrowFunctionExpression: function(node){
+        return map(node.params, convert);
+      },
       Program: function(node){
         var out = {
           functions: [],
@@ -9775,7 +10064,6 @@ exports.assembler = (function(exports){
 
 
 
-
   var currentNode;
   function recurse(node){
     if (node) {
@@ -9815,23 +10103,45 @@ exports.assembler = (function(exports){
     }
   }
 
-  function symbol(node){
-    if (node.type === 'AtSymbol') {
-      return ['@', node.name];
-    } else if (node.type === 'Literal') {
-      return ['', node.value];
-    } else {
-      return ['', node.name];
+  var symbol = (function(){
+    function Symbol(node){
+      if (node.type === 'AtSymbol') {
+        this[0] = '@';
+        this[1] = node.name;
+      } else if (node.type === 'Literal') {
+        this[0] = '';
+        this[1] = node.value;
+      } else {
+        this[0] = '';
+        this[1] = node.name;
+      }
     }
-  }
+
+    define(Symbol.prototype, 'length', 2);
+    define(Symbol.prototype, [
+      Array.prototype.join,
+      function save(serializer){
+        if (this[0] === '@') {
+          return ['@', this[1]];
+        }
+        return this[1];
+      }
+    ]);
+
+    return function symbol(node){
+      return new Symbol(node);
+    };
+  })();
 
 
   function block(callback){
       var entry = new ControlTransfer(context.labels);
       context.jumps.push(entry);
       context.labels = new Hash;
+      context.currentScope = scope.create('block', context.currentScope);
       callback();
       entry.updateBreaks(current());
+      context.currentScope.pop();
       context.jumps.pop();
   }
 
@@ -9982,7 +10292,7 @@ exports.assembler = (function(exports){
       code.name = name.name || name;
     }
     context.queue(code);
-    FUNCTION(null, code);
+    FUNCTION(false, null, code);
     return code;
   }
 
@@ -10005,9 +10315,30 @@ exports.assembler = (function(exports){
   function BlockStatement(node){
     block(function(){
       lexical(function(){
-        BLOCK(lexicalDecls(node.body));
-        each(node.body, recurse);
-        UPSCOPE();
+        var lexicals = lexicalDecls(node.body),
+            funcs = [];
+        if (lexicals.length) {
+          BLOCK([]);
+          each(lexicals, function(decl){
+            each(decl.boundNames, function(name){
+              BINDING(name, decl.IsConstantDeclaration);
+              if (decl.type === 'FunctionDeclaration') {
+                funcs.push(decl);
+              }
+            });
+          });
+
+          each(funcs, function(decl){
+            FunctionDeclaration(decl);
+            FUNCTION(false, decl.id.name, decl.code);
+            LET(decl.id.name);
+          });
+
+          each(node.body, recurse);
+          UPSCOPE();
+        } else {
+          each(node.body, recurse);
+        }
       });
     });
   }
@@ -10042,9 +10373,12 @@ exports.assembler = (function(exports){
         }]
       });
       BLOCK(decls);
+      context.currentScope = scope.create('block', context.currentScope);
+      context.currentScope.lexDeclare(node.param.name, 'catch');
       recurse(node.param);
       PUT();
       each(node.body.body, recurse);
+      context.currentScope.pop();
       UPSCOPE();
     });
   }
@@ -10052,6 +10386,7 @@ exports.assembler = (function(exports){
   function ClassBody(node){}
 
   function ClassDeclaration(node){
+    context.currentScope.lexDeclare(node.id.name, 'class');
     CLASS_DECL(new ClassDefinition(node));
   }
 
@@ -10119,10 +10454,11 @@ exports.assembler = (function(exports){
         if (init){
           var isLexical = isLexicalDeclaration(init);
           if (isLexical) {
-            var scope = BLOCK([]);
+            var scoped = BLOCK([]);
+            context.currentScope = scope.create('block', context.currentScope);
             recurse(init);
             var decl = init.declarations[init.declarations.length - 1].id;
-            scope[0] = boundNames(decl);
+            scoped[0] = boundNames(decl);
             var lexicalDecl = {
               type: 'VariableDeclaration',
               kind: init.kind,
@@ -10177,7 +10513,10 @@ exports.assembler = (function(exports){
 
         JUMP(test);
         adjust(op);
-        isLexical && UPSCOPE();
+        if (isLexical) {
+          context.currentScope.pop();
+          UPSCOPE();
+        }
         return update;
       });
     });
@@ -10232,17 +10571,24 @@ exports.assembler = (function(exports){
   }
 
   function FunctionDeclaration(node){
-    node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
-    context.queue(node.code);
+    if (!node.code) {
+      context.currentScope.lexDeclare(node.id.name, 'function');
+      node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+      context.queue(node.code);
+    }
+    return node.code;
   }
 
   function FunctionExpression(node, methodName){
     var code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+    if (node.id) {
+      code.scope.varDeclare(node.id.name, 'funcname');
+    }
     if (methodName) {
       code.name = methodName.name || methodName;
     }
     context.queue(code);
-    FUNCTION(intern(node.id ? node.id.name : ''), code);
+    FUNCTION(true, intern(node.id ? node.id.name : ''), code);
     return code;
   }
 
@@ -10554,13 +10900,19 @@ exports.assembler = (function(exports){
     UPDATE(!!node.prefix | ((node.operator === '++') << 1));
   }
 
-
   function VariableDeclaration(node, forin){
-    var DECLARE = {
-      'var': VAR,
-      'const': CONST,
-      'let': LET
-    }[node.kind];
+    if (node.kind === 'var') {
+      var DECLARE = function(name){
+        context.currentScope.varDeclare(name, 'var');
+        VAR(name);
+      };
+    } else {
+      var OP = node.kind === 'const' ? CONST : LET;
+      var DECLARE = function(name){
+        context.currentScope.lexDeclare(name, node.kind);
+        OP(name);
+      };
+    }
 
 
     each(node.declarations, function(item){
@@ -10734,6 +11086,7 @@ exports.assembler = (function(exports){
         this.code = code;
         this.code.filename = this.filename;
         parent && code.derive(parent);
+        this.currentScope = code.scope;
 
         if (code.params) {
 
@@ -10741,16 +11094,22 @@ exports.assembler = (function(exports){
 
         recurse(code.body);
 
+        var lastOp = last();
+
         if (code.scopeType === SCOPE.GLOBAL || code.scopeType === SCOPE.EVAL){
           COMPLETE();
         } else {
-          if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
-            GET();
-          } else {
-            UNDEFINED();
+          if (lastOp && lastOp.op.name !== 'RETURN') {
+            if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
+              GET();
+              RETURN();
+            } else {
+              UNDEFINED();
+              RETURN();
+            }
           }
-          RETURN();
         }
+        this.currentScope = this.currentScope.outer;
       },
       function queue(code){
         if (this.code) {
@@ -11671,7 +12030,7 @@ exports.thunk = (function(exports){
 
 
   function Thunk(code, instrumented){
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
       JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
@@ -11785,6 +12144,18 @@ exports.thunk = (function(exports){
           result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
 
       if (result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
+      return cmds[++ip];
+    }
+
+    function BINDING(){
+      var result = context.createBinding(ops[ip][0], ops[ip][1]);
+
+      if (result && result.Abrupt) {
         error = result;
         return unwind;
       }
@@ -11944,7 +12315,7 @@ exports.thunk = (function(exports){
     }
 
     function FUNCTION(){
-      stack[sp++] = context.createFunction(ops[ip][0], ops[ip][1]);
+      stack[sp++] = context.createFunction(ops[ip][0], ops[ip][1], ops[ip][2]);
       return cmds[++ip];
     }
 
@@ -12636,6 +13007,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
       each          = iteration.each,
+      map           = iteration.map,
       numbers       = utility.numbers,
       nextTick      = utility.nextTick,
       unique        = utility.unique;
@@ -12987,6 +13359,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       return GetIdentifierReference(lex.outer, name, strict);
     }
   }
+
 
   function GetSymbol(context, name){
     var env = context.LexicalEnvironment;
@@ -13529,7 +13902,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
     function MapData(){
-      this.id = uid++ + '';
+      $Object.tag(this);
       this.guard = create(LinkedItem.prototype);
       this.guard.key = {};
       this.reset();
@@ -13538,6 +13911,30 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     MapData.sigil = create(null);
 
     define(MapData.prototype, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: 'MapData',
+          size: this.size,
+          items: []
+        });
+        this.forEach(function(value, key){
+          serialized.items.push(map([key, value], function(item){
+            if (isObject(item)) {
+              serializer.add(item);
+              return item.id;
+            } else {
+              item = serializer.serialize(item);
+              return typeof item === 'number' ? [item] : item;
+            }
+          }));
+        });
+        return serialized;
+      },
       function reset(){
         this.size = 0;
         this.strings = create(null);
@@ -13655,10 +14052,20 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var WeakMapData = (function(){
     function WeakMapData(){
-      this.id = uid++ + '';
+      $Object.tag(this);
     }
 
     define(WeakMapData.prototype, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        return serializer.set(this.id, {
+          type: 'WeakMapData'
+        });
+      },
       function set(key, value){
         if (value === undefined) {
           value = Empty;
@@ -14031,15 +14438,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   function Accessor(get, set){
     this.Get = get;
     this.Set = set;
+    $Object.tag(this);
   }
 
   define(Accessor.prototype, {
+    type: 'Accessor',
     Get: undefined,
     Set: undefined
   });
 
 
   function BuiltinAccessor(get, set){
+    $Object.tag(this);
     if (get) this.Get = { Call: get };
     if (set) this.Set = { Call: set };
   }
@@ -14049,10 +14459,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   function ArgAccessor(name, env){
     this.name = name;
+    $Object.tag(this);
     define(this, { env: env  });
   }
 
   inherit(ArgAccessor, Accessor, {
+    type: 'ArgAccessor',
     Get: { Call: function(){ return this.env.GetBindingValue(this.name) } },
     Set: { Call: function(v){ this.env.SetMutableBinding(this.name, v) } }
   });
@@ -14067,18 +14479,42 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     function EnvironmentRecord(bindings, outer){
       this.bindings = bindings;
       this.outer = outer;
-      this.refs = create(null);
-      hide(this, 'refs');
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     define(EnvironmentRecord.prototype, {
       bindings: null,
       withBase: undefined,
-      type: 'Environment',
+      type: 'Env',
       Environment: true
     });
 
     define(EnvironmentRecord.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: this.type
+        });
+
+        if (this.outer) {
+          serializer.add(this.outer);
+          serialized.outer = this.outer.id;
+        }
+
+        if (this.symbols) {
+          serialized.symbols = {};
+          each(this.symbols, function(symbol, name){
+            serializer.add(symbol);
+            serialized.symbols[name] = symbol.id;
+          });
+        }
+
+        return serialized;
+      },
       function EnumerateBindings(){},
       function HasBinding(name){},
       function GetBindingValue(name, strict){},
@@ -14127,14 +14563,42 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var DeclarativeEnvironmentRecord = (function(){
     function DeclarativeEnvironmentRecord(outer){
-      EnvironmentRecord.call(this, new Hash, outer);
+      this.outer = outer;
+      this.bindings = new Hash;
       this.consts = new Hash;
       this.deletables = new Hash;
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     inherit(DeclarativeEnvironmentRecord, EnvironmentRecord, {
-      type: 'Declarative Env'
+      type: 'DeclarativeEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serialized.bindings = {};
+        each(this.bindings, function(binding, name){
+          if (isObject(binding) && 'id' in binding) {
+            serializer.add(binding);
+            serialized.bindings[name] = binding.id;
+          } else {
+            serialized.bindings[name] = serializer.serialize(binding);
+          }
+        });
+        var deletables = ownKeys(this.deletables);
+        if (deletables.length) {
+          serialized.deletables = deletables;
+        }
+        var consts = ownKeys(this.consts);
+        if (deletables.length) {
+          serialized.consts = consts;
+        }
+        return serialized;
+      },
       function EnumerateBindings(){
         return ownKeys(this.bindings);
       },
@@ -14197,12 +14661,25 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var ObjectEnvironmentRecord = (function(){
     function ObjectEnvironmentRecord(object, outer){
-      EnvironmentRecord.call(this, object, outer);
+      this.bindings = object;
+      this.outer = outer;
+      this.cache = new Hash;
+      $Object.tag(this);
     }
 
     inherit(ObjectEnvironmentRecord, EnvironmentRecord, {
-      type: 'Object Env'
+      type: 'ObjectEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serializer.add(this.bindings);
+        serialized.bindings = this.bindings.id;
+        return serialized;
+      },
       function EnumerateBindings(){
         return this.bindings.Enumerate(false, false);
       },
@@ -14237,18 +14714,41 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var FunctionEnvironmentRecord = (function(){
     function FunctionEnvironmentRecord(receiver, method){
-      DeclarativeEnvironmentRecord.call(this, method.Scope);
+      this.outer = method.Scope;
+      this.bindings = new Hash;
+      this.consts = new Hash;
+      this.deletables = new Hash;
+      this.cache = new Hash;
       this.thisValue = receiver;
       this.HomeObject = method.HomeObject;
       this.MethodName = method.MethodName;
+      $Object.tag(this);
     }
 
     inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
       HomeObject: undefined,
       MethodName: undefined,
       thisValue: undefined,
-      type: 'Function Env'
+      type: 'FunctionEnv'
     }, [
+      function save(serializer){
+        var serialized = DeclarativeEnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        if (isObject(this.thisValue)) {
+          serializer.add(this.thisValue);
+          serialized.thisValue = this.thisValue.id;
+        }
+        if (this.HomeObject) {
+          serializer.add(this.HomeObject);
+          serialized.HomeObject =this.HomeObject.id;
+        }
+        if (this.MethodName) {
+          serialized.MethodName = serializer.serialize(this.MethodName);
+        }
+        return serialized;
+      },
       function HasThisBinding(){
         return true;
       },
@@ -14273,16 +14773,28 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var GlobalEnvironmentRecord = (function(){
     function GlobalEnvironmentRecord(global){
-      ObjectEnvironmentRecord.call(this, global);
-      this.thisValue = this.bindings;
+      this.thisValue = this.bindings = global;
+      this.outer = null;
+      this.cache = new Hash;
       global.env = this;
       hide(global, 'env');
+      $Object.tag(this);
     }
 
     inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {
       outer: null,
-      type: 'Global Env'
+      type: 'GlobalEnv'
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = ObjectEnvironmentRecord.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serializer.add(this.bindings.Realm.natives);
+        serialized.natives = this.bindings.Realm.natives.id;
+        return serialized;
+      },
       function GetThisBinding(){
         return this.bindings;
       },
@@ -14297,6 +14809,81 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return GlobalEnvironmentRecord;
   })();
 
+  function Serializer(){
+    this.cache = new Hash;
+    this.repo = new Hash;
+  }
+
+  define(Serializer.prototype, [
+    function ident(obj){
+      if (isObject(obj)) {
+        if ('id' in obj) {
+          if (typeof obj.id !== 'number') {
+            delete obj.id;
+            $Object.tag(obj);
+          }
+        } else {
+          $Object.tag(obj);
+        }
+      }
+    },
+    function serialize(value){
+      if (!isObject(value)) {
+        if (value !== value) {
+          return ['NaN'];
+        } else if (value === Infinity) {
+          return ['Infinity'];
+        } else if (value === -Infinity) {
+          return ['-Infinity'];
+        } else if (value === 0) {
+          return 1 / value === -Infinity ? ['-0'] : 0;
+        } else if (value === undefined) {
+          return ['undefined'];
+        } else {
+          return value;
+        }
+      }
+      if (value.save) {
+        return value.save(this);
+      }
+      if ('Get' in value || 'Set' in value) {
+        var ret = { type: value.type || 'Accessor' };
+        if (value.Get) {
+          ret.Get = this.serialize(value.Get);
+        }
+        if (value.Set) {
+          ret.Set = this.serialize(value.Set);
+        }
+        return ret;
+      }
+      if (value instanceof Array) {
+        return map(value, serialize, this);
+      }
+      if (typeof value === 'function' && value.name) {
+        value = value.name;
+      } else if (value && value.constructor && value.constructor.name) {
+        value = value.constructor.name;
+      }
+      return ['unhandled object '+value];
+    },
+    function has(id){
+      return id in this.cache;
+    },
+    function set(id, value){
+      this.cache[id] = value;
+      value.id = id;
+      if (!(id in this.repo)) {
+        this.repo[id] = value;
+      }
+      return value;
+    },
+    function get(id){
+      return this.cache[id];
+    },
+    function add(obj){
+      this.repo[obj.id] = obj.id in this.cache ? this.cache[obj.id] : this.serialize(obj);
+    }
+  ]);
 
 
   // ###############
@@ -14326,7 +14913,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.Prototype = proto;
       this.properties = new PropertyList;
       this.storage = create(null);
-      this.refs = create(null);
       $Object.tag(this);
       if (proto === null) {
         this.properties.setProperty(['__proto__', null, 6, Proto]);
@@ -14334,7 +14920,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       hide(this, 'storage');
       hide(this, 'Prototype');
-      hide(this, 'refs');
       hide(this, 'Realm');
     }
 
@@ -14381,6 +14966,105 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         },
         function each(callback){
           this.properties.each(callback, this);
+        },
+        function save(serializer){
+          if (!serializer) {
+            var returnRepo = true;
+            serializer = new Serializer;
+          }
+
+          if (serializer.has(this.id)) {
+            return this.id
+          }
+
+          var serialized = serializer.set(this.id, {
+            type: this.constructor.name,
+            BuiltinBrand: this.BuiltinBrand.name
+          });
+
+          if (IsCallable(this)) {
+            var name = this.get('name');
+            if (name && typeof name === 'string') {
+              serialized.name = name;
+            }
+            if (this.strict) {
+              serialized.Strict = this.strict;
+            }
+            serialized.Parameters = null;
+          }
+
+          if (!this.IsExtensible()) {
+            serialized.Extensible = false;
+          }
+
+          if (this.ConstructorName) {
+            serialized.ConstructorName = this.ConstructorName;
+          }
+
+          each(['MapData', 'SetData', 'WeakMapData'], function(data){
+            if (this[data]) {
+              serializer.add(this[data]);
+              serialized[data] = this[data].id;
+            }
+          }, this);
+
+          var objects = [],
+              functions = [],
+              self = this,
+              isFunction = IsCallable(this);
+
+          var props = [];
+          this.properties.each(function(prop){
+            if (isFunction) {
+              if (prop[0] === 'arguments' || prop[0] === 'caller') {
+                if (prop[1] === null || self.strict) {
+                  return;
+                }
+              } else if (prop[0] === 'length') {
+                return;
+              }
+            }
+            if (typeof prop[0] === 'string') {
+              var key = prop[0];
+            } else {
+              serializer.add(prop[0]);
+              var key = prop[0].id;
+            }
+            prop = [key, prop[2], 0, prop[1]];
+            props.push(prop);
+            if (isObject(prop[3])) {
+              if (prop[3].Scope) {
+                functions.push(prop);
+              } else {
+                objects.push(prop);
+              }
+            } else {
+              prop[3] = serializer.serialize(prop[3]);
+            }
+          });
+
+          each(objects, function(prop){
+            serializer.add(prop[3]);
+            prop[3] = prop[3].id;
+            prop[2] = 1;
+          });
+
+          var proto = this.GetInheritance();
+          if (proto) {
+            serializer.add(proto);
+            serialized.Prototype = proto.id;
+          } else {
+            serialized.Prototype = null;
+          }
+
+          each(functions, function(prop){
+            serializer.add(prop[3]);
+            prop[3] = prop[3].id;
+            prop[2] = 2;
+          });
+
+          serialized.properties = props;
+          return returnRepo ? serializer.repo : serialized;
         }
       ]);
     }();
@@ -14801,6 +15485,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.Realm = realm;
       this.Scope = scope;
       this.code = code;
+      $Object.tag(code);
       if (holder !== undefined) {
         this.HomeObject = holder;
       }
@@ -14829,6 +15514,35 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       ThisMode: 'global',
       Realm: null
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        serialized.Strict = this.strict;
+        serialized.ThisMode = this.ThisMode;
+        if (this.Scope) {
+          serializer.add(this.Scope);
+          serialized.Scope = this.Scope.id;
+        }
+        if (this.code) {
+          serializer.add(this.code);
+          serialized.Code = this.code.id;
+          var code = serializer.repo[this.code.id];
+          serialized.Parameters = code.params;
+          delete code.params;
+        }
+        if (this.HomeObject) {
+          serializer.add(this.HomeObject);
+          serialized.HomeObject = this.HomeObject.id;
+        }
+        if (this.MethodName) {
+          serialized.MethodName = serializer.serialize(this.MethodName);
+        }
+
+        return serialized;
+      },
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
@@ -14933,7 +15647,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
       $Object.call(this, intrinsics.FunctionProto);
-      this.ProxyTargetFunction = target;
+      this.TargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
@@ -14942,24 +15656,56 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($BoundFunction, $Function, {
-      ProxyTargetFunction: null,
+      TargetFunction: null,
       BoundThis: null,
-      BoundArguments: null
+      BoundArgs: null
     }, [
+      function save(serializer){
+        if (!serializer) {
+          var returnRepo = true;
+          serializer = new Serializer;
+        }
+
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        delete serialized.Parameters;
+        if (isObject(this.TargetFunction)) {
+          serializer.add(this.TargetFunction);
+          serialized.TargetFunction = this.TargetFunction.id;
+        }
+        if (isObject(this.BoundThis)) {
+          serializer.add(this.BoundThis);
+          serialized.BoundThis = this.BoundThis.id;
+        } else {
+          serialized.BoundThis = serializer.serialize(this.BoundThis);
+        }
+        serialized.BoundArgs = map(this.BoundArgs, function(arg){
+          if (isObject(arg)) {
+            serializer.add(arg);
+            return arg.id;
+          } else {
+            return serializer.serialize(arg);
+          }
+        });
+
+        return returnRepo ? serializer.repo : serialized;
+      },
       function Call(_, newArgs){
-        return this.ProxyTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
+        return this.TargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.ProxyTargetFunction.Construct) {
-          return ThrowException('not_constructor', this.ProxyTargetFunction.name);
+        if (!this.TargetFunction.Construct) {
+          return ThrowException('not_constructor', this.TargetFunction.name);
         }
-        return this.ProxyTargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        return this.TargetFunction.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.ProxyTargetFunction.HasInstance) {
-          return ThrowException('instanceof_function_expected', this.ProxyTargetFunction.name);
+        if (!this.TargetFunction.HasInstance) {
+          return ThrowException('instanceof_function_expected', this.TargetFunction.name);
         }
-        return This.ProxyTargetFunction.HasInstance(arg);
+        return This.TargetFunction.HasInstance(arg);
       }
     ]);
 
@@ -15120,7 +15866,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  var primitiveWrapperSave = (function(){
+    return function save(serializer){
+      serializer || (serializer = new Serializer);
+      var serialized = $Object.prototype.save.call(this, serializer);
+      if (typeof serialized === 'number') {
+        return serialized;
+      }
 
+      serialized.PrimitiveValue = this.PrimitiveValue;
+      return serialized;
+    };
+  })();
 
 
   // #############
@@ -15135,7 +15892,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Date, $Object, {
       BuiltinBrand: BRANDS.BuiltinDate
-    });
+    }, [
+      function save(serializer){
+        return +primitiveWrapperSave.call(this, serializer);
+      }
+    ]);
 
     return $Date;
   })();
@@ -15157,6 +15918,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       BuiltinBrand: BRANDS.StringWrapper,
       PrimitiveValue: undefined
     }, [
+      primitiveWrapperSave,
       function GetOwnProperty(key){
         var desc = $Object.prototype.GetOwnProperty.call(this, key);
         if (desc) {
@@ -15221,7 +15983,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
       PrimitiveValue: undefined
-    });
+    }, [primitiveWrapperSave]);
 
     return $Number;
   })();
@@ -15240,7 +16002,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
       PrimitiveValue: undefined
-    });
+    }, [primitiveWrapperSave]);
 
     return $Boolean;
   })();
@@ -15515,24 +16277,34 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var seed = Math.random() * 4294967296 | 0;
-
-
     var iterator = new $Enumerator([]);
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
-      this.Symbol = seed++;
       this.Name = name;
       this.Private = !isPublic;
     }
 
     inherit($Symbol, $Object, {
       BuiltinBrand: BRANDS.BuiltinSymbol,
-      Extensible: false
+      Extensible: false,
+      Private: true,
+      Name: null
     }, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        return serializer.set(this.id, {
+          type: '$Symbol',
+          Name: this.Name,
+          Private: this.Private
+        });
+      },
       function toString(){
-        return this.Symbol;
+        return this.id;
       },
       function GetInheritance(){
         return null;
@@ -15740,10 +16512,48 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       });
     }
 
+    var fakeProps = { each: function(){} };
+
     inherit($Module, $Object, {
       BuiltinBrand: BRANDS.BuiltinModule,
       Extensible: false
-    });
+    }, [
+      function save(serializer){
+        var props = this.properties;
+        this.properties = fakeProps;
+
+        serializer || (serializer = new Serializer);
+        var serialized = $Object.prototype.save.call(this, serializer);
+        this.properties = props;
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+
+        delete serialized.properties;
+        delete serialized.Prototype;
+        delete serialized.Extensible;
+        serialized.exports = [];
+
+
+        this.properties.each(function(prop){
+          var value = prop[1].Get.Call();
+
+          if (isObject(value)) {
+            serializer.add(value);
+            value = value.id;
+          } else {
+            value = serializer.serialize(value);
+            if (typeof value === 'number') {
+              value = [value];
+            }
+          }
+
+          serialized.exports.push(value);
+        });
+
+        return serialized;
+      },
+    ]);
 
     return $Module;
   })();
@@ -16398,6 +17208,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     inherit($NativeFunction, $Function, {
       Builtin: true
     }, [
+      function save(serializer){
+        var serialized = $Object.prototype.save.call(this, serializer);
+        if (typeof serialized === 'number') {
+          return serialized;
+        }
+        delete serialized.Parameters;
+        return serialized;
+      },
       function Call(receiver, args){
         var result = this.call.apply(receiver, [].concat(args));
         return result && result.type === Return ? result.value : result;
@@ -16471,6 +17289,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
+      function createBinding(name, immutable){
+        if (immutable) {
+          return this.LexicalEnvironment.CreateImmutableBinding(name);
+        } else {
+          return this.LexicalEnvironment.CreateMutableBinding(name, false);
+        }
+      },
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
@@ -16494,11 +17319,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
         return ctor;
       },
-      function createFunction(name, code){
+      function createFunction(isExpression, name, code){
         var $F = code.generator ? $GeneratorFunction : $Function,
             env = this.LexicalEnvironment;
 
-        if (name) {
+        if (isExpression && name) {
           env = new DeclarativeEnvironmentRecord(env);
           env.CreateImmutableBinding(name);
         }
@@ -16507,7 +17332,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
         if (code.lexicalType !== ARROW) {
           MakeConstructor(func);
-          name && env.InitializeBinding(name, func);
+          isExpression && name && env.InitializeBinding(name, func);
         }
 
         return func;
@@ -16525,7 +17350,20 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return Element(this, name, obj);
       },
       function getReference(name){
-        return IdentifierResolution(this, name);
+        var origin = this.LexicalEnvironment;
+        if (name in origin.cache) {
+          return origin.cache[name];
+        }
+
+        var lex = origin,
+            strict = this.strict;
+
+        do {
+          if (lex.HasBinding(name)) {
+            return origin.cache[name] = new Reference(lex, name, strict);
+          }
+        } while (lex = lex.outer)
+        return origin.cache[name] = new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
         return SuperReference(this, name);
@@ -16660,7 +17498,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       bindings.ErrorProto.define('message', '', _CW);
     }
 
-    inherit(Intrinsics, DeclarativeEnvironmentRecord, [
+    inherit(Intrinsics, DeclarativeEnvironmentRecord, {
+      type: 'Intrinsics',
+    }, [
       function binding(options){
         if (typeof options === 'function') {
           options = {
@@ -16725,9 +17565,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     var parseOptions = {
       loc    : true,
       range  : true,
-      raw    : false,
+      raw    : true,
       tokens : false,
-      comment: false
+      comment: true
     }
 
     function parse(src, origin, type, options){
@@ -16804,6 +17644,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.filename = options.filename || '';
       if (this.ast) {
         this.bytecode = assemble(this);
+        $Object.tag(this.bytecode);
         this.thunk = new Thunk(this.bytecode);
       }
       return this;
@@ -17640,9 +18481,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         scope: SCOPE.MODULE
       });
 
+
       if (script.error) {
         return ƒ(script.error);
       }
+
+      realm.scripts.push(script);
 
       var sandbox = createSandbox(global);
 
@@ -17678,7 +18522,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       intrinsics.ThrowTypeError = CreateThrowTypeError(this);
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
-      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify));
+      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
       hide(intrinsics.FunctionProto, 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
@@ -18836,7 +19680,7 @@ exports.debug = (function(exports){
 
   var MirrorScope = (function(){
     function MirrorScope(subject){
-      if (subject.type === 'Global Env') {
+      if (subject.type === 'GlobalEnv') {
         return new MirrorGlobalScope(subject);
       }
       subject.__introspected = this;
@@ -19517,7 +20361,7 @@ exports.modules["@json"] = "export let JSON = {};\n\n$__SetBuiltinBrand(JSON, 'B
 
 exports.modules["@map"] = "import Iterator from '@iter';\nsymbol @iterator = $__iterator;\n\n\nexport function Map(iterable){\n  var map;\n  if ($__IsConstructCall()) {\n    map = this;\n  } else {\n    if (this == null || this === $__MapProto) {\n      map = $__ObjectCreate($__MapProto) ;\n    } else {\n      map = $__ToObject(this);\n    }\n  }\n\n  if ($__HasInternal(map, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map'])\n  }\n\n  $__MapInitialization(map, iterable);\n  return map;\n}\n\n\n$__setupConstructor(Map, $__MapProto);\n\n\n$__defineProps(Map.prototype, {\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  },\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  },\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  },\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  },\n  delete: function(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  },\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator(this, 'key+value');\n  },\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator(this, 'key');\n  },\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator(this, 'value');\n  },\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n});\n\n$__set(Map.prototype.delete, 'name', 'delete');\n\n$__DefineOwnProperty(Map.prototype, 'size', {\n  configurable: true,\n  enumerable: false,\n  get(){\n    return this === $__MapProto ? 0 : $__MapSize(this);\n  },\n  set: void 0\n});\n\n\nclass MapIterator extends Iterator {\n  private @data, @key, @kind;\n\n  constructor(map, kind){\n    this.@data = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!($__has(this, @data) && $__has(this, @key) && $__has(this, @kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@data, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    } else {\n      return item[1];\n    }\n  }\n}\n\n$__hideEverything(MapIterator);\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\n";
 
-exports.modules["@math"] = "const Infinity = 1 / 0,\n      NaN = +'NaN';\n\nexport const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\n\nexport function abs(x){\n  x = +x;\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function acosh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x - 1));\n}\n\nexport function asinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x + 1));\n}\n\nexport function atan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan(x);\n}\n\nexport function asin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__asin(x);\n}\n\nexport function atanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return .5 * $__log((1 + x) / (1 - x));\n}\n\nexport function atan2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan2(x);\n}\n\n\nexport function ceil(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + 1 >> 0;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function cos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__cos(x);\n}\n\nexport function cosh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (x < 0) {\n    x = -x;\n  }\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__exp(x);\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\nexport function expm1(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x >> 0;\n}\n\nexport function hypot(x, y) {\n  x = +x;\n  y = +y;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (y === 0 || y !== y || y === Infinity || y === -Infinity) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x);\n}\n\nexport function log2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG2E;\n}\n\nexport function log10(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG10E;\n}\n\nexport function log1p(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nexport function pow(x, y){\n  return $__pow(+x, +y);\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + .5 | 0;\n}\n\nexport function sign(x){\n  x = +x;\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / 2;\n}\n\nexport function sin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__sin(x);\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__tan(x);\n}\n\nexport function tanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x));\n}\n\nexport function trunc(x){\n  x = +x;\n  return x === 0 || x !== x || x === Infinity || x === -Infinity ? x : ~~x;\n}\n\nexport var Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\n$__set(min, 'length', 2);\n$__set(max, 'length', 2);\n$__hideEverything(Math);\n$__SetBuiltinBrand(Math, 'BuiltinMath');\n";
+exports.modules["@math"] = "const Infinity = 1 / 0,\n      NaN = +'NaN';\n\nexport const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\n\nexport function abs(x){\n  x = +x;\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function acosh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x - 1));\n}\n\nexport function asinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x + $__sqrt(x * x + 1));\n}\n\nexport function atan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan(x);\n}\n\nexport function asin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__asin(x);\n}\n\nexport function atanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return .5 * $__log((1 + x) / (1 - x));\n}\n\nexport function atan2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__atan2(x);\n}\n\n\nexport function ceil(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + 1 >> 0;\n}\n\nexport function acos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__acos(x);\n}\n\nexport function cos(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__cos(x);\n}\n\nexport function cosh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (x < 0) {\n    x = -x;\n  }\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__exp(x);\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\nexport function expm1(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x >> 0;\n}\n\nexport function hypot(x, y) {\n  x = +x;\n  y = +y;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  if (y === 0 || y !== y || y === Infinity || y === -Infinity) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x);\n}\n\nexport function log2(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG2E;\n}\n\nexport function log10(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__log(x) * LOG10E;\n}\n\nexport function log1p(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nexport function pow(x, y){\n  return $__pow(+x, +y);\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return x + .5 | 0;\n}\n\nexport function sign(x){\n  x = +x;\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / 2;\n}\n\nexport function sin(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__sin(x);\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return $__tan(x);\n}\n\nexport function tanh(x) {\n  x = +x;\n  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {\n    return x;\n  }\n  return ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x));\n}\n\nexport function trunc(x){\n  x = +x;\n  return x === 0 || x !== x || x === Infinity || x === -Infinity ? x : ~~x;\n}\n\nexport var Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    $__setupFunctions([Math[k]]);\n    $__remove(Math[k], 'prototype');\n  }\n}\n\n$__set(min, 'length', 2);\n$__set(max, 'length', 2);\n$__hideEverything(Math);\n$__SetBuiltinBrand(Math, 'BuiltinMath');\n";
 
 exports.modules["@number"] = "export function Number(value){\n  value = $__ToNumber(value);\n  if ($__IsConstructCall()) {\n    return $__NumberCreate(value);\n  } else {\n    return value;\n  }\n}\n\n$__setupConstructor(Number, $__NumberProto);\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\n$__defineMethods(Number, [isNaN, isFinite, isInteger, toInteger]);\n\n\nexport let\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = +'NaN',\n  NEGATIVE_INFINITY = 1 / 0,\n  POSITIVE_INFINITY = 1 / -0;\n\n$__defineConstants(Number, {\n  EPSILON          : EPSILON,\n  MAX_INTEGER      : MAX_INTEGER,\n  MAX_VALUE        : MAX_VALUE,\n  MIN_VALUE        : MIN_VALUE,\n  NaN              : NaN,\n  NEGATIVE_INFINITY: NEGATIVE_INFINITY,\n  POSITIVE_INFINITY: POSITIVE_INFINITY\n});\n\n\n\n$__defineProps(Number.prototype, {\n  toString(radix){\n    if ($__GetBuiltinBrand(this) === 'Number') {\n      var number = $__GetPrimitiveValue(this);\n      radix = $__ToInteger(radix);\n      return $__NumberToString(number, radix);\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.toString']);\n    }\n  },\n  valueOf(){\n    if ($__GetBuiltinBrand(this) === 'Number') {\n      return $__GetPrimitiveValue(this);\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  },\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n});\n";
 
@@ -19535,11 +20379,11 @@ exports.modules["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp 
 
 exports.modules["@symbol"] = "export function Symbol(name, isPublic){\n  if (name == null) {\n    throw $__Exception('unnamed_symbol', []);\n  }\n  return $__SymbolCreate(name, !!isPublic);\n}\n\n$__setupConstructor(Symbol, $__SymbolProto);\n$__remove(Symbol.prototype, 'constructor');\n";
 
-exports.modules["@system"] = "{\n  let HIDDEN = 6,\n      FROZEN = 0;\n\n  $__defineMethods = function defineMethods(obj, props){\n    for (var i=0; i < props.length; i++) {\n      $__SetInternal(props[i], 'Native', true);\n      $__define(obj, props[i].name, props[i], HIDDEN);\n      $__remove(props[i], 'prototype');\n    }\n    return obj;\n  };\n\n  $__defineProps = function defineProps(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      var name = keys[i],\n          prop = props[name];\n\n      $__define(obj, name, prop, HIDDEN);\n\n      if (typeof prop === 'function') {\n        $__SetInternal(prop, 'Native', true);\n        $__define(prop, 'name', name, FROZEN);\n        $__remove(prop, 'prototype');\n      }\n    }\n    return obj;\n  };\n\n  $__setupFunctions = function setupFunctions(...funcs){\n    var len = funcs.length;\n    for (var i=0; i < len; i++) {\n      $__SetInternal(funcs[i], 'Native', true);\n      $__remove(funcs[i], 'prototype');\n    }\n  };\n\n  $__defineConstants = function defineConstants(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      $__define(obj, keys[i], props[keys[i]], FROZEN);\n    }\n  };\n\n  $__setupConstructor = function setupConstructor(ctor, proto){\n    if (proto) {\n      $__define(ctor, 'prototype', proto, FROZEN);\n    }\n    $__define(ctor, 'length', 1, FROZEN);\n    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);\n    $__SetInternal(ctor, 'Native', true);\n    $__SetInternal(ctor, 'NativeConstructor', true);\n  };\n\n\n  $__setLength = function setLength(f, length){\n    if (typeof length === 'string') {\n      $__set(f, 'length', length);\n    } else {\n      var keys = $__Enumerate(length, false, false);\n      for (var i=0; i < keys.length; i++) {\n        var key = keys[i];\n        $__set(f[key], 'length', length[key]);\n      }\n    }\n  };\n\n  $__setProperty = function setProperty(key, object, values){\n    var keys = $__Enumerate(values, false, false),\n        i = keys.length;\n\n    while (i--) {\n      $__define(object[keys[i]], key, values[keys[i]], FROZEN);\n    }\n  };\n\n  $__hideEverything = function hideEverything(o){\n    var type = typeof o;\n    if (type === 'object' ? o === null : type !== 'function') {\n      return o;\n    }\n\n    var keys = $__Enumerate(o, false, true),\n        i = keys.length;\n\n    while (i--) {\n      if (typeof o[keys[i]] === 'number') {\n        $__update(o, keys[i], 0);\n      } else {\n        $__update(o, keys[i], 6);\n      }\n    }\n\n    if (typeof o === 'function') {\n      hideEverything(o.prototype);\n    }\n\n    return o;\n  };\n\n  symbol @toStringTag, @iterator;\n  $__toStringTag = @toStringTag;\n  $__iterator = @iterator;\n\n  $__EmptyClass = function(...args){ super(...args) };\n  $__define($__EmptyClass, 'name', '', FROZEN);\n}\n\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {\n      $__SetInternal(module, 'loader', loader);\n      $__SetInternal(module, 'resolved', this.@resolved);\n      $__SetInternal(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.translate;\n    this.@resolve   = options.resolve   || parent.resolve;\n    this.@fetch     = options.fetch     || parent.fetch;\n    this.@global    = options.global    || $__global;\n    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');\n  }\n\n  get global(){\n    return this.@global;\n  }\n\n  get baseURL(){\n    return this.@baseURL;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.@baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(src, this.@global, this.@baseURL);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.@global);\n    for (var k in std) {\n      desc.value = std[k];\n      $__DefineOwnProperty(object, k, desc);\n    }\n\n    return object;\n  }\n}\n\n\nexport function Module(object){\n  if ($__GetBuiltinBrand(object) === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\n$__remove(Module, 'prototype');\n\n\nexport let System = $__System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n\n\nSystem.@strict = false;\nlet std = System.eval(`\n  module std = '@std';\n  export std;\n`).std;\nSystem.@strict = true;\n";
+exports.modules["@system"] = "{\n  let HIDDEN = 6,\n      FROZEN = 0;\n\n  $__defineMethods = function defineMethods(obj, props){\n    for (var i=0; i < props.length; i++) {\n      $__SetInternal(props[i], 'Native', true);\n      $__define(obj, props[i].name, props[i], HIDDEN);\n      $__remove(props[i], 'prototype');\n    }\n    return obj;\n  };\n\n  $__defineProps = function defineProps(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      var name = keys[i],\n          prop = props[name];\n\n      $__define(obj, name, prop, HIDDEN);\n\n      if (typeof prop === 'function') {\n        $__SetInternal(prop, 'Native', true);\n        $__define(prop, 'name', name, FROZEN);\n        $__remove(prop, 'prototype');\n      }\n    }\n    return obj;\n  };\n\n  $__setupFunctions = function setupFunctions(...funcs){\n    var len = funcs.length;\n    if (len) {\n      for (var i=0; i < len; i++) {\n        $__SetInternal(funcs[i], 'Native', true);\n        $__remove(funcs[i], 'prototype');\n      }\n    }\n  };\n\n  $__defineConstants = function defineConstants(obj, props){\n    var keys = $__Enumerate(props, false, false);\n    for (var i=0; i < keys.length; i++) {\n      $__define(obj, keys[i], props[keys[i]], FROZEN);\n    }\n  };\n\n  $__setupConstructor = function setupConstructor(ctor, proto){\n    if (proto) {\n      $__define(ctor, 'prototype', proto, FROZEN);\n    }\n    $__define(ctor, 'length', 1, FROZEN);\n    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);\n    $__SetInternal(ctor, 'Native', true);\n    $__SetInternal(ctor, 'NativeConstructor', true);\n  };\n\n\n  $__setLength = function setLength(f, length){\n    if (typeof length === 'string') {\n      $__set(f, 'length', length);\n    } else {\n      var keys = $__Enumerate(length, false, false);\n      for (var i=0; i < keys.length; i++) {\n        var key = keys[i];\n        $__set(f[key], 'length', length[key]);\n      }\n    }\n  };\n\n  $__setProperty = function setProperty(key, object, values){\n    var keys = $__Enumerate(values, false, false),\n        i = keys.length;\n\n    while (i--) {\n      $__define(object[keys[i]], key, values[keys[i]], FROZEN);\n    }\n  };\n\n  $__hideEverything = function hideEverything(o){\n    var type = typeof o;\n    if (type === 'object' ? o === null : type !== 'function') {\n      return o;\n    }\n\n    var keys = $__Enumerate(o, false, true),\n        i = keys.length;\n\n    while (i--) {\n      if (typeof o[keys[i]] === 'number') {\n        $__update(o, keys[i], 0);\n      } else {\n        $__update(o, keys[i], 6);\n      }\n    }\n\n    if (typeof o === 'function') {\n      hideEverything(o.prototype);\n    }\n\n    return o;\n  };\n\n  symbol @toStringTag, @iterator;\n  $__toStringTag = @toStringTag;\n  $__iterator = @iterator;\n\n  $__EmptyClass = function(...args){ super(...args) };\n  $__define($__EmptyClass, 'name', '', FROZEN);\n}\n\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {\n      $__SetInternal(module, 'loader', loader);\n      $__SetInternal(module, 'resolved', this.@resolved);\n      $__SetInternal(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.translate;\n    this.@resolve   = options.resolve   || parent.resolve;\n    this.@fetch     = options.fetch     || parent.fetch;\n    this.@global    = options.global    || $__global;\n    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');\n  }\n\n  get global(){\n    return this.@global;\n  }\n\n  get baseURL(){\n    return this.@baseURL;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.@baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(src, this.@global, this.@baseURL);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.@baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.@global);\n    for (var k in std) {\n      desc.value = std[k];\n      $__DefineOwnProperty(object, k, desc);\n    }\n\n    return object;\n  }\n}\n\n\nexport function Module(object){\n  if ($__GetBuiltinBrand(object) === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\n$__remove(Module, 'prototype');\n\n\nexport let System = $__System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n\n\nSystem.@strict = false;\nlet std = System.eval(`\n  module std = '@std';\n  export std;\n`).std;\nSystem.@strict = true;\n";
 
 exports.modules["@timers"] = "export function clearInterval(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nexport function clearTimeout(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nexport function setInterval(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, true);\n}\n\nexport function setTimeout(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, false);\n}\n\n$__setupFunctions(clearInterval, clearTimeout, setInterval, setTimeout);\n";
 
-exports.modules["@typed-arrays"] = "\nprivate @get, @set;\n\nfunction wrappingClamp(number, min, max){\n  if (number < min) {\n    number += max;\n  }\n  return number < min ? min : number > max ? max : number;\n}\n\n\nfunction createArrayBuffer(nativeBuffer, byteLength){\n  var buffer = $__ObjectCreate($__ArrayBufferProto);\n  $__define(buffer, 'byteLength', byteLength, 0);\n  $__SetInternal(buffer, 'NativeBuffer', nativeBuffer);\n  $__SetInternal(buffer, 'ConstructorName', 'ArrayBuffer');\n  $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');\n  return buffer;\n}\n\n\nfunction createTypedArray(Type, buffer, byteOffset, length){\n  if (typeof buffer === 'number') {\n    length = $__ToUint32(buffer);\n    var byteLength = length * Type.BYTES_PER_ELEMENT;\n    byteOffset = 0;\n    buffer = new ArrayBuffer(byteLength);\n    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n  } else {\n    buffer = $__ToObject(buffer);\n\n    if ($__GetBuiltinBrand(buffer) === 'ArrayBuffer') {\n      byteOffset = $__ToUint32(byteOffset);\n      if (byteOffset % Type.BYTES_PER_ELEMENT) {\n        throw $__Exception('buffer_unaligned_offset', [Type.name]);\n      }\n\n      var bufferLength = buffer.byteLength,\n          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;\n\n      if (byteOffset + byteLength > bufferLength) {\n        throw $__Exception('buffer_out_of_bounds', [Type.name]);\n      }\n\n      length = byteLength / Type.BYTES_PER_ELEMENT;\n\n      if ($__ToInteger(length) !== length) {\n        throw $__Exception('buffer_unaligned_length', [Type.name]);\n      }\n\n      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n    } else {\n      length = $__ToUint32(buffer.length);\n      var byteLength = length * Type.BYTES_PER_ELEMENT;\n      byteOffset = 0;\n      buffer = new ArrayBuffer(length);\n\n      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n      for (var i=0; i < length; i++) {\n        typedArray[i] = buffer[i];\n      }\n\n      return typedArray;\n    }\n  }\n}\n\nfunction set(Type, instance, array, offset){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);\n  }\n\n  offset = $__ToUint32(offset);\n  array = $__ToObject(array);\n  var srcLength = $__ToUint32(array.length),\n      targetLength = instance.length;\n\n  if (srcLength + offset > targetLength) {\n    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);\n  }\n\n  var temp = new Type(srcLength),\n      k = 0;\n\n  while (k < srcLength) {\n    temp[k] = array[k];\n  }\n\n  k = offset;\n  while (k < targetLength) {\n    instance[k] = temp[k - offset];\n  }\n}\n\nfunction subarray(Type, instance, begin, end){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);\n  }\n\n  var srcLength = instance.length;\n\n  begin = $__ToInt32(begin);\n  end = end === undefined ? srcLength : $__ToInt32(end);\n\n  begin = wrappingClamp(begin, 0, srcLength);\n  end = wrappingClamp(end, 0, srcLength);\n\n  if (end < begin) {\n    [begin, end] = [end, begin];\n  }\n\n  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);\n}\n\n\n\nexport class ArrayBuffer {\n  constructor(byteLength){\n    byteLength = $__ToUint32(byteLength);\n    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);\n  }\n\n  slice(begin, end){\n    var sourceBuffer = $__ToObject(this),\n        sourceNativeBuffer = $__GetInternal(sourceBuffer, 'NativeBuffer');\n\n    if (!sourceNativeBuffer) {\n      throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);\n    }\n\n    var byteLength = sourceBuffer.byteLength;\n\n    begin = $__ToInt32(begin);\n    end = end === undefined ? byteLength : $__ToInt32(end);\n\n    begin = wrappingClamp(begin, 0, byteLength);\n    end = wrappingClamp(end, 0, byteLength);\n\n    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);\n  }\n}\n\n\nexport class DataView {\n  constructor(buffer, byteOffset, byteLength){\n    buffer = $__ToObject(buffer);\n    if ($__GetBuiltinBrand(buffer) !== 'ArrayBuffer') {\n      throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);\n    }\n\n    byteOffset = $__ToUint32(byteOffset);\n    var bufferLength = buffer.byteLength,\n        byteLength = byteLength === undefined ? bufferLength - byteOffset : $__ToUint32(byteLength);\n\n    if (byteOffset + byteLength > bufferLength) {\n      throw $__Exception('buffer_out_of_bounds', ['DataView']);\n    }\n\n    $__define(this, 'byteLength', byteLength, 1);\n    $__define(this, 'byteOffset', byteOffset, 1);\n    $__define(this, 'buffer', buffer, 1);\n    $__SetInternal(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));\n    $__SetBuiltinBrand(this, 'BuiltinDataView');\n  }\n  getUint8(byteOffset){\n    return this.@get('Uint8', byteOffset);\n  }\n  getUint16(byteOffset, littleEndian){\n    return this.@get('Uint16', byteOffset, littleEndian);\n  }\n  getUint32(byteOffset, littleEndian){\n    return this.@get('Uint32', byteOffset, littleEndian);\n  }\n  getInt8(byteOffset){\n    return this.@get('Int8', byteOffset);\n  }\n  getInt16(byteOffset, littleEndian){\n    return this.@get('Int16', byteOffset, littleEndian);\n  }\n  getInt32(byteOffset, littleEndian){\n    return this.@get('Int32', byteOffset, littleEndian);\n  }\n  getFloat32(byteOffset, littleEndian){\n    return this.@get('Float32', byteOffset, littleEndian);\n  }\n  getFloat64(byteOffset, littleEndian){\n    return this.@get('Float64', byteOffset, littleEndian);\n  }\n  setUint8(byteOffset, value){\n    return this.@set('Uint8', byteOffset, value);\n  }\n  setUint16(byteOffset, value, littleEndian){\n    return this.@set('Uint16', byteOffset, value, littleEndian);\n  }\n  setUint32(byteOffset, value, littleEndian){\n    return this.@set('Uint32', byteOffset, value, littleEndian);\n  }\n  setInt8(byteOffset, value){\n    return this.@set('Int8', byteOffset, value);\n  }\n  setInt16(byteOffset, value, littleEndian){\n    return this.@set('Int16', byteOffset, value, littleEndian);\n  }\n  setInt32(byteOffset, value, littleEndian){\n    return this.@set('Int32', byteOffset, value, littleEndian);\n  }\n  setFloat32(byteOffset, value, littleEndian){\n    return this.@set('Float32', byteOffset, value, littleEndian);\n  }\n  setFloat64(byteOffset, value, littleEndian){\n    return this.@set('Float64', byteOffset, value, littleEndian);\n  }\n}\n\nDataView.prototype.@get = $__DataViewGet\nDataView.prototype.@set = $__DataViewSet\n\n\nexport class Float64Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float64Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float64Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float64Array, this, begin, end);\n  }\n}\n\nexport class Float32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float32Array, this, begin, end);\n  }\n}\n\nexport class Int32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int32Array, this, begin, end);\n  }\n}\n\nexport class Int16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int16Array, this, begin, end);\n  }\n}\n\nexport class Int8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int8Array, this, begin, end);\n  }\n}\n\nexport class Uint32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint32Array, this, begin, end);\n  }\n}\n\nexport class Uint16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint16Array, this, begin, end);\n  }\n}\n\nexport class Uint8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint8Array, this, begin, end);\n  }\n}\n\n\n\n{\n  function setupClass(Ctor, bytes){\n    if (bytes) {\n      $__defineConstants(Ctor, { BYTES_PER_ELEMENT: bytes });\n    }\n    $__hideEverything(Ctor);\n    $__setupConstructor(Ctor, Ctor.prototype);\n    $__SetBuiltinBrand(Ctor.prototype, 'Builtin'+Ctor.name);\n  }\n\n  setupClass(ArrayBuffer);\n  setupClass(DataView);\n  setupClass(Int8Array, 1);\n  setupClass(Uint8Array, 1);\n  setupClass(Int16Array, 2);\n  setupClass(Uint16Array, 2);\n  setupClass(Int32Array, 4);\n  setupClass(Uint32Array, 4);\n  setupClass(Float32Array, 4);\n  setupClass(Float64Array, 8);\n\n}\n\n$__ArrayBufferProto = ArrayBuffer.prototype;\n$__DataViewProto = DataView.prototype;\n$__Float32ArrayProto = Float32Array.prototype;\n$__Float64ArrayProto = Float64Array.prototype;\n$__Float64ArrayProto = Float64Array.prototype;\n$__Int16ArrayProto = Int16Array.prototype;\n$__Int32ArrayProto = Int32Array.prototype;\n$__Int8ArrayProto = Int8Array.prototype;\n$__Uint16ArrayProto = Uint16Array.prototype;\n$__Uint32ArrayProto = Uint32Array.prototype;\n$__Uint8ArrayProto = Uint8Array.prototype;\n";
+exports.modules["@typed-arrays"] = "\nprivate @get, @set;\n\nfunction wrappingClamp(number, min, max){\n  if (number < min) {\n    number += max;\n  }\n  return number < min ? min : number > max ? max : number;\n}\n\n\nfunction createArrayBuffer(nativeBuffer, byteLength){\n  var buffer = $__ObjectCreate($__ArrayBufferProto);\n  $__define(buffer, 'byteLength', byteLength, 0);\n  $__SetInternal(buffer, 'NativeBuffer', nativeBuffer);\n  $__SetInternal(buffer, 'ConstructorName', 'ArrayBuffer');\n  $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');\n  return buffer;\n}\n\n\nfunction createTypedArray(Type, buffer, byteOffset, length){\n  if (typeof buffer === 'number') {\n    length = $__ToUint32(buffer);\n    var byteLength = length * Type.BYTES_PER_ELEMENT;\n    byteOffset = 0;\n    buffer = new ArrayBuffer(byteLength);\n    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n  } else {\n    buffer = $__ToObject(buffer);\n\n    if ($__GetBuiltinBrand(buffer) === 'ArrayBuffer') {\n      byteOffset = $__ToUint32(byteOffset);\n      if (byteOffset % Type.BYTES_PER_ELEMENT) {\n        throw $__Exception('buffer_unaligned_offset', [Type.name]);\n      }\n\n      var bufferLength = buffer.byteLength,\n          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;\n\n      if (byteOffset + byteLength > bufferLength) {\n        throw $__Exception('buffer_out_of_bounds', [Type.name]);\n      }\n\n      length = byteLength / Type.BYTES_PER_ELEMENT;\n\n      if ($__ToInteger(length) !== length) {\n        throw $__Exception('buffer_unaligned_length', [Type.name]);\n      }\n\n      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n    } else {\n      length = $__ToUint32(buffer.length);\n      var byteLength = length * Type.BYTES_PER_ELEMENT;\n      byteOffset = 0;\n      buffer = new ArrayBuffer(length);\n\n      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n      for (var i=0; i < length; i++) {\n        typedArray[i] = buffer[i];\n      }\n\n      return typedArray;\n    }\n  }\n}\n\nfunction set(Type, instance, array, offset){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);\n  }\n\n  offset = $__ToUint32(offset);\n  array = $__ToObject(array);\n  var srcLength = $__ToUint32(array.length),\n      targetLength = instance.length;\n\n  if (srcLength + offset > targetLength) {\n    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);\n  }\n\n  var temp = new Type(srcLength),\n      k = 0;\n\n  while (k < srcLength) {\n    temp[k] = array[k];\n  }\n\n  k = offset;\n  while (k < targetLength) {\n    instance[k] = temp[k - offset];\n  }\n}\n\nfunction subarray(Type, instance, begin, end){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);\n  }\n\n  var srcLength = instance.length;\n\n  begin = $__ToInt32(begin);\n  end = end === undefined ? srcLength : $__ToInt32(end);\n\n  begin = wrappingClamp(begin, 0, srcLength);\n  end = wrappingClamp(end, 0, srcLength);\n\n  if (end < begin) {\n    [begin, end] = [end, begin];\n  }\n\n  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);\n}\n\n$__setupFunctions([wrappingClamp, createArrayBuffer, createTypedArray, set])\n\nexport class ArrayBuffer {\n  constructor(byteLength){\n    byteLength = $__ToUint32(byteLength);\n    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);\n  }\n\n  slice(begin, end){\n    var sourceBuffer = $__ToObject(this),\n        sourceNativeBuffer = $__GetInternal(sourceBuffer, 'NativeBuffer');\n\n    if (!sourceNativeBuffer) {\n      throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);\n    }\n\n    var byteLength = sourceBuffer.byteLength;\n\n    begin = $__ToInt32(begin);\n    end = end === undefined ? byteLength : $__ToInt32(end);\n\n    begin = wrappingClamp(begin, 0, byteLength);\n    end = wrappingClamp(end, 0, byteLength);\n\n    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);\n  }\n}\n\n\nexport class DataView {\n  constructor(buffer, byteOffset, byteLength){\n    buffer = $__ToObject(buffer);\n    if ($__GetBuiltinBrand(buffer) !== 'ArrayBuffer') {\n      throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);\n    }\n\n    byteOffset = $__ToUint32(byteOffset);\n    var bufferLength = buffer.byteLength,\n        byteLength = byteLength === undefined ? bufferLength - byteOffset : $__ToUint32(byteLength);\n\n    if (byteOffset + byteLength > bufferLength) {\n      throw $__Exception('buffer_out_of_bounds', ['DataView']);\n    }\n\n    $__define(this, 'byteLength', byteLength, 1);\n    $__define(this, 'byteOffset', byteOffset, 1);\n    $__define(this, 'buffer', buffer, 1);\n    $__SetInternal(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));\n    $__SetBuiltinBrand(this, 'BuiltinDataView');\n  }\n  getUint8(byteOffset){\n    return this.@get('Uint8', byteOffset);\n  }\n  getUint16(byteOffset, littleEndian){\n    return this.@get('Uint16', byteOffset, littleEndian);\n  }\n  getUint32(byteOffset, littleEndian){\n    return this.@get('Uint32', byteOffset, littleEndian);\n  }\n  getInt8(byteOffset){\n    return this.@get('Int8', byteOffset);\n  }\n  getInt16(byteOffset, littleEndian){\n    return this.@get('Int16', byteOffset, littleEndian);\n  }\n  getInt32(byteOffset, littleEndian){\n    return this.@get('Int32', byteOffset, littleEndian);\n  }\n  getFloat32(byteOffset, littleEndian){\n    return this.@get('Float32', byteOffset, littleEndian);\n  }\n  getFloat64(byteOffset, littleEndian){\n    return this.@get('Float64', byteOffset, littleEndian);\n  }\n  setUint8(byteOffset, value){\n    return this.@set('Uint8', byteOffset, value);\n  }\n  setUint16(byteOffset, value, littleEndian){\n    return this.@set('Uint16', byteOffset, value, littleEndian);\n  }\n  setUint32(byteOffset, value, littleEndian){\n    return this.@set('Uint32', byteOffset, value, littleEndian);\n  }\n  setInt8(byteOffset, value){\n    return this.@set('Int8', byteOffset, value);\n  }\n  setInt16(byteOffset, value, littleEndian){\n    return this.@set('Int16', byteOffset, value, littleEndian);\n  }\n  setInt32(byteOffset, value, littleEndian){\n    return this.@set('Int32', byteOffset, value, littleEndian);\n  }\n  setFloat32(byteOffset, value, littleEndian){\n    return this.@set('Float32', byteOffset, value, littleEndian);\n  }\n  setFloat64(byteOffset, value, littleEndian){\n    return this.@set('Float64', byteOffset, value, littleEndian);\n  }\n}\n\nDataView.prototype.@get = $__DataViewGet\nDataView.prototype.@set = $__DataViewSet\n\n\nexport class Float64Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float64Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float64Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float64Array, this, begin, end);\n  }\n}\n\nexport class Float32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float32Array, this, begin, end);\n  }\n}\n\nexport class Int32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int32Array, this, begin, end);\n  }\n}\n\nexport class Int16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int16Array, this, begin, end);\n  }\n}\n\nexport class Int8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int8Array, this, begin, end);\n  }\n}\n\nexport class Uint32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint32Array, this, begin, end);\n  }\n}\n\nexport class Uint16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint16Array, this, begin, end);\n  }\n}\n\nexport class Uint8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint8Array, this, begin, end);\n  }\n}\n\n\n\n{\n  function setupClass(Ctor, bytes){\n    if (bytes) {\n      $__defineConstants(Ctor, { BYTES_PER_ELEMENT: bytes });\n    }\n    $__hideEverything(Ctor);\n    $__setupConstructor(Ctor, Ctor.prototype);\n    $__SetBuiltinBrand(Ctor.prototype, 'Builtin'+Ctor.name);\n  }\n\n  setupClass(ArrayBuffer);\n  setupClass(DataView);\n  setupClass(Int8Array, 1);\n  setupClass(Uint8Array, 1);\n  setupClass(Int16Array, 2);\n  setupClass(Uint16Array, 2);\n  setupClass(Int32Array, 4);\n  setupClass(Uint32Array, 4);\n  setupClass(Float32Array, 4);\n  setupClass(Float64Array, 8);\n\n}\n\n$__ArrayBufferProto = ArrayBuffer.prototype;\n$__DataViewProto = DataView.prototype;\n$__Float32ArrayProto = Float32Array.prototype;\n$__Float64ArrayProto = Float64Array.prototype;\n$__Float64ArrayProto = Float64Array.prototype;\n$__Int16ArrayProto = Int16Array.prototype;\n$__Int32ArrayProto = Int32Array.prototype;\n$__Int8ArrayProto = Int8Array.prototype;\n$__Uint16ArrayProto = Uint16Array.prototype;\n$__Uint32ArrayProto = Uint32Array.prototype;\n$__Uint8ArrayProto = Uint8Array.prototype;\n";
 
 exports.modules["@weakmap"] = "export function WeakMap(iterable){\n  var weakmap;\n  if ($__IsConstructCall()) {\n    weakmap = this;\n  } else {\n    if (this === undefined || this === $__WeakMapProto) {\n      weakmap = $__ObjectCreate($__WeakMapProto) ;\n    } else {\n      weakmap = $__ToObject(this);\n    }\n  }\n\n  if ($__HasInternal(weakmap, 'WeakMapData')) {\n    throw $__Exception('double_initialization', ['WeakMap']);\n  }\n\n  $__WeakMapInitialization(weakmap, iterable);\n  return weakmap;\n}\n\n$__setupConstructor(WeakMap, $__WeakMapProto);\n{\n$__defineProps(WeakMap.prototype, {\n  set(key, value){\n    ensureWeakMap(this, key, 'set');\n    return $__WeakMapSet(this, key, value);\n  },\n  get(key){\n    ensureWeakMap(this, key, 'get');\n    return $__WeakMapGet(this, key);\n  },\n  has(key){\n    ensureWeakMap(this, key, 'has');\n    return $__WeakMapHas(this, key);\n  },\n  delete: function(key){\n    ensureWeakMap(this, key, 'delete');\n    return $__WeakMapDelete(this, key);\n  }\n});\n\n$__define(WeakMap.prototype.delete, 'name', 'delete', 0);\n\n\nfunction ensureWeakMap(o, p, name){\n  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'WeakMapData')) {\n    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);\n  }\n  if (typeof p === 'object' ? p === null : typeof p !== 'function') {\n    throw $__Exception('invalid_weakmap_key', []);\n  }\n}\n}\n";
 

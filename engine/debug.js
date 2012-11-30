@@ -992,7 +992,7 @@ var debug = (function(exports){
 
   var MirrorScope = (function(){
     function MirrorScope(subject){
-      if (subject.type === 'Global Env') {
+      if (subject.type === 'GlobalEnv') {
         return new MirrorGlobalScope(subject);
       }
       subject.__introspected = this;
