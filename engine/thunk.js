@@ -89,7 +89,7 @@ var thunk = (function(exports){
 
 
   function Thunk(code, instrumented){
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
       DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
       JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
@@ -203,6 +203,18 @@ var thunk = (function(exports){
           result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
 
       if (result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
+      return cmds[++ip];
+    }
+
+    function BINDING(){
+      var result = context.createBinding(ops[ip][0], ops[ip][1]);
+
+      if (result && result.Abrupt) {
         error = result;
         return unwind;
       }
@@ -362,7 +374,7 @@ var thunk = (function(exports){
     }
 
     function FUNCTION(){
-      stack[sp++] = context.createFunction(ops[ip][0], ops[ip][1]);
+      stack[sp++] = context.createFunction(ops[ip][0], ops[ip][1], ops[ip][2]);
       return cmds[++ip];
     }
 

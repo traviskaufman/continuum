@@ -48,6 +48,7 @@ var assembler = (function(exports){
 
   var proto = Math.random().toString(36).slice(2),
       context,
+      _push = [].push,
       opcodes = 0;
 
   function StandardOpCode(params, name){
@@ -60,6 +61,13 @@ var assembler = (function(exports){
   }
 
   define(StandardOpCode.prototype, [
+    function save(serializer){
+      var out = [this.name];
+      for (var i=0; i < this.params; i++) {
+        out[i+1] = serializer.serialize(this.params[i]);
+      }
+      return out;
+    },
     function creator(){
       var opcode = this;
       return function(){
@@ -134,6 +142,7 @@ var assembler = (function(exports){
       ARGS             = new StandardOpCode(0, 'ARGS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
+      BINDING          = new StandardOpCode(2, 'BINDING'),
       BLOCK            = new StandardOpCode(1, 'BLOCK'),
       CALL             = new StandardOpCode(1, 'CALL'),
       CASE             = new StandardOpCode(1, 'CASE'),
@@ -150,7 +159,7 @@ var assembler = (function(exports){
       ENUM             = new StandardOpCode(0, 'ENUM'),
       EXTENSIBLE       = new StandardOpCode(1, 'EXTENSIBLE'),
       FLIP             = new StandardOpCode(1, 'FLIP'),
-      FUNCTION         = new StandardOpCode(2, 'FUNCTION'),
+      FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
@@ -204,6 +213,20 @@ var assembler = (function(exports){
 
   var ASSIGN = macro('ASSIGN', REF, [ROTATE, 1], PUT, POP);
 
+  function serializeLocation(loc){
+    if (loc) {
+      if (loc.start) {
+        if (loc.start.line === loc.end.line) {
+          return [loc.start.line, loc.start.column, loc.end.column];
+        } else {
+          return [loc.start.line, loc.start.column, loc.end.line, loc.end.column];
+        }
+      } else if (loc.line) {
+        return [loc.line, loc.column];
+      }
+    }
+    return [];
+  }
 
   var Code = exports.code = (function(){
     var Directive = (function(){
@@ -217,6 +240,25 @@ var assembler = (function(exports){
       }
 
       define(Directive.prototype, [
+        function save(serializer){
+          var serialized = [this.op.name]//, serializeLocation(this.loc)];
+          if (this.op.params) {
+            var params = serialized[2] = [];
+            for (var i=0; i < this.op.params; i++) {
+              if (this[i] && this[i].id) {
+                serializer.add(this[i]);
+                params[i] = this[i].id;
+              } else if (this[i] instanceof Code) {
+                serializer.ident(this[i]);
+                serializer.add(this[i]);
+                params[i] = this[i].id;
+              } else {
+                params[i] = serializer.serialize(this[i]);
+              }
+            }
+          }
+          return serialized;
+        },
         function inspect(){
           var out = [];
           for (var i=0; i < this.op.params; i++) {
@@ -235,7 +277,7 @@ var assembler = (function(exports){
         this.index = 0;
       }
 
-      inherit(Parameters, Iterator, [
+      inherit(ParametersIterator, Iterator, [
         function next(){
           if (this.index >= this.params.length) {
             throw StopIteration;
@@ -247,9 +289,11 @@ var assembler = (function(exports){
       function Parameters(node){
         this.length = 0;
         if (node.params) {
-          pushAll(this, node.params)
+          pushAll(this, node.params);
           this.boundNames = boundNames(node.params);
+          this.reduced = reducer(node);
         } else {
+          this.reduced = [];
           this.boundNames = [];
         }
         this.Rest = node.rest;
@@ -260,16 +304,27 @@ var assembler = (function(exports){
         this.defaults = node.defaults || [];
       }
 
-      define(Parameters, [
+      define(Parameters.prototype, [
+        function save(serializer){
+          var serialized = {
+            formals: this.reduced,
+            count: this.ExpectedArgumentCount
+          };
+          if (this.Rest) {
+            serialized.rest = reducer(this.Rest);
+          }
+          return serialized;
+        },
         function __iterator__(){
           return new ParametersIterator(this);
         }
       ]);
+
       return Parameters;
     })();
 
 
-    function Code(node, source, type, scope, strict){
+    function Code(node, source, lexicalType, scopeType, strict){
       function Instruction(opcode, args){
         Directive.call(this, opcode, args);
       }
@@ -284,12 +339,16 @@ var assembler = (function(exports){
       if (node.type === 'Program') {
         this.flags.topLevel = true;
         this.imports = getImports(node);
+        this.scope = scope.create('global');
       } else {
         this.flags.topLevel = false;
         body = body.body;
         if (node.type === 'ModuleDeclaration') {
           this.imports = getImports(body);
+          this.scope = scope.create('module', context.currentScope)
           body = body.body;
+        } else {
+          this.scope = scope.create('normal', context.currentScope);
         }
       }
 
@@ -321,23 +380,76 @@ var assembler = (function(exports){
       }
 
       this.transfers = [];
-      this.scopeType = scope;
-      this.lexicalType = type || FUNCTYPE.NORMAL;
+      this.scopeType = scopeType;
+      this.lexicalType = lexicalType || FUNCTYPE.NORMAL;
       this.varDecls = [];
       this.flags.usesSuper = ReferencesSuper(this.body);
       this.flags.strict = strict || (context.code && context.code.flags.strict) || isstrict(this.body);
-      if (scope === SCOPE.MODULE) {
+      if (scopeType === SCOPE.MODULE) {
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
       }
       this.ops = [];
       if (node.params) {
         this.params = new Parameters(node);
+        this.scope.varDeclare('arguments', 'arguments');
+        each(this.params.boundNames, function(name){
+          this.varDeclare(name, 'param');
+        }, this.scope);
       }
     }
 
 
     define(Code.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: 'Code',
+          varDecls: this.varDecls,
+          flags: this.flags,
+          range: this.range,
+          loc: serializeLocation(this.loc)
+        });
+        if (this.classDefinition) {
+          if (!this.classDefinition.id) {
+            serializer.ident(this.classDefinition);
+          }
+          serializer.add(this.classDefinition);
+          this.classDefinition = this.classDefinition.id;
+        }
+        if (this.scopeType !== undefined) {
+          serialized.scopeType = constants.SCOPE.array[this.scopeType].toLowerCase();
+        }
+        if (this.lexicalType !== undefined) {
+          serialized.lexicalType = constants.FUNCTYPE.array[this.lexicalType].toLowerCase();
+        }
+
+        if (this.transfers.length) {
+          serialized.transfers = [];
+          each(this.transfers, function(transfer){
+            serialized.transfers.push(serializer.serialize(transfer));
+          })
+        }
+
+        if (this.exportedNames) {
+          serialized.exports = this.exportedNames;
+        }
+
+        if (this.imports) {
+          serialized.imports = this.imports;
+        }
+
+        if (this.params) {
+          serialized.params = serializer.serialize(this.params);
+        }
+
+        serialized.ops = map(this.ops, serializer.serialize, serializer);
+
+        return serialized;
+      },
       function derive(code){
         if (code) {
           this.strings = code.strings;
@@ -365,6 +477,8 @@ var assembler = (function(exports){
       this.name = node.id ? node.id.name : null;
       this.methods = [];
       this.symbols = [[], []];
+      this.scope = scope.create('normal', context.currentScope);
+      this.name && this.scope.varDeclare(this.name);
 
       each(node.body.body, function(node){
         if (node.type === 'SymbolDeclaration') {
@@ -382,6 +496,59 @@ var assembler = (function(exports){
     }
 
     define(ClassDefinition.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+        var serialized = serializer.set(this.id, {
+          type: 'ClassDefinition',
+        });
+
+        if (this.name) {
+          serialized.name = serializer.serialize(this.name);
+        }
+        if (this.hasSuper) {
+          serializer.hasSuper = true;
+        }
+        var methods = {
+          method: [],
+          get: [],
+          set: []
+        };
+
+        each(this.methods, function(method){
+          serializer.add(method.code);
+          methods[method.kind].push([serializer.serialize(method.name), method.code.id]);
+        });
+        if (methods.method.length) {
+          serialized.methods = methods.method;
+        }
+        if (methods.get.length) {
+          serialized.getters = methods.get;
+        }
+        if (methods.set.length) {
+          serialized.setters = methods.set;
+        }
+        if (this.symbols[0].length) {
+          var privates = [],
+              publics = [];
+          each(this.symbols[0], function(symbol, i){
+            if (this.symbols[1][i]) {
+              publics.push(symbol);
+            } else {
+              privates.push(symbol);
+            }
+          }, this);
+          if (privates.length) {
+            serialized.privateSymbols = privates;
+          }
+          if (publics.length) {
+            serialized.publicSymbols = publics;
+          }
+        }
+
+        return serialized;
+      },
       function defineSymbols(node){
         var isPublic = node.kind !== 'private',
             self = this;
@@ -395,6 +562,7 @@ var assembler = (function(exports){
       function defineMethod(node){
         var code = new Code(node.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.flags.strict),
             name = code.name = symbol(node.key);
+        code.scope.outer = this.scope;
 
         context.queue(code);
         code.displayName = this.name ? this.name+'#'+name.join('') : name.join('');
@@ -403,6 +571,7 @@ var assembler = (function(exports){
 
         if (name === 'constructor') {
           this.ctor = code;
+          code.classDefinition = this;
         } else {
           this.methods.push({
             kind: node.kind,
@@ -424,7 +593,7 @@ var assembler = (function(exports){
     }
 
     define(Unwinder.prototype, [
-      function toJSON(){
+      function save(serializer){
         return [this.type, this.begin, this.end];
       }
     ]);
@@ -461,6 +630,120 @@ var assembler = (function(exports){
     return ControlTransfer;
   })();
 
+
+  var scope = (function(){
+    var types = create(null);
+
+    var Scope = types.normal = (function(){
+      function Scope(outer){
+        this.varNames = create(null);
+        this.lexNames = create(null);
+        this.outer = outer;
+      }
+
+      define(Scope.prototype, [
+        function varDeclare(name, type){
+          this.varNames[name] = type;
+        },
+        function lexDeclare(name, type){
+          if (type === 'function') {
+            this.varNames[name] = type;
+          } else {
+            this.lexNames[name] = type;
+          }
+        },
+        function has(name){
+          return name in this.varNames || name in this.lexNames;
+        },
+        function pop(){
+          if (this === context.currentScope) {
+            context.currentScope = this.outer;
+          }
+        }
+      ]);
+
+      return Scope;
+    })();
+
+
+    var BlockScope = types.block = (function(){
+      function BlockScope(outer){
+        this.lexNames = create(null);
+        this.outer = outer;
+      }
+
+      inherit(BlockScope, Scope, [
+        function varDeclare(name, type){
+          this.outer.varDeclare(name, type);
+        },
+        function lexDeclare(name, type){
+          this.lexNames[name] = type;
+        },
+        function has(name){
+          return name in this.lexNames;
+        }
+      ]);
+
+      return BlockScope;
+    })();
+
+
+    var GlobalScope = types.global = (function(){
+      function GlobalScope(){
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(GlobalScope, Scope, [
+
+      ]);
+
+      return GlobalScope;
+    })();
+
+    var ModuleScope = types.module = (function(){
+      function ModuleScope(outer){
+        this.outer = outer;
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(ModuleScope, GlobalScope, [
+
+      ]);
+
+      return ModuleScope;
+    })();
+
+
+    var EvalScope = types.eval = (function(){
+      function EvalScope(outer){
+        this.outer = outer;
+        this.varNames = create(null);
+        this.lexNames = create(null);
+      }
+
+      inherit(EvalScope, Scope, [
+
+      ]);
+
+      return EvalScope;
+    })();
+
+    return define({}, [
+      function resolve(scope, name){
+        while (scope) {
+          if (scope.has(name)) {
+            return scope;
+          }
+          scope = scope.outer;
+        }
+      },
+      function create(type, outer){
+        return new types[type](outer);
+      }
+    ]);
+  })();
 
 
   function isSuperReference(node) {
@@ -795,6 +1078,12 @@ var assembler = (function(exports){
       FunctionDeclaration: function(node){
         return map(node.params, convert);
       },
+      FunctionExpression: function(node){
+        return map(node.params, convert);
+      },
+      ArrowFunctionExpression: function(node){
+        return map(node.params, convert);
+      },
       Program: function(node){
         var out = {
           functions: [],
@@ -987,7 +1276,6 @@ var assembler = (function(exports){
 
 
 
-
   var currentNode;
   function recurse(node){
     if (node) {
@@ -1027,23 +1315,45 @@ var assembler = (function(exports){
     }
   }
 
-  function symbol(node){
-    if (node.type === 'AtSymbol') {
-      return ['@', node.name];
-    } else if (node.type === 'Literal') {
-      return ['', node.value];
-    } else {
-      return ['', node.name];
+  var symbol = (function(){
+    function Symbol(node){
+      if (node.type === 'AtSymbol') {
+        this[0] = '@';
+        this[1] = node.name;
+      } else if (node.type === 'Literal') {
+        this[0] = '';
+        this[1] = node.value;
+      } else {
+        this[0] = '';
+        this[1] = node.name;
+      }
     }
-  }
+
+    define(Symbol.prototype, 'length', 2);
+    define(Symbol.prototype, [
+      Array.prototype.join,
+      function save(serializer){
+        if (this[0] === '@') {
+          return ['@', this[1]];
+        }
+        return this[1];
+      }
+    ]);
+
+    return function symbol(node){
+      return new Symbol(node);
+    };
+  })();
 
 
   function block(callback){
       var entry = new ControlTransfer(context.labels);
       context.jumps.push(entry);
       context.labels = new Hash;
+      context.currentScope = scope.create('block', context.currentScope);
       callback();
       entry.updateBreaks(current());
+      context.currentScope.pop();
       context.jumps.pop();
   }
 
@@ -1194,7 +1504,7 @@ var assembler = (function(exports){
       code.name = name.name || name;
     }
     context.queue(code);
-    FUNCTION(null, code);
+    FUNCTION(false, null, code);
     return code;
   }
 
@@ -1217,9 +1527,30 @@ var assembler = (function(exports){
   function BlockStatement(node){
     block(function(){
       lexical(function(){
-        BLOCK(lexicalDecls(node.body));
-        each(node.body, recurse);
-        UPSCOPE();
+        var lexicals = lexicalDecls(node.body),
+            funcs = [];
+        if (lexicals.length) {
+          BLOCK([]);
+          each(lexicals, function(decl){
+            each(decl.boundNames, function(name){
+              BINDING(name, decl.IsConstantDeclaration);
+              if (decl.type === 'FunctionDeclaration') {
+                funcs.push(decl);
+              }
+            });
+          });
+
+          each(funcs, function(decl){
+            FunctionDeclaration(decl);
+            FUNCTION(false, decl.id.name, decl.code);
+            LET(decl.id.name);
+          });
+
+          each(node.body, recurse);
+          UPSCOPE();
+        } else {
+          each(node.body, recurse);
+        }
       });
     });
   }
@@ -1254,9 +1585,12 @@ var assembler = (function(exports){
         }]
       });
       BLOCK(decls);
+      context.currentScope = scope.create('block', context.currentScope);
+      context.currentScope.lexDeclare(node.param.name, 'catch');
       recurse(node.param);
       PUT();
       each(node.body.body, recurse);
+      context.currentScope.pop();
       UPSCOPE();
     });
   }
@@ -1264,6 +1598,7 @@ var assembler = (function(exports){
   function ClassBody(node){}
 
   function ClassDeclaration(node){
+    context.currentScope.lexDeclare(node.id.name, 'class');
     CLASS_DECL(new ClassDefinition(node));
   }
 
@@ -1331,10 +1666,11 @@ var assembler = (function(exports){
         if (init){
           var isLexical = isLexicalDeclaration(init);
           if (isLexical) {
-            var scope = BLOCK([]);
+            var scoped = BLOCK([]);
+            context.currentScope = scope.create('block', context.currentScope);
             recurse(init);
             var decl = init.declarations[init.declarations.length - 1].id;
-            scope[0] = boundNames(decl);
+            scoped[0] = boundNames(decl);
             var lexicalDecl = {
               type: 'VariableDeclaration',
               kind: init.kind,
@@ -1389,7 +1725,10 @@ var assembler = (function(exports){
 
         JUMP(test);
         adjust(op);
-        isLexical && UPSCOPE();
+        if (isLexical) {
+          context.currentScope.pop();
+          UPSCOPE();
+        }
         return update;
       });
     });
@@ -1444,17 +1783,24 @@ var assembler = (function(exports){
   }
 
   function FunctionDeclaration(node){
-    node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
-    context.queue(node.code);
+    if (!node.code) {
+      context.currentScope.lexDeclare(node.id.name, 'function');
+      node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+      context.queue(node.code);
+    }
+    return node.code;
   }
 
   function FunctionExpression(node, methodName){
     var code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+    if (node.id) {
+      code.scope.varDeclare(node.id.name, 'funcname');
+    }
     if (methodName) {
       code.name = methodName.name || methodName;
     }
     context.queue(code);
-    FUNCTION(intern(node.id ? node.id.name : ''), code);
+    FUNCTION(true, intern(node.id ? node.id.name : ''), code);
     return code;
   }
 
@@ -1766,13 +2112,19 @@ var assembler = (function(exports){
     UPDATE(!!node.prefix | ((node.operator === '++') << 1));
   }
 
-
   function VariableDeclaration(node, forin){
-    var DECLARE = {
-      'var': VAR,
-      'const': CONST,
-      'let': LET
-    }[node.kind];
+    if (node.kind === 'var') {
+      var DECLARE = function(name){
+        context.currentScope.varDeclare(name, 'var');
+        VAR(name);
+      };
+    } else {
+      var OP = node.kind === 'const' ? CONST : LET;
+      var DECLARE = function(name){
+        context.currentScope.lexDeclare(name, node.kind);
+        OP(name);
+      };
+    }
 
 
     each(node.declarations, function(item){
@@ -1946,6 +2298,7 @@ var assembler = (function(exports){
         this.code = code;
         this.code.filename = this.filename;
         parent && code.derive(parent);
+        this.currentScope = code.scope;
 
         if (code.params) {
 
@@ -1953,16 +2306,22 @@ var assembler = (function(exports){
 
         recurse(code.body);
 
+        var lastOp = last();
+
         if (code.scopeType === SCOPE.GLOBAL || code.scopeType === SCOPE.EVAL){
           COMPLETE();
         } else {
-          if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
-            GET();
-          } else {
-            UNDEFINED();
+          if (lastOp && lastOp.op.name !== 'RETURN') {
+            if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
+              GET();
+              RETURN();
+            } else {
+              UNDEFINED();
+              RETURN();
+            }
           }
-          RETURN();
         }
+        this.currentScope = this.currentScope.outer;
       },
       function queue(code){
         if (this.code) {
