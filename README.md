@@ -70,8 +70,9 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * builtin '@std' modules `module std = '@std'` or `import call from '@function'`
 * Generators (kind of broken at the moment though)
 * Proxy and Reflect (also buggy)
-* Private Names
+* Symbols with syntactic @name support
 * Typed Arrays
+* Object.observe (es-next/es7)
 
 ### Soon to be Implemented
 
