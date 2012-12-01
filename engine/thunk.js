@@ -89,14 +89,14 @@ var thunk = (function(exports){
 
 
   function Thunk(code, instrumented){
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
-      CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
-      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
-      JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
-      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP,
-      POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
-      SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
-      THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
+      CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
+      ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
+      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG,
+      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
+      REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
+      SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
+      UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
 
 
     var thunk = this,
@@ -182,6 +182,23 @@ var thunk = (function(exports){
     function ARG(){
       var arg = stack[--sp];
       stack[sp - 1].push(arg);
+      return cmds[++ip];
+    }
+
+    function ARGUMENTS(){
+      if (code.strict) {
+        var args = context.args;
+        stack[sp++] = context.createArguments(args);
+        stack[sp++] = args;
+      } else {
+        var params = code.params.boundNames,
+            env = context.LexicalEnvironment,
+            args = context.args,
+            func = context.callee;
+        stack[sp++] = context.createArguments(args, env, params, func);
+        stack[sp++] = args;
+      }
+
       return cmds[++ip];
     }
 
@@ -408,6 +425,11 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function HAS_BINDING(){
+      stack[sp++] = context.hasBinding(ops[ip][0]);
+      return cmds[++ip];
+    }
+
     function INC(){
       stack[sp - 1]++;
       return cmds[++ip];
@@ -421,6 +443,12 @@ var thunk = (function(exports){
       array.DefineOwnProperty(index+'', new Desc(val));
       stack[sp++] = index + 1;
 
+      return cmds[++ip];
+    }
+
+    function INTERNAL_MEMBER(){
+      var item = stack[--sp];
+      stack[sp++] = item[ops[ip][0]];
       return cmds[++ip];
     }
 
@@ -517,7 +545,7 @@ var thunk = (function(exports){
     }
 
     function LOG(){
-      context.Realm.emit('debug', [sp, stack]);
+      context.Realm.emit('debug', sp, stack);
       return cmds[++ip];
     }
 

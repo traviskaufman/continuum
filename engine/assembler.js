@@ -140,6 +140,7 @@ var assembler = (function(exports){
       ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
+      ARGUMENTS        = new StandardOpCode(0, 'ARGUMENTS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
       BINDING          = new StandardOpCode(2, 'BINDING'),
@@ -161,8 +162,10 @@ var assembler = (function(exports){
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
+      HAS_BINDING      = new StandardOpCode(1, 'HAS_BINDING'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
+      INTERNAL_MEMBER  = new InternedOpCode(1, 'INTERNAL_MEMBER'),
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
       JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
@@ -297,7 +300,7 @@ var assembler = (function(exports){
           this.boundNames = [];
         }
         this.Rest = node.rest;
-        this.ExpectedArgumentCount = this.boundNames.length;
+        this.ExpectedArgumentCount = this.length;
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
@@ -891,13 +894,15 @@ var assembler = (function(exports){
   function FunctionDeclarationInstantiation(code){
     var varDeclarations = VarScopedDeclarations(code.body),
         len = varDeclarations.length,
-        argumentsObjectNotNeeded = false
-
-    RESET(A);
+        argumentsObjectNotNeeded = false,
+        strict = code.strict,
+        funcs = [];
 
     while (len--) {
       var decl = varDeclarations[len];
       if (decl.type === 'FunctionDeclaration') {
+        funcs.push(decl);
+
         decl.boundNames || (decl.boundNames = boundNames(decl));
         var name = decl.boundNames[0];
         if (name === 'arguments') {
@@ -905,8 +910,8 @@ var assembler = (function(exports){
         }
         HAS_BINDING(name);
         var jump = JTRUE(0);
-        CREATE_BINDING(name, false);
-        ACCUM(A, name);
+        BINDING(name, false);
+        POP();
         adjust(jump);
       }
     }
@@ -917,34 +922,49 @@ var assembler = (function(exports){
       }
       HAS_BINDING(name);
       var jump = JTRUE(0);
-      CREATE_BINDING(name, false);
+      BINDING(name, false);
       UNDEFINED();
       VAR(name);
       adjust(jump);
     });
 
     if (!argumentsObjectNotNeeded) {
-      CREATE_BINDING('arguments', code.strict);
+      BINDING('arguments', strict);
     }
 
     each(code.varNames, function(name){
       HAS_BINDING(name);
       var jump = JTRUE(0);
-      CREATE_BINDING(name, false);
+      BINDING(name, false);
+      POP();
       adjust(jump);
     });
 
     each(lexicalDecls(code.body), function(decl){
       each(decl.boundNames, function(name){
-        CREATE_BINDING(name, decl.IsConstantDeclaration);
+        BINDING(name, decl.IsConstantDeclaration);
+        POP();
       });
     });
 
-    each(varDeclarations, function(decl){
-      if (decl.type === 'FunctionDeclaration') {
-
-      }
+    each(funcs, function(decl){
+      FunctionDeclaration(decl);
+      FUNCTION(false, decl.id.name, decl.code);
+      VAR(decl.id.name);
     });
+
+    POP();
+    ARGUMENTS();
+    each(code.params, function(param, i){
+      DUP();
+      INTERNAL_MEMBER(i);
+      destructure(param, VAR);
+    });
+    POP();
+
+    if (!argumentsObjectNotNeeded) {
+      VAR('arguments');
+    }
   }
 
   var getExports = (function(){
@@ -1410,25 +1430,30 @@ var assembler = (function(exports){
       if (item.type === 'Property') {
         MEMBER(symbol(item.key));
         GET();
+      LOG();
         if (isPattern(item.value)) {
           destructure(item.value, STORE);
+        } else if (item.value.type === 'Identifier') {
+          STORE(symbol(item.value));
         } else {
-          STORE(item.key.name);
+          STORE(symbol(item.value));
         }
       } else if (item.type === 'ArrayPattern') {
         LITERAL(i);
         ELEMENT();
         GET();
+      LOG();
         destructure(item, STORE);
       } else if (item.type === 'Identifier') {
         LITERAL(i);
         ELEMENT();
         GET();
-        STORE(item.name);
+        STORE(symbol(item));
       } else if (item.type === 'SpreadElement') {
         GET();
+      LOG();
         SPREAD(i);
-        STORE(item.argument.name);
+        STORE(symbol(item.argument));
       }
     });
   }
@@ -2302,9 +2327,9 @@ var assembler = (function(exports){
         parent && code.derive(parent);
         this.currentScope = code.scope;
 
-        if (code.params) {
-
-        }
+        //if (code.params) {
+        //  FunctionDeclarationInstantiation(code);
+        //}
 
         recurse(code.body);
 
