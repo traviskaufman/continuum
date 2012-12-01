@@ -14,7 +14,7 @@ Currently known to work in:
 * Firefox 15+
 * Opera 12+
 
-Will soon work in:
+Usually works in but sometimes doesn't (the debugger interface doesn't work, but the engine can):
 
 * IE6-7
 
