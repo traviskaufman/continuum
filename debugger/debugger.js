@@ -106,6 +106,10 @@ realm.on('inspect', function(obj){
   inspect(obj).expand();
 });
 
+realm.on('debug', function(sp, stack){
+  console.log(sp, stack.slice());
+})
+
 realm.on('pause', function(){
   var overlay = body.append(block('.overlay')),
       unpause = body.append(createPanel('button', 'Unpause', 'unpause'));
