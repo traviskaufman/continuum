@@ -7652,7 +7652,7 @@ exports.Emitter = (function(module){
     function emit(type, a, b, c, d){
       var handlers = this._events['*'];
       if (handlers) {
-        handles.forEach(function(context, handler){
+        handlers.forEach(function(context, handler){
           handler.call(context, type, a, b, c, d);
         });
       }
@@ -8928,6 +8928,7 @@ exports.assembler = (function(exports){
       ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
+      ARGUMENTS        = new StandardOpCode(0, 'ARGUMENTS'),
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
       BINDING          = new StandardOpCode(2, 'BINDING'),
@@ -8949,8 +8950,10 @@ exports.assembler = (function(exports){
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
+      HAS_BINDING      = new StandardOpCode(1, 'HAS_BINDING'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
+      INTERNAL_MEMBER  = new InternedOpCode(1, 'INTERNAL_MEMBER'),
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
       JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
@@ -9085,7 +9088,7 @@ exports.assembler = (function(exports){
           this.boundNames = [];
         }
         this.Rest = node.rest;
-        this.ExpectedArgumentCount = this.boundNames.length;
+        this.ExpectedArgumentCount = this.length;
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
@@ -9679,13 +9682,15 @@ exports.assembler = (function(exports){
   function FunctionDeclarationInstantiation(code){
     var varDeclarations = VarScopedDeclarations(code.body),
         len = varDeclarations.length,
-        argumentsObjectNotNeeded = false
-
-    RESET(A);
+        argumentsObjectNotNeeded = false,
+        strict = code.strict,
+        funcs = [];
 
     while (len--) {
       var decl = varDeclarations[len];
       if (decl.type === 'FunctionDeclaration') {
+        funcs.push(decl);
+
         decl.boundNames || (decl.boundNames = boundNames(decl));
         var name = decl.boundNames[0];
         if (name === 'arguments') {
@@ -9693,8 +9698,8 @@ exports.assembler = (function(exports){
         }
         HAS_BINDING(name);
         var jump = JTRUE(0);
-        CREATE_BINDING(name, false);
-        ACCUM(A, name);
+        BINDING(name, false);
+        POP();
         adjust(jump);
       }
     }
@@ -9705,34 +9710,49 @@ exports.assembler = (function(exports){
       }
       HAS_BINDING(name);
       var jump = JTRUE(0);
-      CREATE_BINDING(name, false);
+      BINDING(name, false);
       UNDEFINED();
       VAR(name);
       adjust(jump);
     });
 
     if (!argumentsObjectNotNeeded) {
-      CREATE_BINDING('arguments', code.strict);
+      BINDING('arguments', strict);
     }
 
     each(code.varNames, function(name){
       HAS_BINDING(name);
       var jump = JTRUE(0);
-      CREATE_BINDING(name, false);
+      BINDING(name, false);
+      POP();
       adjust(jump);
     });
 
     each(lexicalDecls(code.body), function(decl){
       each(decl.boundNames, function(name){
-        CREATE_BINDING(name, decl.IsConstantDeclaration);
+        BINDING(name, decl.IsConstantDeclaration);
+        POP();
       });
     });
 
-    each(varDeclarations, function(decl){
-      if (decl.type === 'FunctionDeclaration') {
-
-      }
+    each(funcs, function(decl){
+      FunctionDeclaration(decl);
+      FUNCTION(false, decl.id.name, decl.code);
+      VAR(decl.id.name);
     });
+
+    POP();
+    ARGUMENTS();
+    each(code.params, function(param, i){
+      DUP();
+      INTERNAL_MEMBER(i);
+      destructure(param, VAR);
+    });
+    POP();
+
+    if (!argumentsObjectNotNeeded) {
+      VAR('arguments');
+    }
   }
 
   var getExports = (function(){
@@ -10198,25 +10218,30 @@ exports.assembler = (function(exports){
       if (item.type === 'Property') {
         MEMBER(symbol(item.key));
         GET();
+      LOG();
         if (isPattern(item.value)) {
           destructure(item.value, STORE);
+        } else if (item.value.type === 'Identifier') {
+          STORE(symbol(item.value));
         } else {
-          STORE(item.key.name);
+          STORE(symbol(item.value));
         }
       } else if (item.type === 'ArrayPattern') {
         LITERAL(i);
         ELEMENT();
         GET();
+      LOG();
         destructure(item, STORE);
       } else if (item.type === 'Identifier') {
         LITERAL(i);
         ELEMENT();
         GET();
-        STORE(item.name);
+        STORE(symbol(item));
       } else if (item.type === 'SpreadElement') {
         GET();
+      LOG();
         SPREAD(i);
-        STORE(item.argument.name);
+        STORE(symbol(item.argument));
       }
     });
   }
@@ -11090,9 +11115,9 @@ exports.assembler = (function(exports){
         parent && code.derive(parent);
         this.currentScope = code.scope;
 
-        if (code.params) {
-
-        }
+        //if (code.params) {
+        //  FunctionDeclarationInstantiation(code);
+        //}
 
         recurse(code.body);
 
@@ -12032,14 +12057,14 @@ exports.thunk = (function(exports){
 
 
   function Thunk(code, instrumented){
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
-      CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE,
-      DUP, ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, INC, INDEX, ITERATE, JUMP,
-      JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET,
-      LITERAL, LOG, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP,
-      POPN, PROPERTY, PUT, REF, REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD,
-      SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE,
-      THIS, THROW, UNARY, UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
+      CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
+      ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
+      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG,
+      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
+      REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
+      SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
+      UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
 
 
     var thunk = this,
@@ -12125,6 +12150,23 @@ exports.thunk = (function(exports){
     function ARG(){
       var arg = stack[--sp];
       stack[sp - 1].push(arg);
+      return cmds[++ip];
+    }
+
+    function ARGUMENTS(){
+      if (code.strict) {
+        var args = context.args;
+        stack[sp++] = context.createArguments(args);
+        stack[sp++] = args;
+      } else {
+        var params = code.params.boundNames,
+            env = context.LexicalEnvironment,
+            args = context.args,
+            func = context.callee;
+        stack[sp++] = context.createArguments(args, env, params, func);
+        stack[sp++] = args;
+      }
+
       return cmds[++ip];
     }
 
@@ -12351,6 +12393,11 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function HAS_BINDING(){
+      stack[sp++] = context.hasBinding(ops[ip][0]);
+      return cmds[++ip];
+    }
+
     function INC(){
       stack[sp - 1]++;
       return cmds[++ip];
@@ -12364,6 +12411,12 @@ exports.thunk = (function(exports){
       array.DefineOwnProperty(index+'', new Desc(val));
       stack[sp++] = index + 1;
 
+      return cmds[++ip];
+    }
+
+    function INTERNAL_MEMBER(){
+      var item = stack[--sp];
+      stack[sp++] = item[ops[ip][0]];
       return cmds[++ip];
     }
 
@@ -12460,7 +12513,7 @@ exports.thunk = (function(exports){
     }
 
     function LOG(){
-      context.Realm.emit('debug', [sp, stack]);
+      context.Realm.emit('debug', sp, stack);
       return cmds[++ip];
     }
 
@@ -13558,7 +13611,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       var ao = new $StrictArguments(args);
       var status = ArgumentBindingInitialization(formals, ao, env);
     } else {
-      var ao = env.arguments = new $MappedArguments(params, env, args, func);
+      var ao = env.arguments = new $MappedArguments(args, env, params, func);
       var status = ArgumentBindingInitialization(formals, ao);
     }
 
@@ -13804,7 +13857,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ## ObjectBindingInitialization
 
   function ObjectBindingInitialization(pattern, object, env){
-    for (var i=0; property = pattern.properties[i]; i++) {
+    for (var i=0, property; property = pattern.properties[i]; i++) {
       var value = object.HasProperty(property.key.name) ? object.Get(property.key.name) : undefined;
       if (value && value.Completion) {
         if (value.Abrupt) {
@@ -15546,6 +15599,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return serialized;
       },
       function Call(receiver, args, isConstruct){
+
         if (realm !== this.Realm) {
           activate(this.Realm);
         }
@@ -16404,7 +16458,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
   var $MappedArguments = (function(){
-    function $MappedArguments(names, env, args, func){
+    function $MappedArguments(args, env, names, func){
       var mapped = create(null);
       $Arguments.call(this, args.length);
 
@@ -17301,6 +17355,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
+      function hasBinding(name){
+        return this.LexicalEnvironment.HasBinding(name);
+      },
       function popBlock(){
         var block = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
@@ -17338,6 +17395,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         return func;
+      },
+      function createArguments(args, env, params, func){
+        if (env === undefined) {
+          return new $StrictArguments(args);
+        } else {
+          return new $MappedArguments(args, env, params, func);
+        }
       },
       function createArray(len){
         return new $Array(len);
