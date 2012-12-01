@@ -1,6 +1,6 @@
 # Continuum - A JavaScript Virtual Machine Built in JavaScript
 
-Continuum is a JavaScript virtual machine built in JavaScript. It assembles bytecode from sourcecode and executes it an ES6 runtime environment. The code of the VM is written in ES3 level JavaScript, which means it can run in browsers as old as IE6. (though currently it's only been tested in IE9+ and there's probably some kinks to work out in older IE's).
+Continuum is a JavaScript virtual machine built in JavaScript. It assembles bytecode from sourcecode and executes it an ES6 runtime environment. The code of the VM is written in ES3 level JavaScript, which means it can run in browsers as old as IE6. (though currently it's only regularly tested in IE8+ and there's probably some kinks to work out in older IE's).
 
 *ES6 is still an unfinished specification and is still a moving target*
 
