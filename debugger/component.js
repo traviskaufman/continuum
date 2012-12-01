@@ -215,7 +215,6 @@ var Component = (function(){
     function width(value){
       if (value === undefined) {
         return this.element.offsetWidth;
-        //return this.element.getBoundingClientRect().width;
       } else {
         this.styles.width = value + 'px';
       }
@@ -223,7 +222,6 @@ var Component = (function(){
     function height(value){
       if (value === undefined) {
         return this.element.offsetHeight;
-        //return this.element.getBoundingClientRect().height;
       } else {
         this.styles.height = value + 'px';
       }
@@ -709,15 +707,15 @@ var VerticalScrollbar = function(){
       this.percent(this.percent() + percent);
     },
     function resize(){
-      //this.refresh();
+      this.refresh();
     },
     function thumbTop(){
       var el = this.container.element;
-      return el.scrollTop / el.scrollHeight * this.trackHeight() + .5 | 0;
+      return el.scrollTop / el.scrollHeight * this.track.height() + .5 | 0;
     },
     function thumbBottom(){
       var el = this.container.element,
-          height = this.trackHeight();
+          height = this.track.height();
       return height - (el.clientHeight + el.scrollTop) / el.scrollHeight * height + .5 | 0;
     },
     function trackHeight(){
