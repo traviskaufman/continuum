@@ -580,7 +580,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       var ao = new $StrictArguments(args);
       var status = ArgumentBindingInitialization(formals, ao, env);
     } else {
-      var ao = env.arguments = new $MappedArguments(params, env, args, func);
+      var ao = env.arguments = new $MappedArguments(args, env, params, func);
       var status = ArgumentBindingInitialization(formals, ao);
     }
 
@@ -826,7 +826,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ## ObjectBindingInitialization
 
   function ObjectBindingInitialization(pattern, object, env){
-    for (var i=0; property = pattern.properties[i]; i++) {
+    for (var i=0, property; property = pattern.properties[i]; i++) {
       var value = object.HasProperty(property.key.name) ? object.Get(property.key.name) : undefined;
       if (value && value.Completion) {
         if (value.Abrupt) {
@@ -2568,6 +2568,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return serialized;
       },
       function Call(receiver, args, isConstruct){
+
         if (realm !== this.Realm) {
           activate(this.Realm);
         }
@@ -3426,7 +3427,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var $MappedArguments = (function(){
-    function $MappedArguments(names, env, args, func){
+    function $MappedArguments(args, env, names, func){
       var mapped = create(null);
       $Arguments.call(this, args.length);
 
@@ -4323,6 +4324,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
       },
+      function hasBinding(name){
+        return this.LexicalEnvironment.HasBinding(name);
+      },
       function popBlock(){
         var block = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
@@ -4360,6 +4364,13 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         return func;
+      },
+      function createArguments(args, env, params, func){
+        if (env === undefined) {
+          return new $StrictArguments(args);
+        } else {
+          return new $MappedArguments(args, env, params, func);
+        }
       },
       function createArray(len){
         return new $Array(len);
