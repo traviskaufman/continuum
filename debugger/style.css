@@ -105,6 +105,13 @@ h1, h2
       .ƒbottom > .ƒpanel-label
       { top: 8px; }
 
+  .ƒpulldown
+  { position: absolute; width: 400px; height: 200px; right: 50px; background: #803; -webit-transitiion: .3s; }
+  .ƒpulldown.ƒexpanded
+  { top: 0; }
+  .ƒpulldown.ƒcontracted
+  { top: -200px; }
+
 .ƒtree
 { width: 90%; padding: 0 0 0 15px; margin: 0 0 0 10px; list-style: none; position: relative; display: inline-block; }
 

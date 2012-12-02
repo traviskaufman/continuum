@@ -1,14 +1,15 @@
 (function(continuum){
-var Component = continuum.Component,
-    constants = continuum.constants,
-    utility   = continuum.utility,
-    inherit   = utility.inherit,
-    iterate   = utility.iterate,
-    isObject  = utility.isObject,
-    each      = utility.each,
-    inline    = continuum.inline,
-    block     = continuum.block,
-    _         = continuum._;
+var Component   = continuum.Component,
+    constants   = continuum.constants,
+    utility     = continuum.utility,
+    inherit     = utility.inherit,
+    iterate     = utility.iterate,
+    isObject    = utility.isObject,
+    each        = utility.each,
+    inline      = continuum.inline,
+    createPanel = continuum.createPanel,
+    block       = continuum.block,
+    _           = continuum._;
 
 var Editor = (function(commands, Pass){
   var paging = CodeMirror.keyMap.paging = {
@@ -339,10 +340,37 @@ var Inspector = (function(){
   return Inspector;
 })();
 
+
+var Pulldown = (function(){
+  function Pulldown(){
+    Component.call(this, 'div');
+    this.addClass('pulldown');
+    this.append()
+    this.expand();
+  }
+
+  inherit(Pulldown, Component, [
+    Inspector.prototype.expand,
+    Inspector.prototype.contract,
+    Inspector.prototype.toggle,
+    function hide(){
+      this.addClass('contracted');
+      this.removeClass('expanded');
+    },
+    function show(){
+      this.addClass('expanded');
+      this.removeClass('contracted');
+    }
+  ]);
+
+  return Pulldown
+})();
+
 continuum.createPanel.panels.editor = Editor;
 continuum.createPanel.panels.console = Console;
 continuum.createPanel.panels.inspector = Inspector;
 continuum.createPanel.panels.instructions = Instructions;
+continuum.createPanel.panels.pulldown = Pulldown;
 
 
 })(continuum);
