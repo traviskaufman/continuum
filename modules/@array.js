@@ -52,6 +52,29 @@ $__defineMethods(Array, [isArray, from, of]);
 
 {
 $__defineProps(Array.prototype, {
+  concat(...items){
+    var obj = $__ToObject(this),
+        array = [],
+        count = items.length,
+        n = 0,
+        i = 0;
+
+    do {
+      if (obj && typeof obj === 'object' && $__GetBuiltinBrand(obj) === 'Array') {
+        var len = obj.length;
+        for (var j=0; j < len; j++) {
+          if (j in obj) {
+            array[n++] = obj[j];
+          }
+        }
+      } else {
+        array[n++] = obj;
+      }
+      obj = items[i++];
+    } while (i <= count)
+
+    return array;
+  },
   every(callback, context){
     var array = $__ToObject(this),
         len = $__ToUint32(array.length),
