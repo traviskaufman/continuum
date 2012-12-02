@@ -4823,7 +4823,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         EnqueueChangeRecord: EnqueueChangeRecord,
         DeliverChangeRecords: DeliverChangeRecords,
         GetBuiltinBrand: function(object){
-          return object.BuiltinBrand.name;
+          if (object && object.BuiltinBrand) {
+            return object.BuiltinBrand.name;
+          }
         },
         SetBuiltinBrand: function(object, name){
           var brand = BRANDS[name];
@@ -5015,8 +5017,8 @@ var runtime = (function(GLOBAL, exports, undefined){
             return code.source.slice(code.range[0], code.range[1]);
           }
         },
-        NumberToString: function(object, radix){
-          return object.PrimitiveValue.toString(radix);
+        NumberToString: function(number, radix){
+          return number.toString(radix);
         },
         RegExpToString: function(object){
           return ''+object.PrimitiveValue;

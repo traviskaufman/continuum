@@ -59,15 +59,19 @@ $__defineConstants(Number, {
 
 $__defineProps(Number.prototype, {
   toString(radix){
-    if ($__GetBuiltinBrand(this) === 'Number') {
+    if (typeof this === 'number') {
+      var number = this;
+    } else if ($__GetBuiltinBrand(this) === 'Number') {
       var number = $__GetPrimitiveValue(this);
-      radix = $__ToInteger(radix);
-      return $__NumberToString(number, radix);
     } else {
       throw $__Exception('not_generic', ['Number.prototype.toString']);
     }
+    return $__NumberToString(number, $__ToInteger(radix));
   },
   valueOf(){
+    if (typeof this === 'number') {
+      return this;
+    }
     if ($__GetBuiltinBrand(this) === 'Number') {
       return $__GetPrimitiveValue(this);
     } else {
