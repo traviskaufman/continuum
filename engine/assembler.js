@@ -1999,6 +1999,7 @@ var assembler = (function(exports){
 
       lexical(function(){
         BLOCK(lexicalDecls(node.cases));
+        var defaultFound;
 
         if (node.cases){
           var cases = [];
@@ -2008,7 +2009,7 @@ var assembler = (function(exports){
               GET();
               cases.push(CASE(0));
             } else {
-              var defaultFound = i;
+              defaultFound = i;
               cases.push(0);
             }
           });
@@ -2060,7 +2061,11 @@ var assembler = (function(exports){
   function TemplateElement(node){}
 
   function TemplateLiteral(node, tagged){
-    each(node.quasis, function(element, i){
+    if (node.quasis) {
+      node.templates = node.quasis;
+      delete node.quasis;
+    }
+    each(node.templates, function(element, i){
       STRING(element.value.raw);
       if (!element.tail) {
         recurse(node.expressions[i]);
@@ -2073,9 +2078,14 @@ var assembler = (function(exports){
     });
   }
 
+
   function TaggedTemplateExpression(node){
     var template = [];
-    each(node.quasi.quasis, function(element){
+    if (node.quasi) {
+      node.template = node.quasi;
+      delete node.quasi;
+    }
+    each(node.template.templates, function(element){
       template.push(element.value);
     });
 
@@ -2086,7 +2096,7 @@ var assembler = (function(exports){
     TEMPLATE(template);
     GET();
     ARG();
-    each(node.quasi.expressions, function(node){
+    each(node.template.expressions, function(node){
       recurse(node);
       GET();
       ARG();
