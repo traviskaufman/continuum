@@ -1683,6 +1683,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+
   var ObjectEnvironmentRecord = (function(){
     function ObjectEnvironmentRecord(object, outer){
       this.bindings = object;
@@ -1733,7 +1734,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return ObjectEnvironmentRecord;
   })();
-
 
 
   var FunctionEnvironmentRecord = (function(){
@@ -1792,7 +1792,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return FunctionEnvironmentRecord;
   })();
-
 
 
   var GlobalEnvironmentRecord = (function(){
@@ -2785,7 +2784,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return $GeneratorFunction;
   })();
-
 
   var $Generator = (function(){
     var EXECUTING = 'executing',
@@ -4192,14 +4190,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $DataView = (function(){
-    function $DataView(buffer){
-      $Object.call(this, intrinsics.DataViewProto);
-      this.view = new DataView(buffer.NativeBuffer);
-    }
-  })();
-
-
   var $NativeFunction = (function(){
     function $NativeFunction(options){
       if (typeof options === 'function') {
@@ -4259,7 +4249,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return $NativeFunction;
   })();
-
 
 
   var ExecutionContext = (function(){
@@ -4480,21 +4469,35 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
 
     exports.builtins = {
-      $Array   : $Array,
-      $Boolean : $Boolean,
-      $Date    : $Date,
-      $Error   : $Error,
-      $Function: $Function,
-      $Map     : $Map,
-      $Number  : $Number,
-      $Object  : $Object,
-      $Proxy   : $Proxy,
-      $RegExp  : $RegExp,
-      $Set     : $Set,
-      $Symbol  : $Symbol,
-      $String  : $String,
-      $WeakMap : $WeakMap
+      $Array                : $Array,
+      $Boolean              : $Boolean,
+      $BoundFunction        : $BoundFunction,
+      $Date                 : $Date,
+      $Error                : $Error,
+      $Function             : $Function,
+      $Generator            : $Generator,
+      $GeneratorFunction    : $GeneratorFunction,
+      $Map                  : $Map,
+      $Module               : $Module,
+      $NativeFunction       : $NativeFunction,
+      $Number               : $Number,
+      $Object               : $Object,
+      $Proxy                : $Proxy,
+      $RegExp               : $RegExp,
+      $Set                  : $Set,
+      $Symbol               : $Symbol,
+      $String               : $String,
+      $TypedArray           : $TypedArray,
+      $WeakMap              : $WeakMap,
+      MapData               : MapData,
+      WeakMapData           : WeakMapData,
+      DeclarativeEnvironment: DeclarativeEnvironmentRecord,
+      ObjectEnvironment     : ObjectEnvironmentRecord,
+      FunctionEnvironment   : FunctionEnvironmentRecord,
+      GlobalEnvironment     : GlobalEnvironmentRecord,
+      ExecutionContext      : ExecutionContext
     };
+
 
     var primitives = {
       Date   : Date.prototype,
