@@ -1,18 +1,10 @@
 {
- "AnonXMLHttpRequest": {
-  "type": "interface",
-  "inherits": [
-   "XMLHttpRequest"
-  ],
-  "construct": {}
- },
  "ApplicationCache": {
   "type": "interface",
   "inherits": [
    "EventTarget"
   ],
   "constants": {
-   "UNCACHED": 0,
    "IDLE": 1,
    "CHECKING": 2,
    "DOWNLOADING": 3,
@@ -73,7 +65,7 @@
    "onremovetrack": "EventHandler"
   },
   "indexed": {
-   "itemType": "AudioTrack",
+   "itemType": [],
    "readonly": true
   }
  },
@@ -129,13 +121,59 @@
    }
   }
  },
+ "CanvasProxy": {
+  "type": "interface",
+  "inherits": [],
+  "methods": {
+   "setContext": {
+    "args": {
+     "context": [
+      "CanvasRenderingContext2D",
+      "WebGLRenderingContext"
+     ]
+    }
+   }
+  }
+ },
  "CanvasRenderingContext2D": {
   "type": "interface",
   "inherits": [],
   "readonly": {
    "canvas": "HTMLCanvasElement"
   },
+  "properties": {
+   "width": "Uint32",
+   "height": "Uint32",
+   "currentTransform": "SVGMatrix",
+   "globalAlpha": "Float64",
+   "globalCompositeOperation": "String",
+   "imageSmoothingEnabled": "Boolean",
+   "strokeStyle": [
+    "String",
+    "CanvasGradient",
+    "CanvasPattern"
+   ],
+   "fillStyle": [
+    "String",
+    "CanvasGradient",
+    "CanvasPattern"
+   ],
+   "shadowOffsetX": "Float64",
+   "shadowOffsetY": "Float64",
+   "shadowBlur": "Float64",
+   "shadowColor": "String",
+   "lineWidth": "Float64",
+   "lineCap": "String",
+   "lineJoin": "String",
+   "miterLimit": "Float64",
+   "lineDashOffset": "Float64",
+   "font": "String",
+   "textAlign": "String",
+   "textBaseline": "String",
+   "direction": "String"
+  },
   "methods": {
+   "commit": {},
    "save": {},
    "restore": {},
    "scale": {
@@ -201,8 +239,10 @@
     "args": {
      "image": [
       "HTMLImageElement",
+      "HTMLVideoElement",
       "HTMLCanvasElement",
-      "HTMLVideoElement"
+      "CanvasRenderingContext2D",
+      "ImageBitmap"
      ],
      "repetition": "String"
     }
@@ -300,8 +340,10 @@
     "args": {
      "image": [
       "HTMLImageElement",
+      "HTMLVideoElement",
       "HTMLCanvasElement",
-      "HTMLVideoElement"
+      "CanvasRenderingContext2D",
+      "ImageBitmap"
      ],
      "dx": "Float64",
      "dy": "Float64",
@@ -360,7 +402,11 @@
     "args": {
      "imagedata": "ImageData",
      "dx": "Float64",
-     "dy": "Float64"
+     "dy": "Float64",
+     "dirtyX": "Float64",
+     "dirtyY": "Float64",
+     "dirtyWidth": "Float64",
+     "dirtyHeight": "Float64"
     }
    },
    "putImageDataHD": {
@@ -456,33 +502,11 @@
     }
    }
   },
-  "properties": {
-   "currentTransform": "SVGMatrix",
-   "globalAlpha": "Float64",
-   "globalCompositeOperation": "String",
-   "imageSmoothingEnabled": "Boolean",
-   "strokeStyle": [
-    "String",
-    "CanvasGradient",
-    "CanvasPattern"
-   ],
-   "fillStyle": [
-    "String",
-    "CanvasGradient",
-    "CanvasPattern"
-   ],
-   "shadowOffsetX": "Float64",
-   "shadowOffsetY": "Float64",
-   "shadowBlur": "Float64",
-   "shadowColor": "String",
-   "lineWidth": "Float64",
-   "lineCap": "String",
-   "lineJoin": "String",
-   "miterLimit": "Float64",
-   "lineDashOffset": "Float64",
-   "font": "String",
-   "textAlign": "String",
-   "textBaseline": "String"
+  "construct": {
+   "args": {
+    "width": "Uint32",
+    "height": "Uint32"
+   }
   }
  },
  "CloseEvent": {
@@ -507,30 +531,22 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "wasClean": false,
-   "code": 0,
-   "reason": ""
-  }
+  "defaults": {}
  },
  "DOMElementMap": {
   "type": "interface",
   "inherits": [],
   "keyed": {
-   "itemType": "Element",
-   "writable": true,
-   "deletable": true,
-   "creatable": true
+   "itemType": [],
+   "readonly": true
   }
  },
  "DOMStringMap": {
   "type": "interface",
   "inherits": [],
   "keyed": {
-   "itemType": "String",
-   "writable": true,
-   "deletable": true,
-   "creatable": true
+   "itemType": [],
+   "readonly": true
   }
  },
  "DataTransfer": {
@@ -610,8 +626,8 @@
    }
   },
   "indexed": {
-   "itemType": "DataTransferItem",
-   "deletable": true
+   "itemType": [],
+   "readonly": true
   }
  },
  "DedicatedWorkerGlobalScope": {
@@ -629,6 +645,25 @@
   },
   "properties": {
    "onmessage": "EventHandlerNonNull"
+  }
+ },
+ "Document": {
+  "type": "interface",
+  "inherits": [],
+  "properties": {
+   "fgColor": "String",
+   "linkColor": "String",
+   "vlinkColor": "String",
+   "alinkColor": "String",
+   "bgColor": "String"
+  },
+  "readonly": {
+   "anchors": "HTMLCollection",
+   "applets": "HTMLCollection",
+   "all": "HTMLAllCollection"
+  },
+  "methods": {
+   "clear": {}
   }
  },
  "DragEvent": {
@@ -651,9 +686,7 @@
   "inherits": [
    "MouseEventInit"
   ],
-  "defaults": {
-   "dataTransfer": ""
-  }
+  "defaults": {}
  },
  "DrawingStyle": {
   "type": "interface",
@@ -671,7 +704,8 @@
    "lineDashOffset": "Float64",
    "font": "String",
    "textAlign": "String",
-   "textBaseline": "String"
+   "textBaseline": "String",
+   "direction": "String"
   },
   "methods": {
    "setLineDash": {
@@ -692,7 +726,8 @@
   "readonly": {
    "message": "String",
    "filename": "String",
-   "lineno": "Uint32"
+   "lineno": "Uint32",
+   "column": "Uint32"
   },
   "construct": {
    "args": {
@@ -706,16 +741,17 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "message": "",
-   "filename": "",
-   "lineno": 0
-  }
+  "defaults": {}
  },
  "EventHandlerNonNull": {
   "type": "callback",
   "returns": "Any",
-  "TreatNonCallableAsNull": true
+  "args": {
+   "event": "Event"
+  },
+  "TreatNonCallableAsNull": {
+   "arguments": null
+  }
  },
  "EventSource": {
   "type": "interface",
@@ -728,7 +764,6 @@
    "readyState": "Uint16"
   },
   "constants": {
-   "CONNECTING": 0,
    "OPEN": 1,
    "CLOSED": 2
   },
@@ -750,9 +785,7 @@
  "EventSourceInit": {
   "type": "dictionary",
   "inherits": [],
-  "defaults": {
-   "withCredentials": false
-  }
+  "defaults": {}
  },
  "External": {
   "type": "interface",
@@ -771,27 +804,6 @@
    }
   }
  },
- "FormData": {
-  "type": "interface",
-  "inherits": [],
-  "methods": {
-   "append": {
-    "args": {
-     "name": "String",
-     "value": [
-      "Blob",
-      "String"
-     ],
-     "filename": "String"
-    }
-   }
-  },
-  "construct": {
-   "args": {
-    "form": "HTMLFormElement"
-   }
-  }
- },
  "FunctionStringCallback": {
   "type": "interface",
   "inherits": [],
@@ -802,8 +814,12 @@
     }
    }
   },
-  "Callback": true,
-  "NoInterfaceObject": true
+  "Callback": {
+   "arguments": null
+  },
+  "NoInterfaceObject": {
+   "arguments": null
+  }
  },
  "HTMLAllCollection": {
   "type": "interface",
@@ -811,6 +827,12 @@
    "HTMLCollection"
   ],
   "methods": {
+   "item": {
+    "returns": "Object",
+    "args": {
+     "name": "String"
+    }
+   },
    "namedItem": {
     "returns": "Object",
     "args": {
@@ -828,34 +850,13 @@
  "HTMLAnchorElement": {
   "type": "interface",
   "tag": "a",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "href": "String",
-   "target": "String",
-   "download": "String",
-   "ping": "String",
-   "rel": "String",
-   "media": "String",
-   "hreflang": "String",
-   "type": "String",
-   "text": "String",
-   "protocol": "String",
-   "host": "String",
-   "hostname": "String",
-   "port": "String",
-   "pathname": "String",
-   "search": "String",
-   "hash": "String",
    "coords": "String",
    "charset": "String",
    "name": "String",
    "rev": "String",
    "shape": "String"
-  },
-  "readonly": {
-   "relList": "DOMTokenList"
   }
  },
  "HTMLAppletElement": {
@@ -880,32 +881,9 @@
  "HTMLAreaElement": {
   "type": "interface",
   "tag": "area",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "alt": "String",
-   "coords": "String",
-   "shape": "String",
-   "href": "String",
-   "target": "String",
-   "download": "String",
-   "ping": "String",
-   "rel": "String",
-   "media": "String",
-   "hreflang": "String",
-   "type": "String",
-   "protocol": "String",
-   "host": "String",
-   "hostname": "String",
-   "port": "String",
-   "pathname": "String",
-   "search": "String",
-   "hash": "String",
    "noHref": "Boolean"
-  },
-  "readonly": {
-   "relList": "DOMTokenList"
   }
  },
  "HTMLAudioElement": {
@@ -915,7 +893,6 @@
    "HTMLMediaElement"
   ],
   "construct": {
-   "name": "Audio",
    "args": {
     "src": "String"
    }
@@ -924,9 +901,7 @@
  "HTMLBRElement": {
   "type": "interface",
   "tag": "br",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "clear": "String"
   }
@@ -956,28 +931,8 @@
  "HTMLBodyElement": {
   "type": "interface",
   "tag": "body",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "onafterprint": "EventHandler",
-   "onbeforeprint": "EventHandler",
-   "onbeforeunload": "EventHandler",
-   "onblur": "EventHandler",
-   "onerror": "OnErrorEventHandler",
-   "onfocus": "EventHandler",
-   "onhashchange": "EventHandler",
-   "onload": "EventHandler",
-   "onmessage": "EventHandler",
-   "onoffline": "EventHandler",
-   "ononline": "EventHandler",
-   "onpopstate": "EventHandler",
-   "onpagehide": "EventHandler",
-   "onpageshow": "EventHandler",
-   "onresize": "EventHandler",
-   "onscroll": "EventHandler",
-   "onstorage": "EventHandler",
-   "onunload": "EventHandler",
    "text": "String",
    "link": "String",
    "vLink": "String",
@@ -1033,39 +988,60 @@
    "height": "Uint32"
   },
   "methods": {
+   "getContext": {
+    "returns": [
+     "CanvasRenderingContext2D",
+     "WebGLRenderingContext"
+    ],
+    "args": {
+     "contextId": "String",
+     "arguments": "Any"
+    }
+   },
+   "supportsContext": {
+    "returns": "Boolean",
+    "args": {
+     "contextId": "String",
+     "arguments": "Any"
+    }
+   },
+   "setContext": {
+    "args": {
+     "context": [
+      "CanvasRenderingContext2D",
+      "WebGLRenderingContext"
+     ]
+    }
+   },
+   "transferControlToProxy": {
+    "returns": "CanvasProxy"
+   },
    "toDataURL": {
     "returns": "String",
     "args": {
      "type": "String",
-     "args": "Any"
+     "arguments": "Any"
     }
    },
    "toDataURLHD": {
     "returns": "String",
     "args": {
      "type": "String",
-     "args": "Any"
+     "arguments": "Any"
     }
    },
    "toBlob": {
     "args": {
      "_callback": "FileCallback",
      "type": "String",
-     "args": "Any"
+     "arguments": "Any"
     }
    },
    "toBlobHD": {
     "args": {
      "_callback": "FileCallback",
      "type": "String",
-     "args": "Any"
-    }
-   },
-   "getContext": {
-    "returns": "Object",
-    "args": {
-     "contextId": "String",
-     "args": "Any"
+     "arguments": "Any"
     }
    }
   }
@@ -1088,22 +1064,10 @@
    "command": "HTMLElement"
   }
  },
- "HTMLContentElement": {
-  "type": "interface",
-  "inherits": [
-   "HTMLElement"
-  ],
-  "properties": {
-   "select": "String",
-   "resetStyleInheritance": "Boolean"
-  }
- },
  "HTMLDListElement": {
   "type": "interface",
   "tag": "dl",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "compact": "Boolean"
   }
@@ -1181,9 +1145,7 @@
  "HTMLDivElement": {
   "type": "interface",
   "tag": "div",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "align": "String"
   }
@@ -1284,27 +1246,17 @@
   "methods": {
    "click": {},
    "focus": {},
-   "blur": {}
+   "blur": {},
+   "forceSpellCheck": {}
   }
  },
  "HTMLEmbedElement": {
   "type": "interface",
   "tag": "embed",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "src": "String",
-   "type": "String",
-   "width": "String",
-   "height": "String",
    "align": "String",
    "name": "String"
-  },
-  "legacyCaller": {
-   "args": {
-    "args": "Any"
-   }
   }
  },
  "HTMLFieldSetElement": {
@@ -1390,10 +1342,12 @@
    }
   },
   "keyed": {
-   "itemType": "Object",
+   "itemType": [],
    "readonly": true
   },
-  "OverrideBuiltins": true
+  "OverrideBuiltins": {
+   "arguments": null
+  }
  },
  "HTMLFrameElement": {
   "type": "interface",
@@ -1446,9 +1400,7 @@
  "HTMLHRElement": {
   "type": "interface",
   "tag": "hr",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "align": "String",
    "color": "String",
@@ -1467,9 +1419,7 @@
  "HTMLHeadingElement": {
   "type": "interface",
   "tag": "h6",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "align": "String"
   }
@@ -1477,9 +1427,7 @@
  "HTMLHtmlElement": {
   "type": "interface",
   "tag": "html",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "version": "String"
   }
@@ -1487,155 +1435,36 @@
  "HTMLIFrameElement": {
   "type": "interface",
   "tag": "iframe",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "src": "String",
-   "srcdoc": "String",
-   "name": "String",
-   "seamless": "Boolean",
-   "width": "String",
-   "height": "String",
    "align": "String",
    "scrolling": "String",
    "frameBorder": "String",
    "longDesc": "String",
    "marginHeight": "String",
    "marginWidth": "String"
-  },
-  "readonly": {
-   "sandbox": "DOMSettableTokenList",
-   "contentDocument": "Document",
-   "contentWindow": "Window"
   }
  },
  "HTMLImageElement": {
   "type": "interface",
   "tag": "img",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "alt": "String",
-   "src": "String",
-   "srcset": "String",
-   "crossOrigin": "String",
-   "useMap": "String",
-   "isMap": "Boolean",
-   "width": "Uint32",
-   "height": "Uint32",
    "name": "String",
    "align": "String",
    "hspace": "Uint32",
    "vspace": "Uint32",
    "longDesc": "String",
    "border": "String"
-  },
-  "readonly": {
-   "naturalWidth": "Uint32",
-   "naturalHeight": "Uint32",
-   "complete": "Boolean"
-  },
-  "construct": {
-   "name": "Image",
-   "args": {
-    "width": "Uint32",
-    "height": "Uint32"
-   }
   }
  },
  "HTMLInputElement": {
   "type": "interface",
   "tag": "input",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "accept": "String",
-   "alt": "String",
-   "autocomplete": "String",
-   "autofocus": "Boolean",
-   "defaultChecked": "Boolean",
-   "checked": "Boolean",
-   "dirName": "String",
-   "disabled": "Boolean",
-   "formAction": "String",
-   "formEnctype": "String",
-   "formMethod": "String",
-   "formNoValidate": "Boolean",
-   "formTarget": "String",
-   "height": "Uint32",
-   "indeterminate": "Boolean",
-   "inputMode": "String",
-   "max": "String",
-   "maxLength": "Int32",
-   "min": "String",
-   "multiple": "Boolean",
-   "name": "String",
-   "pattern": "String",
-   "placeholder": "String",
-   "readOnly": "Boolean",
-   "required": "Boolean",
-   "size": "Uint32",
-   "src": "String",
-   "step": "String",
-   "type": "String",
-   "defaultValue": "String",
-   "value": "String",
-   "valueAsDate": "Date",
-   "valueAsNumber": "Float64",
-   "width": "Uint32",
-   "selectionStart": "Uint32",
-   "selectionEnd": "Uint32",
-   "selectionDirection": "String",
    "align": "String",
    "useMap": "String"
-  },
-  "readonly": {
-   "form": "HTMLFormElement",
-   "files": "FileList",
-   "list": "HTMLElement",
-   "willValidate": "Boolean",
-   "validity": "ValidityState",
-   "validationMessage": "String",
-   "labels": "NodeList"
-  },
-  "methods": {
-   "stepUp": {
-    "args": {
-     "n": "Int32"
-    }
-   },
-   "stepDown": {
-    "args": {
-     "n": "Int32"
-    }
-   },
-   "checkValidity": {
-    "returns": "Boolean"
-   },
-   "setCustomValidity": {
-    "args": {
-     "error": "String"
-    }
-   },
-   "select": {},
-   "setRangeText": {
-    "args": {
-     "replacement": "String",
-     "start": "Uint32",
-     "end": "Uint32",
-     "selectionMode": "SelectionMode"
-    }
-   },
-   "setSelectionRange": {
-    "args": {
-     "start": "Uint32",
-     "end": "Uint32",
-     "direction": "String"
-    }
-   }
   }
  },
  "HTMLKeygenElement": {
@@ -1673,11 +1502,8 @@
  "HTMLLIElement": {
   "type": "interface",
   "tag": "li",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "value": "Int32",
    "type": "String"
   }
  },
@@ -1698,12 +1524,7 @@
  "HTMLLegendElement": {
   "type": "interface",
   "tag": "legend",
-  "inherits": [
-   "HTMLElement"
-  ],
-  "readonly": {
-   "form": "HTMLFormElement"
-  },
+  "inherits": [],
   "properties": {
    "align": "String"
   }
@@ -1711,24 +1532,11 @@
  "HTMLLinkElement": {
   "type": "interface",
   "tag": "link",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "disabled": "Boolean",
-   "href": "String",
-   "rel": "String",
-   "media": "String",
-   "hreflang": "String",
-   "type": "String",
    "charset": "String",
    "rev": "String",
    "target": "String"
-  },
-  "readonly": {
-   "relList": "DOMTokenList",
-   "sizes": "DOMSettableTokenList",
-   "sheet": "StyleSheet"
   }
  },
  "HTMLMapElement": {
@@ -1810,11 +1618,9 @@
    "defaultMuted": "Boolean"
   },
   "constants": {
-   "NETWORK_EMPTY": 0,
    "NETWORK_IDLE": 1,
    "NETWORK_LOADING": 2,
    "NETWORK_NO_SOURCE": 3,
-   "HAVE_NOTHING": 0,
    "HAVE_METADATA": 1,
    "HAVE_CURRENT_DATA": 2,
    "HAVE_FUTURE_DATA": 3,
@@ -1826,6 +1632,11 @@
     "returns": "String",
     "args": {
      "type": "String"
+    }
+   },
+   "fastSeek": {
+    "args": {
+     "time": "Float64"
     }
    },
    "play": {},
@@ -1843,25 +1654,16 @@
  "HTMLMenuElement": {
   "type": "interface",
   "tag": "menu",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "type": "String",
-   "label": "String",
    "compact": "Boolean"
   }
  },
  "HTMLMetaElement": {
   "type": "interface",
   "tag": "meta",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "name": "String",
-   "httpEquiv": "String",
-   "content": "String",
    "scheme": "String"
   }
  },
@@ -1897,30 +1699,16 @@
  "HTMLOListElement": {
   "type": "interface",
   "tag": "ol",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "reversed": "Boolean",
-   "start": "Int32",
-   "type": "String",
    "compact": "Boolean"
   }
  },
  "HTMLObjectElement": {
   "type": "interface",
   "tag": "object",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "data": "String",
-   "type": "String",
-   "typeMustMatch": "Boolean",
-   "name": "String",
-   "useMap": "String",
-   "width": "String",
-   "height": "String",
    "align": "String",
    "archive": "String",
    "code": "String",
@@ -1931,29 +1719,6 @@
    "codeBase": "String",
    "codeType": "String",
    "border": "String"
-  },
-  "readonly": {
-   "form": "HTMLFormElement",
-   "contentDocument": "Document",
-   "contentWindow": "Window",
-   "willValidate": "Boolean",
-   "validity": "ValidityState",
-   "validationMessage": "String"
-  },
-  "methods": {
-   "checkValidity": {
-    "returns": "Boolean"
-   },
-   "setCustomValidity": {
-    "args": {
-     "error": "String"
-    }
-   }
-  },
-  "legacyCaller": {
-   "args": {
-    "args": "Any"
-   }
   }
  },
  "HTMLOptGroupElement": {
@@ -1986,7 +1751,6 @@
    "index": "Int32"
   },
   "construct": {
-   "name": "Option",
    "args": {
     "text": "String",
     "value": "String",
@@ -2030,8 +1794,8 @@
    }
   },
   "indexed": {
-   "itemType": "HTMLOptionElement",
-   "writable": true
+   "itemType": [],
+   "readonly": true
   }
  },
  "HTMLOutputElement": {
@@ -2068,9 +1832,7 @@
  "HTMLParagraphElement": {
   "type": "interface",
   "tag": "p",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "align": "String"
   }
@@ -2078,12 +1840,8 @@
  "HTMLParamElement": {
   "type": "interface",
   "tag": "param",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "name": "String",
-   "value": "String",
    "type": "String",
    "valueType": "String"
   }
@@ -2091,9 +1849,7 @@
  "HTMLPreElement": {
   "type": "interface",
   "tag": "pre",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "width": "Int32"
   }
@@ -2143,16 +1899,8 @@
  "HTMLScriptElement": {
   "type": "interface",
   "tag": "script",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "src": "String",
-   "async": "Boolean",
-   "defer": "Boolean",
-   "type": "String",
-   "charset": "String",
-   "text": "String",
    "event": "String",
    "htmlFor": "String"
   }
@@ -2224,8 +1972,8 @@
    }
   },
   "indexed": {
-   "itemType": "HTMLOptionElement",
-   "writable": true
+   "itemType": [],
+   "readonly": true
   }
  },
  "HTMLSourceElement": {
@@ -2258,29 +2006,20 @@
    "media": "String",
    "type": "String",
    "scoped": "Boolean"
-  },
-  "readonly": {
-   "sheet": "StyleSheet"
   }
  },
  "HTMLTableCaptionElement": {
   "type": "interface",
   "tag": "caption",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "align": "String"
   }
  },
  "HTMLTableCellElement": {
   "type": "interface",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "colSpan": "Uint32",
-   "rowSpan": "Uint32",
    "abbr": "String",
    "align": "String",
    "axis": "String",
@@ -2291,20 +2030,13 @@
    "noWrap": "Boolean",
    "vAlign": "String",
    "bgColor": "String"
-  },
-  "readonly": {
-   "headers": "DOMSettableTokenList",
-   "cellIndex": "Int32"
   }
  },
  "HTMLTableColElement": {
   "type": "interface",
   "tag": "colgroup",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "span": "Uint32",
    "align": "String",
    "ch": "String",
    "chOff": "String",
@@ -2322,13 +2054,8 @@
  "HTMLTableElement": {
   "type": "interface",
   "tag": "table",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
-   "caption": "HTMLTableCaptionElement",
-   "tHead": "HTMLTableSectionElement",
-   "tFoot": "HTMLTableSectionElement",
    "align": "String",
    "border": "String",
    "frame": "String",
@@ -2338,38 +2065,6 @@
    "bgColor": "String",
    "cellPadding": "String",
    "cellSpacing": "String"
-  },
-  "methods": {
-   "createCaption": {
-    "returns": "HTMLElement"
-   },
-   "deleteCaption": {},
-   "createTHead": {
-    "returns": "HTMLElement"
-   },
-   "deleteTHead": {},
-   "createTFoot": {
-    "returns": "HTMLElement"
-   },
-   "deleteTFoot": {},
-   "createTBody": {
-    "returns": "HTMLElement"
-   },
-   "insertRow": {
-    "returns": "HTMLElement",
-    "args": {
-     "index": "Int32"
-    }
-   },
-   "deleteRow": {
-    "args": {
-     "index": "Int32"
-    }
-   }
-  },
-  "readonly": {
-   "tBodies": "HTMLCollection",
-   "rows": "HTMLCollection"
   }
  },
  "HTMLTableHeaderCellElement": {
@@ -2379,33 +2074,14 @@
    "HTMLTableCellElement"
   ],
   "properties": {
-   "scope": "String"
+   "scope": "String",
+   "abbr": "String"
   }
  },
  "HTMLTableRowElement": {
   "type": "interface",
   "tag": "tr",
-  "inherits": [
-   "HTMLElement"
-  ],
-  "readonly": {
-   "rowIndex": "Int32",
-   "sectionRowIndex": "Int32",
-   "cells": "HTMLCollection"
-  },
-  "methods": {
-   "insertCell": {
-    "returns": "HTMLElement",
-    "args": {
-     "index": "Int32"
-    }
-   },
-   "deleteCell": {
-    "args": {
-     "index": "Int32"
-    }
-   }
-  },
+  "inherits": [],
   "properties": {
    "align": "String",
    "ch": "String",
@@ -2417,25 +2093,7 @@
  "HTMLTableSectionElement": {
   "type": "interface",
   "tag": "thead",
-  "inherits": [
-   "HTMLElement"
-  ],
-  "readonly": {
-   "rows": "HTMLCollection"
-  },
-  "methods": {
-   "insertRow": {
-    "returns": "HTMLElement",
-    "args": {
-     "index": "Int32"
-    }
-   },
-   "deleteRow": {
-    "args": {
-     "index": "Int32"
-    }
-   }
-  },
+  "inherits": [],
   "properties": {
    "align": "String",
    "ch": "String",
@@ -2539,7 +2197,6 @@
    "default": "Boolean"
   },
   "constants": {
-   "NONE": 0,
    "LOADING": 1,
    "LOADED": 2,
    "ERROR": 3
@@ -2552,9 +2209,7 @@
  "HTMLUListElement": {
   "type": "interface",
   "tag": "ul",
-  "inherits": [
-   "HTMLElement"
-  ],
+  "inherits": [],
   "properties": {
    "compact": "Boolean",
    "type": "String"
@@ -2603,12 +2258,9 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "oldURL": "",
-   "newURL": ""
-  }
+  "defaults": {}
  },
- "HistorySection": {
+ "History": {
   "type": "interface",
   "inherits": [],
   "readonly": {
@@ -2642,14 +2294,16 @@
  "HitRegionOptions": {
   "type": "dictionary",
   "inherits": [],
-  "defaults": {
-   "path": "",
-   "id": "",
-   "parentID": "",
-   "cursor": "inherit",
-   "control": "",
-   "label": "",
-   "role": ""
+  "defaults": {}
+ },
+ "ImageBitmap": {
+  "type": "interface",
+  "inherits": []
+ },
+ "ImageBitmapCallback": {
+  "type": "callback",
+  "args": {
+   "image": "ImageBitmap"
   }
  },
  "ImageData": {
@@ -2686,19 +2340,16 @@
     }
    },
    "reload": {}
+  },
+  "Unforgeable": {
+   "arguments": null
   }
  },
- "MediaControllerPlaybackState": {
-  "type": "enum",
-  "values": [
-   "waiting",
-   "playing",
-   "ended"
-  ]
- },
- "MediaControllerSection": {
+ "MediaController": {
   "type": "interface",
-  "inherits": [],
+  "inherits": [
+   "EventTarget"
+  ],
   "readonly": {
    "readyState": "Uint16",
    "buffered": "TimeRanges",
@@ -2730,10 +2381,19 @@
    "onvolumechange": "EventHandler"
   },
   "methods": {
-   "play": {},
-   "pause": {}
+   "pause": {},
+   "unpause": {},
+   "play": {}
   },
   "construct": {}
+ },
+ "MediaControllerPlaybackState": {
+  "type": "enum",
+  "values": [
+   "waiting",
+   "playing",
+   "ended"
+  ]
  },
  "MediaError": {
   "type": "interface",
@@ -2784,13 +2444,7 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "data": "",
-   "origin": "",
-   "lastEventId": "",
-   "source": "",
-   "ports": ""
-  }
+  "defaults": {}
  },
  "MessagePort": {
   "type": "interface",
@@ -2810,6 +2464,18 @@
   "properties": {
    "onmessage": "EventHandlerNonNull"
   }
+ },
+ "MouseEvent": {
+  "type": "interface",
+  "inherits": [],
+  "readonly": {
+   "region": "String"
+  }
+ },
+ "MouseEventInit": {
+  "type": "dictionary",
+  "inherits": [],
+  "defaults": {}
  },
  "Navigator": {
   "type": "interface",
@@ -2868,7 +2534,18 @@
  "OnErrorEventHandlerNonNull": {
   "type": "callback",
   "returns": "Any",
-  "TreatNonCallableAsNull": true
+  "args": {
+   "event": [
+    "Event",
+    "String"
+   ],
+   "source": "String",
+   "lineno": "Uint32",
+   "column": "Uint32"
+  },
+  "TreatNonCallableAsNull": {
+   "arguments": null
+  }
  },
  "PageTransitionEvent": {
   "type": "interface",
@@ -2890,9 +2567,7 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "persisted": false
-  }
+  "defaults": {}
  },
  "Path": {
   "type": "interface",
@@ -3033,36 +2708,35 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "state": ""
-  }
+  "defaults": {}
  },
- "ProgressEvent": {
+ "PortCollection": {
   "type": "interface",
-  "inherits": [
-   "Event"
-  ],
-  "readonly": {
-   "lengthComputable": "Boolean",
-   "loaded": "Uint64",
-   "total": "Uint64"
-  },
-  "construct": {
-   "args": {
-    "type": "String",
-    "eventInitDict": "ProgressEventInit"
+  "inherits": [],
+  "methods": {
+   "add": {
+    "args": {
+     "port": "MessagePort"
+    }
+   },
+   "remove": {
+    "args": {
+     "port": "MessagePort"
+    }
+   },
+   "clear": {},
+   "iterate": {
+    "args": {
+     "callback": "PortCollectionCallback"
+    }
    }
-  }
+  },
+  "construct": {}
  },
- "ProgressEventInit": {
-  "type": "dictionary",
-  "inherits": [
-   "EventInit"
-  ],
-  "defaults": {
-   "lengthComputable": false,
-   "loaded": "",
-   "total": ""
+ "PortCollectionCallback": {
+  "type": "callback",
+  "args": {
+   "port": "MessagePort"
   }
  },
  "PropertyNodeList": {
@@ -3085,6 +2759,13 @@
    "value": "String"
   }
  },
+ "Screen": {
+  "type": "interface",
+  "inherits": [],
+  "readonly": {
+   "canvasResolution": "Float64"
+  }
+ },
  "SelectionMode": {
   "type": "enum",
   "values": [
@@ -3093,68 +2774,6 @@
    "end",
    "preserve"
   ]
- },
- "ShadowRoot": {
-  "type": "interface",
-  "inherits": [
-   "DocumentFragment"
-  ],
-  "methods": {
-   "getElementById": {
-    "returns": "HTMLElement",
-    "args": {
-     "elementId": "String"
-    }
-   },
-   "getElementsByClassName": {
-    "returns": "NodeList",
-    "args": {
-     "tagName": "String"
-    }
-   },
-   "getElementsByTagName": {
-    "returns": "NodeList",
-    "args": {
-     "className": "String"
-    }
-   },
-   "getElementsByTagNameNS": {
-    "returns": "NodeList",
-    "args": {
-     "namespace": "String",
-     "localName": "String"
-    }
-   },
-   "getSelection": {
-    "returns": "Selection"
-   },
-   "addStyleSheet": {
-    "returns": "CSSStyleSheet",
-    "args": {
-     "element": "HTMLElement"
-    }
-   },
-   "removeStyleSheet": {
-    "returns": "CSSStyleSheet",
-    "args": {
-     "styleSheet": "CSSStyleSheet"
-    }
-   }
-  },
-  "properties": {
-   "applyAuthorStyles": "bool",
-   "resetStyleInheritance": "bool",
-   "innerHTML": "String"
-  },
-  "readonly": {
-   "activeElement": "Element",
-   "styleSheets": "StyleSheetList"
-  },
-  "construct": {
-   "args": {
-    "host": "HTMLElement"
-   }
-  }
  },
  "SharedWorker": {
   "type": "interface",
@@ -3244,13 +2863,7 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "key": "",
-   "oldValue": "",
-   "newValue": "",
-   "url": "",
-   "storageArea": ""
-  }
+  "defaults": {}
  },
  "TextMetrics": {
   "type": "interface",
@@ -3354,7 +2967,7 @@
    }
   },
   "indexed": {
-   "itemType": "TextTrackCue",
+   "itemType": [],
    "readonly": true
   }
  },
@@ -3371,7 +2984,7 @@
    "onremovetrack": "EventHandler"
   },
   "indexed": {
-   "itemType": "TextTrack",
+   "itemType": [],
    "readonly": true
   }
  },
@@ -3424,9 +3037,7 @@
   "inherits": [
    "EventInit"
   ],
-  "defaults": {
-   "track": {}
-  }
+  "defaults": {}
  },
  "ValidityState": {
   "type": "interface",
@@ -3439,6 +3050,7 @@
    "rangeUnderflow": "Boolean",
    "rangeOverflow": "Boolean",
    "stepMismatch": "Boolean",
+   "badInput": "Boolean",
    "customError": "Boolean",
    "valid": "Boolean"
   }
@@ -3479,7 +3091,7 @@
    "onremovetrack": "EventHandler"
   },
   "indexed": {
-   "itemType": "VideoTrack",
+   "itemType": [],
    "readonly": true
   }
  },
@@ -3496,7 +3108,6 @@
    "protocol": "String"
   },
   "constants": {
-   "CONNECTING": 0,
    "OPEN": 1,
    "CLOSING": 2,
    "CLOSED": 3
@@ -3684,21 +3295,6 @@
      "transfer": "Transferable..."
     }
    },
-   "requestFileSystem": {
-    "args": {
-     "type": "Uint16",
-     "size": "Uint64",
-     "successCallback": "FileSystemCallback",
-     "errorCallback": "ErrorCallback"
-    }
-   },
-   "resolveLocalFileSystemURL": {
-    "args": {
-     "url": "String",
-     "successCallback": "EntryCallback",
-     "errorCallback": "ErrorCallback"
-    }
-   },
    "btoa": {
     "returns": "String",
     "args": {
@@ -3719,7 +3315,7 @@
       "String"
      ],
      "timeout": "Int32",
-     "args": "Any"
+     "arguments": "Any"
     }
    },
    "clearTimeout": {
@@ -3735,23 +3331,34 @@
       "String"
      ],
      "timeout": "Int32",
-     "args": "Any"
+     "arguments": "Any"
     }
    },
    "clearInterval": {
     "args": {
      "handle": "Int32"
     }
+   },
+   "createImageBitmap": {
+    "args": {
+     "image": [
+      "HTMLImageElement",
+      "HTMLVideoElement",
+      "HTMLCanvasElement",
+      "Blob",
+      "ImageData",
+      "CanvasRenderingContext2D"
+     ],
+     "_callback": "ImageBitmapCallback"
+    }
    }
   },
   "keyed": {
-   "itemType": "Object",
+   "itemType": [],
    "readonly": true
   },
-  "NamedPropertiesObject": true,
-  "constants": {
-   "TEMPORARY": 0,
-   "PERSISTENT": 1
+  "NamedPropertiesObject": {
+   "arguments": null
   }
  },
  "WindowModal": {
@@ -3763,7 +3370,9 @@
   "properties": {
    "returnValue": "String"
   },
-  "NoInterfaceObject": true
+  "NoInterfaceObject": {
+   "arguments": null
+  }
  },
  "Worker": {
   "type": "interface",
@@ -3801,37 +3410,22 @@
   },
   "methods": {
    "close": {},
-   "requestFileSystem": {
-    "args": {
-     "type": "Uint16",
-     "size": "Uint64",
-     "successCallback": "FileSystemCallback",
-     "errorCallback": "ErrorCallback"
-    }
-   },
-   "resolveLocalFileSystemURL": {
-    "args": {
-     "url": "String",
-     "successCallback": "EntryCallback",
-     "errorCallback": "ErrorCallback"
-    }
-   },
-   "requestFileSystemSync": {
-    "returns": "FileSystemSync",
-    "args": {
-     "type": "Uint16",
-     "size": "Uint64"
-    }
-   },
-   "resolveLocalFileSystemSyncURL": {
-    "returns": "EntrySync",
-    "args": {
-     "url": "String"
-    }
-   },
    "importScripts": {
     "args": {
      "urls": "String"
+    }
+   },
+   "createImageBitmap": {
+    "args": {
+     "image": [
+      "HTMLImageElement",
+      "HTMLVideoElement",
+      "HTMLCanvasElement",
+      "Blob",
+      "ImageData",
+      "CanvasRenderingContext2D"
+     ],
+     "_callback": "ImageBitmapCallback"
     }
    }
   },
@@ -3839,10 +3433,6 @@
    "onerror": "EventHandlerNonNull",
    "onoffline": "EventHandlerNonNull",
    "ononline": "EventHandlerNonNull"
-  },
-  "constants": {
-   "TEMPORARY": 0,
-   "PERSISTENT": 1
   }
  },
  "WorkerLocation": {
@@ -3870,109 +3460,16 @@
    "onLine": "Boolean"
   }
  },
- "XMLHttpRequest": {
+ "XMLDocument": {
   "type": "interface",
-  "inherits": [
-   "XMLHttpRequestEventTarget"
-  ],
-  "properties": {
-   "onreadystatechange": "EventHandlerNonNull",
-   "timeout": "Uint32",
-   "withCredentials": "Boolean",
-   "responseType": "XMLHttpRequestResponseType"
-  },
-  "constants": {
-   "UNSENT": 0,
-   "OPENED": 1,
-   "HEADERS_RECEIVED": 2,
-   "LOADING": 3,
-   "DONE": 4
-  },
-  "readonly": {
-   "readyState": "Uint16",
-   "upload": "XMLHttpRequestUpload",
-   "status": "Uint16",
-   "statusText": "ByteString",
-   "response": "Any",
-   "responseText": "String",
-   "responseXML": "Document"
-  },
+  "inherits": [],
   "methods": {
-   "open": {
+   "load": {
+    "returns": "Boolean",
     "args": {
-     "method": "ByteString",
-     "url": "String",
-     "async": "Boolean",
-     "user": "String",
-     "password": "String"
-    }
-   },
-   "setRequestHeader": {
-    "args": {
-     "header": "ByteString",
-     "value": "ByteString"
-    }
-   },
-   "send": {
-    "args": {
-     "data": [
-      "ArrayBufferView",
-      "Blob",
-      "Document",
-      "String",
-      "FormData"
-     ]
-    }
-   },
-   "abort": {},
-   "getResponseHeader": {
-    "returns": "ByteString",
-    "args": {
-     "header": "ByteString"
-    }
-   },
-   "getAllResponseHeaders": {
-    "returns": "ByteString"
-   },
-   "overrideMimeType": {
-    "args": {
-     "mime": "String"
+     "url": "String"
     }
    }
-  },
-  "construct": {}
- },
- "XMLHttpRequestEventTarget": {
-  "type": "interface",
-  "inherits": [
-   "EventTarget"
-  ],
-  "properties": {
-   "onloadstart": "EventHandlerNonNull",
-   "onprogress": "EventHandlerNonNull",
-   "onabort": "EventHandlerNonNull",
-   "onerror": "EventHandlerNonNull",
-   "onload": "EventHandlerNonNull",
-   "ontimeout": "EventHandlerNonNull",
-   "onloadend": "EventHandlerNonNull"
-  },
-  "NoInterfaceObject": true
- },
- "XMLHttpRequestResponseType": {
-  "type": "enum",
-  "values": [
-   "",
-   "arraybuffer",
-   "blob",
-   "document",
-   "json",
-   "text"
-  ]
- },
- "XMLHttpRequestUpload": {
-  "type": "interface",
-  "inherits": [
-   "XMLHttpRequestEventTarget"
-  ]
+  }
  }
 }

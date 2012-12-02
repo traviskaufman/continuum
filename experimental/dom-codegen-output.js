@@ -98,6 +98,50 @@ module DOM {
       return CALL(this.@wrapped, 'toString');
     }
   }
+  export class Document {
+    get fgColor() {
+      return GET(this.@wrapped, 'fgColor');
+    }
+    set fgColor(v) {
+      SET(this.@wrapped, 'fgColor', '' + v);
+    }
+    get linkColor() {
+      return GET(this.@wrapped, 'linkColor');
+    }
+    set linkColor(v) {
+      SET(this.@wrapped, 'linkColor', '' + v);
+    }
+    get vlinkColor() {
+      return GET(this.@wrapped, 'vlinkColor');
+    }
+    set vlinkColor(v) {
+      SET(this.@wrapped, 'vlinkColor', '' + v);
+    }
+    get alinkColor() {
+      return GET(this.@wrapped, 'alinkColor');
+    }
+    set alinkColor(v) {
+      SET(this.@wrapped, 'alinkColor', '' + v);
+    }
+    get bgColor() {
+      return GET(this.@wrapped, 'bgColor');
+    }
+    set bgColor(v) {
+      SET(this.@wrapped, 'bgColor', '' + v);
+    }
+    get anchors() {
+      return WRAP(GET(this.@wrapped, 'anchors'));
+    }
+    get applets() {
+      return WRAP(GET(this.@wrapped, 'applets'));
+    }
+    get all() {
+      return WRAP(GET(this.@wrapped, 'all'));
+    }
+    clear() {
+      CALL(this.@wrapped, 'clear');
+    }
+  }
   export class Event {
     constructor(type, eventInitDict) {
       this.@wrapped = CONSTRUCT(Event, '' + type, new EventInit(eventInitDict));
@@ -480,6 +524,11 @@ module DOM {
       return WRAP(CALL(this.@wrapped, 'nextNode'));
     }
   }
+  export class XMLDocument {
+    load(url) {
+      return CALL(this.@wrapped, 'load', '' + url);
+    }
+  }
   export class ApplicationCache extends EventTarget {
     get onchecking() {
       return WRAP(GET(this.@wrapped, 'onchecking'));
@@ -542,7 +591,7 @@ module DOM {
       CALL(this.@wrapped, 'swapCache');
     }
   }
-  constants(ApplicationCache, { UNCACHED: 0, IDLE: 1, CHECKING: 2, DOWNLOADING: 3, UPDATEREADY: 4, OBSOLETE: 5 });
+  constants(ApplicationCache, { IDLE: 1, CHECKING: 2, DOWNLOADING: 3, UPDATEREADY: 4, OBSOLETE: 5 });
   export class AudioTrack {
     get enabled() {
       return GET(this.@wrapped, 'enabled');
@@ -614,7 +663,27 @@ module DOM {
       CALL(this.@wrapped, 'setTransform', UNWRAP(transform));
     }
   }
+  export class CanvasProxy {
+    setContext(context) {
+      CALL(this.@wrapped, 'setContext', UNWRAP(context));
+    }
+  }
   export class CanvasRenderingContext2D {
+    constructor(width, height) {
+      this.@wrapped = CONSTRUCT(CanvasRenderingContext2D, width >>> 0, height >>> 0);
+    }
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', v >>> 0);
+    }
+    get height() {
+      return GET(this.@wrapped, 'height');
+    }
+    set height(v) {
+      SET(this.@wrapped, 'height', v >>> 0);
+    }
     get currentTransform() {
       return WRAP(GET(this.@wrapped, 'currentTransform'));
     }
@@ -723,8 +792,17 @@ module DOM {
     set textBaseline(v) {
       SET(this.@wrapped, 'textBaseline', '' + v);
     }
+    get direction() {
+      return GET(this.@wrapped, 'direction');
+    }
+    set direction(v) {
+      SET(this.@wrapped, 'direction', '' + v);
+    }
     get canvas() {
       return WRAP(GET(this.@wrapped, 'canvas'));
+    }
+    commit() {
+      CALL(this.@wrapped, 'commit');
     }
     save() {
       CALL(this.@wrapped, 'save');
@@ -825,8 +903,8 @@ module DOM {
     getImageDataHD(sx, sy, sw, sh) {
       return WRAP(CALL(this.@wrapped, 'getImageDataHD', +sx || 0, +sy || 0, +sw || 0, +sh || 0));
     }
-    putImageData(imagedata, dx, dy) {
-      CALL(this.@wrapped, 'putImageData', UNWRAP(imagedata), +dx || 0, +dy || 0);
+    putImageData(imagedata, dx, dy, dirtyX, dirtyY, dirtyWidth, dirtyHeight) {
+      CALL(this.@wrapped, 'putImageData', UNWRAP(imagedata), +dx || 0, +dy || 0, +dirtyX || 0, +dirtyY || 0, +dirtyWidth || 0, +dirtyHeight || 0);
     }
     putImageDataHD(imagedata, dx, dy, dirtyX, dirtyY, dirtyWidth, dirtyHeight) {
       CALL(this.@wrapped, 'putImageDataHD', UNWRAP(imagedata), +dx || 0, +dy || 0, +dirtyX || 0, +dirtyY || 0, +dirtyWidth || 0, +dirtyHeight || 0);
@@ -883,9 +961,6 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.wasClean = 'wasClean' in dict ? dict.wasClean : false;
-      this.code = 'code' in dict ? dict.code : 0;
-      this.reason = 'reason' in dict ? dict.reason : '';
     }
   }
   export class DOMElementMap {
@@ -1001,6 +1076,12 @@ module DOM {
     set textBaseline(v) {
       SET(this.@wrapped, 'textBaseline', '' + v);
     }
+    get direction() {
+      return GET(this.@wrapped, 'direction');
+    }
+    set direction(v) {
+      SET(this.@wrapped, 'direction', '' + v);
+    }
     setLineDash(...segments) {
       CALL(this.@wrapped, 'setLineDash');
     }
@@ -1021,14 +1102,14 @@ module DOM {
     get lineno() {
       return GET(this.@wrapped, 'lineno');
     }
+    get column() {
+      return GET(this.@wrapped, 'column');
+    }
   }
   class ErrorEventInit extends EventInit {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.message = 'message' in dict ? dict.message : '';
-      this.filename = 'filename' in dict ? dict.filename : '';
-      this.lineno = 'lineno' in dict ? dict.lineno : 0;
     }
   }
   export class EventSource extends EventTarget {
@@ -1066,11 +1147,10 @@ module DOM {
       CALL(this.@wrapped, 'close');
     }
   }
-  constants(EventSource, { CONNECTING: 0, OPEN: 1, CLOSED: 2 });
+  constants(EventSource, { OPEN: 1, CLOSED: 2 });
   class EventSourceInit {
     constructor(dict) {
       dict = dict || EMPTY;
-      this.withCredentials = 'withCredentials' in dict ? dict.withCredentials : false;
     }
   }
   export class External {
@@ -1081,20 +1161,15 @@ module DOM {
       return CALL(this.@wrapped, 'IsSearchProviderInstalled', '' + engineURL);
     }
   }
-  export class FormData {
-    constructor(form) {
-      this.@wrapped = CONSTRUCT(FormData, UNWRAP(form));
-    }
-    append(name, value, filename) {
-      CALL(this.@wrapped, 'append', '' + name, UNWRAP(value), '' + filename);
-    }
-  }
   export class FunctionStringCallback {
     handleEvent(data) {
       CALL(this.@wrapped, 'handleEvent', '' + data);
     }
   }
   export class HTMLAllCollection extends HTMLCollection {
+    item(name) {
+      return WRAP(CALL(this.@wrapped, 'item', '' + name));
+    }
     namedItem(name) {
       return WRAP(CALL(this.@wrapped, 'namedItem', '' + name));
     }
@@ -1102,9 +1177,385 @@ module DOM {
       return WRAP(CALL(this.@wrapped, 'tags', '' + tagName));
     }
   }
+  export class HTMLAnchorElement {
+    get coords() {
+      return GET(this.@wrapped, 'coords');
+    }
+    set coords(v) {
+      SET(this.@wrapped, 'coords', '' + v);
+    }
+    get charset() {
+      return GET(this.@wrapped, 'charset');
+    }
+    set charset(v) {
+      SET(this.@wrapped, 'charset', '' + v);
+    }
+    get name() {
+      return GET(this.@wrapped, 'name');
+    }
+    set name(v) {
+      SET(this.@wrapped, 'name', '' + v);
+    }
+    get rev() {
+      return GET(this.@wrapped, 'rev');
+    }
+    set rev(v) {
+      SET(this.@wrapped, 'rev', '' + v);
+    }
+    get shape() {
+      return GET(this.@wrapped, 'shape');
+    }
+    set shape(v) {
+      SET(this.@wrapped, 'shape', '' + v);
+    }
+  }
+  export class HTMLAreaElement {
+    get noHref() {
+      return GET(this.@wrapped, 'noHref');
+    }
+    set noHref(v) {
+      SET(this.@wrapped, 'noHref', !!v);
+    }
+  }
+  export class HTMLBRElement {
+    get clear() {
+      return GET(this.@wrapped, 'clear');
+    }
+    set clear(v) {
+      SET(this.@wrapped, 'clear', '' + v);
+    }
+  }
+  export class HTMLBodyElement {
+    get text() {
+      return GET(this.@wrapped, 'text');
+    }
+    set text(v) {
+      SET(this.@wrapped, 'text', '' + v);
+    }
+    get link() {
+      return GET(this.@wrapped, 'link');
+    }
+    set link(v) {
+      SET(this.@wrapped, 'link', '' + v);
+    }
+    get vLink() {
+      return GET(this.@wrapped, 'vLink');
+    }
+    set vLink(v) {
+      SET(this.@wrapped, 'vLink', '' + v);
+    }
+    get aLink() {
+      return GET(this.@wrapped, 'aLink');
+    }
+    set aLink(v) {
+      SET(this.@wrapped, 'aLink', '' + v);
+    }
+    get bgColor() {
+      return GET(this.@wrapped, 'bgColor');
+    }
+    set bgColor(v) {
+      SET(this.@wrapped, 'bgColor', '' + v);
+    }
+    get background() {
+      return GET(this.@wrapped, 'background');
+    }
+    set background(v) {
+      SET(this.@wrapped, 'background', '' + v);
+    }
+  }
+  export class HTMLDListElement {
+    get compact() {
+      return GET(this.@wrapped, 'compact');
+    }
+    set compact(v) {
+      SET(this.@wrapped, 'compact', !!v);
+    }
+  }
+  export class HTMLDivElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+  }
+  export class HTMLEmbedElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get name() {
+      return GET(this.@wrapped, 'name');
+    }
+    set name(v) {
+      SET(this.@wrapped, 'name', '' + v);
+    }
+  }
   export class HTMLFormControlsCollection extends HTMLCollection {
     namedItem(name) {
       return WRAP(CALL(this.@wrapped, 'namedItem', '' + name));
+    }
+  }
+  export class HTMLHRElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get color() {
+      return GET(this.@wrapped, 'color');
+    }
+    set color(v) {
+      SET(this.@wrapped, 'color', '' + v);
+    }
+    get noShade() {
+      return GET(this.@wrapped, 'noShade');
+    }
+    set noShade(v) {
+      SET(this.@wrapped, 'noShade', !!v);
+    }
+    get size() {
+      return GET(this.@wrapped, 'size');
+    }
+    set size(v) {
+      SET(this.@wrapped, 'size', '' + v);
+    }
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', '' + v);
+    }
+  }
+  export class HTMLHeadingElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+  }
+  export class HTMLHtmlElement {
+    get version() {
+      return GET(this.@wrapped, 'version');
+    }
+    set version(v) {
+      SET(this.@wrapped, 'version', '' + v);
+    }
+  }
+  export class HTMLIFrameElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get scrolling() {
+      return GET(this.@wrapped, 'scrolling');
+    }
+    set scrolling(v) {
+      SET(this.@wrapped, 'scrolling', '' + v);
+    }
+    get frameBorder() {
+      return GET(this.@wrapped, 'frameBorder');
+    }
+    set frameBorder(v) {
+      SET(this.@wrapped, 'frameBorder', '' + v);
+    }
+    get longDesc() {
+      return GET(this.@wrapped, 'longDesc');
+    }
+    set longDesc(v) {
+      SET(this.@wrapped, 'longDesc', '' + v);
+    }
+    get marginHeight() {
+      return GET(this.@wrapped, 'marginHeight');
+    }
+    set marginHeight(v) {
+      SET(this.@wrapped, 'marginHeight', '' + v);
+    }
+    get marginWidth() {
+      return GET(this.@wrapped, 'marginWidth');
+    }
+    set marginWidth(v) {
+      SET(this.@wrapped, 'marginWidth', '' + v);
+    }
+  }
+  export class HTMLImageElement {
+    get name() {
+      return GET(this.@wrapped, 'name');
+    }
+    set name(v) {
+      SET(this.@wrapped, 'name', '' + v);
+    }
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get hspace() {
+      return GET(this.@wrapped, 'hspace');
+    }
+    set hspace(v) {
+      SET(this.@wrapped, 'hspace', v >>> 0);
+    }
+    get vspace() {
+      return GET(this.@wrapped, 'vspace');
+    }
+    set vspace(v) {
+      SET(this.@wrapped, 'vspace', v >>> 0);
+    }
+    get longDesc() {
+      return GET(this.@wrapped, 'longDesc');
+    }
+    set longDesc(v) {
+      SET(this.@wrapped, 'longDesc', '' + v);
+    }
+    get border() {
+      return GET(this.@wrapped, 'border');
+    }
+    set border(v) {
+      SET(this.@wrapped, 'border', '' + v);
+    }
+  }
+  export class HTMLInputElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get useMap() {
+      return GET(this.@wrapped, 'useMap');
+    }
+    set useMap(v) {
+      SET(this.@wrapped, 'useMap', '' + v);
+    }
+  }
+  export class HTMLLIElement {
+    get type() {
+      return GET(this.@wrapped, 'type');
+    }
+    set type(v) {
+      SET(this.@wrapped, 'type', '' + v);
+    }
+  }
+  export class HTMLLegendElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+  }
+  export class HTMLLinkElement {
+    get charset() {
+      return GET(this.@wrapped, 'charset');
+    }
+    set charset(v) {
+      SET(this.@wrapped, 'charset', '' + v);
+    }
+    get rev() {
+      return GET(this.@wrapped, 'rev');
+    }
+    set rev(v) {
+      SET(this.@wrapped, 'rev', '' + v);
+    }
+    get target() {
+      return GET(this.@wrapped, 'target');
+    }
+    set target(v) {
+      SET(this.@wrapped, 'target', '' + v);
+    }
+  }
+  export class HTMLMenuElement {
+    get compact() {
+      return GET(this.@wrapped, 'compact');
+    }
+    set compact(v) {
+      SET(this.@wrapped, 'compact', !!v);
+    }
+  }
+  export class HTMLMetaElement {
+    get scheme() {
+      return GET(this.@wrapped, 'scheme');
+    }
+    set scheme(v) {
+      SET(this.@wrapped, 'scheme', '' + v);
+    }
+  }
+  export class HTMLOListElement {
+    get compact() {
+      return GET(this.@wrapped, 'compact');
+    }
+    set compact(v) {
+      SET(this.@wrapped, 'compact', !!v);
+    }
+  }
+  export class HTMLObjectElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get archive() {
+      return GET(this.@wrapped, 'archive');
+    }
+    set archive(v) {
+      SET(this.@wrapped, 'archive', '' + v);
+    }
+    get code() {
+      return GET(this.@wrapped, 'code');
+    }
+    set code(v) {
+      SET(this.@wrapped, 'code', '' + v);
+    }
+    get declare() {
+      return GET(this.@wrapped, 'declare');
+    }
+    set declare(v) {
+      SET(this.@wrapped, 'declare', !!v);
+    }
+    get hspace() {
+      return GET(this.@wrapped, 'hspace');
+    }
+    set hspace(v) {
+      SET(this.@wrapped, 'hspace', v >>> 0);
+    }
+    get standby() {
+      return GET(this.@wrapped, 'standby');
+    }
+    set standby(v) {
+      SET(this.@wrapped, 'standby', '' + v);
+    }
+    get vspace() {
+      return GET(this.@wrapped, 'vspace');
+    }
+    set vspace(v) {
+      SET(this.@wrapped, 'vspace', v >>> 0);
+    }
+    get codeBase() {
+      return GET(this.@wrapped, 'codeBase');
+    }
+    set codeBase(v) {
+      SET(this.@wrapped, 'codeBase', '' + v);
+    }
+    get codeType() {
+      return GET(this.@wrapped, 'codeType');
+    }
+    set codeType(v) {
+      SET(this.@wrapped, 'codeType', '' + v);
+    }
+    get border() {
+      return GET(this.@wrapped, 'border');
+    }
+    set border(v) {
+      SET(this.@wrapped, 'border', '' + v);
     }
   }
   export class HTMLOptionsCollection extends HTMLCollection {
@@ -1118,12 +1569,302 @@ module DOM {
       CALL(this.@wrapped, 'remove', index >> 0);
     }
   }
+  export class HTMLParagraphElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+  }
+  export class HTMLParamElement {
+    get type() {
+      return GET(this.@wrapped, 'type');
+    }
+    set type(v) {
+      SET(this.@wrapped, 'type', '' + v);
+    }
+    get valueType() {
+      return GET(this.@wrapped, 'valueType');
+    }
+    set valueType(v) {
+      SET(this.@wrapped, 'valueType', '' + v);
+    }
+  }
+  export class HTMLPreElement {
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', v >> 0);
+    }
+  }
   export class HTMLPropertiesCollection extends HTMLCollection {
     get names() {
       return WRAP(GET(this.@wrapped, 'names'));
     }
     namedItem(name) {
       return WRAP(CALL(this.@wrapped, 'namedItem', '' + name));
+    }
+  }
+  export class HTMLScriptElement {
+    get event() {
+      return GET(this.@wrapped, 'event');
+    }
+    set event(v) {
+      SET(this.@wrapped, 'event', '' + v);
+    }
+    get htmlFor() {
+      return GET(this.@wrapped, 'htmlFor');
+    }
+    set htmlFor(v) {
+      SET(this.@wrapped, 'htmlFor', '' + v);
+    }
+  }
+  export class HTMLTableCaptionElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+  }
+  export class HTMLTableCellElement {
+    get abbr() {
+      return GET(this.@wrapped, 'abbr');
+    }
+    set abbr(v) {
+      SET(this.@wrapped, 'abbr', '' + v);
+    }
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get axis() {
+      return GET(this.@wrapped, 'axis');
+    }
+    set axis(v) {
+      SET(this.@wrapped, 'axis', '' + v);
+    }
+    get height() {
+      return GET(this.@wrapped, 'height');
+    }
+    set height(v) {
+      SET(this.@wrapped, 'height', '' + v);
+    }
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', '' + v);
+    }
+    get ch() {
+      return GET(this.@wrapped, 'ch');
+    }
+    set ch(v) {
+      SET(this.@wrapped, 'ch', '' + v);
+    }
+    get chOff() {
+      return GET(this.@wrapped, 'chOff');
+    }
+    set chOff(v) {
+      SET(this.@wrapped, 'chOff', '' + v);
+    }
+    get noWrap() {
+      return GET(this.@wrapped, 'noWrap');
+    }
+    set noWrap(v) {
+      SET(this.@wrapped, 'noWrap', !!v);
+    }
+    get vAlign() {
+      return GET(this.@wrapped, 'vAlign');
+    }
+    set vAlign(v) {
+      SET(this.@wrapped, 'vAlign', '' + v);
+    }
+    get bgColor() {
+      return GET(this.@wrapped, 'bgColor');
+    }
+    set bgColor(v) {
+      SET(this.@wrapped, 'bgColor', '' + v);
+    }
+  }
+  export class HTMLTableColElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get ch() {
+      return GET(this.@wrapped, 'ch');
+    }
+    set ch(v) {
+      SET(this.@wrapped, 'ch', '' + v);
+    }
+    get chOff() {
+      return GET(this.@wrapped, 'chOff');
+    }
+    set chOff(v) {
+      SET(this.@wrapped, 'chOff', '' + v);
+    }
+    get vAlign() {
+      return GET(this.@wrapped, 'vAlign');
+    }
+    set vAlign(v) {
+      SET(this.@wrapped, 'vAlign', '' + v);
+    }
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', '' + v);
+    }
+  }
+  export class HTMLTableDataCellElement extends HTMLTableCellElement {
+  }
+  export class HTMLTableElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get border() {
+      return GET(this.@wrapped, 'border');
+    }
+    set border(v) {
+      SET(this.@wrapped, 'border', '' + v);
+    }
+    get frame() {
+      return GET(this.@wrapped, 'frame');
+    }
+    set frame(v) {
+      SET(this.@wrapped, 'frame', '' + v);
+    }
+    get rules() {
+      return GET(this.@wrapped, 'rules');
+    }
+    set rules(v) {
+      SET(this.@wrapped, 'rules', '' + v);
+    }
+    get summary() {
+      return GET(this.@wrapped, 'summary');
+    }
+    set summary(v) {
+      SET(this.@wrapped, 'summary', '' + v);
+    }
+    get width() {
+      return GET(this.@wrapped, 'width');
+    }
+    set width(v) {
+      SET(this.@wrapped, 'width', '' + v);
+    }
+    get bgColor() {
+      return GET(this.@wrapped, 'bgColor');
+    }
+    set bgColor(v) {
+      SET(this.@wrapped, 'bgColor', '' + v);
+    }
+    get cellPadding() {
+      return GET(this.@wrapped, 'cellPadding');
+    }
+    set cellPadding(v) {
+      SET(this.@wrapped, 'cellPadding', '' + v);
+    }
+    get cellSpacing() {
+      return GET(this.@wrapped, 'cellSpacing');
+    }
+    set cellSpacing(v) {
+      SET(this.@wrapped, 'cellSpacing', '' + v);
+    }
+  }
+  export class HTMLTableHeaderCellElement extends HTMLTableCellElement {
+    get scope() {
+      return GET(this.@wrapped, 'scope');
+    }
+    set scope(v) {
+      SET(this.@wrapped, 'scope', '' + v);
+    }
+    get abbr() {
+      return GET(this.@wrapped, 'abbr');
+    }
+    set abbr(v) {
+      SET(this.@wrapped, 'abbr', '' + v);
+    }
+  }
+  export class HTMLTableRowElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get ch() {
+      return GET(this.@wrapped, 'ch');
+    }
+    set ch(v) {
+      SET(this.@wrapped, 'ch', '' + v);
+    }
+    get chOff() {
+      return GET(this.@wrapped, 'chOff');
+    }
+    set chOff(v) {
+      SET(this.@wrapped, 'chOff', '' + v);
+    }
+    get vAlign() {
+      return GET(this.@wrapped, 'vAlign');
+    }
+    set vAlign(v) {
+      SET(this.@wrapped, 'vAlign', '' + v);
+    }
+    get bgColor() {
+      return GET(this.@wrapped, 'bgColor');
+    }
+    set bgColor(v) {
+      SET(this.@wrapped, 'bgColor', '' + v);
+    }
+  }
+  export class HTMLTableSectionElement {
+    get align() {
+      return GET(this.@wrapped, 'align');
+    }
+    set align(v) {
+      SET(this.@wrapped, 'align', '' + v);
+    }
+    get ch() {
+      return GET(this.@wrapped, 'ch');
+    }
+    set ch(v) {
+      SET(this.@wrapped, 'ch', '' + v);
+    }
+    get chOff() {
+      return GET(this.@wrapped, 'chOff');
+    }
+    set chOff(v) {
+      SET(this.@wrapped, 'chOff', '' + v);
+    }
+    get vAlign() {
+      return GET(this.@wrapped, 'vAlign');
+    }
+    set vAlign(v) {
+      SET(this.@wrapped, 'vAlign', '' + v);
+    }
+  }
+  export class HTMLUListElement {
+    get compact() {
+      return GET(this.@wrapped, 'compact');
+    }
+    set compact(v) {
+      SET(this.@wrapped, 'compact', !!v);
+    }
+    get type() {
+      return GET(this.@wrapped, 'type');
+    }
+    set type(v) {
+      SET(this.@wrapped, 'type', '' + v);
     }
   }
   export class HashChangeEvent extends Event {
@@ -1141,11 +1882,9 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.oldURL = 'oldURL' in dict ? dict.oldURL : '';
-      this.newURL = 'newURL' in dict ? dict.newURL : '';
     }
   }
-  export class HistorySection {
+  export class History {
     go(delta) {
       CALL(this.@wrapped, 'go', delta >> 0);
     }
@@ -1165,14 +1904,9 @@ module DOM {
   class HitRegionOptions {
     constructor(dict) {
       dict = dict || EMPTY;
-      this.path = 'path' in dict ? dict.path : '';
-      this.id = 'id' in dict ? dict.id : '';
-      this.parentID = 'parentID' in dict ? dict.parentID : '';
-      this.cursor = 'cursor' in dict ? dict.cursor : 'inherit';
-      this.control = 'control' in dict ? dict.control : '';
-      this.label = 'label' in dict ? dict.label : '';
-      this.role = 'role' in dict ? dict.role : '';
     }
+  }
+  export class ImageBitmap {
   }
   export class ImageData {
     get width() {
@@ -1244,10 +1978,9 @@ module DOM {
       CALL(this.@wrapped, 'reload');
     }
   }
-  const MediaControllerPlaybackState = { waiting: 'waiting', playing: 'playing', ended: 'ended' };
-  export class MediaControllerSection {
+  export class MediaController extends EventTarget {
     constructor() {
-      this.@wrapped = CONSTRUCT(MediaControllerSection);
+      this.@wrapped = CONSTRUCT(MediaController);
     }
     get currentTime() {
       return GET(this.@wrapped, 'currentTime');
@@ -1384,13 +2117,17 @@ module DOM {
     get played() {
       return WRAP(GET(this.@wrapped, 'played'));
     }
-    play() {
-      CALL(this.@wrapped, 'play');
-    }
     pause() {
       CALL(this.@wrapped, 'pause');
     }
+    unpause() {
+      CALL(this.@wrapped, 'unpause');
+    }
+    play() {
+      CALL(this.@wrapped, 'play');
+    }
   }
+  const MediaControllerPlaybackState = { waiting: 'waiting', playing: 'playing', ended: 'ended' };
   export class MediaError {
     get code() {
       return GET(this.@wrapped, 'code');
@@ -1432,11 +2169,6 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.data = 'data' in dict ? dict.data : '';
-      this.origin = 'origin' in dict ? dict.origin : '';
-      this.lastEventId = 'lastEventId' in dict ? dict.lastEventId : '';
-      this.source = 'source' in dict ? dict.source : '';
-      this.ports = 'ports' in dict ? dict.ports : '';
     }
   }
   export class MessagePort extends EventTarget {
@@ -1454,6 +2186,16 @@ module DOM {
     }
     close() {
       CALL(this.@wrapped, 'close');
+    }
+  }
+  export class MouseEvent {
+    get region() {
+      return GET(this.@wrapped, 'region');
+    }
+  }
+  class MouseEventInit {
+    constructor(dict) {
+      dict = dict || EMPTY;
     }
   }
   export class Navigator {
@@ -1506,7 +2248,6 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.persisted = 'persisted' in dict ? dict.persisted : false;
     }
   }
   export class Path {
@@ -1565,30 +2306,23 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.state = 'state' in dict ? dict.state : '';
     }
   }
-  export class ProgressEvent extends Event {
-    constructor(type, eventInitDict) {
-      this.@wrapped = CONSTRUCT(ProgressEvent, '' + type, new ProgressEventInit(eventInitDict));
+  export class PortCollection {
+    constructor() {
+      this.@wrapped = CONSTRUCT(PortCollection);
     }
-    get lengthComputable() {
-      return GET(this.@wrapped, 'lengthComputable');
+    add(port) {
+      CALL(this.@wrapped, 'add', UNWRAP(port));
     }
-    get loaded() {
-      return toUint64(GET(this.@wrapped, 'loaded'));
+    remove(port) {
+      CALL(this.@wrapped, 'remove', UNWRAP(port));
     }
-    get total() {
-      return toUint64(GET(this.@wrapped, 'total'));
+    clear() {
+      CALL(this.@wrapped, 'clear');
     }
-  }
-  class ProgressEventInit extends EventInit {
-    constructor(dict) {
-      dict = dict || EMPTY;
-      super(dict);
-      this.lengthComputable = 'lengthComputable' in dict ? dict.lengthComputable : false;
-      this.loaded = 'loaded' in dict ? dict.loaded : '';
-      this.total = 'total' in dict ? dict.total : '';
+    iterate(callback) {
+      CALL(this.@wrapped, 'iterate', CALLBACK(callback));
     }
   }
   export class PropertyNodeList extends NodeList {
@@ -1602,6 +2336,11 @@ module DOM {
     }
     set value(v) {
       SET(this.@wrapped, 'value', '' + v);
+    }
+  }
+  export class Screen {
+    get canvasResolution() {
+      return GET(this.@wrapped, 'canvasResolution');
     }
   }
   const SelectionMode = { select: 'select', start: 'start', end: 'end', preserve: 'preserve' };
@@ -1660,11 +2399,6 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.key = 'key' in dict ? dict.key : '';
-      this.oldValue = 'oldValue' in dict ? dict.oldValue : '';
-      this.newValue = 'newValue' in dict ? dict.newValue : '';
-      this.url = 'url' in dict ? dict.url : '';
-      this.storageArea = 'storageArea' in dict ? dict.storageArea : '';
     }
   }
   export class TextMetrics {
@@ -1872,7 +2606,6 @@ module DOM {
     constructor(dict) {
       dict = dict || EMPTY;
       super(dict);
-      this.track = 'track' in dict ? dict.track : {};
     }
   }
   export class ValidityState {
@@ -1896,6 +2629,9 @@ module DOM {
     }
     get stepMismatch() {
       return GET(this.@wrapped, 'stepMismatch');
+    }
+    get badInput() {
+      return GET(this.@wrapped, 'badInput');
     }
     get customError() {
       return GET(this.@wrapped, 'customError');
@@ -2003,7 +2739,7 @@ module DOM {
       CALL(this.@wrapped, 'send', UNWRAP(data));
     }
   }
-  constants(WebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+  constants(WebSocket, { OPEN: 1, CLOSING: 2, CLOSED: 3 });
   export class Window extends EventTarget {
     get name() {
       return GET(this.@wrapped, 'name');
@@ -2464,32 +3200,28 @@ module DOM {
     postMessage(message, targetOrigin, ...transfer) {
       CALL(this.@wrapped, 'postMessage', UNWRAP(message), '' + targetOrigin);
     }
-    requestFileSystem(type, size, successCallback, errorCallback) {
-      CALL(this.@wrapped, 'requestFileSystem', toInt16(type), size >>> 0, CALLBACK(successCallback), CALLBACK(errorCallback));
-    }
-    resolveLocalFileSystemURL(url, successCallback, errorCallback) {
-      CALL(this.@wrapped, 'resolveLocalFileSystemURL', '' + url, CALLBACK(successCallback), CALLBACK(errorCallback));
-    }
     btoa(btoa) {
       return CALL(this.@wrapped, 'btoa', '' + btoa);
     }
     atob(atob) {
       return CALL(this.@wrapped, 'atob', '' + atob);
     }
-    setTimeout(handler, timeout, args) {
-      return CALL(this.@wrapped, 'setTimeout', UNWRAP(handler), timeout >> 0, UNWRAP(args));
+    setTimeout(handler, timeout, arguments) {
+      return CALL(this.@wrapped, 'setTimeout', UNWRAP(handler), timeout >> 0, UNWRAP(arguments));
     }
     clearTimeout(handle) {
       CALL(this.@wrapped, 'clearTimeout', handle >> 0);
     }
-    setInterval(handler, timeout, args) {
-      return CALL(this.@wrapped, 'setInterval', UNWRAP(handler), timeout >> 0, UNWRAP(args));
+    setInterval(handler, timeout, arguments) {
+      return CALL(this.@wrapped, 'setInterval', UNWRAP(handler), timeout >> 0, UNWRAP(arguments));
     }
     clearInterval(handle) {
       CALL(this.@wrapped, 'clearInterval', handle >> 0);
     }
+    createImageBitmap(image, _callback) {
+      CALL(this.@wrapped, 'createImageBitmap', UNWRAP(image), CALLBACK(_callback));
+    }
   }
-  constants(Window, { TEMPORARY: 0, PERSISTENT: 1 });
   export class WindowModal {
     get returnValue() {
       return GET(this.@wrapped, 'returnValue');
@@ -2555,23 +3287,13 @@ module DOM {
     close() {
       CALL(this.@wrapped, 'close');
     }
-    requestFileSystem(type, size, successCallback, errorCallback) {
-      CALL(this.@wrapped, 'requestFileSystem', toInt16(type), size >>> 0, CALLBACK(successCallback), CALLBACK(errorCallback));
-    }
-    resolveLocalFileSystemURL(url, successCallback, errorCallback) {
-      CALL(this.@wrapped, 'resolveLocalFileSystemURL', '' + url, CALLBACK(successCallback), CALLBACK(errorCallback));
-    }
-    requestFileSystemSync(type, size) {
-      return WRAP(CALL(this.@wrapped, 'requestFileSystemSync', toInt16(type), size >>> 0));
-    }
-    resolveLocalFileSystemSyncURL(url) {
-      return WRAP(CALL(this.@wrapped, 'resolveLocalFileSystemSyncURL', '' + url));
-    }
     importScripts(urls) {
       CALL(this.@wrapped, 'importScripts', '' + urls);
     }
+    createImageBitmap(image, _callback) {
+      CALL(this.@wrapped, 'createImageBitmap', UNWRAP(image), CALLBACK(_callback));
+    }
   }
-  constants(WorkerGlobalScope, { TEMPORARY: 0, PERSISTENT: 1 });
   export class WorkerLocation {
     get href() {
       return GET(this.@wrapped, 'href');
@@ -2614,53 +3336,6 @@ module DOM {
     get onLine() {
       return GET(this.@wrapped, 'onLine');
     }
-  }
-  export class XMLHttpRequestEventTarget extends EventTarget {
-    get onloadstart() {
-      return WRAP(GET(this.@wrapped, 'onloadstart'));
-    }
-    set onloadstart(v) {
-      SET(this.@wrapped, 'onloadstart', CALLBACK(v));
-    }
-    get onprogress() {
-      return WRAP(GET(this.@wrapped, 'onprogress'));
-    }
-    set onprogress(v) {
-      SET(this.@wrapped, 'onprogress', CALLBACK(v));
-    }
-    get onabort() {
-      return WRAP(GET(this.@wrapped, 'onabort'));
-    }
-    set onabort(v) {
-      SET(this.@wrapped, 'onabort', CALLBACK(v));
-    }
-    get onerror() {
-      return WRAP(GET(this.@wrapped, 'onerror'));
-    }
-    set onerror(v) {
-      SET(this.@wrapped, 'onerror', CALLBACK(v));
-    }
-    get onload() {
-      return WRAP(GET(this.@wrapped, 'onload'));
-    }
-    set onload(v) {
-      SET(this.@wrapped, 'onload', CALLBACK(v));
-    }
-    get ontimeout() {
-      return WRAP(GET(this.@wrapped, 'ontimeout'));
-    }
-    set ontimeout(v) {
-      SET(this.@wrapped, 'ontimeout', CALLBACK(v));
-    }
-    get onloadend() {
-      return WRAP(GET(this.@wrapped, 'onloadend'));
-    }
-    set onloadend(v) {
-      SET(this.@wrapped, 'onloadend', CALLBACK(v));
-    }
-  }
-  const XMLHttpRequestResponseType = { '': '', arraybuffer: 'arraybuffer', blob: 'blob', document: 'document', json: 'json', text: 'text' };
-  export class XMLHttpRequestUpload extends XMLHttpRequestEventTarget {
   }
   export class CharacterData extends Node {
     get data() {
@@ -2720,86 +3395,6 @@ module DOM {
     }
     set value(v) {
       SET(this.@wrapped, 'value', '' + v);
-    }
-  }
-  export class Document extends Node {
-    get implementation() {
-      return WRAP(GET(this.@wrapped, 'implementation'));
-    }
-    get URL() {
-      return GET(this.@wrapped, 'URL');
-    }
-    get documentURI() {
-      return GET(this.@wrapped, 'documentURI');
-    }
-    get compatMode() {
-      return GET(this.@wrapped, 'compatMode');
-    }
-    get characterSet() {
-      return GET(this.@wrapped, 'characterSet');
-    }
-    get contentType() {
-      return GET(this.@wrapped, 'contentType');
-    }
-    get doctype() {
-      return WRAP(GET(this.@wrapped, 'doctype'));
-    }
-    get documentElement() {
-      return WRAP(GET(this.@wrapped, 'documentElement'));
-    }
-    getElementsByTagName(localName) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByTagName', '' + localName));
-    }
-    getElementsByTagNameNS(namespace, localName) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByTagNameNS', '' + namespace, '' + localName));
-    }
-    getElementsByClassName(classNames) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByClassName', '' + classNames));
-    }
-    getElementById(elementId) {
-      return WRAP(CALL(this.@wrapped, 'getElementById', '' + elementId));
-    }
-    createElement(localName) {
-      return WRAP(CALL(this.@wrapped, 'createElement', '' + localName));
-    }
-    createElementNS(namespace, qualifiedName) {
-      return WRAP(CALL(this.@wrapped, 'createElementNS', '' + namespace, '' + qualifiedName));
-    }
-    createDocumentFragment() {
-      return WRAP(CALL(this.@wrapped, 'createDocumentFragment'));
-    }
-    createTextNode(data) {
-      return WRAP(CALL(this.@wrapped, 'createTextNode', '' + data));
-    }
-    createComment(data) {
-      return WRAP(CALL(this.@wrapped, 'createComment', '' + data));
-    }
-    createProcessingInstruction(target, data) {
-      return WRAP(CALL(this.@wrapped, 'createProcessingInstruction', '' + target, '' + data));
-    }
-    importNode(node, deep) {
-      return WRAP(CALL(this.@wrapped, 'importNode', UNWRAP(node), !!deep));
-    }
-    adoptNode(node) {
-      return WRAP(CALL(this.@wrapped, 'adoptNode', UNWRAP(node)));
-    }
-    createEvent(interface) {
-      return WRAP(CALL(this.@wrapped, 'createEvent', '' + interface));
-    }
-    createRange() {
-      return WRAP(CALL(this.@wrapped, 'createRange'));
-    }
-    createNodeIterator(root, whatToShow, filter) {
-      return WRAP(CALL(this.@wrapped, 'createNodeIterator', UNWRAP(root), whatToShow >>> 0, UNWRAP(filter)));
-    }
-    createTreeWalker(root, whatToShow, filter) {
-      return WRAP(CALL(this.@wrapped, 'createTreeWalker', UNWRAP(root), whatToShow >>> 0, UNWRAP(filter)));
-    }
-    prepend(nodes) {
-      CALL(this.@wrapped, 'prepend', UNWRAP(nodes));
-    }
-    append(nodes) {
-      CALL(this.@wrapped, 'append', UNWRAP(nodes));
     }
   }
   export class DocumentFragment extends Node {
@@ -2950,8 +3545,6 @@ module DOM {
       return WRAP(CALL(this.@wrapped, 'splitText', offset >>> 0));
     }
   }
-  export class XMLDocument extends Document {
-  }
   export class DedicatedWorkerGlobalScope extends WorkerGlobalScope {
     get onmessage() {
       return WRAP(GET(this.@wrapped, 'onmessage'));
@@ -2961,6 +3554,20 @@ module DOM {
     }
     postMessage(message, ...transfer) {
       CALL(this.@wrapped, 'postMessage', UNWRAP(message));
+    }
+  }
+  export class DragEvent extends MouseEvent {
+    constructor(type, eventInitDict) {
+      this.@wrapped = CONSTRUCT(DragEvent, '' + type, new DragEventInit(eventInitDict));
+    }
+    get dataTransfer() {
+      return WRAP(GET(this.@wrapped, 'dataTransfer'));
+    }
+  }
+  class DragEventInit extends MouseEventInit {
+    constructor(dict) {
+      dict = dict || EMPTY;
+      super(dict);
     }
   }
   export class HTMLElement extends Element {
@@ -3432,43 +4039,8 @@ module DOM {
     blur() {
       CALL(this.@wrapped, 'blur');
     }
-  }
-  export class HTMLEmbedElement extends HTMLElement {
-    get src() {
-      return GET(this.@wrapped, 'src');
-    }
-    set src(v) {
-      SET(this.@wrapped, 'src', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-    get height() {
-      return GET(this.@wrapped, 'height');
-    }
-    set height(v) {
-      SET(this.@wrapped, 'height', '' + v);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
+    forceSpellCheck() {
+      CALL(this.@wrapped, 'forceSpellCheck');
     }
   }
   export class HTMLFieldSetElement extends HTMLElement {
@@ -3772,418 +4344,7 @@ module DOM {
       SET(this.@wrapped, 'onunload', CALLBACK(v));
     }
   }
-  export class HTMLHRElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get color() {
-      return GET(this.@wrapped, 'color');
-    }
-    set color(v) {
-      SET(this.@wrapped, 'color', '' + v);
-    }
-    get noShade() {
-      return GET(this.@wrapped, 'noShade');
-    }
-    set noShade(v) {
-      SET(this.@wrapped, 'noShade', !!v);
-    }
-    get size() {
-      return GET(this.@wrapped, 'size');
-    }
-    set size(v) {
-      SET(this.@wrapped, 'size', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-  }
   export class HTMLHeadElement extends HTMLElement {
-  }
-  export class HTMLHeadingElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-  }
-  export class HTMLHtmlElement extends HTMLElement {
-    get version() {
-      return GET(this.@wrapped, 'version');
-    }
-    set version(v) {
-      SET(this.@wrapped, 'version', '' + v);
-    }
-  }
-  export class HTMLIFrameElement extends HTMLElement {
-    get src() {
-      return GET(this.@wrapped, 'src');
-    }
-    set src(v) {
-      SET(this.@wrapped, 'src', '' + v);
-    }
-    get srcdoc() {
-      return GET(this.@wrapped, 'srcdoc');
-    }
-    set srcdoc(v) {
-      SET(this.@wrapped, 'srcdoc', '' + v);
-    }
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get seamless() {
-      return GET(this.@wrapped, 'seamless');
-    }
-    set seamless(v) {
-      SET(this.@wrapped, 'seamless', !!v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-    get height() {
-      return GET(this.@wrapped, 'height');
-    }
-    set height(v) {
-      SET(this.@wrapped, 'height', '' + v);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get scrolling() {
-      return GET(this.@wrapped, 'scrolling');
-    }
-    set scrolling(v) {
-      SET(this.@wrapped, 'scrolling', '' + v);
-    }
-    get frameBorder() {
-      return GET(this.@wrapped, 'frameBorder');
-    }
-    set frameBorder(v) {
-      SET(this.@wrapped, 'frameBorder', '' + v);
-    }
-    get longDesc() {
-      return GET(this.@wrapped, 'longDesc');
-    }
-    set longDesc(v) {
-      SET(this.@wrapped, 'longDesc', '' + v);
-    }
-    get marginHeight() {
-      return GET(this.@wrapped, 'marginHeight');
-    }
-    set marginHeight(v) {
-      SET(this.@wrapped, 'marginHeight', '' + v);
-    }
-    get marginWidth() {
-      return GET(this.@wrapped, 'marginWidth');
-    }
-    set marginWidth(v) {
-      SET(this.@wrapped, 'marginWidth', '' + v);
-    }
-    get sandbox() {
-      return WRAP(GET(this.@wrapped, 'sandbox'));
-    }
-    get contentDocument() {
-      return WRAP(GET(this.@wrapped, 'contentDocument'));
-    }
-    get contentWindow() {
-      return WRAP(GET(this.@wrapped, 'contentWindow'));
-    }
-  }
-  export var HTMLImageElement = class Image extends HTMLElement {
-      };
-  export class HTMLInputElement extends HTMLElement {
-    get accept() {
-      return GET(this.@wrapped, 'accept');
-    }
-    set accept(v) {
-      SET(this.@wrapped, 'accept', '' + v);
-    }
-    get alt() {
-      return GET(this.@wrapped, 'alt');
-    }
-    set alt(v) {
-      SET(this.@wrapped, 'alt', '' + v);
-    }
-    get autocomplete() {
-      return GET(this.@wrapped, 'autocomplete');
-    }
-    set autocomplete(v) {
-      SET(this.@wrapped, 'autocomplete', '' + v);
-    }
-    get autofocus() {
-      return GET(this.@wrapped, 'autofocus');
-    }
-    set autofocus(v) {
-      SET(this.@wrapped, 'autofocus', !!v);
-    }
-    get defaultChecked() {
-      return GET(this.@wrapped, 'defaultChecked');
-    }
-    set defaultChecked(v) {
-      SET(this.@wrapped, 'defaultChecked', !!v);
-    }
-    get checked() {
-      return GET(this.@wrapped, 'checked');
-    }
-    set checked(v) {
-      SET(this.@wrapped, 'checked', !!v);
-    }
-    get dirName() {
-      return GET(this.@wrapped, 'dirName');
-    }
-    set dirName(v) {
-      SET(this.@wrapped, 'dirName', '' + v);
-    }
-    get disabled() {
-      return GET(this.@wrapped, 'disabled');
-    }
-    set disabled(v) {
-      SET(this.@wrapped, 'disabled', !!v);
-    }
-    get formAction() {
-      return GET(this.@wrapped, 'formAction');
-    }
-    set formAction(v) {
-      SET(this.@wrapped, 'formAction', '' + v);
-    }
-    get formEnctype() {
-      return GET(this.@wrapped, 'formEnctype');
-    }
-    set formEnctype(v) {
-      SET(this.@wrapped, 'formEnctype', '' + v);
-    }
-    get formMethod() {
-      return GET(this.@wrapped, 'formMethod');
-    }
-    set formMethod(v) {
-      SET(this.@wrapped, 'formMethod', '' + v);
-    }
-    get formNoValidate() {
-      return GET(this.@wrapped, 'formNoValidate');
-    }
-    set formNoValidate(v) {
-      SET(this.@wrapped, 'formNoValidate', !!v);
-    }
-    get formTarget() {
-      return GET(this.@wrapped, 'formTarget');
-    }
-    set formTarget(v) {
-      SET(this.@wrapped, 'formTarget', '' + v);
-    }
-    get height() {
-      return GET(this.@wrapped, 'height');
-    }
-    set height(v) {
-      SET(this.@wrapped, 'height', v >>> 0);
-    }
-    get indeterminate() {
-      return GET(this.@wrapped, 'indeterminate');
-    }
-    set indeterminate(v) {
-      SET(this.@wrapped, 'indeterminate', !!v);
-    }
-    get inputMode() {
-      return GET(this.@wrapped, 'inputMode');
-    }
-    set inputMode(v) {
-      SET(this.@wrapped, 'inputMode', '' + v);
-    }
-    get max() {
-      return GET(this.@wrapped, 'max');
-    }
-    set max(v) {
-      SET(this.@wrapped, 'max', '' + v);
-    }
-    get maxLength() {
-      return GET(this.@wrapped, 'maxLength');
-    }
-    set maxLength(v) {
-      SET(this.@wrapped, 'maxLength', v >> 0);
-    }
-    get min() {
-      return GET(this.@wrapped, 'min');
-    }
-    set min(v) {
-      SET(this.@wrapped, 'min', '' + v);
-    }
-    get multiple() {
-      return GET(this.@wrapped, 'multiple');
-    }
-    set multiple(v) {
-      SET(this.@wrapped, 'multiple', !!v);
-    }
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get pattern() {
-      return GET(this.@wrapped, 'pattern');
-    }
-    set pattern(v) {
-      SET(this.@wrapped, 'pattern', '' + v);
-    }
-    get placeholder() {
-      return GET(this.@wrapped, 'placeholder');
-    }
-    set placeholder(v) {
-      SET(this.@wrapped, 'placeholder', '' + v);
-    }
-    get readOnly() {
-      return GET(this.@wrapped, 'readOnly');
-    }
-    set readOnly(v) {
-      SET(this.@wrapped, 'readOnly', !!v);
-    }
-    get required() {
-      return GET(this.@wrapped, 'required');
-    }
-    set required(v) {
-      SET(this.@wrapped, 'required', !!v);
-    }
-    get size() {
-      return GET(this.@wrapped, 'size');
-    }
-    set size(v) {
-      SET(this.@wrapped, 'size', v >>> 0);
-    }
-    get src() {
-      return GET(this.@wrapped, 'src');
-    }
-    set src(v) {
-      SET(this.@wrapped, 'src', '' + v);
-    }
-    get step() {
-      return GET(this.@wrapped, 'step');
-    }
-    set step(v) {
-      SET(this.@wrapped, 'step', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get defaultValue() {
-      return GET(this.@wrapped, 'defaultValue');
-    }
-    set defaultValue(v) {
-      SET(this.@wrapped, 'defaultValue', '' + v);
-    }
-    get value() {
-      return GET(this.@wrapped, 'value');
-    }
-    set value(v) {
-      SET(this.@wrapped, 'value', '' + v);
-    }
-    get valueAsDate() {
-      return WRAP(GET(this.@wrapped, 'valueAsDate'));
-    }
-    set valueAsDate(v) {
-      SET(this.@wrapped, 'valueAsDate', UNWRAP(v));
-    }
-    get valueAsNumber() {
-      return GET(this.@wrapped, 'valueAsNumber');
-    }
-    set valueAsNumber(v) {
-      SET(this.@wrapped, 'valueAsNumber', +v || 0);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', v >>> 0);
-    }
-    get selectionStart() {
-      return GET(this.@wrapped, 'selectionStart');
-    }
-    set selectionStart(v) {
-      SET(this.@wrapped, 'selectionStart', v >>> 0);
-    }
-    get selectionEnd() {
-      return GET(this.@wrapped, 'selectionEnd');
-    }
-    set selectionEnd(v) {
-      SET(this.@wrapped, 'selectionEnd', v >>> 0);
-    }
-    get selectionDirection() {
-      return GET(this.@wrapped, 'selectionDirection');
-    }
-    set selectionDirection(v) {
-      SET(this.@wrapped, 'selectionDirection', '' + v);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get useMap() {
-      return GET(this.@wrapped, 'useMap');
-    }
-    set useMap(v) {
-      SET(this.@wrapped, 'useMap', '' + v);
-    }
-    get form() {
-      return WRAP(GET(this.@wrapped, 'form'));
-    }
-    get files() {
-      return WRAP(GET(this.@wrapped, 'files'));
-    }
-    get list() {
-      return WRAP(GET(this.@wrapped, 'list'));
-    }
-    get willValidate() {
-      return GET(this.@wrapped, 'willValidate');
-    }
-    get validity() {
-      return WRAP(GET(this.@wrapped, 'validity'));
-    }
-    get validationMessage() {
-      return GET(this.@wrapped, 'validationMessage');
-    }
-    get labels() {
-      return WRAP(GET(this.@wrapped, 'labels'));
-    }
-    stepUp(n) {
-      CALL(this.@wrapped, 'stepUp', n >> 0);
-    }
-    stepDown(n) {
-      CALL(this.@wrapped, 'stepDown', n >> 0);
-    }
-    checkValidity() {
-      return CALL(this.@wrapped, 'checkValidity');
-    }
-    setCustomValidity(error) {
-      CALL(this.@wrapped, 'setCustomValidity', '' + error);
-    }
-    select() {
-      CALL(this.@wrapped, 'select');
-    }
-    setRangeText(replacement, start, end, selectionMode) {
-      CALL(this.@wrapped, 'setRangeText', '' + replacement, start >>> 0, end >>> 0, UNWRAP(selectionMode));
-    }
-    setSelectionRange(start, end, direction) {
-      CALL(this.@wrapped, 'setSelectionRange', start >>> 0, end >>> 0, '' + direction);
-    }
   }
   export class HTMLKeygenElement extends HTMLElement {
     get autofocus() {
@@ -4241,20 +4402,6 @@ module DOM {
       CALL(this.@wrapped, 'setCustomValidity', '' + error);
     }
   }
-  export class HTMLLIElement extends HTMLElement {
-    get value() {
-      return GET(this.@wrapped, 'value');
-    }
-    set value(v) {
-      SET(this.@wrapped, 'value', v >> 0);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-  }
   export class HTMLLabelElement extends HTMLElement {
     get htmlFor() {
       return GET(this.@wrapped, 'htmlFor');
@@ -4267,82 +4414,6 @@ module DOM {
     }
     get control() {
       return WRAP(GET(this.@wrapped, 'control'));
-    }
-  }
-  export class HTMLLegendElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get form() {
-      return WRAP(GET(this.@wrapped, 'form'));
-    }
-  }
-  export class HTMLLinkElement extends HTMLElement {
-    get disabled() {
-      return GET(this.@wrapped, 'disabled');
-    }
-    set disabled(v) {
-      SET(this.@wrapped, 'disabled', !!v);
-    }
-    get href() {
-      return GET(this.@wrapped, 'href');
-    }
-    set href(v) {
-      SET(this.@wrapped, 'href', '' + v);
-    }
-    get rel() {
-      return GET(this.@wrapped, 'rel');
-    }
-    set rel(v) {
-      SET(this.@wrapped, 'rel', '' + v);
-    }
-    get media() {
-      return GET(this.@wrapped, 'media');
-    }
-    set media(v) {
-      SET(this.@wrapped, 'media', '' + v);
-    }
-    get hreflang() {
-      return GET(this.@wrapped, 'hreflang');
-    }
-    set hreflang(v) {
-      SET(this.@wrapped, 'hreflang', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get charset() {
-      return GET(this.@wrapped, 'charset');
-    }
-    set charset(v) {
-      SET(this.@wrapped, 'charset', '' + v);
-    }
-    get rev() {
-      return GET(this.@wrapped, 'rev');
-    }
-    set rev(v) {
-      SET(this.@wrapped, 'rev', '' + v);
-    }
-    get target() {
-      return GET(this.@wrapped, 'target');
-    }
-    set target(v) {
-      SET(this.@wrapped, 'target', '' + v);
-    }
-    get relList() {
-      return WRAP(GET(this.@wrapped, 'relList'));
-    }
-    get sizes() {
-      return WRAP(GET(this.@wrapped, 'sizes'));
-    }
-    get sheet() {
-      return WRAP(GET(this.@wrapped, 'sheet'));
     }
   }
   export class HTMLMapElement extends HTMLElement {
@@ -4587,6 +4658,9 @@ module DOM {
     canPlayType(type) {
       return CALL(this.@wrapped, 'canPlayType', '' + type);
     }
+    fastSeek(time) {
+      CALL(this.@wrapped, 'fastSeek', +time || 0);
+    }
     play() {
       CALL(this.@wrapped, 'play');
     }
@@ -4598,62 +4672,14 @@ module DOM {
     }
   }
   constants(HTMLMediaElement, {
-    NETWORK_EMPTY: 0,
     NETWORK_IDLE: 1,
     NETWORK_LOADING: 2,
     NETWORK_NO_SOURCE: 3,
-    HAVE_NOTHING: 0,
     HAVE_METADATA: 1,
     HAVE_CURRENT_DATA: 2,
     HAVE_FUTURE_DATA: 3,
     HAVE_ENOUGH_DATA: 4
   });
-  export class HTMLMenuElement extends HTMLElement {
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get label() {
-      return GET(this.@wrapped, 'label');
-    }
-    set label(v) {
-      SET(this.@wrapped, 'label', '' + v);
-    }
-    get compact() {
-      return GET(this.@wrapped, 'compact');
-    }
-    set compact(v) {
-      SET(this.@wrapped, 'compact', !!v);
-    }
-  }
-  export class HTMLMetaElement extends HTMLElement {
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get httpEquiv() {
-      return GET(this.@wrapped, 'httpEquiv');
-    }
-    set httpEquiv(v) {
-      SET(this.@wrapped, 'httpEquiv', '' + v);
-    }
-    get content() {
-      return GET(this.@wrapped, 'content');
-    }
-    set content(v) {
-      SET(this.@wrapped, 'content', '' + v);
-    }
-    get scheme() {
-      return GET(this.@wrapped, 'scheme');
-    }
-    set scheme(v) {
-      SET(this.@wrapped, 'scheme', '' + v);
-    }
-  }
   export class HTMLMeterElement extends HTMLElement {
     get value() {
       return GET(this.@wrapped, 'value');
@@ -4709,160 +4735,6 @@ module DOM {
       SET(this.@wrapped, 'dateTime', '' + v);
     }
   }
-  export class HTMLOListElement extends HTMLElement {
-    get reversed() {
-      return GET(this.@wrapped, 'reversed');
-    }
-    set reversed(v) {
-      SET(this.@wrapped, 'reversed', !!v);
-    }
-    get start() {
-      return GET(this.@wrapped, 'start');
-    }
-    set start(v) {
-      SET(this.@wrapped, 'start', v >> 0);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get compact() {
-      return GET(this.@wrapped, 'compact');
-    }
-    set compact(v) {
-      SET(this.@wrapped, 'compact', !!v);
-    }
-  }
-  export class HTMLObjectElement extends HTMLElement {
-    get data() {
-      return GET(this.@wrapped, 'data');
-    }
-    set data(v) {
-      SET(this.@wrapped, 'data', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get typeMustMatch() {
-      return GET(this.@wrapped, 'typeMustMatch');
-    }
-    set typeMustMatch(v) {
-      SET(this.@wrapped, 'typeMustMatch', !!v);
-    }
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get useMap() {
-      return GET(this.@wrapped, 'useMap');
-    }
-    set useMap(v) {
-      SET(this.@wrapped, 'useMap', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-    get height() {
-      return GET(this.@wrapped, 'height');
-    }
-    set height(v) {
-      SET(this.@wrapped, 'height', '' + v);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get archive() {
-      return GET(this.@wrapped, 'archive');
-    }
-    set archive(v) {
-      SET(this.@wrapped, 'archive', '' + v);
-    }
-    get code() {
-      return GET(this.@wrapped, 'code');
-    }
-    set code(v) {
-      SET(this.@wrapped, 'code', '' + v);
-    }
-    get declare() {
-      return GET(this.@wrapped, 'declare');
-    }
-    set declare(v) {
-      SET(this.@wrapped, 'declare', !!v);
-    }
-    get hspace() {
-      return GET(this.@wrapped, 'hspace');
-    }
-    set hspace(v) {
-      SET(this.@wrapped, 'hspace', v >>> 0);
-    }
-    get standby() {
-      return GET(this.@wrapped, 'standby');
-    }
-    set standby(v) {
-      SET(this.@wrapped, 'standby', '' + v);
-    }
-    get vspace() {
-      return GET(this.@wrapped, 'vspace');
-    }
-    set vspace(v) {
-      SET(this.@wrapped, 'vspace', v >>> 0);
-    }
-    get codeBase() {
-      return GET(this.@wrapped, 'codeBase');
-    }
-    set codeBase(v) {
-      SET(this.@wrapped, 'codeBase', '' + v);
-    }
-    get codeType() {
-      return GET(this.@wrapped, 'codeType');
-    }
-    set codeType(v) {
-      SET(this.@wrapped, 'codeType', '' + v);
-    }
-    get border() {
-      return GET(this.@wrapped, 'border');
-    }
-    set border(v) {
-      SET(this.@wrapped, 'border', '' + v);
-    }
-    get form() {
-      return WRAP(GET(this.@wrapped, 'form'));
-    }
-    get contentDocument() {
-      return WRAP(GET(this.@wrapped, 'contentDocument'));
-    }
-    get contentWindow() {
-      return WRAP(GET(this.@wrapped, 'contentWindow'));
-    }
-    get willValidate() {
-      return GET(this.@wrapped, 'willValidate');
-    }
-    get validity() {
-      return WRAP(GET(this.@wrapped, 'validity'));
-    }
-    get validationMessage() {
-      return GET(this.@wrapped, 'validationMessage');
-    }
-    checkValidity() {
-      return CALL(this.@wrapped, 'checkValidity');
-    }
-    setCustomValidity(error) {
-      CALL(this.@wrapped, 'setCustomValidity', '' + error);
-    }
-  }
   export class HTMLOptGroupElement extends HTMLElement {
     get disabled() {
       return GET(this.@wrapped, 'disabled');
@@ -4877,8 +4749,53 @@ module DOM {
       SET(this.@wrapped, 'label', '' + v);
     }
   }
-  export var HTMLOptionElement = class Option extends HTMLElement {
-      };
+  export class HTMLOptionElement extends HTMLElement {
+    constructor(text, value, defaultSelected, selected) {
+      this.@wrapped = CONSTRUCT(HTMLOptionElement, '' + text, '' + value, !!defaultSelected, !!selected);
+    }
+    get disabled() {
+      return GET(this.@wrapped, 'disabled');
+    }
+    set disabled(v) {
+      SET(this.@wrapped, 'disabled', !!v);
+    }
+    get label() {
+      return GET(this.@wrapped, 'label');
+    }
+    set label(v) {
+      SET(this.@wrapped, 'label', '' + v);
+    }
+    get defaultSelected() {
+      return GET(this.@wrapped, 'defaultSelected');
+    }
+    set defaultSelected(v) {
+      SET(this.@wrapped, 'defaultSelected', !!v);
+    }
+    get selected() {
+      return GET(this.@wrapped, 'selected');
+    }
+    set selected(v) {
+      SET(this.@wrapped, 'selected', !!v);
+    }
+    get value() {
+      return GET(this.@wrapped, 'value');
+    }
+    set value(v) {
+      SET(this.@wrapped, 'value', '' + v);
+    }
+    get text() {
+      return GET(this.@wrapped, 'text');
+    }
+    set text(v) {
+      SET(this.@wrapped, 'text', '' + v);
+    }
+    get form() {
+      return WRAP(GET(this.@wrapped, 'form'));
+    }
+    get index() {
+      return GET(this.@wrapped, 'index');
+    }
+  }
   export class HTMLOutputElement extends HTMLElement {
     get name() {
       return GET(this.@wrapped, 'name');
@@ -4926,48 +4843,6 @@ module DOM {
       CALL(this.@wrapped, 'setCustomValidity', '' + error);
     }
   }
-  export class HTMLParagraphElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-  }
-  export class HTMLParamElement extends HTMLElement {
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get value() {
-      return GET(this.@wrapped, 'value');
-    }
-    set value(v) {
-      SET(this.@wrapped, 'value', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get valueType() {
-      return GET(this.@wrapped, 'valueType');
-    }
-    set valueType(v) {
-      SET(this.@wrapped, 'valueType', '' + v);
-    }
-  }
-  export class HTMLPreElement extends HTMLElement {
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', v >> 0);
-    }
-  }
   export class HTMLProgressElement extends HTMLElement {
     get value() {
       return GET(this.@wrapped, 'value');
@@ -4994,56 +4869,6 @@ module DOM {
     }
     set cite(v) {
       SET(this.@wrapped, 'cite', '' + v);
-    }
-  }
-  export class HTMLScriptElement extends HTMLElement {
-    get src() {
-      return GET(this.@wrapped, 'src');
-    }
-    set src(v) {
-      SET(this.@wrapped, 'src', '' + v);
-    }
-    get async() {
-      return GET(this.@wrapped, 'async');
-    }
-    set async(v) {
-      SET(this.@wrapped, 'async', !!v);
-    }
-    get defer() {
-      return GET(this.@wrapped, 'defer');
-    }
-    set defer(v) {
-      SET(this.@wrapped, 'defer', !!v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get charset() {
-      return GET(this.@wrapped, 'charset');
-    }
-    set charset(v) {
-      SET(this.@wrapped, 'charset', '' + v);
-    }
-    get text() {
-      return GET(this.@wrapped, 'text');
-    }
-    set text(v) {
-      SET(this.@wrapped, 'text', '' + v);
-    }
-    get event() {
-      return GET(this.@wrapped, 'event');
-    }
-    set event(v) {
-      SET(this.@wrapped, 'event', '' + v);
-    }
-    get htmlFor() {
-      return GET(this.@wrapped, 'htmlFor');
-    }
-    set htmlFor(v) {
-      SET(this.@wrapped, 'htmlFor', '' + v);
     }
   }
   export class HTMLSelectElement extends HTMLElement {
@@ -5136,334 +4961,6 @@ module DOM {
     }
     set scoped(v) {
       SET(this.@wrapped, 'scoped', !!v);
-    }
-    get sheet() {
-      return WRAP(GET(this.@wrapped, 'sheet'));
-    }
-  }
-  export class HTMLTableCaptionElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-  }
-  export class HTMLTableCellElement extends HTMLElement {
-    get colSpan() {
-      return GET(this.@wrapped, 'colSpan');
-    }
-    set colSpan(v) {
-      SET(this.@wrapped, 'colSpan', v >>> 0);
-    }
-    get rowSpan() {
-      return GET(this.@wrapped, 'rowSpan');
-    }
-    set rowSpan(v) {
-      SET(this.@wrapped, 'rowSpan', v >>> 0);
-    }
-    get abbr() {
-      return GET(this.@wrapped, 'abbr');
-    }
-    set abbr(v) {
-      SET(this.@wrapped, 'abbr', '' + v);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get axis() {
-      return GET(this.@wrapped, 'axis');
-    }
-    set axis(v) {
-      SET(this.@wrapped, 'axis', '' + v);
-    }
-    get height() {
-      return GET(this.@wrapped, 'height');
-    }
-    set height(v) {
-      SET(this.@wrapped, 'height', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-    get ch() {
-      return GET(this.@wrapped, 'ch');
-    }
-    set ch(v) {
-      SET(this.@wrapped, 'ch', '' + v);
-    }
-    get chOff() {
-      return GET(this.@wrapped, 'chOff');
-    }
-    set chOff(v) {
-      SET(this.@wrapped, 'chOff', '' + v);
-    }
-    get noWrap() {
-      return GET(this.@wrapped, 'noWrap');
-    }
-    set noWrap(v) {
-      SET(this.@wrapped, 'noWrap', !!v);
-    }
-    get vAlign() {
-      return GET(this.@wrapped, 'vAlign');
-    }
-    set vAlign(v) {
-      SET(this.@wrapped, 'vAlign', '' + v);
-    }
-    get bgColor() {
-      return GET(this.@wrapped, 'bgColor');
-    }
-    set bgColor(v) {
-      SET(this.@wrapped, 'bgColor', '' + v);
-    }
-    get headers() {
-      return WRAP(GET(this.@wrapped, 'headers'));
-    }
-    get cellIndex() {
-      return GET(this.@wrapped, 'cellIndex');
-    }
-  }
-  export class HTMLTableColElement extends HTMLElement {
-    get span() {
-      return GET(this.@wrapped, 'span');
-    }
-    set span(v) {
-      SET(this.@wrapped, 'span', v >>> 0);
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get ch() {
-      return GET(this.@wrapped, 'ch');
-    }
-    set ch(v) {
-      SET(this.@wrapped, 'ch', '' + v);
-    }
-    get chOff() {
-      return GET(this.@wrapped, 'chOff');
-    }
-    set chOff(v) {
-      SET(this.@wrapped, 'chOff', '' + v);
-    }
-    get vAlign() {
-      return GET(this.@wrapped, 'vAlign');
-    }
-    set vAlign(v) {
-      SET(this.@wrapped, 'vAlign', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-  }
-  export class HTMLTableDataCellElement extends HTMLTableCellElement {
-  }
-  export class HTMLTableElement extends HTMLElement {
-    get caption() {
-      return WRAP(GET(this.@wrapped, 'caption'));
-    }
-    set caption(v) {
-      SET(this.@wrapped, 'caption', UNWRAP(v));
-    }
-    get tHead() {
-      return WRAP(GET(this.@wrapped, 'tHead'));
-    }
-    set tHead(v) {
-      SET(this.@wrapped, 'tHead', UNWRAP(v));
-    }
-    get tFoot() {
-      return WRAP(GET(this.@wrapped, 'tFoot'));
-    }
-    set tFoot(v) {
-      SET(this.@wrapped, 'tFoot', UNWRAP(v));
-    }
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get border() {
-      return GET(this.@wrapped, 'border');
-    }
-    set border(v) {
-      SET(this.@wrapped, 'border', '' + v);
-    }
-    get frame() {
-      return GET(this.@wrapped, 'frame');
-    }
-    set frame(v) {
-      SET(this.@wrapped, 'frame', '' + v);
-    }
-    get rules() {
-      return GET(this.@wrapped, 'rules');
-    }
-    set rules(v) {
-      SET(this.@wrapped, 'rules', '' + v);
-    }
-    get summary() {
-      return GET(this.@wrapped, 'summary');
-    }
-    set summary(v) {
-      SET(this.@wrapped, 'summary', '' + v);
-    }
-    get width() {
-      return GET(this.@wrapped, 'width');
-    }
-    set width(v) {
-      SET(this.@wrapped, 'width', '' + v);
-    }
-    get bgColor() {
-      return GET(this.@wrapped, 'bgColor');
-    }
-    set bgColor(v) {
-      SET(this.@wrapped, 'bgColor', '' + v);
-    }
-    get cellPadding() {
-      return GET(this.@wrapped, 'cellPadding');
-    }
-    set cellPadding(v) {
-      SET(this.@wrapped, 'cellPadding', '' + v);
-    }
-    get cellSpacing() {
-      return GET(this.@wrapped, 'cellSpacing');
-    }
-    set cellSpacing(v) {
-      SET(this.@wrapped, 'cellSpacing', '' + v);
-    }
-    get tBodies() {
-      return WRAP(GET(this.@wrapped, 'tBodies'));
-    }
-    get rows() {
-      return WRAP(GET(this.@wrapped, 'rows'));
-    }
-    createCaption() {
-      return WRAP(CALL(this.@wrapped, 'createCaption'));
-    }
-    deleteCaption() {
-      CALL(this.@wrapped, 'deleteCaption');
-    }
-    createTHead() {
-      return WRAP(CALL(this.@wrapped, 'createTHead'));
-    }
-    deleteTHead() {
-      CALL(this.@wrapped, 'deleteTHead');
-    }
-    createTFoot() {
-      return WRAP(CALL(this.@wrapped, 'createTFoot'));
-    }
-    deleteTFoot() {
-      CALL(this.@wrapped, 'deleteTFoot');
-    }
-    createTBody() {
-      return WRAP(CALL(this.@wrapped, 'createTBody'));
-    }
-    insertRow(index) {
-      return WRAP(CALL(this.@wrapped, 'insertRow', index >> 0));
-    }
-    deleteRow(index) {
-      CALL(this.@wrapped, 'deleteRow', index >> 0);
-    }
-  }
-  export class HTMLTableHeaderCellElement extends HTMLTableCellElement {
-    get scope() {
-      return GET(this.@wrapped, 'scope');
-    }
-    set scope(v) {
-      SET(this.@wrapped, 'scope', '' + v);
-    }
-  }
-  export class HTMLTableRowElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get ch() {
-      return GET(this.@wrapped, 'ch');
-    }
-    set ch(v) {
-      SET(this.@wrapped, 'ch', '' + v);
-    }
-    get chOff() {
-      return GET(this.@wrapped, 'chOff');
-    }
-    set chOff(v) {
-      SET(this.@wrapped, 'chOff', '' + v);
-    }
-    get vAlign() {
-      return GET(this.@wrapped, 'vAlign');
-    }
-    set vAlign(v) {
-      SET(this.@wrapped, 'vAlign', '' + v);
-    }
-    get bgColor() {
-      return GET(this.@wrapped, 'bgColor');
-    }
-    set bgColor(v) {
-      SET(this.@wrapped, 'bgColor', '' + v);
-    }
-    get rowIndex() {
-      return GET(this.@wrapped, 'rowIndex');
-    }
-    get sectionRowIndex() {
-      return GET(this.@wrapped, 'sectionRowIndex');
-    }
-    get cells() {
-      return WRAP(GET(this.@wrapped, 'cells'));
-    }
-    insertCell(index) {
-      return WRAP(CALL(this.@wrapped, 'insertCell', index >> 0));
-    }
-    deleteCell(index) {
-      CALL(this.@wrapped, 'deleteCell', index >> 0);
-    }
-  }
-  export class HTMLTableSectionElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
-    }
-    get ch() {
-      return GET(this.@wrapped, 'ch');
-    }
-    set ch(v) {
-      SET(this.@wrapped, 'ch', '' + v);
-    }
-    get chOff() {
-      return GET(this.@wrapped, 'chOff');
-    }
-    set chOff(v) {
-      SET(this.@wrapped, 'chOff', '' + v);
-    }
-    get vAlign() {
-      return GET(this.@wrapped, 'vAlign');
-    }
-    set vAlign(v) {
-      SET(this.@wrapped, 'vAlign', '' + v);
-    }
-    get rows() {
-      return WRAP(GET(this.@wrapped, 'rows'));
-    }
-    insertRow(index) {
-      return WRAP(CALL(this.@wrapped, 'insertRow', index >> 0));
-    }
-    deleteRow(index) {
-      CALL(this.@wrapped, 'deleteRow', index >> 0);
     }
   }
   export class HTMLTextAreaElement extends HTMLElement {
@@ -5666,21 +5163,7 @@ module DOM {
       return WRAP(GET(this.@wrapped, 'track'));
     }
   }
-  constants(HTMLTrackElement, { NONE: 0, LOADING: 1, LOADED: 2, ERROR: 3 });
-  export class HTMLUListElement extends HTMLElement {
-    get compact() {
-      return GET(this.@wrapped, 'compact');
-    }
-    set compact(v) {
-      SET(this.@wrapped, 'compact', !!v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-  }
+  constants(HTMLTrackElement, { LOADING: 1, LOADED: 2, ERROR: 3 });
   export class HTMLUnknownElement extends HTMLElement {
   }
   export class HTMLVideoElement extends HTMLMediaElement {
@@ -5709,56 +5192,6 @@ module DOM {
       return GET(this.@wrapped, 'videoHeight');
     }
   }
-  export class ShadowRoot extends DocumentFragment {
-    constructor(host) {
-      this.@wrapped = CONSTRUCT(ShadowRoot, UNWRAP(host));
-    }
-    get applyAuthorStyles() {
-      return WRAP(GET(this.@wrapped, 'applyAuthorStyles'));
-    }
-    set applyAuthorStyles(v) {
-      SET(this.@wrapped, 'applyAuthorStyles', UNWRAP(v));
-    }
-    get resetStyleInheritance() {
-      return WRAP(GET(this.@wrapped, 'resetStyleInheritance'));
-    }
-    set resetStyleInheritance(v) {
-      SET(this.@wrapped, 'resetStyleInheritance', UNWRAP(v));
-    }
-    get innerHTML() {
-      return GET(this.@wrapped, 'innerHTML');
-    }
-    set innerHTML(v) {
-      SET(this.@wrapped, 'innerHTML', '' + v);
-    }
-    get activeElement() {
-      return WRAP(GET(this.@wrapped, 'activeElement'));
-    }
-    get styleSheets() {
-      return WRAP(GET(this.@wrapped, 'styleSheets'));
-    }
-    getElementById(elementId) {
-      return WRAP(CALL(this.@wrapped, 'getElementById', '' + elementId));
-    }
-    getElementsByClassName(tagName) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByClassName', '' + tagName));
-    }
-    getElementsByTagName(className) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByTagName', '' + className));
-    }
-    getElementsByTagNameNS(namespace, localName) {
-      return WRAP(CALL(this.@wrapped, 'getElementsByTagNameNS', '' + namespace, '' + localName));
-    }
-    getSelection() {
-      return WRAP(CALL(this.@wrapped, 'getSelection'));
-    }
-    addStyleSheet(element) {
-      return WRAP(CALL(this.@wrapped, 'addStyleSheet', UNWRAP(element)));
-    }
-    removeStyleSheet(styleSheet) {
-      return WRAP(CALL(this.@wrapped, 'removeStyleSheet', UNWRAP(styleSheet)));
-    }
-  }
   export class SharedWorkerGlobalScope extends WorkerGlobalScope {
     get onconnect() {
       return WRAP(GET(this.@wrapped, 'onconnect'));
@@ -5771,214 +5204,6 @@ module DOM {
     }
     get applicationCache() {
       return WRAP(GET(this.@wrapped, 'applicationCache'));
-    }
-  }
-  export class XMLHttpRequest extends XMLHttpRequestEventTarget {
-    constructor() {
-      this.@wrapped = CONSTRUCT(XMLHttpRequest);
-    }
-    get onreadystatechange() {
-      return WRAP(GET(this.@wrapped, 'onreadystatechange'));
-    }
-    set onreadystatechange(v) {
-      SET(this.@wrapped, 'onreadystatechange', CALLBACK(v));
-    }
-    get timeout() {
-      return GET(this.@wrapped, 'timeout');
-    }
-    set timeout(v) {
-      SET(this.@wrapped, 'timeout', v >>> 0);
-    }
-    get withCredentials() {
-      return GET(this.@wrapped, 'withCredentials');
-    }
-    set withCredentials(v) {
-      SET(this.@wrapped, 'withCredentials', !!v);
-    }
-    get responseType() {
-      return WRAP(GET(this.@wrapped, 'responseType'));
-    }
-    set responseType(v) {
-      SET(this.@wrapped, 'responseType', UNWRAP(v));
-    }
-    get readyState() {
-      return GET(this.@wrapped, 'readyState');
-    }
-    get upload() {
-      return WRAP(GET(this.@wrapped, 'upload'));
-    }
-    get status() {
-      return GET(this.@wrapped, 'status');
-    }
-    get statusText() {
-      return WRAP(GET(this.@wrapped, 'statusText'));
-    }
-    get response() {
-      return WRAP(GET(this.@wrapped, 'response'));
-    }
-    get responseText() {
-      return GET(this.@wrapped, 'responseText');
-    }
-    get responseXML() {
-      return WRAP(GET(this.@wrapped, 'responseXML'));
-    }
-    open(method, url, async, user, password) {
-      CALL(this.@wrapped, 'open', UNWRAP(method), '' + url, !!async, '' + user, '' + password);
-    }
-    setRequestHeader(header, value) {
-      CALL(this.@wrapped, 'setRequestHeader', UNWRAP(header), UNWRAP(value));
-    }
-    send(data) {
-      CALL(this.@wrapped, 'send', UNWRAP(data));
-    }
-    abort() {
-      CALL(this.@wrapped, 'abort');
-    }
-    getResponseHeader(header) {
-      return WRAP(CALL(this.@wrapped, 'getResponseHeader', UNWRAP(header)));
-    }
-    getAllResponseHeaders() {
-      return WRAP(CALL(this.@wrapped, 'getAllResponseHeaders'));
-    }
-    overrideMimeType(mime) {
-      CALL(this.@wrapped, 'overrideMimeType', '' + mime);
-    }
-  }
-  constants(XMLHttpRequest, { UNSENT: 0, OPENED: 1, HEADERS_RECEIVED: 2, LOADING: 3, DONE: 4 });
-  export class AnonXMLHttpRequest extends XMLHttpRequest {
-    constructor() {
-      this.@wrapped = CONSTRUCT(AnonXMLHttpRequest);
-    }
-  }
-  export class HTMLAnchorElement extends HTMLElement {
-    get href() {
-      return GET(this.@wrapped, 'href');
-    }
-    set href(v) {
-      SET(this.@wrapped, 'href', '' + v);
-    }
-    get target() {
-      return GET(this.@wrapped, 'target');
-    }
-    set target(v) {
-      SET(this.@wrapped, 'target', '' + v);
-    }
-    get download() {
-      return GET(this.@wrapped, 'download');
-    }
-    set download(v) {
-      SET(this.@wrapped, 'download', '' + v);
-    }
-    get ping() {
-      return GET(this.@wrapped, 'ping');
-    }
-    set ping(v) {
-      SET(this.@wrapped, 'ping', '' + v);
-    }
-    get rel() {
-      return GET(this.@wrapped, 'rel');
-    }
-    set rel(v) {
-      SET(this.@wrapped, 'rel', '' + v);
-    }
-    get media() {
-      return GET(this.@wrapped, 'media');
-    }
-    set media(v) {
-      SET(this.@wrapped, 'media', '' + v);
-    }
-    get hreflang() {
-      return GET(this.@wrapped, 'hreflang');
-    }
-    set hreflang(v) {
-      SET(this.@wrapped, 'hreflang', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get text() {
-      return GET(this.@wrapped, 'text');
-    }
-    set text(v) {
-      SET(this.@wrapped, 'text', '' + v);
-    }
-    get protocol() {
-      return GET(this.@wrapped, 'protocol');
-    }
-    set protocol(v) {
-      SET(this.@wrapped, 'protocol', '' + v);
-    }
-    get host() {
-      return GET(this.@wrapped, 'host');
-    }
-    set host(v) {
-      SET(this.@wrapped, 'host', '' + v);
-    }
-    get hostname() {
-      return GET(this.@wrapped, 'hostname');
-    }
-    set hostname(v) {
-      SET(this.@wrapped, 'hostname', '' + v);
-    }
-    get port() {
-      return GET(this.@wrapped, 'port');
-    }
-    set port(v) {
-      SET(this.@wrapped, 'port', '' + v);
-    }
-    get pathname() {
-      return GET(this.@wrapped, 'pathname');
-    }
-    set pathname(v) {
-      SET(this.@wrapped, 'pathname', '' + v);
-    }
-    get search() {
-      return GET(this.@wrapped, 'search');
-    }
-    set search(v) {
-      SET(this.@wrapped, 'search', '' + v);
-    }
-    get hash() {
-      return GET(this.@wrapped, 'hash');
-    }
-    set hash(v) {
-      SET(this.@wrapped, 'hash', '' + v);
-    }
-    get coords() {
-      return GET(this.@wrapped, 'coords');
-    }
-    set coords(v) {
-      SET(this.@wrapped, 'coords', '' + v);
-    }
-    get charset() {
-      return GET(this.@wrapped, 'charset');
-    }
-    set charset(v) {
-      SET(this.@wrapped, 'charset', '' + v);
-    }
-    get name() {
-      return GET(this.@wrapped, 'name');
-    }
-    set name(v) {
-      SET(this.@wrapped, 'name', '' + v);
-    }
-    get rev() {
-      return GET(this.@wrapped, 'rev');
-    }
-    set rev(v) {
-      SET(this.@wrapped, 'rev', '' + v);
-    }
-    get shape() {
-      return GET(this.@wrapped, 'shape');
-    }
-    set shape(v) {
-      SET(this.@wrapped, 'shape', '' + v);
-    }
-    get relList() {
-      return WRAP(GET(this.@wrapped, 'relList'));
     }
   }
   export class HTMLAppletElement extends HTMLElement {
@@ -6049,133 +5274,9 @@ module DOM {
       SET(this.@wrapped, 'width', '' + v);
     }
   }
-  export class HTMLAreaElement extends HTMLElement {
-    get alt() {
-      return GET(this.@wrapped, 'alt');
-    }
-    set alt(v) {
-      SET(this.@wrapped, 'alt', '' + v);
-    }
-    get coords() {
-      return GET(this.@wrapped, 'coords');
-    }
-    set coords(v) {
-      SET(this.@wrapped, 'coords', '' + v);
-    }
-    get shape() {
-      return GET(this.@wrapped, 'shape');
-    }
-    set shape(v) {
-      SET(this.@wrapped, 'shape', '' + v);
-    }
-    get href() {
-      return GET(this.@wrapped, 'href');
-    }
-    set href(v) {
-      SET(this.@wrapped, 'href', '' + v);
-    }
-    get target() {
-      return GET(this.@wrapped, 'target');
-    }
-    set target(v) {
-      SET(this.@wrapped, 'target', '' + v);
-    }
-    get download() {
-      return GET(this.@wrapped, 'download');
-    }
-    set download(v) {
-      SET(this.@wrapped, 'download', '' + v);
-    }
-    get ping() {
-      return GET(this.@wrapped, 'ping');
-    }
-    set ping(v) {
-      SET(this.@wrapped, 'ping', '' + v);
-    }
-    get rel() {
-      return GET(this.@wrapped, 'rel');
-    }
-    set rel(v) {
-      SET(this.@wrapped, 'rel', '' + v);
-    }
-    get media() {
-      return GET(this.@wrapped, 'media');
-    }
-    set media(v) {
-      SET(this.@wrapped, 'media', '' + v);
-    }
-    get hreflang() {
-      return GET(this.@wrapped, 'hreflang');
-    }
-    set hreflang(v) {
-      SET(this.@wrapped, 'hreflang', '' + v);
-    }
-    get type() {
-      return GET(this.@wrapped, 'type');
-    }
-    set type(v) {
-      SET(this.@wrapped, 'type', '' + v);
-    }
-    get protocol() {
-      return GET(this.@wrapped, 'protocol');
-    }
-    set protocol(v) {
-      SET(this.@wrapped, 'protocol', '' + v);
-    }
-    get host() {
-      return GET(this.@wrapped, 'host');
-    }
-    set host(v) {
-      SET(this.@wrapped, 'host', '' + v);
-    }
-    get hostname() {
-      return GET(this.@wrapped, 'hostname');
-    }
-    set hostname(v) {
-      SET(this.@wrapped, 'hostname', '' + v);
-    }
-    get port() {
-      return GET(this.@wrapped, 'port');
-    }
-    set port(v) {
-      SET(this.@wrapped, 'port', '' + v);
-    }
-    get pathname() {
-      return GET(this.@wrapped, 'pathname');
-    }
-    set pathname(v) {
-      SET(this.@wrapped, 'pathname', '' + v);
-    }
-    get search() {
-      return GET(this.@wrapped, 'search');
-    }
-    set search(v) {
-      SET(this.@wrapped, 'search', '' + v);
-    }
-    get hash() {
-      return GET(this.@wrapped, 'hash');
-    }
-    set hash(v) {
-      SET(this.@wrapped, 'hash', '' + v);
-    }
-    get noHref() {
-      return GET(this.@wrapped, 'noHref');
-    }
-    set noHref(v) {
-      SET(this.@wrapped, 'noHref', !!v);
-    }
-    get relList() {
-      return WRAP(GET(this.@wrapped, 'relList'));
-    }
-  }
-  export var HTMLAudioElement = class Audio extends HTMLMediaElement {
-      };
-  export class HTMLBRElement extends HTMLElement {
-    get clear() {
-      return GET(this.@wrapped, 'clear');
-    }
-    set clear(v) {
-      SET(this.@wrapped, 'clear', '' + v);
+  export class HTMLAudioElement extends HTMLMediaElement {
+    constructor(src) {
+      this.@wrapped = CONSTRUCT(HTMLAudioElement, '' + src);
     }
   }
   export class HTMLBaseElement extends HTMLElement {
@@ -6210,152 +5311,6 @@ module DOM {
     }
     set size(v) {
       SET(this.@wrapped, 'size', v >> 0);
-    }
-  }
-  export class HTMLBodyElement extends HTMLElement {
-    get onafterprint() {
-      return WRAP(GET(this.@wrapped, 'onafterprint'));
-    }
-    set onafterprint(v) {
-      SET(this.@wrapped, 'onafterprint', CALLBACK_OR_NULL(v));
-    }
-    get onbeforeprint() {
-      return WRAP(GET(this.@wrapped, 'onbeforeprint'));
-    }
-    set onbeforeprint(v) {
-      SET(this.@wrapped, 'onbeforeprint', CALLBACK_OR_NULL(v));
-    }
-    get onbeforeunload() {
-      return WRAP(GET(this.@wrapped, 'onbeforeunload'));
-    }
-    set onbeforeunload(v) {
-      SET(this.@wrapped, 'onbeforeunload', CALLBACK_OR_NULL(v));
-    }
-    get onblur() {
-      return WRAP(GET(this.@wrapped, 'onblur'));
-    }
-    set onblur(v) {
-      SET(this.@wrapped, 'onblur', CALLBACK_OR_NULL(v));
-    }
-    get onerror() {
-      return WRAP(GET(this.@wrapped, 'onerror'));
-    }
-    set onerror(v) {
-      SET(this.@wrapped, 'onerror', UNWRAP(v));
-    }
-    get onfocus() {
-      return WRAP(GET(this.@wrapped, 'onfocus'));
-    }
-    set onfocus(v) {
-      SET(this.@wrapped, 'onfocus', CALLBACK_OR_NULL(v));
-    }
-    get onhashchange() {
-      return WRAP(GET(this.@wrapped, 'onhashchange'));
-    }
-    set onhashchange(v) {
-      SET(this.@wrapped, 'onhashchange', CALLBACK_OR_NULL(v));
-    }
-    get onload() {
-      return WRAP(GET(this.@wrapped, 'onload'));
-    }
-    set onload(v) {
-      SET(this.@wrapped, 'onload', CALLBACK_OR_NULL(v));
-    }
-    get onmessage() {
-      return WRAP(GET(this.@wrapped, 'onmessage'));
-    }
-    set onmessage(v) {
-      SET(this.@wrapped, 'onmessage', CALLBACK_OR_NULL(v));
-    }
-    get onoffline() {
-      return WRAP(GET(this.@wrapped, 'onoffline'));
-    }
-    set onoffline(v) {
-      SET(this.@wrapped, 'onoffline', CALLBACK_OR_NULL(v));
-    }
-    get ononline() {
-      return WRAP(GET(this.@wrapped, 'ononline'));
-    }
-    set ononline(v) {
-      SET(this.@wrapped, 'ononline', CALLBACK_OR_NULL(v));
-    }
-    get onpopstate() {
-      return WRAP(GET(this.@wrapped, 'onpopstate'));
-    }
-    set onpopstate(v) {
-      SET(this.@wrapped, 'onpopstate', CALLBACK_OR_NULL(v));
-    }
-    get onpagehide() {
-      return WRAP(GET(this.@wrapped, 'onpagehide'));
-    }
-    set onpagehide(v) {
-      SET(this.@wrapped, 'onpagehide', CALLBACK_OR_NULL(v));
-    }
-    get onpageshow() {
-      return WRAP(GET(this.@wrapped, 'onpageshow'));
-    }
-    set onpageshow(v) {
-      SET(this.@wrapped, 'onpageshow', CALLBACK_OR_NULL(v));
-    }
-    get onresize() {
-      return WRAP(GET(this.@wrapped, 'onresize'));
-    }
-    set onresize(v) {
-      SET(this.@wrapped, 'onresize', CALLBACK_OR_NULL(v));
-    }
-    get onscroll() {
-      return WRAP(GET(this.@wrapped, 'onscroll'));
-    }
-    set onscroll(v) {
-      SET(this.@wrapped, 'onscroll', CALLBACK_OR_NULL(v));
-    }
-    get onstorage() {
-      return WRAP(GET(this.@wrapped, 'onstorage'));
-    }
-    set onstorage(v) {
-      SET(this.@wrapped, 'onstorage', CALLBACK_OR_NULL(v));
-    }
-    get onunload() {
-      return WRAP(GET(this.@wrapped, 'onunload'));
-    }
-    set onunload(v) {
-      SET(this.@wrapped, 'onunload', CALLBACK_OR_NULL(v));
-    }
-    get text() {
-      return GET(this.@wrapped, 'text');
-    }
-    set text(v) {
-      SET(this.@wrapped, 'text', '' + v);
-    }
-    get link() {
-      return GET(this.@wrapped, 'link');
-    }
-    set link(v) {
-      SET(this.@wrapped, 'link', '' + v);
-    }
-    get vLink() {
-      return GET(this.@wrapped, 'vLink');
-    }
-    set vLink(v) {
-      SET(this.@wrapped, 'vLink', '' + v);
-    }
-    get aLink() {
-      return GET(this.@wrapped, 'aLink');
-    }
-    set aLink(v) {
-      SET(this.@wrapped, 'aLink', '' + v);
-    }
-    get bgColor() {
-      return GET(this.@wrapped, 'bgColor');
-    }
-    set bgColor(v) {
-      SET(this.@wrapped, 'bgColor', '' + v);
-    }
-    get background() {
-      return GET(this.@wrapped, 'background');
-    }
-    set background(v) {
-      SET(this.@wrapped, 'background', '' + v);
     }
   }
   export class HTMLButtonElement extends HTMLElement {
@@ -6454,20 +5409,29 @@ module DOM {
     set height(v) {
       SET(this.@wrapped, 'height', v >>> 0);
     }
-    toDataURL(type, args) {
-      return CALL(this.@wrapped, 'toDataURL', '' + type, UNWRAP(args));
+    getContext(contextId, arguments) {
+      return WRAP(CALL(this.@wrapped, 'getContext', '' + contextId, UNWRAP(arguments)));
     }
-    toDataURLHD(type, args) {
-      return CALL(this.@wrapped, 'toDataURLHD', '' + type, UNWRAP(args));
+    supportsContext(contextId, arguments) {
+      return CALL(this.@wrapped, 'supportsContext', '' + contextId, UNWRAP(arguments));
     }
-    toBlob(_callback, type, args) {
-      CALL(this.@wrapped, 'toBlob', CALLBACK(_callback), '' + type, UNWRAP(args));
+    setContext(context) {
+      CALL(this.@wrapped, 'setContext', UNWRAP(context));
     }
-    toBlobHD(_callback, type, args) {
-      CALL(this.@wrapped, 'toBlobHD', CALLBACK(_callback), '' + type, UNWRAP(args));
+    transferControlToProxy() {
+      return WRAP(CALL(this.@wrapped, 'transferControlToProxy'));
     }
-    getContext(contextId, args) {
-      return WRAP(CALL(this.@wrapped, 'getContext', '' + contextId, UNWRAP(args)));
+    toDataURL(type, arguments) {
+      return CALL(this.@wrapped, 'toDataURL', '' + type, UNWRAP(arguments));
+    }
+    toDataURLHD(type, arguments) {
+      return CALL(this.@wrapped, 'toDataURLHD', '' + type, UNWRAP(arguments));
+    }
+    toBlob(_callback, type, arguments) {
+      CALL(this.@wrapped, 'toBlob', CALLBACK(_callback), '' + type, UNWRAP(arguments));
+    }
+    toBlobHD(_callback, type, arguments) {
+      CALL(this.@wrapped, 'toBlobHD', CALLBACK(_callback), '' + type, UNWRAP(arguments));
     }
   }
   export class HTMLCommandElement extends HTMLElement {
@@ -6509,28 +5473,6 @@ module DOM {
     }
     get command() {
       return WRAP(GET(this.@wrapped, 'command'));
-    }
-  }
-  export class HTMLContentElement extends HTMLElement {
-    get select() {
-      return GET(this.@wrapped, 'select');
-    }
-    set select(v) {
-      SET(this.@wrapped, 'select', '' + v);
-    }
-    get resetStyleInheritance() {
-      return GET(this.@wrapped, 'resetStyleInheritance');
-    }
-    set resetStyleInheritance(v) {
-      SET(this.@wrapped, 'resetStyleInheritance', !!v);
-    }
-  }
-  export class HTMLDListElement extends HTMLElement {
-    get compact() {
-      return GET(this.@wrapped, 'compact');
-    }
-    set compact(v) {
-      SET(this.@wrapped, 'compact', !!v);
     }
   }
   export class HTMLDataElement extends HTMLElement {
@@ -6583,14 +5525,6 @@ module DOM {
     }
     set compact(v) {
       SET(this.@wrapped, 'compact', !!v);
-    }
-  }
-  export class HTMLDivElement extends HTMLElement {
-    get align() {
-      return GET(this.@wrapped, 'align');
-    }
-    set align(v) {
-      SET(this.@wrapped, 'align', '' + v);
     }
   }
 }
