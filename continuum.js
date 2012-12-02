@@ -185,7 +185,7 @@ parseYieldExpression: true
         UnexpectedString:  'Unexpected string',
         UnexpectedIdentifier:  'Unexpected identifier',
         UnexpectedReserved:  'Unexpected reserved word',
-        UnexpectedTemplate:  'Unexpected quasi %0',
+        UnexpectedTemplate:  'Unexpected template %0',
         UnexpectedEOS:  'Unexpected end of input',
         NewlineAfterThrow:  'Illegal newline after throw',
         InvalidRegExp: 'Invalid regular expression',
@@ -2001,21 +2001,21 @@ parseYieldExpression: true
     }
 
     function parseTemplateLiteral() {
-        var quasi, quasis, expressions;
+        var template, templates, expressions;
 
-        quasi = parseTemplateElement({ head: true });
-        quasis = [ quasi ];
+        template = parseTemplateElement({ head: true });
+        templates = [ template ];
         expressions = [];
 
-        while (!quasi.tail) {
+        while (!template.tail) {
             expressions.push(parseExpression());
-            quasi = parseTemplateElement({ head: false });
-            quasis.push(quasi);
+            template = parseTemplateElement({ head: false });
+            templates.push(template);
         }
 
         return {
             type: Syntax.TemplateLiteral,
-            quasis: quasis,
+            templates: templates,
             expressions: expressions
         };
     }
@@ -2254,7 +2254,7 @@ parseYieldExpression: true
                 expr = {
                     type: Syntax.TaggedTemplateExpression,
                     tag: expr,
-                    quasi: parseTemplateLiteral()
+                    template: parseTemplateLiteral()
                 };
             }
         }
@@ -2287,7 +2287,7 @@ parseYieldExpression: true
                 expr = {
                     type: Syntax.TaggedTemplateExpression,
                     tag: expr,
-                    quasi: parseTemplateLiteral()
+                    template: parseTemplateLiteral()
                 };
             }
         }
@@ -4952,7 +4952,7 @@ parseYieldExpression: true
                 expr = {
                     type: Syntax.TaggedTemplateExpression,
                     tag: expr,
-                    quasi: parseTemplateLiteral()
+                    template: parseTemplateLiteral()
                 };
                 marker.end();
                 marker.apply(expr);
@@ -5001,7 +5001,7 @@ parseYieldExpression: true
                 expr = {
                     type: Syntax.TaggedTemplateExpression,
                     tag: expr,
-                    quasi: parseTemplateLiteral()
+                    template: parseTemplateLiteral()
                 };
                 marker.end();
                 marker.apply(expr);
@@ -10787,6 +10787,7 @@ exports.assembler = (function(exports){
 
       lexical(function(){
         BLOCK(lexicalDecls(node.cases));
+        var defaultFound;
 
         if (node.cases){
           var cases = [];
@@ -10796,7 +10797,7 @@ exports.assembler = (function(exports){
               GET();
               cases.push(CASE(0));
             } else {
-              var defaultFound = i;
+              defaultFound = i;
               cases.push(0);
             }
           });
@@ -10848,7 +10849,11 @@ exports.assembler = (function(exports){
   function TemplateElement(node){}
 
   function TemplateLiteral(node, tagged){
-    each(node.quasis, function(element, i){
+    if (node.quasis) {
+      node.templates = node.quasis;
+      delete node.quasis;
+    }
+    each(node.templates, function(element, i){
       STRING(element.value.raw);
       if (!element.tail) {
         recurse(node.expressions[i]);
@@ -10861,9 +10866,14 @@ exports.assembler = (function(exports){
     });
   }
 
+
   function TaggedTemplateExpression(node){
     var template = [];
-    each(node.quasi.quasis, function(element){
+    if (node.quasi) {
+      node.template = node.quasi;
+      delete node.quasi;
+    }
+    each(node.template.templates, function(element){
       template.push(element.value);
     });
 
@@ -10874,7 +10884,7 @@ exports.assembler = (function(exports){
     TEMPLATE(template);
     GET();
     ARG();
-    each(node.quasi.expressions, function(node){
+    each(node.template.expressions, function(node){
       recurse(node);
       GET();
       ARG();
@@ -14714,6 +14724,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+
   var ObjectEnvironmentRecord = (function(){
     function ObjectEnvironmentRecord(object, outer){
       this.bindings = object;
@@ -14764,7 +14775,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return ObjectEnvironmentRecord;
   })();
-
 
 
   var FunctionEnvironmentRecord = (function(){
@@ -14823,7 +14833,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return FunctionEnvironmentRecord;
   })();
-
 
 
   var GlobalEnvironmentRecord = (function(){
@@ -15816,7 +15825,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return $GeneratorFunction;
   })();
-
 
   var $Generator = (function(){
     var EXECUTING = 'executing',
@@ -17223,14 +17231,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var $DataView = (function(){
-    function $DataView(buffer){
-      $Object.call(this, intrinsics.DataViewProto);
-      this.view = new DataView(buffer.NativeBuffer);
-    }
-  })();
-
-
   var $NativeFunction = (function(){
     function $NativeFunction(options){
       if (typeof options === 'function') {
@@ -17290,7 +17290,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return $NativeFunction;
   })();
-
 
 
   var ExecutionContext = (function(){
@@ -17511,21 +17510,35 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     };
 
     exports.builtins = {
-      $Array   : $Array,
-      $Boolean : $Boolean,
-      $Date    : $Date,
-      $Error   : $Error,
-      $Function: $Function,
-      $Map     : $Map,
-      $Number  : $Number,
-      $Object  : $Object,
-      $Proxy   : $Proxy,
-      $RegExp  : $RegExp,
-      $Set     : $Set,
-      $Symbol  : $Symbol,
-      $String  : $String,
-      $WeakMap : $WeakMap
+      $Array                : $Array,
+      $Boolean              : $Boolean,
+      $BoundFunction        : $BoundFunction,
+      $Date                 : $Date,
+      $Error                : $Error,
+      $Function             : $Function,
+      $Generator            : $Generator,
+      $GeneratorFunction    : $GeneratorFunction,
+      $Map                  : $Map,
+      $Module               : $Module,
+      $NativeFunction       : $NativeFunction,
+      $Number               : $Number,
+      $Object               : $Object,
+      $Proxy                : $Proxy,
+      $RegExp               : $RegExp,
+      $Set                  : $Set,
+      $Symbol               : $Symbol,
+      $String               : $String,
+      $TypedArray           : $TypedArray,
+      $WeakMap              : $WeakMap,
+      MapData               : MapData,
+      WeakMapData           : WeakMapData,
+      DeclarativeEnvironment: DeclarativeEnvironmentRecord,
+      ObjectEnvironment     : ObjectEnvironmentRecord,
+      FunctionEnvironment   : FunctionEnvironmentRecord,
+      GlobalEnvironment     : GlobalEnvironmentRecord,
+      ExecutionContext      : ExecutionContext
     };
+
 
     var primitives = {
       Date   : Date.prototype,
