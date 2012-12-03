@@ -33,9 +33,9 @@
 
 ### Classes
 
-* [Assembler](docs/Assembler.md)
-* [Code](docs/Code.md)
-* [Exotics](docs/Exotics.md)
-* [Realm](docs/Realm.md)
-* [Renderer](docs/Renderer.md)
-* [Script](docs/Script.md)
+* [Assembler](Assembler.md)
+* [Code](Code.md)
+* [Exotics](Exotics.md)
+* [Realm](Realm.md)
+* [Renderer](Renderer.md)
+* [Script](Script.md)
