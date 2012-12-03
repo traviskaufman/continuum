@@ -33,9 +33,9 @@
 
 ### Classes
 
-* [Assembler](continuum/docs/Assembler.md)
-* [Code](continuum/docs/Code.md)
-* [Exotics](continuum/docs/Exotics.md)
-* [Realm](continuum/docs/Realm.md)
-* [Renderer](continuum/docs/Renderer.md)
-* [Script](continuum/docs/Script.md)
+* [Assembler](continuum/tree/gh-pages/docs/Assembler.md)
+* [Code](continuum/tree/gh-pages/docs/Code.md)
+* [Exotics](continuum/tree/gh-pages/docs/Exotics.md)
+* [Realm](continuum/tree/gh-pages/docs/Realm.md)
+* [Renderer](continuum/tree/gh-pages/docs/Renderer.md)
+* [Script](continuum/tree/gh-pages/docs/Script.md)
