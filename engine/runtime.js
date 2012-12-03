@@ -4387,7 +4387,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             return origin.cache[name] = new Reference(lex, name, strict);
           }
         } while (lex = lex.outer)
-        return origin.cache[name] = new Reference(undefined, name, strict);
+        return new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
         return SuperReference(this, name);
