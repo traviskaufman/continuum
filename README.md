@@ -232,10 +232,12 @@ var $MyObjectType = continuum.createExotic('Object', [
 
 # Todo
 
+* IE6/7 stability
 * Pass test262 (at least get to the point of only failing specific tests on purpose)
-* External interface to the DOM/Node.js
-* Serializable bytecode
+* Stabailize experimental DOM interface
+* Resumable state from the serializer output
 * Full dev environment built around Continuum
-* Bootstrap the runtime by compiling it to bytecode and self-executing
-* Massive work on optimizations
-* IE6/7
+* Create a tracing meta-interpreter to run the interpreter/runtime
+*  * Garbage Collector
+*  * Tracing JIT "compiler" that targets host engine's JIT compiler
+*  * Refactor the runtime to compile efficiently
