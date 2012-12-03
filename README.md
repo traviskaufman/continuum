@@ -238,6 +238,6 @@ var $MyObjectType = continuum.createExotic('Object', [
 * Resumable state from the serializer output
 * Full dev environment built around Continuum
 * Create a tracing meta-interpreter to run the interpreter/runtime
-*  * Garbage Collector
-*  * Tracing JIT "compiler" that targets host engine's JIT compiler
-*  * Refactor the runtime to compile efficiently
+    * Garbage Collector
+    * Tracing JIT "compiler" that targets host engine's JIT compiler
+    * Refactor the runtime to compile efficiently
