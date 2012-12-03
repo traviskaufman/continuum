@@ -6,7 +6,7 @@ var file = require('fs'),
     continuum = require('continuum');
 
 var createRealm = continuum.createRealm,
-    createNativeFunction = continuum.createNativeFunction;
+    createFunction = continuum.createFunction;
 
 
 function render(mirror, prop){
