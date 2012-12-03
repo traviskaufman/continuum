@@ -48,10 +48,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
       console.log(result) // $Module { Function, call, apply, bind }
     });
 
-# Documentation
-
-[docs](continuum/tree/gh-pages/docs/README.md)
-
+## [Documentation](continuum/tree/gh-pages/docs/index.md)
 
 # ES6 Implementation Status
 
@@ -79,7 +76,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Typed Arrays
 * Object.observe (es-next/es7)
 
-### Soon to be Implemented
+### Not Yet Implemented
 
 * Array Comprehensions
 * Default parameters
@@ -94,7 +91,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Stabailize experimental DOM interface
 * Resumable state from the serializer output
 * Full dev environment built around Continuum
-* Create a tracing meta-interpreter to run the interpreter/runtime
+* Create a tracing meta-interpreter to run the interpreter/runtime (see [PyPy](http://pypy.org))
     * Garbage Collector
     * Tracing JIT "compiler" that targets host engine's JIT compiler
-    * Refactor the runtime to compile efficiently
+    * Refactor the runtime to compile efficiently (see [PyPy Coding Guide](http://doc.pypy.org/en/latest/coding-guide.html))
