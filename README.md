@@ -50,7 +50,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 
 # Documentation
 
-[docs](continuum/tree/gh-pages/docs)
+[docs](continuum/tree/gh-pages/docs/README.md)
 
 
 # ES6 Implementation Status
