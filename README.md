@@ -87,17 +87,6 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Binary data api (structs, etc.)
 
 
-# API Classes In Depth
-
-
-
-
-
-
-
-
-
-
 # Todo
 
 * IE6/7 stability
