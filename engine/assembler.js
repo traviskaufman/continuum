@@ -1697,7 +1697,6 @@ var assembler = (function(exports){
             context.currentScope = scope.create('block', context.currentScope);
             recurse(init);
             var decl = init.declarations[init.declarations.length - 1].id;
-            scoped[0] = boundNames(decl);
             var lexicalDecl = {
               type: 'VariableDeclaration',
               kind: init.kind,
@@ -1707,6 +1706,7 @@ var assembler = (function(exports){
                 init: null
               }]
             };
+            scoped[0] = lexicalDecl;
             lexicalDecl.boundNames = boundNames(lexicalDecl);
             recurse(decl);
           } else {
@@ -2230,7 +2230,7 @@ var assembler = (function(exports){
 
   each([ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
     AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
-    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression,
+    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression, ContinueStatement,
     DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
     ExportSpecifierSet, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement,
     FunctionDeclaration, FunctionExpression, Glob, Identifier, IfStatement, ImportDeclaration,
