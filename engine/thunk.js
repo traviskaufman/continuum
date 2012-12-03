@@ -219,7 +219,7 @@ var thunk = (function(exports){
           left   = stack[--sp],
           result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
 
-      if (result.Abrupt) {
+      if (result && result.Abrupt) {
         error = result;
         return unwind;
       }
