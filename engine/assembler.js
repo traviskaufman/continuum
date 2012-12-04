@@ -1341,7 +1341,7 @@ var assembler = (function(exports){
     function Symbol(node){
       if (node.type === 'AtSymbol') {
         this[0] = '@';
-        this[1] = node.name;
+        this[1] = (node.internal ? '@' : '') + node.name;
       } else if (node.type === 'Literal') {
         this[0] = '';
         this[1] = node.value;
@@ -1536,7 +1536,15 @@ var assembler = (function(exports){
   }
 
   function AtSymbol(node){
-    REFSYMBOL(node.name);
+    if (node.internal) {
+      if (!context.code.natives) {
+        context.earlyError('illegal_internal_symbol', ['@@'+node.name]);
+      } else {
+        REFSYMBOL('@'+node.name);
+      }
+    } else {
+      REFSYMBOL(node.name);
+    }
   }
 
   function BinaryExpression(node){
@@ -2049,8 +2057,17 @@ var assembler = (function(exports){
         GET();
       }
 
-      SYMBOL(item.id.name, pub, !!init);
-      symbols.push(item.id.name);
+      if (item.id.internal) {
+        if (!context.code.natives) {
+          context.earlyError('illegal_internal_symbol', ['@@'+item.id.name]);
+        } else {
+          var name = '@'+item.id.name;
+        }
+      } else {
+        var name = item.id.name;
+      }
+      SYMBOL(name, pub, !!init);
+      symbols.push(name);
     });
   }
 
