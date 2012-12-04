@@ -5084,8 +5084,12 @@ var runtime = (function(GLOBAL, exports, undefined){
             obj = obj.ProxyTarget;
           }
           var code = obj.code;
-          if (obj.Builtin || !code) {
-            return nativeCode[0] + obj.get('name') + nativeCode[1];
+          if (obj.BuiltinFunction || !code) {
+            var name = obj.get('name');
+            if (name && typeof name !== 'string' && name instanceof $Symbol) {
+              name = '@' + name.Name;
+            }
+            return nativeCode[0] + name + nativeCode[1];
           } else {
             return code.source.slice(code.range[0], code.range[1]);
           }

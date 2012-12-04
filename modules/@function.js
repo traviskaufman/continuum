@@ -22,16 +22,14 @@ export class Function {
 
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
-    return this.@@toString();
+    return this.@toString();
   }
 }
 
 builtinClass(Function);
 
 Function.prototype.@@define('name', '', 0);
-Function.prototype.@@extend({
-  @toString: $__FunctionToString
-});
+Function.prototype.@toString = $__FunctionToString;
 
 
 
