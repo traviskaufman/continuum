@@ -116,20 +116,18 @@ var thunk = (function(exports){
 
     function unwind(){
       for (var i = 0, entry; entry = code.transfers[i]; i++) {
-        if (entry.begin < ip && ip <= entry.end) {
+        if (entry.begin <= ip && ip <= entry.end) {
           if (entry.type === ENTRY.ENV) {
             trace(context.popBlock());
-          } else {
-            if (entry.type === ENTRY.TRYCATCH) {
-              stack[sp++] = error.value;
+          } else if (entry.type === ENTRY.TRY) {
+            stack[sp++] = error.value;
+            ip = entry.end + 1;
+          } else if (entry.type === ENTRY.CATCH) {
+            return cmds[ip];
+          } else if (entry.type === ENTRY.FOROF) {
+            if (error && error.value && error.value.BuiltinBrand === StopIteration) {
               ip = entry.end;
-              console.log(ops[ip])
               return cmds[ip];
-            } else if (entry.type === ENTRY.FOROF) {
-              if (error && error.value && error.value.BuiltinBrand === StopIteration) {
-                ip = entry.end;
-                return cmds[ip];
-              }
             }
           }
         }

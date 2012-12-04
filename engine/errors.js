@@ -167,6 +167,7 @@ var errors = (function(errors, messages, exports){
     generator_closed                    : ["'", "$0", "' called on closed generator"],
     generator_send_newborn              : ["Sent value into newborn generator"],
     unnamed_symbol                      : ["Symbol must have a name"],
+    symbol_redefine                     : ["Symbol '", "$0", "' defined multiple times"],
     missing_fundamental_handler         : ["Exotic object missing fundamental handler for '", "$0", "'"],
     buffer_unaligned_offset             : ["$0", " was called with an unalign offset"],
     buffer_out_of_bounds                : ["$0", " was was called with an out of bounds length and/or offset"],

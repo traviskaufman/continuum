@@ -387,7 +387,7 @@ var assembler = (function(exports){
       this.lexicalType = lexicalType || FUNCTYPE.NORMAL;
       this.varDecls = [];
       this.flags.usesSuper = ReferencesSuper(this.body);
-      this.flags.strict = strict || (context.code && context.code.flags.strict) || isstrict(this.body);
+      this.flags.strict = strict || (context.code && context.code.flags.strict) || isStrict(node);
       if (scopeType === SCOPE.MODULE) {
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
@@ -755,12 +755,6 @@ var assembler = (function(exports){
     return !!node && node.type === 'Identifier' && node.name === 'super';
   }
 
-  function isUsestrictDirective(node){
-    return node.type === 'ExpressionSatatement'
-        && node.expression.type === 'Literal'
-        && node.expression.value === 'use strict';
-  }
-
   function isPattern(node){
     return !!node && node.type === 'ObjectPattern' || node.type === 'ArrayPattern';
   }
@@ -787,7 +781,13 @@ var assembler = (function(exports){
         || node.type === 'ArrowFunctionExpression';
   }
 
-  function isstrict(node){
+  function isUseStrictDirective(node){
+    return node.type === 'ExpressionStatement'
+        && node.expression.type === 'Literal'
+        && node.expression.value === 'use strict';
+  }
+
+  function isStrict(node){
     if (isFunction(node)) {
       node = node.body.body;
     } else if (node.type === 'Program') {
@@ -795,7 +795,7 @@ var assembler = (function(exports){
     }
     if (node instanceof Array) {
       for (var i=0, element; element = node[i]; i++) {
-        if (isUsestrictDirective(element)) {
+        if (isUseStrictDirective(element)) {
           return true;
         } else if (element.type !== 'EmptyStatement' && element.type !== 'FunctionDeclaration') {
           return false;
@@ -1598,28 +1598,26 @@ var assembler = (function(exports){
   }
 
   function CatchClause(node){
-    lexical(function(){
-      var decls = lexicalDecls(node.body);
-      decls.push({
-        type: 'VariableDeclaration',
-        kind: 'let',
-        IsConstantDeclaration: false,
-        boundNames: [node.param.name],
-        declarations: [{
-          type: 'VariableDeclarator',
-          id: node.param,
-          init: undefined
-        }]
-      });
-      BLOCK(decls);
+    lexical(ENTRY.CATCH, function(){
       context.currentScope = scope.create('block', context.currentScope);
       context.currentScope.lexDeclare(node.param.name, 'catch');
-      recurse(node.param);
-      PUT();
-      each(node.body.body, recurse);
+
+      var lexicals = lexicalDecls(node.body);
+      BLOCK(null);
+      BINDING(node.param.name, false);
+      POP();
+      LET(node.param.name);
+      each(lexicals, function(decl){
+        each(decl.boundNames, function(name){
+          BINDING(name, decl.IsConstantDeclaration);
+        });
+      });
+      each(node.body, recurse);
+
+
       context.currentScope.pop();
-      UPSCOPE();
     });
+    UPSCOPE();
   }
 
   function ClassBody(node){}
@@ -2115,8 +2113,8 @@ var assembler = (function(exports){
   }
 
   function TryStatement(node){
-    lexical(ENTRY.TRYCATCH, function(){
-      recurse(node.block);
+    lexical(ENTRY.TRY, function(){
+      each(node.block.body, recurse);
     });
 
     var tryer = JUMP(0),
