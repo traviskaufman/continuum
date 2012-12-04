@@ -549,6 +549,38 @@ var Button = (function(){
   inherit(Button, Component, [
     function text(value){
       return this.face.text(value);
+    },
+    function click(event){
+      if (event && event.type === 'click') {
+        return this.emit(event);
+      } else {
+        return this.emit('click');
+      }
+    },
+    function emit(event, opts){
+      if (this.disabled) {
+        var type = event && event.type ? event.type : event;
+        if (type === 'click' || type === 'mousedown' || type === 'mousemove' || type === 'mouseup') {
+          return false;
+        }
+      }
+      return Component.prototype.emit.call(this, event, opts);
+    },
+    function enable(){
+      if (this.disabled) {
+        if (this.emit('enable')) {
+          this.disabled = false;
+          this.removeClass('disabled');
+        }
+      }
+    },
+    function disable(){
+      if (!this.disabled) {
+        if (this.emit('disable')) {
+          this.disabled = true;
+          this.addClass('disabled');
+        }
+      }
     }
   ]);
 
@@ -880,7 +912,7 @@ var Panel = function(){
     function resize(){
       if (this.content) {
         //this.content.width(this.content.calcWidth);
-        //this.content.height(this.content.calcHeight);
+        this.content.height(this.content.calcHeight);
         this.content.resize && this.content.resize();
       } else if (this.orient === 'vertical') {
         this.top.height(this.top.calcHeight);
