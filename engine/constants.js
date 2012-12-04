@@ -64,14 +64,18 @@ var constants = (function(exports){
     BuiltinDataView     : new BuiltinBrand('DataView'),
     BuiltinError        : new BuiltinBrand('Error'),
     BuiltinFunction     : new BuiltinBrand('Function'),
+    BuiltinHandler      : new BuiltinBrand('Handler'),
     BuiltinIterator     : new BuiltinBrand('Iterator'),
     BuiltinJSON         : new BuiltinBrand('JSON'),
     BuiltinMap          : new BuiltinBrand('Map'),
+    BuiltinMapIterator  : new BuiltinBrand('MapIterator'),
     BuiltinMath         : new BuiltinBrand('Math'),
     BuiltinModule       : new BuiltinBrand('Module'),
     BuiltinObject       : new BuiltinBrand('Object'),
+    BuiltinProxy        : new BuiltinBrand('Proxy'),
     BuiltinRegExp       : new BuiltinBrand('RegExp'),
     BuiltinSet          : new BuiltinBrand('Set'),
+    BuiltinSetIterator  : new BuiltinBrand('SetIterator'),
     BuiltinSymbol       : new BuiltinBrand('Symbol'),
     BuiltinWeakMap      : new BuiltinBrand('WeakMap'),
     NumberWrapper       : new BuiltinBrand('Number'),
@@ -79,20 +83,24 @@ var constants = (function(exports){
     StringWrapper       : new BuiltinBrand('String'),
     BuiltinArrayBuffer  : new BuiltinBrand('ArrayBuffer'),
     BuiltinInt8Array    : new BuiltinBrand('Int8Array'),
-    BuiltinUint8Array   : new BuiltinBrand('Uint8Array'),
     BuiltinInt16Array   : new BuiltinBrand('Int16Array'),
-    BuiltinUint16Array  : new BuiltinBrand('Uint16Array'),
     BuiltinInt32Array   : new BuiltinBrand('Int32Array'),
+    BuiltinUint8Array   : new BuiltinBrand('Uint8Array'),
+    BuiltinUint16Array  : new BuiltinBrand('Uint16Array'),
     BuiltinUint32Array  : new BuiltinBrand('Uint32Array'),
     BuiltinFloat32Array : new BuiltinBrand('Float32Array'),
     BuiltinFloat64Array : new BuiltinBrand('Float64Array')
   };
 
+  exports.BRANDS.BuiltinString = exports.BRANDS.StringWrapper;
+  exports.BRANDS.BuiltinNumber = exports.BRANDS.NumberWrapper;
+  exports.BRANDS.BuiltinBoolean = exports.BRANDS.BooleanWrapper;
+
 
   exports.BINARYOPS = new Constants(['instanceof', 'in', '==', '!=', '===', '!==', '<', '>',
                                    '<=', '>=', '*', '/','%', '+', '-', '<<', '>>', '>>>', '|', '&', '^', 'string+']);
   exports.UNARYOPS = new Constants(['delete', 'void', 'typeof', '+', '-', '~', '!']);
-  exports.ENTRY = new Constants(['ENV', 'FINALLY', 'TRYCATCH', 'FOROF' ]);
+  exports.ENTRY = new Constants(['ENV', 'FOROF', 'TRY', 'CATCH', 'FINALLY' ]);
   exports.FUNCTYPE = new Constants(['NORMAL', 'METHOD', 'ARROW' ]);
   exports.SCOPE = new Constants(['EVAL', 'FUNCTION', 'GLOBAL', 'MODULE' ]);
 

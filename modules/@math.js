@@ -12,101 +12,77 @@ export const
   SQRT2   = 1.4142135623730951;
 
 
+function isFiniteNonZero(value) {
+  return value === value
+      && value !== -Infinity
+      && value !== Infinity
+      && value | 0 === value;
+}
+
+internalFunction(isFiniteNonZero);
 
 export function abs(x){
-  x = +x;
+  x = $__ToNumber(x);
   return x === 0 ? 0 : x < 0 ? -x : x;
 }
 
 export function acos(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__acos(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__acos(x) : x;
 }
 
 export function acosh(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__log(x + $__sqrt(x * x - 1));
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;
 }
 
 export function asinh(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__log(x + $__sqrt(x * x + 1));
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;
 }
 
 export function atan(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__atan(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__atan(x) : x;
 }
 
 export function asin(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__asin(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__asin(x) : x;
 }
 
 export function atanh(x) {
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return .5 * $__log((1 + x) / (1 - x));
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;
 }
 
 export function atan2(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__atan2(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__atan2(x) : x;
 }
 
 
 export function ceil(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return x + 1 >> 0;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? x + 1 >> 0 : x;
 }
 
 export function acos(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__acos(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__acos(x) : x;
 }
 
 export function cos(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__cos(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__cos(x) : x;
 }
 
 export function cosh(x) {
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
+  x = $__ToNumber(x);
+  if (!isFiniteNonZero(x)) {
     return x;
   }
-  if (x < 0) {
-    x = -x;
-  }
+  x = abs(x);
   if (x > 21) {
     return $__exp(x) / 2;
   } else {
@@ -115,11 +91,8 @@ export function cosh(x) {
 }
 
 export function exp(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__exp(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__exp(x) : x;
 }
 
 function factorial(x){
@@ -134,9 +107,11 @@ function factorial(x){
   return o;
 }
 
+internalFunction(factorial);
+
 export function expm1(x) {
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
+  x = $__ToNumber(x);
+  if (!isFiniteNonZero(x)) {
     return x;
   }
 
@@ -150,54 +125,43 @@ export function expm1(x) {
 }
 
 export function floor(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return x >> 0;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? x >> 0 : x;
 }
 
 export function hypot(x, y) {
-  x = +x;
-  y = +y;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
+  x = $__ToNumber(x);
+  y = $__ToNumber(y);
+  if (!isFiniteNonZero(x)) {
     return x;
   }
-  if (y === 0 || y !== y || y === Infinity || y === -Infinity) {
+  if (!isFiniteNonZero(y)) {
     return y;
   }
   return $__sqrt(x * x + y * y);
 }
 
 export function log(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__log(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x) : x;
 }
 
 export function log2(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__log(x) * LOG2E;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;
 }
 
 export function log10(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__log(x) * LOG10E;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;
 }
 
 export function log1p(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
+  x = $__ToNumber(x);
+  if (!isFiniteNonZero(x)) {
     return x;
   }
+
   var o = 0,
       n = 50;
 
@@ -235,13 +199,15 @@ export function max(...values){
   return maximum;
 }
 
+max.@@set('length', 2);
+
 export function min(...values){
   var i = values.length,
       minimum = Infinity,
       current;
 
   while (i--) {
-    current = +values[i];
+    current = $__ToNumber(values[i]);
     if (current !== current) {
       return NaN;
     }
@@ -253,39 +219,32 @@ export function min(...values){
   return minimum;
 }
 
+min.@@set('length', 2);
+
 export function pow(x, y){
-  return $__pow(+x, +y);
+  return $__pow($__ToNumber(x), $__ToNumber(y));
 }
 
 export let random = $__random;
 
 export function round(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return x + .5 | 0;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? x + .5 | 0 : x;
 }
 
 export function sign(x){
-  x = +x;
+  x = $__ToNumber(x);
   return x === 0 || x !== x ? x : x < 0 ? -1 : 1;
 }
 
 export function sinh(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return ($__exp(x) - $__exp(-x)) / 2;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;
 }
 
 export function sin(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__sin(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__sin(x) : x;
 }
 
 export function sqrt(x, y){
@@ -293,24 +252,18 @@ export function sqrt(x, y){
 }
 
 export function tan(x){
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return $__tan(x);
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__tan(x) : x;
 }
 
 export function tanh(x) {
-  x = +x;
-  if (x === 0 || x !== x || x === Infinity || x === -Infinity) {
-    return x;
-  }
-  return ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x));
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;
 }
 
 export function trunc(x){
-  x = +x;
-  return x === 0 || x !== x || x === Infinity || x === -Infinity ? x : ~~x;
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? ~~x : x;
 }
 
 export var Math = {
@@ -319,14 +272,15 @@ export var Math = {
   cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,
   min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc
 };
+
+Math.@@SetBuiltinBrand('BuiltinMath');
+
 for (let k in Math) {
   if (typeof Math[k] === 'function') {
-    $__setupFunctions([Math[k]]);
-    $__remove(Math[k], 'prototype');
+    builtinFunction(Math[k]);
+    Math.@@update(k, 6);
+  } else {
+    Math.@@update(k, 0);
   }
 }
 
-$__set(min, 'length', 2);
-$__set(max, 'length', 2);
-$__hideEverything(Math);
-$__SetBuiltinBrand(Math, 'BuiltinMath');

@@ -1,42 +1,61 @@
-export function Error(message){
-  this.message = message;
-}
-
-export function EvalError(message){
-  this.message = message;
-}
-
-export function RangeError(message){
-  this.message = message;
-}
-
-export function ReferenceError(message){
-  this.message = message;
-}
-
-export function SyntaxError(message){
-  this.message = message;
-}
-
-export function TypeError(message){
-  this.message = message;
-}
-
-export function URIError(message){
-  this.message = message;
-}
-
-
-$__defineProps(Error.prototype, {
-  toString(){
-    return this.name + ': '+this.message;
+export class Error {
+  constructor(message){
+    this.message = message;
   }
-});
 
-$__setupConstructor(Error, $__ErrorProto);
-$__setupConstructor(EvalError, $__EvalErrorProto);
-$__setupConstructor(RangeError, $__RangeErrorProto);
-$__setupConstructor(ReferenceError, $__ReferenceErrorProto);
-$__setupConstructor(SyntaxError, $__SyntaxErrorProto);
-$__setupConstructor(TypeError, $__TypeErrorProto);
-$__setupConstructor(URIError, $__URIErrorProto);
+  toString(){
+    return this.name + ': ' + this.message;
+  }
+}
+
+builtinClass(Error, 'BuiltinError');
+
+
+export class EvalError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(EvalError, 'BuiltinError');
+
+
+export class RangeError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(RangeError, 'BuiltinError');
+
+export class ReferenceError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(ReferenceError, 'BuiltinError');
+
+export class SyntaxError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(SyntaxError, 'BuiltinError');
+
+export class TypeError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(TypeError, 'BuiltinError');
+
+export class URIError extends Error {
+  constructor(message){
+    this.message = message;
+  }
+}
+
+builtinClass(URIError, 'BuiltinError');

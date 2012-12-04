@@ -1,87 +1,22 @@
 import Iterator from '@iter';
-symbol @iterator = $__iterator;
 
-
-export function Map(iterable){
-  var map;
-  if ($__IsConstructCall()) {
-    map = this;
-  } else {
-    if (this == null || this === $__MapProto) {
-      map = $__ObjectCreate($__MapProto) ;
-    } else {
-      map = $__ToObject(this);
-    }
+function ensureMap(o, name){
+  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {
+    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
   }
-
-  if ($__HasInternal(map, 'MapData')) {
-    throw $__Exception('double_initialization', ['Map'])
-  }
-
-  $__MapInitialization(map, iterable);
-  return map;
 }
 
+internalFunction(ensureMap);
 
-$__setupConstructor(Map, $__MapProto);
-
-
-$__defineProps(Map.prototype, {
-  clear(){
-    ensureMap(this, 'clear');
-    return $__MapClear(this, key);
-  },
-  set(key, value){
-    ensureMap(this, 'set');
-    return $__MapSet(this, key, value);
-  },
-  get(key){
-    ensureMap(this, 'get');
-    return $__MapGet(this, key);
-  },
-  has(key){
-    ensureMap(this, 'has');
-    return $__MapHas(this, key);
-  },
-  delete: function(key){
-    ensureMap(this, 'delete');
-    return $__MapDelete(this, key);
-  },
-  items(){
-    ensureMap(this, 'items');
-    return new MapIterator(this, 'key+value');
-  },
-  keys(){
-    ensureMap(this, 'keys');
-    return new MapIterator(this, 'key');
-  },
-  values(){
-    ensureMap(this, 'values');
-    return new MapIterator(this, 'value');
-  },
-  @iterator(){
-    ensureMap(this, '@iterator');
-    return new MapIterator(this, 'key+value');
-  }
-});
-
-$__set(Map.prototype.delete, 'name', 'delete');
-
-$__DefineOwnProperty(Map.prototype, 'size', {
-  configurable: true,
-  enumerable: false,
-  get(){
-    return this === $__MapProto ? 0 : $__MapSize(this);
-  },
-  set: void 0
-});
 
 
 class MapIterator extends Iterator {
-  private @data, @key, @kind;
+  private @map,  // Map
+          @key,  // MapNextKey
+          @kind; // MapIterationKind
 
   constructor(map, kind){
-    this.@data = $__ToObject(map);
+    this.@map = $__ToObject(map);
     this.@key = $__MapSigil();
     this.@kind = kind;
   }
@@ -90,12 +25,12 @@ class MapIterator extends Iterator {
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
-    if (!($__has(this, @data) && $__has(this, @key) && $__has(this, @kind))) {
+    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {
       throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
 
     var kind = this.@kind,
-        item = $__MapNext(this.@data, this.@key);
+        item = $__MapNext(this.@map, this.@key);
 
     if (!item) {
       throw $__StopIteration;
@@ -113,11 +48,81 @@ class MapIterator extends Iterator {
   }
 }
 
-$__hideEverything(MapIterator);
+builtinClass(MapIterator);
 
-function ensureMap(o, name){
-  if (!o || typeof o !== 'object' || !$__HasInternal(o, 'MapData')) {
-    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
+
+export class Map {
+  constructor(iterable){
+    var map;
+    if ($__IsConstructCall()) {
+      map = this;
+    } else {
+      if (this == null || this === MapPrototype) {
+        map = $__ObjectCreate(MapPrototype) ;
+      } else {
+        map = $__ToObject(this);
+      }
+    }
+
+    if (map.@@hasInternal('MapData')) {
+      throw $__Exception('double_initialization', ['Map'])
+    }
+
+    $__MapInitialization(map, iterable);
+    return map;
+  }
+
+  clear(){
+    ensureMap(this, 'clear');
+    return $__MapClear(this, key);
+  }
+
+  set(key, value){
+    ensureMap(this, 'set');
+    return $__MapSet(this, key, value);
+  }
+
+  get(key){
+    ensureMap(this, 'get');
+    return $__MapGet(this, key);
+  }
+
+  has(key){
+    ensureMap(this, 'has');
+    return $__MapHas(this, key);
+  }
+
+  delete(key){
+    ensureMap(this, 'delete');
+    return $__MapDelete(this, key);
+  }
+
+  items(){
+    ensureMap(this, 'items');
+    return new MapIterator('key+value');
+  }
+
+  keys(){
+    ensureMap(this, 'keys');
+    return new MapIterator('key');
+  }
+
+  values(){
+    ensureMap(this, 'values');
+    return new MapIterator('value');
+  }
+
+  get size(){
+    return this === MapPrototype ? 0 : $__MapSize(this);
+  }
+
+  @iterator(){
+    ensureMap(this, '@iterator');
+    return new MapIterator(this, 'key+value');
   }
 }
+
+builtinClass(Map);
+var MapPrototype = Map.prototype;
+
 

@@ -1,116 +1,3 @@
-{
-  let HIDDEN = 6,
-      FROZEN = 0;
-
-  $__defineMethods = function defineMethods(obj, props){
-    for (var i=0; i < props.length; i++) {
-      $__SetInternal(props[i], 'Native', true);
-      $__define(obj, props[i].name, props[i], HIDDEN);
-      $__remove(props[i], 'prototype');
-    }
-    return obj;
-  };
-
-  $__defineProps = function defineProps(obj, props){
-    var keys = $__Enumerate(props, false, false);
-    for (var i=0; i < keys.length; i++) {
-      var name = keys[i],
-          prop = props[name];
-
-      $__define(obj, name, prop, HIDDEN);
-
-      if (typeof prop === 'function') {
-        $__SetInternal(prop, 'Native', true);
-        $__define(prop, 'name', name, FROZEN);
-        $__remove(prop, 'prototype');
-      }
-    }
-    return obj;
-  };
-
-  $__setupFunctions = function setupFunctions(...funcs){
-    var len = funcs.length;
-    if (len) {
-      for (var i=0; i < len; i++) {
-        $__SetInternal(funcs[i], 'Native', true);
-        $__remove(funcs[i], 'prototype');
-      }
-    }
-  };
-
-  $__defineConstants = function defineConstants(obj, props){
-    var keys = $__Enumerate(props, false, false);
-    for (var i=0; i < keys.length; i++) {
-      $__define(obj, keys[i], props[keys[i]], FROZEN);
-    }
-  };
-
-  $__setupConstructor = function setupConstructor(ctor, proto){
-    if (proto) {
-      $__define(ctor, 'prototype', proto, FROZEN);
-    }
-    $__define(ctor, 'length', 1, FROZEN);
-    $__define(ctor.prototype, 'constructor', ctor, HIDDEN);
-    $__SetInternal(ctor, 'Native', true);
-    $__SetInternal(ctor, 'NativeConstructor', true);
-  };
-
-
-  $__setLength = function setLength(f, length){
-    if (typeof length === 'string') {
-      $__set(f, 'length', length);
-    } else {
-      var keys = $__Enumerate(length, false, false);
-      for (var i=0; i < keys.length; i++) {
-        var key = keys[i];
-        $__set(f[key], 'length', length[key]);
-      }
-    }
-  };
-
-  $__setProperty = function setProperty(key, object, values){
-    var keys = $__Enumerate(values, false, false),
-        i = keys.length;
-
-    while (i--) {
-      $__define(object[keys[i]], key, values[keys[i]], FROZEN);
-    }
-  };
-
-  $__hideEverything = function hideEverything(o){
-    var type = typeof o;
-    if (type === 'object' ? o === null : type !== 'function') {
-      return o;
-    }
-
-    var keys = $__Enumerate(o, false, true),
-        i = keys.length;
-
-    while (i--) {
-      if (typeof o[keys[i]] === 'number') {
-        $__update(o, keys[i], 0);
-      } else {
-        $__update(o, keys[i], 6);
-      }
-    }
-
-    if (typeof o === 'function') {
-      hideEverything(o.prototype);
-    }
-
-    return o;
-  };
-
-  symbol @toStringTag, @iterator;
-  $__toStringTag = @toStringTag;
-  $__iterator = @iterator;
-
-  $__EmptyClass = function(...args){ super(...args) };
-  $__define($__EmptyClass, 'name', '', FROZEN);
-}
-
-
-
 class Request {
   private @loader, @callback, @errback, @mrl, @resolved;
 
@@ -125,15 +12,15 @@ class Request {
   fulfill(src){
     var loader = this.@loader;
 
-    var translated = (loader.@translate)(src, this.@mrl, loader.@baseURL, this.@resolved);
+    var translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);
     if (loader.@strict) {
       translated = '"use strict";\n'+translated;
     }
 
-    $__EvaluateModule(translated, loader.@global, this.@resolved, module => {
-      $__SetInternal(module, 'loader', loader);
-      $__SetInternal(module, 'resolved', this.@resolved);
-      $__SetInternal(module, 'mrl', this.@mrl);
+    loader.@evaluate(translated, this.@resolved, module => {
+      module.@@setInternal('loader', loader);
+      module.@@setInternal('resolved', this.@resolved);
+      module.@@setInternal('mrl', this.@mrl);
       loader.@modules[this.@resolved] = module;
       (this.@callback)(module);
     }, msg => this.reject(msg));
@@ -158,7 +45,7 @@ class Request {
   }
 }
 
-private @translate, @resolve, @fetch, @strict, @global, @baseURL, @modules;
+private @translate, @resolve, @fetch, @strict, @modules, @evaluate;
 
 export class Loader {
   constructor(parent, options){
@@ -166,47 +53,47 @@ export class Loader {
     this.linkedTo   = options.linkedTo  || null;
     this.@strict    = true;
     this.@modules   = $__ObjectCreate(null);
-    this.@translate = options.translate || parent.translate;
-    this.@resolve   = options.resolve   || parent.resolve;
-    this.@fetch     = options.fetch     || parent.fetch;
-    this.@global    = options.global    || $__global;
-    this.@baseURL   = options.baseURL   || (parent ? parent.@baseURL : '');
+    this.@translate = options.translate || parent.@translate;
+    this.@resolve   = options.resolve   || parent.@resolve;
+    this.@fetch     = options.fetch     || parent.@fetch;
+    this.@@setInternal('global', options.global || (parent ? parent.global : $__global));
+    this.@@setInternal('baseURL', options.baseURL || (parent ? parent.baseURL : ''));
   }
 
   get global(){
-    return this.@global;
+    return this.@@getInternal('global');
   }
 
   get baseURL(){
-    return this.@baseURL;
+    return this.@@getInternal('baseURL');
   }
 
   load(mrl, callback, errback){
-    var key = (this.@resolve)(mrl, this.@baseURL),
+    var key = (this.@resolve)(mrl, this.baseURL),
         module = this.@modules[key];
 
     if (module) {
       callback(module);
     } else {
-      (this.@fetch)(mrl, this.@baseURL, new Request(this, mrl, key, callback, errback), key);
+      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);
     }
   }
 
   eval(src){
-    return $__EvaluateModule(src, this.@global, this.@baseURL);
+    return this.@evaluate(src);
   }
 
   evalAsync(src, callback, errback){
-    $__EvaluateModule(src, this.@global, this.@baseURL, callback, errback);
+    this.@evaluate(src, callback, errback);
   }
 
   get(mrl){
-    var canonical = (this.@resolve)(mrl, this.@baseURL);
+    var canonical = (this.@resolve)(mrl, this.baseURL);
     return this.@modules[canonical];
   }
 
   set(mrl, mod){
-    var canonical = (this.@resolve)(mrl, this.@baseURL);
+    var canonical = (this.@resolve)(mrl, this.baseURL);
 
     if (typeof canonical === 'string') {
       this.@modules[canonical] = mod;
@@ -223,28 +110,29 @@ export class Loader {
                  writable: true,
                  value: undefined };
 
-    object || (object = this.@global);
+    object || (object = this.global);
     for (var k in std) {
       desc.value = std[k];
-      $__DefineOwnProperty(object, k, desc);
+      object.@@DefineOwnProperty(k, desc);
     }
 
     return object;
   }
 }
+Loader.prototype.@evaluate = $__EvaluateModule;
 
 
 export function Module(object){
-  if ($__GetBuiltinBrand(object) === 'Module') {
+  if (object.@@GetBuiltinBrand() === 'BuiltinModule') {
     return object;
   }
   return $__ToModule($__ToObject(object));
 }
 
-$__remove(Module, 'prototype');
+builtinFunction(Module);
 
 
-export let System = $__System = new Loader(null, {
+export let System = new Loader(null, {
   fetch(relURL, baseURL, request, resolved) {
     var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;
 
@@ -264,11 +152,19 @@ export let System = $__System = new Loader(null, {
   }
 });
 
+$__SetDefaultLoader(System);
 
 
-System.@strict = false;
-let std = System.eval(`
+let internalLoader = $__internalLoader = new Loader(System, { global: this });
+internalLoader.@strict = false;
+
+let std = internalLoader.eval(`
   module std = '@std';
   export std;
 `).std;
-System.@strict = true;
+
+
+for (let k in internalLoader.@modules) {
+  System.@modules[k] = internalLoader.@modules[k];
+}
+

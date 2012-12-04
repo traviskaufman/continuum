@@ -1,20 +1,19 @@
-import hasOwn from '@reflect';
-
-symbol @iterator = $__iterator;
 export let iterator = @iterator;
 
-export function Iterator(){}
+export class Iterator {
+  @iterator(){
+    return this;
+  }
+}
 
-$__define(Iterator, 'prototype', Iterator.prototype, 0);
-$__define(Iterator.prototype, @iterator, function iterator(){ return this }, 0);
-$__SetBuiltinBrand(Iterator.prototype, 'BuiltinIterator');
+builtinClass(Iterator);
 
 
 export function keys(obj){
   return {
     @iterator: ()=> (function*(){
       for (let x in obj) {
-        if (hasOwn(obj, x)) {
+        if (obj.@@has(x)) {
           yield x;
         }
       }
@@ -22,11 +21,13 @@ export function keys(obj){
   };
 }
 
+builtinFunction(keys);
+
 export function values(obj){
   return {
     @iterator: ()=> (function*(){
       for (let x in obj) {
-        if (hasOwn(obj, x)) {
+        if (obj.@@has(x)) {
           yield obj[x];
         }
       }
@@ -34,17 +35,21 @@ export function values(obj){
   };
 }
 
+builtinFunction(values);
+
 export function items(obj){
   return {
     @iterator: ()=> (function*(){
       for (let x in obj) {
-        if (hasOwn(obj, x)) {
+        if (obj.@@has(x)) {
           yield [x, obj[x]];
         }
       }
     })()
   };
 }
+
+builtinFunction(items);
 
 export function allKeys(obj){
   return {
@@ -56,6 +61,8 @@ export function allKeys(obj){
   };
 }
 
+builtinFunction(allKeys);
+
 export function allValues(obj){
   return {
     @iterator: ()=> (function*(){
@@ -66,6 +73,8 @@ export function allValues(obj){
   };
 }
 
+builtinFunction(allValues);
+
 export function allItems(obj){
   return {
     @iterator: ()=> (function*(){
@@ -75,3 +84,5 @@ export function allItems(obj){
     })()
   };
 }
+
+builtinFunction(allItems);

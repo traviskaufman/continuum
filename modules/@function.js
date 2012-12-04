@@ -1,60 +1,58 @@
-export function Function(...args){
-  return $__FunctionCreate(args);
-}
+private @toString;
 
-$__setupConstructor(Function, $__FunctionProto);
-$__define(Function.prototype, 'name', '', 0);
+export class Function {
+  constructor(...args){
+    return $__FunctionCreate(...args);
+  }
 
-
-export function apply(func, receiver, args){
-  ensureFunction(func, '@function.apply');
-  return $__Call(func, receiver, ensureArgs(args));
-}
-
-export function bind(func, receiver, ...args){
-  ensureFunction(func, '@function.bind');
-  return $__BoundFunctionCreate(func, receiver, args);
-}
-
-export function call(func, receiver, ...args){
-  ensureFunction(func, '@function.call');
-  return $__Call(func, receiver, args);
-}
-
-$__setupFunctions(apply, bind, call);
-
-
-$__defineProps(Function.prototype, {
-  apply(receiver, args){
+  apply(thisArg, args){
     ensureFunction(this, 'Function.prototype.apply');
-    return $__Call(this, receiver, ensureArgs(args));
-  },
-  bind(receiver, ...args){
+    return this.@@Call(thisArg, ensureArgs(args));
+  }
+
+  bind(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.bind');
-    return $__BoundFunctionCreate(this, receiver, args);
-  },
-  call(receiver, ...args){
+    return $__BoundFunctionCreate(this, thisArg, args);
+  }
+
+  call(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.call');
-    return $__Call(this, receiver, args);
-  },
+    return this.@@Call(thisArg, args);
+  }
+
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
-    return $__FunctionToString(this);
+    return this.@@toString();
   }
+}
+
+builtinClass(Function);
+
+Function.prototype.@@define('name', '', 0);
+Function.prototype.@@extend({
+  @toString: $__FunctionToString
 });
 
 
-function ensureArgs(o, name){
-  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {
-    throw $__Exception('apply_wrong_args', []);
-  }
 
-  var brand = $__GetBuiltinBrand(o);
-  return brand === 'Array' || brand === 'Arguments' ? o : [...o];
+export function apply(func, thisArg, args){
+  ensureFunction(func, '@function.apply');
+  return func.@@Call(thisArg, ensureArgs(args));
 }
 
-function ensureFunction(o, name){
-  if (typeof o !== 'function') {
-    throw $__Exception('called_on_non_function', [name]);
-  }
+builtinFunction(apply);
+
+export function bind(func, thisArg, ...args){
+  ensureFunction(func, '@function.bind');
+  return $__BoundFunctionCreate(func, thisArg, args);
 }
+
+builtinFunction(bind);
+
+export function call(func, thisArg, ...args){
+  ensureFunction(func, '@function.call');
+  return func.@@Call(thisArg, args);
+}
+
+builtinFunction(call);
+

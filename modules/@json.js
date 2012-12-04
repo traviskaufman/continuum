@@ -1,7 +1,3 @@
-export let JSON = {};
-
-$__SetBuiltinBrand(JSON, 'BuiltinJSON');
-
 let ReplacerFunction,
     PropertyList,
     stack,
@@ -20,7 +16,7 @@ function J(value){
   indent += gap;
   stack.add(value);
 
-  if ($__GetBuiltinBrand(value) === 'Array') {
+  if (value.@@GetBuiltinBrand() === 'Array') {
     brackets = ['[', ']'];
 
     for (var i=0, len = value.length; i < len; i++) {
@@ -28,7 +24,7 @@ function J(value){
       partial[i] = prop === undefined ? 'null' : prop;
     }
   } else {
-    var keys = PropertyList || $__Enumerate(value, false, true),
+    var keys = PropertyList || value.@@Enumerate(false, true),
         colon = gap ? ': ' : ':';
 
     brackets = ['{', '}'];
@@ -44,64 +40,66 @@ function J(value){
   if (!partial.length) {
     stack.delete(value);
     indent = stepback;
-    return brackets[0]+brackets[1];
+    return brackets[0] + brackets[1];
   } else if (!gap) {
     stack.delete(value);
     indent = stepback;
-    return brackets[0]+partial.join(',')+brackets[1];
+    return brackets[0] + partial.join(',') + brackets[1];
   } else {
     var final = '\n' + indent + partial.join(',\n' + indent) + '\n' + stepback;
     stack.delete(value);
     indent = stepback;
-    return brackets[0]+final+brackets[1];
+    return brackets[0] + final + brackets[1];
   }
 }
 
+internalFunction(J);
 
 function Str(key, holder){
-  var v = holder[key];
-  if ($__Type(v) === 'Object') {
-    var toJSON = v.toJSON;
+  var value = holder[key];
+  if ($__Type(value) === 'Object') {
+    var toJSON = value.toJSON;
     if (typeof toJSON === 'function') {
-      v = $__Call(toJSON, v, [key]);
+      value = toJSON.@@Call(value, [key]);
     }
   }
 
   if (ReplacerFunction) {
-    v = $__Call(ReplacerFunction, holder, [key, v]);
+    value = ReplacerFunction.@@Call(holder, [key, value]);
   }
 
-  if ($__Type(v) === 'Object') {
-    var brand = $__GetBuiltinBrand(v);
+  if ($__Type(value) === 'Object') {
+    var brand = value.@@GetBuiltinBrand();
     if (brand === 'Number') {
-      v = $__ToNumber(v);
+      value = $__ToNumber(value);
     } else if (brand === 'String') {
-      v = $__ToString(v);
+      value = $__ToString(value);
     } else if (brand === 'Boolean') {
-      v = $__GetPrimitiveValue(v);
+      value = value.@@PrimitiveValue;
     }
   }
 
 
-  if (v === null) {
+  if (value === null) {
     return 'null';
-  } else if (v === true) {
+  } else if (value === true) {
     return 'true';
-  } else if (v === false) {
+  } else if (value === false) {
     return 'false';
   }
 
-  var type = typeof v;
+  var type = typeof value;
   if (type === 'string') {
-    return $__Quote(v);
+    return $__Quote(value);
   } else if (type === 'number') {
-    return v !== v || v === Infinity || v === -Infinity ? 'null' : '' + v;
+    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;
   } else if (type === 'object') {
-    return J(v);
+    return J(value);
   }
 
 }
 
+internalFunction(Str);
 
 export function stringify(value, replacer, space){
   ReplacerFunction = undefined;
@@ -112,21 +110,21 @@ export function stringify(value, replacer, space){
   if ($__Type(replacer) === 'Object') {
     if (typeof replacer === 'function') {
       ReplacerFunction = replacer;
-    } else if ($__GetBuiltinBrand(replacer) === 'Array') {
+    } else if (replacer.@@GetBuiltinBrand() === 'Array') {
       let props = new Set;
 
-      for (let v of replacer) {
+      for (let value of replacer) {
         var item,
-            type = $__Type(v);
+            type = $__Type(value);
 
         if (type === 'String') {
-          item = v;
+          item = value;
         } else if (type === 'Number') {
-          item = v + '';
+          item = value + '';
         } else if (type === 'Object') {
-          let brand = $__GetBuiltinBrand(v);
+          let brand = value.@@GetBuiltinBrand();
           if (brand === 'String' || brand === 'Number') {
-            item = $__ToString(v);
+            item = $__ToString(value);
           }
         }
 
@@ -140,7 +138,7 @@ export function stringify(value, replacer, space){
   }
 
   if ($__Type(space) === 'Object') {
-    space = $__GetPrimitiveValue(space);
+    space = space.@@PrimitiveValue;
   }
 
   if ($__Type(space) === 'String') {
@@ -160,4 +158,8 @@ export function parse(source, reviver){
   return $__JSONParse(source, reviver);
 }
 
-$__defineMethods(JSON, [stringify, parse]);
+
+
+export let JSON = {};
+JSON.@@SetBuiltinBrand('BuiltinJSON');
+JSON.@extend({ stringify, parse });

@@ -122,6 +122,15 @@ var debug = (function(exports){
     inherit(MirrorAccessor, Mirror, {
       accessor: true
     }, [
+      function getValue(key){
+        return this.introspected.getValue(key);
+      },
+      function getError(){
+        return this.introspected.getError && this.introspected.getError();
+      },
+      function origin(){
+        return this.introspected.origin && this.introspected.origin();
+      },
       function label(){
         return this.introspected.label();
       },
@@ -227,17 +236,28 @@ var debug = (function(exports){
         return this.get(key).subject;
       },
       function getPrototype(){
-        return introspect(this.subject.GetInheritance());
+        var obj = this.subject;
+        do {
+          obj = obj.GetInheritance();
+        } while (obj && obj.HiddenPrototype)
+        return introspect(obj);
       },
       function setPrototype(value){
         realm().enterMutationContext();
-        var ret = this.subject.SetInheritance(value);
+        var proto = this.subject.Prototype;
+
+        if (proto && proto.HiddenPrototype) {
+          var ret = proto.SetInheritance(value);
+        } else {
+          var ret = this.subject.SetInheritance(value);
+        }
+
         realm().exitMutationContext();
         return ret;
       },
       function set(key, value){
         var ret;
-        ret = this.subject.sut(key, value);
+        ret = this.subject.set(key, value);
         return ret;
       },
       function update(key, attr){

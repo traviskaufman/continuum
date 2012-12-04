@@ -1,23 +1,54 @@
-export function Object(value){
-  if ($__IsConstructCall()) {
-    return {};
-  } else if (value == null) {
-    return {};
-  } else {
-    return $__ToObject(value);
+export class Object {
+  constructor(value){
+    return $__IsConstructCall() || value == null ? {} : $__ToObject(value);
+  }
+
+  toString(){
+    if (this === undefined) {
+      return '[object Undefined]';
+    } else if (this === null) {
+      return '[object Null]';
+    } else {
+      return '[object ' + $__ToObject(this).@toStringTag + ']';
+    }
+  }
+
+  isPrototypeOf(object){
+    while ($__Type(object) === 'Object') {
+      object = object.@@GetPrototype();
+      if (object === this) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  toLocaleString(){
+    return this.toString();
+  }
+
+  valueOf(){
+    return $__ToObject(this);
+  }
+
+  hasOwnProperty(key){
+    return $__ToObject(this).@@HasOwnProperty($__ToPropertyName(key));
+  }
+
+  propertyIsEnumerable(key){
+    return !!($__ToObject(this).@@query(key) & 1);
   }
 }
 
-$__setupConstructor(Object, $__ObjectProto);
-
+builtinClass(Object);
 
 
 export function assign(target, source){
   ensureObject(target, 'Object.assign');
   source = $__ToObject(source);
-  for (let [i, key] of $__Enumerate(source, false, true)) {
+  for (let [i, key] of source.@@Enumerate(false, true)) {
     let prop = source[key];
-    if (typeof prop === 'function' && $__GetInternal(prop, 'HomeObject')) {
+    if (typeof prop === 'function' && prop.@@get('HomeObject')) {
       // TODO
     }
     target[key] = prop;
@@ -35,10 +66,10 @@ export function create(prototype, properties){
   if (properties !== undefined) {
     ensureDescriptor(properties);
 
-    for (var k in properties) {
-      var desc = properties[k];
+    for (var key in properties) {
+      var desc = properties[key];
       ensureDescriptor(desc);
-      $__DefineOwnProperty(object, key, desc);
+      object.@@DefineOwnProperty(key, desc);
     }
   }
 
@@ -48,8 +79,7 @@ export function create(prototype, properties){
 export function defineProperty(object, key, property){
   ensureObject(object, 'Object.defineProperty');
   ensureDescriptor(property);
-  key = $__ToPropertyName(key);
-  $__DefineOwnProperty(object, key, property);
+  object.@@DefineOwnProperty($__ToPropertyName(key), property);
   return object;
 }
 
@@ -60,7 +90,7 @@ export function defineProperties(object, properties){
   for (var key in properties) {
     var desc = properties[key];
     ensureDescriptor(desc);
-    $__DefineOwnProperty(object, key, desc);
+    object.@@DefineOwnProperty(key, desc);
   }
 
   return object;
@@ -68,48 +98,46 @@ export function defineProperties(object, properties){
 
 export function freeze(object){
   ensureObject(object, 'Object.freeze');
-  var props = $__Enumerate(object, false, false);
+  var props = object.@@Enumerate(false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = $__GetOwnProperty(object, props[i]);
+    var desc = object.@@GetOwnProperty(props[i]);
     if (desc.configurable) {
       desc.configurable = false;
       if ('writable' in desc) {
         desc.writable = false;
       }
-      $__DefineOwnProperty(object, props[i], desc);
+      object.@@DefineOwnProperty(props[i], desc);
     }
   }
 
-  $__PreventExtensions(object, false);
+  object.@@PreventExtensions();
   return object;
 }
 
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
-  key = $__ToPropertyName(key);
-  return $__GetOwnProperty(object, key);
+  return object.@@GetOwnProperty($__ToPropertyName(key));
 }
 
 export function getOwnPropertyNames(object){
   ensureObject(object, 'Object.getOwnPropertyNames');
-  return $__Enumerate(object, false, false);
+  return object.@@Enumerate(false, false);
 }
 
 export function getPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getPropertyDescriptor');
-  key = $__ToPropertyName(key);
-  return $__GetProperty(object, key);
+  return object.@@GetProperty($__ToPropertyName(key));
 }
 
 export function getPropertyNames(object){
   ensureObject(object, 'Object.getPropertyNames');
-  return $__Enumerate(object, true, false);
+  return object.@@Enumerate(true, false);
 }
 
 export function getPrototypeOf(object){
   ensureObject(object, 'Object.getPrototypeOf');
-  return $__GetInheritence(object);
+  return object.@@GetPrototype();
 }
 
 export function is(x, y){
@@ -122,19 +150,19 @@ export function isnt(x, y){
 
 export function isExtensible(object){
   ensureObject(object, 'Object.isExtensible');
-  return $__IsExtensible(object);
+  return object.@@IsExtensible();
 }
 
 export function isFrozen(object){
   ensureObject(object, 'Object.isFrozen');
-  if ($__IsExtensible(object)) {
+  if (object.@@IsExtensible()) {
     return false;
   }
 
-  var props = $__Enumerate(object, false, false);
+  var props = object.@@Enumerate(false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = $__GetOwnProperty(object, props[i]);
+    var desc = object.@@GetOwnProperty(props[i]);
     if (desc) {
       if (desc.configurable || 'writable' in desc && desc.writable) {
         return false;
@@ -147,14 +175,14 @@ export function isFrozen(object){
 
 export function isSealed(object){
   ensureObject(object, 'Object.isSealed');
-  if ($__IsExtensible(object)) {
+  if (object.@@IsExtensible()) {
     return false;
   }
 
-  var props = $__Enumerate(object, false, false);
+  var props = object.@@Enumerate(false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = $__GetOwnProperty(object, props[i]);
+    var desc = object.@@GetOwnProperty(props[i]);
     if (desc && desc.configurable) {
       return false;
     }
@@ -165,12 +193,12 @@ export function isSealed(object){
 
 export function keys(object){
   ensureObject(object, 'Object.keys');
-  return $__Enumerate(object, false, true);
+  return object.@@Enumerate(false, true);
 }
 
 export function preventExtensions(object){
   ensureObject(object, 'Object.preventExtensions');
-  $__PreventExtensions(object, false);
+  object.@@PreventExtensions();
   return object;
 }
 
@@ -178,13 +206,13 @@ export function seal(object){
   ensureObject(object, 'Object.seal');
 
   var desc = { configurable: false },
-      props = $__Enumerate(object, false, false);
+      props = object.@@Enumerate(false, false);
 
   for (var i=0; i < props.length; i++) {
-    $__DefineOwnProperty(object, props[i], desc);
+    object.@@DefineOwnProperty(props[i], desc);
   }
 
-  $__PreventExtensions(object, false);
+  object.@@PreventExtensions();
   return object;
 }
 
@@ -197,7 +225,7 @@ export function observe(object, callback){
   }
 
   var notifier = $__GetNotifier(object),
-      changeObservers = $__GetInternal(notifier, 'ChangeObservers');
+      changeObservers = notifier.@@get('ChangeObservers');
 
   $__AddObserver(changeObservers, callback);
   $__AddObserver($__ObserverCallbacks, callback);
@@ -209,7 +237,7 @@ export function unobserve(object, callback){
   ensureFunction(callback, 'Object.unobserve');
 
   var notifier = $__GetNotifier(object),
-      changeObservers = $__GetInternal(notifier, 'ChangeObservers');
+      changeObservers = notifier.@@get('ChangeObservers');
 
   $__RemoveObserver(changeObservers, callback);
   return object;
@@ -217,7 +245,7 @@ export function unobserve(object, callback){
 
 export function deliverChangeRecords(callback){
   ensureFunction(callback, 'Object.deliverChangeRecords');
-  $__DeliverChangeRecords(callback);
+  callback.@@DeliverChangeRecords();
 }
 
 export function getNotifier(object){
@@ -229,16 +257,17 @@ export function getNotifier(object){
 }
 
 
+Object.@@extend({ assign, create, defineProperty, defineProperties, deliverChangeRecords,
+  freeze, getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor,
+  getPropertyNames, getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe,
+  preventExtensions, seal, unobserve
+});
 
-
-$__defineProps(Object, { assign, create, defineProperty, defineProperties, deliverChangeRecords, freeze,
-  getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor, getPropertyNames,
-  getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe, preventExtensions, seal, unobserve });
 
 
 export function isPrototypeOf(object, prototype){
   while (prototype) {
-    prototype = $__GetPrototype(prototype);
+    prototype = prototype.@@GetPrototype();
     if (prototype === object) {
       return true;
     }
@@ -246,72 +275,19 @@ export function isPrototypeOf(object, prototype){
   return false;
 }
 
+builtinFunction(isPrototypeOf);
+
+
 export function hasOwnProperty(object, key){
-  var object = $__ToObject(object);
-  return $__HasOwnProperty(object, key);
+  return $__ToObject(object).@@HasOwnProperty($__ToPropertyNames(key));
 }
+
+builtinFunction(hasOwnProperty);
+
 
 export function propertyIsEnumerable(object, key){
-  var object = $__ToObject(object);
-  return ($__GetPropertyAttributes(object, key) & 0x01) !== 0;
+  return !!($__ToObject(object).@@query(key) & 1);
 }
 
-$__setupFunctions(isPrototypeOf, hasOwnProperty, propertyIsEnumerable);
+builtinFunction(propertyIsEnumerable);
 
-
-
-$__defineProps(Object.prototype, {
-  toString(){
-    if (this === undefined) {
-      return '[object Undefined]';
-    } else if (this === null) {
-      return '[object Null]';
-    } else {
-      return '[object '+$__GetBrand($__ToObject(this))+']';
-    }
-  },
-  isPrototypeOf(object){
-    while (object) {
-      object = $__GetPrototype(object);
-      if (object === this) {
-        return true;
-      }
-    }
-    return false;
-  },
-  toLocaleString(){
-    return this.toString();
-  },
-  valueOf(){
-    return $__ToObject(this);
-  },
-  hasOwnProperty(key){
-    var object = $__ToObject(this);
-    return $__HasOwnProperty(object, key);
-  },
-  propertyIsEnumerable(key){
-    var object = $__ToObject(this);
-    return ($__GetPropertyAttributes(this, key) & 0x01) !== 0;
-  }
-});
-
-$__ObjectToString = Object.prototype.toString;
-
-function ensureObject(o, name){
-  var type = typeof o;
-  if (type === 'object' ? o === null : type !== 'function') {
-    throw $__Exception('called_on_non_object', [name]);
-  }
-}
-
-function ensureDescriptor(o){
-  if (o === null || typeof o !== 'object') {
-    throw $__Exception('property_desc_object', [typeof o])
-  }
-}
-
-function ensureFunction(o, name){
-  if (typeof o !== 'function') {
-    throw $__Exception('called_on_non_function', [name]);
-  }
-}
