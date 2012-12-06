@@ -13,7 +13,7 @@ function isFiniteNonZero(value) {
   return value === value
       && value !== -Infinity
       && value !== Infinity
-      && value | 0 === value;
+      && value !== 0;
 }
 
 internalFunction(isFiniteNonZero);
