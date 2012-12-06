@@ -1,31 +1,137 @@
-var fs = require('fs'),
-    path = require('path'),
-    continuum = require('../continuum'),
-    resolve = path.resolve,
-    exists = fs.existsSync,
-    print = console.log,
-    define = continuum.utility.define,
-    iterate = continuum.utility.iterate,
-    map = continuum.utility.map,
-    Queue = continuum.utility.Queue,
-    createNativeFunction = continuum.createNativeFunction;
+var util      = require('util'),
+    continuum = require('continuum');
+
+var print          = console.log,
+    define         = continuum.utility.define,
+    iterate        = continuum.utility.iterate,
+    create         = continuum.utility.create,
+    map            = continuum.utility.map,
+    Queue          = continuum.utility.Queue,
+    createFunction = continuum.createFunction;
 
 var _push = [].push;
 
-function isDirectory(file){
-  return fs.statSync(file).isDirectory();
+
+function path(path){
+  if (typeof path === 'string') {
+    return new Path(path);
+  } else if (path instanceof Path) {
+    return path;
+  } else {
+    return new Path(path+'');
+  }
 }
 
-function dir(name){
-  return fs.readdirSync(name).map(path.resolve.bind(null, name));
+
+function Path(path){
+  this.path = Path.normalize(path);
 }
 
-function read(name){
-  return fs.readFileSync(name, 'utf8');
-}
+define(Path, [
+  function normalize(path){}
+]);
 
-function write(name, value){
-  fs.writeFileSync(name, value);
+
+define(Path.prototype, [
+  function isDirectory(){},
+  function isFile(){},
+  function exists(){},
+  function dir(){},
+  function read(){},
+  function write(content){},
+  function resolve(to){},
+  function relativeTo(to){},
+  function relativeFrom(from){},
+  function basename(){},
+  function extname(){},
+  function dirname(){},
+  function parts(){
+    return this.path.split(/[\\\/]/);
+  },
+  function parent(){
+    var dirname = this.dirname();
+    if (dirname === this.path) {
+      dirname = this.resolve('..');
+    }
+    return new Path(dirname || '/');
+  },
+  function children(){
+    if (this.isDirectory()) {
+      return this.dir().map(path);
+    }
+    throw new Error(this.path + ' is not a directory');
+  },
+  function toString(){
+    return this.path;
+  },
+  function barename(){
+    return this.basename().slice(0, -this.extname().length);
+  }
+]);
+
+void function(){
+  var fs   = require('fs'),
+      path = require('path');
+
+  define(Path, [
+    function normalize(pathname){
+      return path.resolve(pathname);
+    }
+  ]);
+
+  define(Path.prototype, [
+    function inspect(){
+      return '<Path '+this.path+'>';
+    },
+    function stat(){
+      var stat = fs.statSync(this.path);
+      this.stat = function(){ return stat };
+      return stat;
+    },
+    function isDirectory(){
+      return this.stat().isDirectory();
+    },
+    function isFile(){
+      return this.stat().isFile();
+    },
+    function exists(){
+      return fs.existsSync(this.path);
+    },
+    function dir(){
+      return fs.readdirSync(this.path).map(function(name){
+        return path.resolve(this.path, name);
+      }, this);
+    },
+    function read(){
+      return fs.readFileSync(this.path, 'utf8');
+    },
+    function write(content){
+      fs.writeFileSync(this.path, content);
+    },
+    function basename(){
+      return path.basename(this.path);
+    },
+    function extname(){
+      return path.extname(this.path);
+    },
+    function dirname(){
+      return path.dirname(this.path);
+    },
+    function relativeTo(to){
+      return path.relative(to, this.path);
+    },
+    function relativeFrom(from){
+      return path.relative(this.path, to);
+    },
+    function resolve(to){
+      return new Path(path.resolve.apply(null, [this.path].concat(to)));
+    }
+  ]);
+}();
+
+
+function stringify(o){
+  return util.inspect(o);
 }
 
 function percent(n, t){
@@ -44,16 +150,24 @@ function formatPath(name){
   return name.split(/\/|\\/).slice(3).join('/');
 }
 
-function stringify(o){
-  return require('util').inspect(o);
+
+function fromObject(realm, object){
+  var obj = realm.evaluate('({})');
+  Object.keys(object).forEach(function(key){
+    if (key !== 'test') {
+      obj.Put(key, object[key]);
+    }
+  });
+  return obj;
 }
+
 
 function toObject(o){
   if (o && o.Enumerate) {
     var out = {};
     var keys = o.Enumerate(false, true);
     for (var i=0; i < keys.length; i++) {
-      var item = out[keys[i]] = o.Get(keys[i]);
+      var item = out[keys[i]] = o.get(keys[i]);
       if (item && item.Enumerate) {
         out[keys[i]] = toObject(item);
       }
@@ -114,9 +228,9 @@ var TestCase = (function(){
   }
 
   function TestCase(filename, strict){
-    this.abspath = filename;
-    this.name = path.basename(filename).slice(0, -3);
-    parseTestRecord(this, read(filename), this.name);
+    this.file = path(filename);
+    this.name = this.file.barename();
+    parseTestRecord(this, this.file.read(), this.name);
   }
 
   define(TestCase.prototype, [
@@ -154,65 +268,60 @@ function TestRunner(suite, before, after) {
     executeAfter: after || ''
   });
 
-
-  this.testFinished = function testFinished(){
-    var current = self.current,
-        result = current.Get('result'),
-        error = current.Get('error');
-
-    if (result === undefined) {
-      current.Put('result', 'fail');
-      current.Put('error', 'Failed to load test case (probable parse error).');
-      current.Put('description', 'Failed to load test case!');
-    } else if (error !== undefined) {
-      var msg = error.ConstructorName === 'Test262Error' ? '' : error.Get('name') + ": ";
-      msg += error.Get('message');
-      current.Put('error', msg);
-    } else if (error === undefined && result === 'fail') {
-      current.Put('error', 'Test case returned non-true value.');
-    }
-
-    self.callback(toObject(current));
-  };
-
-  this.testRun = function testRun(id, path, description, code, result, error){
-    var current = self.current;
-    current.Put('id', id);
-    current.Put('path', path);
-    current.Put('description', description);
-    current.Put('result', result);
-    current.Put('error', error);
-    current.Put('code', code);
-  };
 }
 
 define(TestRunner.prototype, [
-  function run(test, callback){
-    var self = this;
-    this.callback = callback;
-    continuum(function(realm){
-      var src = test.getSource(),
-          current = self.current = realm.evaluate('({})');
+  function run(test){
+    var realm   = continuum.createRealm(),
+        src     = test.getSource(),
+        current = realm.evaluate('({})');
 
-      realm.on('throw', function(e){
-        self.current = e.value;
-        self.testFinished();
-      });
-
-      iterate(test, function(val, key){
-        if (key !== 'test') {
-          current.Put(key, val);
-        }
-      });
-
-      current.Put('code', src);
-      realm.evaluate(self.executeBefore);
-      realm.global.Put('testRun', createNativeFunction(self.testRun));
-      realm.global.Put('testFinished', createNativeFunction(self.testFinished));
-      realm.global.Put('testDescrip', current);
-      realm.evaluate(src);
-      realm.evaluate(self.executeAfter);
+    realm.on('throw', function(e){
+      realm.global.set('iframeError', e.value);
     });
+
+    for (var k in test) {
+      if (typeof test[k] === 'string') {
+        current.set(k, test[k]);
+      }
+    }
+
+
+    function testRun(id, path, description, code, result, error){
+      id !== undefined && current.set('id', id);
+      path !== undefined && current.set('path', path);
+      description !== undefined && current.set('description', description);
+      result !== undefined && current.set('result', result);
+      error !== undefined && current.set('error', error);
+      code !== undefined && current.set('code', code);
+    }
+
+    function testFinished(){
+      var result = current.get('result'),
+          error = current.get('error');
+
+      if (result === undefined) {
+        current.set('result', 'fail');
+        current.set('error', 'Failed to load test case (probable parse error).');
+        current.set('description', 'Failed to load test case!');
+      } else if (error !== undefined) {
+        var msg = error.ConstructorName === 'Test262Error' ? '' : error.Get('name') + ": ";
+        msg += error.Get('message');
+        current.set('error', msg);
+      } else if (error === undefined && result === 'fail') {
+        current.set('error', 'Test case returned non-true value.');
+      }
+    }
+
+    current.set('code', src);
+    realm.evaluate(this.executeBefore);
+    realm.global.set('testRun', createFunction(testRun));
+    realm.global.set('testFinished', createFunction(testFinished));
+    realm.global.set('testDescrip', current);
+    realm.evaluate(src);
+    realm.evaluate(this.executeAfter);
+
+    return toObject(current);
   }
 ]);
 
@@ -238,28 +347,28 @@ var TestSuite = (function(){
 
   function TestSuite(options){
     options = new TestSuiteOptions(options);
-    var root = resolve(options.root, 'test262', 'test');
-    this.tests = resolve(root, 'suite');
-    this.libs = resolve(root, 'harness');
+    var root = path(options.root).resolve(['test262', 'test']);
+    this.tests = root.resolve('suite');
+    this.libs = root.resolve('harness');
     this.strictOnly = options.strictOnly;
     this.nonStrictOnly = options.nonStrictOnly;
     this.unmarkedDefault = options.unmarkedDefault;
     this.queue = new Queue;
     this.results = {};
 
-    if (!exists(this.tests)) {
+    if (!this.tests.exists()) {
       throw new Error('No test repository found');
     }
 
-    if (!exists(this.libs)) {
+    if (!this.libs.exists()) {
       throw new Error('No test library found');
     }
 
     var before = map(['cth.js', 'sta.js', 'testBuiltInObject.js'], function(name){
-      return read(resolve(this.libs, name));
+      return this.libs.resolve(name).read();
     }, this).join('\n\n');
 
-    var after = read(resolve(this.libs, 'gs.js'));
+    var after = this.libs.resolve('gs.js').read();
     this.runner = new TestRunner(this, before, after);
 
     Object.defineProperty(this, 'includes', {
@@ -280,35 +389,36 @@ var TestSuite = (function(){
         print(" - Failed %d tests (%d)", progress.failed, percent(progress.failed, progress.count));
       }
     },
-    function enqueue(path){
+    function enqueue(file){
       if (this.queue.length >= this.max) return this;
-      if (isDirectory(path)) {
-        dir(path).forEach(this.enqueue, this);
+      file = path(file);
+      if (file.isDirectory()) {
+        file.children().forEach(this.enqueue, this);
       } else {
-        this.queue.push(path);
+        this.queue.push(file);
       }
       return this;
     },
     function chapter(chapter){
       chapter = chapter.toString().split('.');
-      var path = resolve(this.tests, 'ch' + ('00'+ (chapter[0] | 0)).slice(-2));
+      var file = this.tests.resolve('ch' + ('00'+ (chapter[0] | 0)).slice(-2));
       if (chapter[1]) {
-        path = resolve(path, chapter[0] + '.' + chapter[1]);
+        file = file.resolve(chapter[0] + '.' + chapter[1]);
       }
       if (chapter[2]) {
-        path = resolve(path, chapter[0] + '.' + chapter[1] + '.' + chapter[2]);
+        file = file.resolve(chapter[0] + '.' + chapter[1] + '.' + chapter[2]);
       }
-      if (exists(path)) {
-        this.enqueue(path);
+      if (file.exists()) {
+        this.enqueue(file);
       }
       return this;
     },
-    function next(done){
+    function next(){
       var item = this.queue.shift();
       if (item) {
         var test = new TestCase(item, this.strict);
 
-        test.paths = test.path.split('/');
+        test.paths = test.file.parts();
 
         test.paths.reduce(function(r, s, i, a){
           if (!(s in r)) {
@@ -321,43 +431,38 @@ var TestSuite = (function(){
           return r[s];
         }, this.results);
 
-        var self = this;
-        this.runner.run(test, function(result){
-          done.call(self, test);
-        });
+        return this.runner.run(test);
       }
     },
-    function run(count, done){
-      var record = __dirname+'/tested.json';
-      var tested = fs.existsSync(record) ? require(record) : {};
-      if (typeof count === 'function') {
-        done = count;
-        count = 40;
-      }
-      if (count-- && this.queue.length) {
-        var name = formatPath(path.relative(__dirname, this.queue.front()));
+    function run(count){
+      count = +count || Math.min(10, this.queue.length);
+      var record = path(__dirname+'/tested.json');
+      var tested = record.exists() ? require(record.path) : {};
+
+      while (count-- && this.queue.length) {
+        var name = formatPath(this.queue.front().relativeTo(__dirname));
         if (name in tested) {
           this.queue.shift();
-          return this.run(++count, done);
+          continue;
         }
-        tested[name] = true;
 
-        this.next(function(test){
-          var name = test.paths.slice(-1);
-          delete test.abspath;
-          delete test.path;
-          delete test.paths;
-          if (test.result === undefined) {
-            test.result = 'PASS';
+        var result = tested[name] = this.next();
+        if (result) {
+          if (result.result === 'pass') {
+            tested[name] = 'pass';
+          } else {
+            delete result.abspath;
+            delete result.path;
+            delete result.paths;
+            delete result.code;
+            delete result.test;
+            delete result.name;
           }
-
-          write(__dirname + '/results/'+name+'.js', stringify(test));
-          test.global = null;
-          this.run(count, done);
-        });
-      } else {
-        done('done')
+        }
+        record.write(JSON.stringify(tested, null, '  '));
       }
+
+      return tested;
     }
   ]);
 
@@ -365,10 +470,5 @@ var TestSuite = (function(){
 })();
 
 var x = new TestSuite;
-
-x.chapter('8.2');
-x.run(function(result){
-  print(x);
-});
-// print(x.includes);
-//print(realm.global);
+x.chapter('8.7');
+print(x.run());
