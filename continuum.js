@@ -8423,6 +8423,7 @@ exports.buffers = (function(global, exports){
 
 
 exports.constants = (function(exports){
+  "use strict";
   var objects = require('../lib/objects');
 
   var create  = objects.create,
@@ -8575,6 +8576,7 @@ exports.constants = (function(exports){
 
 
 exports.errors = (function(errors, messages, exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       constants = require('./constants');
 
@@ -11228,6 +11230,7 @@ exports.assembler = (function(exports){
 
 
 exports.operators = (function(exports){
+  "use strict";
   var ThrowException = require('./errors').ThrowException;
 
   var SYMBOLS       = require('./constants').SYMBOLS,
@@ -20362,6 +20365,7 @@ exports.debug = (function(exports){
 
 
 exports.index = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       iteration = require('../lib/iteration'),
       runtime   = require('./runtime'),

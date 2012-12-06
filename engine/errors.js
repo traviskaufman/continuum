@@ -1,4 +1,5 @@
 var errors = (function(errors, messages, exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       constants = require('./constants');
 

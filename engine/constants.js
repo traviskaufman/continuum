@@ -1,4 +1,5 @@
 var constants = (function(exports){
+  "use strict";
   var objects = require('../lib/objects');
 
   var create  = objects.create,

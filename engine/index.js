@@ -1,4 +1,5 @@
 var index = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       iteration = require('../lib/iteration'),
       runtime   = require('./runtime'),

@@ -1,4 +1,5 @@
 var operators = (function(exports){
+  "use strict";
   var ThrowException = require('./errors').ThrowException;
 
   var SYMBOLS       = require('./constants').SYMBOLS,
