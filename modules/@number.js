@@ -4,25 +4,24 @@ export const
   MAX_VALUE         = 1.7976931348623157e+308,
   MIN_VALUE         = 5e-324,
   NaN               = NaN,
-  NEGATIVE_INFINITY = Infinity,
-  POSITIVE_INFINITY = -Infinity;
+  NEGATIVE_INFINITY = -Infinity,
+  POSITIVE_INFINITY = Infinity;
 
 
 export class Number {
   constructor(value){
-    value = $__ToNumber(value);
+    value = arguments.length ? $__ToNumber(value) : 0;
     return $__IsConstructCall() ? $__NumberCreate(value) : value;
   }
 
   toString(radix){
+    radix = $__ToInteger(radix || 10);
     if (typeof this === 'number') {
-      var number = this;
+      return $__NumberToString(this, radix);
     } else if (this.@@GetBuiltinBrand() === 'Number') {
-      var number = this.@@PrimitiveValue;
-    } else {
-      throw $__Exception('not_generic', ['Number.prototype.toString']);
+      return $__NumberToString(this.@@getInternal('PrimitiveValue'), radix);
     }
-    return $__NumberToString(number, $__ToInteger(radix));
+    throw $__Exception('not_generic', ['Number.prototype.toString']);
   }
 
   valueOf(){
@@ -30,7 +29,7 @@ export class Number {
       return this;
     }
     if (this.@@GetBuiltinBrand() === 'Number') {
-      return this.@@PrimitiveValue;
+      return this.@@getInternal('PrimitiveValue');
     } else {
       throw $__Exception('not_generic', ['Number.prototype.valueOf']);
     }
@@ -49,13 +48,6 @@ export class Number {
 }
 
 builtinClass(Number);
-
-Number.prototype.@@DefineOwnProperty(@@PrimitiveValue, {
-  configurable: true,
-  enumerable: false,
-  get: $__GetPrimitiveValue,
-  set: $__SetPrimitiveValue
-});
 
 
 export function isNaN(number){
