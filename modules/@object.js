@@ -1,6 +1,6 @@
 export class Object {
   constructor(value){
-    return $__IsConstructCall() || value == null ? {} : $__ToObject(value);
+    return value == null ? {} : $__ToObject(value);
   }
 
   toString(){
