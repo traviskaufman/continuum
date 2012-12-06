@@ -33,7 +33,7 @@ function createTypedArray(Type, buffer, byteOffset, length){
   } else {
     buffer = $__ToObject(buffer);
 
-    if (buffer.@@GetBuiltinBrand() === 'BuiltinArrayBuffer') {
+    if (buffer.@@GetBuiltinBrand() === 'ArrayBuffer') {
       byteOffset = $__ToUint32(byteOffset);
       if (byteOffset % Type.BYTES_PER_ELEMENT) {
         throw $__Exception('buffer_unaligned_offset', [Type.name]);
@@ -75,7 +75,7 @@ internalFunction(createTypedArray);
 
 
 function set(Type, instance, array, offset){
-  if (instance.@@GetBuiltinBrand() !== 'Builtin'+Type.name) {
+  if (instance.@@GetBuiltinBrand() !== Type.name) {
     throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);
   }
 
@@ -105,7 +105,7 @@ internalFunction(set);
 
 
 function subarray(Type, instance, begin, end){
-  if (instance.@@GetBuiltinBrand() !== 'Builtin'+Type.name) {
+  if (instance.@@GetBuiltinBrand() !== Type.name) {
     throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);
   }
 
@@ -161,7 +161,7 @@ private @get, @set;
 export class DataView {
   constructor(buffer, byteOffset, byteLength){
     buffer = $__ToObject(buffer);
-    if (buffer.@@GetBuiltinBrand() !== 'BuiltinArrayBuffer') {
+    if (buffer.@@GetBuiltinBrand() !== 'ArrayBuffer') {
       throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);
     }
 

@@ -21,7 +21,7 @@ function ToHTML(tag, content, attrName, attrVal){
 internalFunction(ToHTML);
 
 function isRegExp(subject){
-  return subject !== null && typeof subject === 'object' && subject.@@GetBuiltinBrand() === 'BuiltinRegExp';
+  return subject !== null && typeof subject === 'object' && subject.@@GetBuiltinBrand() === 'RegExp';
 }
 
 internalFunction(isRegExp);
@@ -84,7 +84,7 @@ internalFunction(stringMatch);
 
 
 function useHost(value, method){
-  return $__CallNative(ensureCoercible(value, method), method);
+  return $__CallBuiltin(ensureCoercible(value, method), method);
 }
 
 internalFunction(useHost);
@@ -320,7 +320,7 @@ export class String {
   }
 
   toString(){
-    if (this.@@GetBuiltinBrand() === 'StringWrapper') {
+    if (this.@@GetBuiltinBrand() === 'String') {
       return this.@@getInternal('PrimitiveValue');
     }
     throw $__exception('not_generic', ['String.prototype.toString']);
@@ -335,7 +335,7 @@ export class String {
   }
 
   valueOf(){
-    if (this.@@GetBuiltinBrand() === 'StringWrapper') {
+    if (this.@@GetBuiltinBrand() === 'String') {
       return this.@@getInternal('PrimitiveValue');
     }
     throw $__Exception('not_generic', ['String.prototype.valueOf']);

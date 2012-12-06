@@ -121,5 +121,5 @@ export class Set {
 }
 
 builtinClass(Set);
-var SetPrototype = Set.prototype;
+const SetPrototype = Set.prototype;
 

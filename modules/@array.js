@@ -384,7 +384,7 @@ builtinClass(Array);
 
 
 export function isArray(array){
-  return array ? array.@@GetBuiltinBrand() === 'BuiltinArray' : false;
+  return array ? array.@@GetBuiltinBrand() === 'Array' : false;
 }
 
 export function from(arrayLike){

@@ -8,7 +8,7 @@ export class Boolean {
     var type = $__Type(this);
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'BuiltinBoolean') {
+    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {
       return this.@@PrimitiveValue ? 'true' : 'false';
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.toString']);
@@ -19,7 +19,7 @@ export class Boolean {
     var type = $__Type(this);
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'BuiltinBoolean') {
+    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {
       return this.@@PrimitiveValue;
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);

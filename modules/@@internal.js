@@ -214,7 +214,7 @@ function ensureArgs(o, name){
   }
 
   var brand = o.@@GetBuiltinBrand();
-  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];
+  return brand === 'Array' || brand === 'Arguments' ? o : [...o];
 }
 
 internalFunction(ensureArgs);

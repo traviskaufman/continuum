@@ -17,7 +17,7 @@ export class Number {
   toString(radix){
     if (typeof this === 'number') {
       var number = this;
-    } else if (this.@@GetBuiltinBrand() === 'NumberWrapper') {
+    } else if (this.@@GetBuiltinBrand() === 'Number') {
       var number = this.@@PrimitiveValue;
     } else {
       throw $__Exception('not_generic', ['Number.prototype.toString']);
