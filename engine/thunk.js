@@ -4,7 +4,8 @@ var thunk = (function(exports){
       Emitter   = require('../lib/Emitter');
 
   var define  = objects.define,
-      inherit = objects.inherit;
+      inherit = objects.inherit,
+      Hash    = objects.Hash;
 
   var operators    = require('./operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
@@ -76,23 +77,61 @@ var thunk = (function(exports){
 
 
   function instructions(ops, opcodes){
-    var out = [];
+    var out = [],
+        traceNext;
+
     for (var i=0; i < ops.length; i++) {
       out[i] = opcodes[+ops[i].op];
       out[i].ip = i;
       if (out[i].name === 'LOG') {
         out.log = true;
+      } else if (out[i].name === 'LOOP' ) {
+        traceNext = true;
+      } else if (traceNext) {
+        out[i].count = out[i].total = 0;
+        traceNext = false;
       }
     }
     return out;
   }
 
+  function Action(op, result){
+    this.ip = op.ip;
+    this.op = op;
+    this.result = result;
+  }
+
+  function Trace(context, ip, jump){
+    this.context = context;
+    this.start = jump[0];
+    this.end = ip;
+    this.total = this.end - this.start;
+    this.record = [];
+    this.count = 0;
+    this.index = new Array(this.total);
+    this.complete = false;
+  }
+
+  define(Trace.prototype, [
+    function record(op, result){
+      var offset = op.ip - this.start;
+      if (!(offset in this.index)) {
+        var action = new Action(op, result);
+        this.record[this.count++] = action;
+        this.index[offset] = action;
+      } else if (op.ip === this.end) {
+        this.complete = true;
+      }
+      return this.complete;
+    }
+  ]);
 
   function Thunk(code, instrumented){
+
     var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
-      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG,
+      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
       MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
       REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
       SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
@@ -162,6 +201,7 @@ var thunk = (function(exports){
 
 
 
+
     function AND(){
       if (stack[sp - 1]) {
         sp--;
@@ -171,6 +211,7 @@ var thunk = (function(exports){
         return cmds[ip];
       }
     }
+
 
     function ARGS(){
       stack[sp++] = [];
@@ -547,6 +588,18 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function LOOP(){
+      var jump = cmds[++ip];
+      return jump;
+
+      if (jump.count++ > 50) {
+        jump.total += jump.count;
+        jump.count = 0;
+        return TRACE_STACK;
+      }
+      return jump;
+    }
+
     function MEMBER(){
       var obj = stack[--sp],
           key = getKey(ops[ip][0]);
@@ -917,6 +970,129 @@ var thunk = (function(exports){
     function trace(unwound){
       stacktrace || (stacktrace = []);
       stacktrace.push(unwound);
+    }
+
+    function Change(type, from, to){
+      this.type = type;
+      if (to === undefined) {
+        this.index = from;
+      } else {
+        this.from = from;
+        this.to = to;
+      }
+    }
+
+    define(Change.prototype, [
+      function compare(change){
+        if (change.type === this.type) {
+          if ('index' in this) {
+            return change.index === this.index;
+          } else {
+            return change.from - change.to === this.from - this.to;
+          }
+        }
+        return false;
+      }
+    ]);
+
+    function StackTrace(sp, stack){
+      this.stack = stack.slice(0, sp);
+      this.sp = sp;
+      this.ops = new Hash;
+    }
+
+    define(StackTrace.prototype, [
+      function record(op, sp, stack){
+        var ops = this.ops[op.op.name] || (this.ops[op.op.name] = []);
+        ops.push(this.diff(sp, stack));
+      },
+      function diff(sp, stack){
+        var max = Math.max(sp, this.sp),
+            diffs = [];
+
+        stack = stack.slice(0, sp);
+
+        for (var i=0; i < max; i++) {
+          if (this.stack[i] !== stack[i]) {
+            diffs.push(i);
+          }
+        }
+
+        if (!diffs.length) {
+          return diffs;
+        }
+
+        var changes = [];
+
+        for (var i=0; i < diffs.length; i++) {
+          if (diffs[i] > sp) {
+            var index = stack.indexOf(this.stack[diffs[i]]);
+            if (~index) {
+              changes.push(new Change('move', diffs[i], index));
+            } else {
+              changes.push(new Change('remove', diffs[i]));
+            }
+          } else if (diffs[i] > this.sp) {
+            var index = this.stack.indexOf(stack[diffs[i]]);
+            if (~index) {
+              changes.push(new Change('move', index, diffs[i]));
+            } else {
+              changes.push(new Change('add', diffs[i]));
+            }
+          } else {
+            var index1 = this.stack.indexOf(stack[diffs[i]]);
+            var index2 = stack.indexOf(this.stack[diffs[i]]);
+            if (~index1) {
+              if (~index2) {
+                if (index1 === index2) {
+                  changes.push(new Change('replace', index1));
+                } else {
+                  changes.push(new Change('swap', index1, diffs[i]));
+                }
+              } else {
+                changes.push(new Change('remove', index1));
+              }
+            } else if (~index2) {
+              changes.push(new Change('add', index2));
+            } else if (this.sp < sp) {
+              changes.push(new Change('push', sp));
+            } else {
+              changes.push(new Change('pop', this.sp));
+            }
+          }
+        }
+
+        this.sp = sp;
+        this.stack = stack.slice(0, sp);
+        return changes;
+      },
+      function summary(){
+        for (var k in this.ops) {
+
+        }
+      }
+    ]);
+
+    function TRACE_STACK(){
+      var tracer = new StackTrace(sp, stack);
+      var f = cmds[ip],
+          lastip;
+      while (f) {
+        lastip = ip;
+        f = f();
+        tracer.record(ops[lastip], sp, stack);
+      }
+      console.log(tracer);
+    }
+
+    function TRACE(){
+      var tracer = new Trace(context, ip, cmds[ip]),
+          _stack = stack.slice(0, sp);
+      var f = cmds[ip];
+      while (f) {
+        f = f();
+      }
+
     }
 
     function normalPrepare(newContext){
