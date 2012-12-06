@@ -34,6 +34,10 @@ private @@extend;
 symbol  @toStringTag,
         @iterator;
 
+
+$__iterator = @iterator;
+$__toStringTag = @toStringTag;
+
 var Genesis = $__Genesis;
 Genesis.@@Call              = $__Call;
 Genesis.@@Construct         = $__Construct;

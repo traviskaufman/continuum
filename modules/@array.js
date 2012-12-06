@@ -1,35 +1,27 @@
 import Iterator from '@iter';
 
-function joinArray(array, separator){
-  array = $__ToObject(array);
+const joinArray = (target, separator) => {
+  const array = $__ToObject(target),
+        len   = $__ToUint32(array.length),
+        sep   = $__ToString(separator);
 
-  var result = '',
-      len = $__ToUint32(array.length);
+  if (len === 0) return '';
 
-  if (len === 0) {
-    return result;
+  var result = $__ToString(array[0]),
+      i = 0;
+
+  while (++i < len) {
+    result += sep + array[i];
   }
-
-  if (typeof separator !== 'string') {
-    separator = $__ToString(separator);
-  }
-
-  for (var i=0; i < len; i++) {
-    if (i) result += separator;
-    result += $__ToString(array[i]);
-  }
-
   return result;
-}
-
-internalFunction(joinArray);
+};
 
 
-var K = 0x01,
-    V = 0x02,
-    S = 0x04;
+const K = 0x01,
+      V = 0x02,
+      S = 0x04;
 
-var kinds = {
+const kinds = {
   'key': 1,
   'value': 2,
   'key+value': 3,
@@ -53,18 +45,17 @@ class ArrayIterator extends Iterator {
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);
     }
-    if (!(this.@@has(@array) && this.@@has(@index) && this.@@has(@kind))) {
+    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {
       throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
     }
 
-    var array = this.@array,
-        index = this.@index,
-        kind  = this.@kind,
-        len   = $__ToUint32(array.length),
-        key   = $__ToString(index);
+    const array = this.@array,
+          index = this.@index,
+          kind  = this.@kind,
+          len   = $__ToUint32(array.length);
 
     if (kind & S) {
-      var found = false;
+      let found = false;
       while (!found && index < len) {
         found = index in array;
         if (!found) {
@@ -79,15 +70,8 @@ class ArrayIterator extends Iterator {
     }
 
     this.@index = index + 1;
-
-    if (kind & V) {
-      var value = array[key];
-      if (kind & K) {
-        return [key, value];
-      }
-      return value;
-    }
-    return key;
+    const key = $__ToString(index);
+    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;
   }
 }
 
@@ -98,25 +82,27 @@ builtinClass(ArrayIterator);
 export class Array {
   constructor(...values){
     if (values.length === 1 && typeof values[0] === 'number') {
-      var out = [];
+      let out = [];
       out.length = values[0];
       return out;
-    } else {
-      return values;
     }
+    return values;
   }
 
   concat(...items){
-    var obj   = $__ToObject(this),
-        array = [],
-        count = items.length,
-        n     = 0,
-        i     = 0;
+    const array = [],
+          count = items.length;
+
+    var obj = $__ToObject(this),
+        n   = 0,
+        i   = 0;
 
     do {
-      if (obj && typeof obj === 'object' && obj.@@GetBuiltinBrand() === 'BuiltinArray') {
-        var len = obj.length;
-        for (var j=0; j < len; j++) {
+      if (isArray(obj)) {
+        var len = $__ToInt32(obj.length),
+            j   = 0;
+
+        while (j < len) {
           if (j in obj) {
             array[n++] = obj[j];
           }
@@ -124,22 +110,23 @@ export class Array {
       } else {
         array[n++] = obj;
       }
-      obj = items[i++];
-    } while (i <= count)
+      obj = items[i];
+    } while (i++ < count)
 
     return array;
   }
 
   every(callback, context){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          result = [];
 
     if (typeof callback !== 'function') {
       throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);
     }
 
-    for (var i = 0; i < len; i++) {
+    var i = 0;
+    while (i < len) {
       if (i in array && !callback.@@Call(context, [array[i], i, array])) {
         return false;
       }
@@ -149,24 +136,23 @@ export class Array {
   }
 
   filter(callback, context){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [],
-        count  = 0;
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          result = [];
 
     if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.filter']);
+      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);
     }
 
-    for (var i = 0; i < len; i++) {
+    var i = 0;
+    while (i < len) {
       if (i in array) {
         var element = array[i];
-        if (callback.@@Call(context, [element, i, this])) {
+        if (i in array && !callback.@@Call(context, [element, i, array])) {
           result[count++] = element;
         }
       }
     }
-
     return result;
   }
 
@@ -275,9 +261,12 @@ export class Array {
         len   = $__ToUint32(array.length),
         count = values.length;
 
-    for (var i=0; i < valuesLen; i++) {
-      array[len++] = count[i];
+    array.length += count;
+
+    for (var i=0; i < count; i++) {
+      array[len++] = values[i];
     }
+
     return len;
   }
 
