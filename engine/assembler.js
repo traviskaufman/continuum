@@ -179,6 +179,7 @@ var assembler = (function(exports){
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
       LOG              = new StandardOpCode(0, 'LOG'),
+      LOOP             = new StandardOpCode(0, 'LOOP'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
@@ -232,6 +233,19 @@ var assembler = (function(exports){
   }
 
   var Code = exports.code = (function(){
+    function Directives(){
+      this.length = 0;
+    }
+
+    inherit(Directives, Array, [
+      function inspect(){
+        var space = new Array((''+this.length).length + 1).join(' ');
+        return this.map(function(op, i){
+          return (space + i).slice(-space.length) + ' ' + op.inspect();
+        }).join('\n');
+      }
+    ]);
+
     var Directive = (function(){
       function Directive(op, args){
         this.op = op;
@@ -392,7 +406,7 @@ var assembler = (function(exports){
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
       }
-      this.ops = [];
+      this.ops = new Directives;
       if (node.params) {
         this.params = new Parameters(node);
         this.scope.varDeclare('arguments', 'arguments');
@@ -911,7 +925,6 @@ var assembler = (function(exports){
         HAS_BINDING(name);
         var jump = JTRUE(0);
         BINDING(name, false);
-        POP();
         adjust(jump);
       }
     }
@@ -936,14 +949,12 @@ var assembler = (function(exports){
       HAS_BINDING(name);
       var jump = JTRUE(0);
       BINDING(name, false);
-      POP();
       adjust(jump);
     });
 
     each(lexicalDecls(code.body), function(decl){
       each(decl.boundNames, function(name){
         BINDING(name, decl.IsConstantDeclaration);
-        POP();
       });
     });
 
@@ -1398,6 +1409,26 @@ var assembler = (function(exports){
     context.code.transfers.push(new Unwinder(type, begin, current()));
   }
 
+  var pushBlock, popBlock;
+
+  void function(){
+    var stack = [];
+
+    pushBlock = function(){
+      BLOCK();
+      context.currentScope = scope.create('block', context.currentScope);
+      stack.push(current());
+    };
+
+
+    popBlock = function(){
+      UPSCOPE();
+      context.currentScope.pop();
+      context.code.transfers.push(new Unwinder(ENTRY.ENV, stack.pop(), current()));
+    };
+  }();
+
+
   function move(node, set, pos){
     if (node.label) {
       var transfer = context.jumps.first(function(transfer){
@@ -1430,30 +1461,25 @@ var assembler = (function(exports){
       if (item.type === 'Property') {
         MEMBER(symbol(item.key));
         GET();
-      LOG();
         if (isPattern(item.value)) {
           destructure(item.value, STORE);
         } else if (item.value.type === 'Identifier') {
-          STORE(symbol(item.value));
-        } else {
-          STORE(symbol(item.value));
+          STORE(item.value.name);
         }
       } else if (item.type === 'ArrayPattern') {
         LITERAL(i);
         ELEMENT();
         GET();
-      LOG();
         destructure(item, STORE);
       } else if (item.type === 'Identifier') {
         LITERAL(i);
         ELEMENT();
         GET();
-        STORE(symbol(item));
+        STORE(item.name);
       } else if (item.type === 'SpreadElement') {
         GET();
-      LOG();
         SPREAD(i);
-        STORE(symbol(item.argument));
+        STORE(item.argument.name);
       }
     });
   }
@@ -1560,34 +1586,30 @@ var assembler = (function(exports){
   }
 
   function BlockStatement(node){
+    pushBlock();
     block(function(){
       lexical(function(){
-        var lexicals = lexicalDecls(node.body),
-            funcs = [];
-        if (lexicals.length) {
-          BLOCK([]);
-          each(lexicals, function(decl){
-            each(decl.boundNames, function(name){
-              BINDING(name, decl.IsConstantDeclaration);
-              if (decl.type === 'FunctionDeclaration') {
-                funcs.push(decl);
-              }
-            });
-          });
+        var funcs = [];
 
-          each(funcs, function(decl){
-            FunctionDeclaration(decl);
-            FUNCTION(false, decl.id.name, decl.code);
-            LET(decl.id.name);
+        each(lexicalDecls(node.body), function(decl){
+          each(decl.boundNames, function(name){
+            BINDING(name, decl.IsConstantDeclaration);
+            if (decl.type === 'FunctionDeclaration') {
+              funcs.push(decl);
+            }
           });
+        });
 
-          each(node.body, recurse);
-          UPSCOPE();
-        } else {
-          each(node.body, recurse);
-        }
+        each(funcs, function(decl){
+          FunctionDeclaration(decl);
+          FUNCTION(false, decl.id.name, decl.code);
+          LET(decl.id.name);
+        });
+
+        each(node.body, recurse);
       });
     });
+    popBlock();
   }
 
   function CallExpression(node){
@@ -1607,25 +1629,18 @@ var assembler = (function(exports){
 
   function CatchClause(node){
     lexical(ENTRY.CATCH, function(){
-      context.currentScope = scope.create('block', context.currentScope);
+      pushBlock();
       context.currentScope.lexDeclare(node.param.name, 'catch');
-
-      var lexicals = lexicalDecls(node.body);
-      BLOCK(null);
       BINDING(node.param.name, false);
-      POP();
       LET(node.param.name);
-      each(lexicals, function(decl){
+      each(lexicalDecls(node.body), function(decl){
         each(decl.boundNames, function(name){
           BINDING(name, decl.IsConstantDeclaration);
         });
       });
       each(node.body, recurse);
-
-
-      context.currentScope.pop();
+      popBlock();
     });
-    UPSCOPE();
   }
 
   function ClassBody(node){}
@@ -1665,6 +1680,7 @@ var assembler = (function(exports){
       var cond = current();
       recurse(node.test);
       GET();
+      //LOOP();
       JTRUE(start);
       return cond;
     });
@@ -1694,78 +1710,54 @@ var assembler = (function(exports){
 
   function ForStatement(node){
     control(function(){
-      lexical(function(){
-        var init = node.init;
-        if (init){
-          var isLexical = isLexicalDeclaration(init);
-          if (isLexical) {
-            var scoped = BLOCK([]);
-            context.currentScope = scope.create('block', context.currentScope);
-            recurse(init);
-            var decl = init.declarations[init.declarations.length - 1].id;
-            var lexicalDecl = {
-              type: 'VariableDeclaration',
-              kind: init.kind,
-              declarations: [{
-                type: 'VariableDeclarator',
-                id: decl,
-                init: null
-              }]
-            };
-            scoped[0] = lexicalDecl;
-            lexicalDecl.boundNames = boundNames(lexicalDecl);
-            recurse(decl);
-          } else {
-            recurse(init);
-            GET();
-            POP();
-          }
-        }
-
-        var test = current();
-
-        if (node.test) {
-          recurse(node.test);
-          GET();
-          var op = JFALSE(0);
-        }
-
-        var update = current();
-
-        if (node.body.body && decl) {
-          block(function(){
-            lexical(function(){
-              var lexicals = lexicalDecls(node.body.body);
-              lexicals.push(lexicalDecl);
-              GET();
-              BLOCK(lexicals);
-              recurse(decl);
-              ROTATE(1);
-              PUT();
-              each(node.body.body, recurse);
-              UPSCOPE();
+      if (node.init){
+        if (node.init.type === 'VariableDeclaration') {
+          if (node.init.kind !== 'var') {
+            var lexical = true;
+            pushBlock();
+            each(lexicalDecls(node.init), function(decl){
+              each(decl.boundNames, function(name){
+                BINDING(name, decl.IsConstantDeclaration);
+              });
             });
-          });
+          }
+          recurse(node.init);
         } else {
-          recurse(node.body);
-        }
-
-        if (node.update) {
-          recurse(node.update);
+          recurse(node.init);
           GET();
           POP();
         }
+      }
 
-        JUMP(test);
-        adjust(op);
-        if (isLexical) {
-          context.currentScope.pop();
-          UPSCOPE();
-        }
-        return update;
-      });
+      var repeat = current();
+
+      if (node.test) {
+        recurse(node.test);
+        GET();
+        var test = JFALSE(0);
+      }
+
+      recurse(node.body);
+
+      if (node.update) {
+        recurse(node.update);
+        GET();
+      }
+
+      POP();
+
+      JUMP(repeat);
+      adjust(test);
+
+      if (lexical) {
+        popScope();
+      }
+
+      return repeat;
     });
   }
+
+
 
   function ForInStatement(node){
     iter(node, ENUM);
@@ -1779,6 +1771,16 @@ var assembler = (function(exports){
     control(function(){
       var update;
       lexical(ENTRY.FOROF, function(){
+        if (isLexicalDeclaration(node.left)) {
+          var lexical = true;
+          context.currentScope = scope.create('block', context.currentScope);
+          BLOCK();
+          each(lexicalDecls(node.left), function(decl){
+            each(decl.boundNames, function(name){
+              BINDING(name, decl.IsConstantDeclaration);
+            });
+          });
+        }
         recurse(node.right);
         GET();
         KIND();
@@ -1789,27 +1791,20 @@ var assembler = (function(exports){
         GET();
         ARGS();
         CALL();
-        if (isLexicalDeclaration(node.left)) {
-          block(function(){
-            lexical(function(){
-              BLOCK(lexicalDecls(node.left));
-              VariableDeclaration(node.left, true);
-              recurse(node.body);
-              UPSCOPE();
-            });
-          });
+        if (node.left.type === 'VariableDeclaration') {
+          VariableDeclaration(node.left, true);
         } else {
-          if (node.left.type === 'VariableDeclaration') {
-            VariableDeclaration(node.left, true);
-          } else {
-            recurse(node.left);
-            ROTATE(1);
-            PUT();
-            POP();
-          }
-          recurse(node.body);
+          recurse(node.left);
+          ROTATE(1);
+          PUT();
+          POP();
         }
+        recurse(node.body);
         JUMP(update);
+        if (lexical) {
+          context.currentScope.pop();
+          UPSCOPE();
+        }
       });
       return update;
     });
@@ -2215,6 +2210,7 @@ var assembler = (function(exports){
       GET();
       var op = JFALSE(0)
       recurse(node.body);
+      //LOOP();
       JUMP(start);
       adjust(op);
       return start;
