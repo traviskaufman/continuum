@@ -160,7 +160,6 @@ var thunk = (function(exports){
           } else if (entry.type === 'try') {
             stack[sp++] = error.value;
             ip = entry.end + 1;
-          } else if (entry.type === 'catch') {
             return cmds[ip];
           } else if (entry.type === 'iteration') {
             if (error && error.value && error.value.BuiltinBrand === StopIteration) {

@@ -1419,9 +1419,9 @@ var assembler = (function(exports){
   var scopeStack = [];
 
   function pushScope(type){
-    type === 'with' ? WITH() : SCOPE_PUSH();
     context.currentScope = scope.create('block', context.currentScope);
     scopeStack.push(current());
+    type === 'with' ? WITH() : SCOPE_PUSH();
   }
 
 
@@ -1656,15 +1656,13 @@ var assembler = (function(exports){
   }
 
   function CatchClause(node){
-    unwinder('catch', function(){
-      pushScope('block');
-      context.currentScope.lexDeclare(node.param.name, 'catch');
-      BINDING(node.param.name, false);
-      LET(node.param.name);
-      lexicalInit(node.body);
-      each(node.body, recurse);
-      popScope();
-    });
+    pushScope('block');
+    context.currentScope.lexDeclare(node.param.name, 'catch');
+    BINDING(node.param.name, false);
+    LET(node.param.name);
+    lexicalInit(node.body);
+    each(node.body, recurse);
+    popScope();
   }
 
   function ClassBody(node){}
