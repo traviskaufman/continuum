@@ -22,7 +22,6 @@ var thunk = (function(exports){
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.array,
       UNARYOPS  = constants.UNARYOPS.array,
-      ENTRY     = constants.ENTRY.hash,
       AST       = constants.AST.array,
       Pause     = constants.SYMBOLS.Pause,
       Empty     = constants.SYMBOLS.Empty,
@@ -128,14 +127,14 @@ var thunk = (function(exports){
 
   function Thunk(code, instrumented){
 
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
       JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
-      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
-      REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
-      SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
-      UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
+      REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
+      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY, UNDEFINED,
+      UPDATE, VAR, WITH, YIELD];
 
 
     var thunk = this,
@@ -154,16 +153,16 @@ var thunk = (function(exports){
     }
 
     function unwind(){
-      for (var i = 0, entry; entry = code.transfers[i]; i++) {
+      for (var i = 0, entry; entry = code.unwinders[i]; i++) {
         if (entry.begin <= ip && ip <= entry.end) {
-          if (entry.type === ENTRY.ENV) {
-            trace(context.popBlock());
-          } else if (entry.type === ENTRY.TRY) {
+          if (entry.type === 'scope') {
+            trace(context.popScope());
+          } else if (entry.type === 'try') {
             stack[sp++] = error.value;
             ip = entry.end + 1;
-          } else if (entry.type === ENTRY.CATCH) {
+          } else if (entry.type === 'catch') {
             return cmds[ip];
-          } else if (entry.type === ENTRY.FOROF) {
+          } else if (entry.type === 'iteration') {
             if (error && error.value && error.value.BuiltinBrand === StopIteration) {
               ip = entry.end;
               return cmds[ip];
@@ -276,11 +275,6 @@ var thunk = (function(exports){
       }
 
       stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function BLOCK(){
-      context.pushBlock(ops[ip][0]);
       return cmds[++ip];
     }
 
@@ -764,6 +758,21 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function SCOPE_CLONE(){
+      context.cloneScope();
+      return cmds[++ip];
+    }
+
+    function SCOPE_POP(){
+      context.popScope();
+      return cmds[++ip];
+    }
+
+    function SCOPE_PUSH(){
+      context.pushScope();
+      return cmds[++ip];
+    }
+
     function SPREAD(){
       var obj    = stack[--sp],
           index  = ops[ip][0],
@@ -931,11 +940,6 @@ var thunk = (function(exports){
       }
 
       stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function UPSCOPE(){
-      context.popBlock();
       return cmds[++ip];
     }
 

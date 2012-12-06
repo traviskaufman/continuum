@@ -1215,11 +1215,38 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (value.Abrupt) return value; else value = value.value;
       }
 
-      array.set(offset++, value);
+      array.set(offset++ + '', value);
     }
 
     array.define('length', offset, _CW);
     return offset;
+  }
+
+  function SpreadDestructuring(context, target, index){
+    var array = context.createArray(0);
+    if (target == null) {
+      return array;
+    }
+    if (typeof target !== 'object') {
+      return ThrowException('spread_non_object', typeof target);
+    }
+
+    var len = ToUint32(target.Get('length'));
+    if (len && len.Completion) {
+      if (len.Abrupt) return len; else len = len.value;
+    }
+
+    var count = len - index;
+    for (var i=0; i < count; i++) {
+      var value = target.Get(index + i);
+      if (value && value.Completion) {
+        if (value.Abrupt) return value; else value = value.value;
+      }
+      array.set(i+'', value);
+    }
+
+    array.define('length', i, _CW);
+    return array;
   }
 
   function GetTemplateCallSite(context, template){
@@ -1247,33 +1274,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     raw.PreventExtensions(false);
     realm.templates[template.id] = site;
     return site;
-  }
-
-  function SpreadDestructuring(context, target, index){
-    var array = context.createArray(0);
-    if (target == null) {
-      return array;
-    }
-    if (typeof target !== 'object') {
-      return ThrowException('spread_non_object', typeof target);
-    }
-
-    var len = ToUint32(target.Get('length'));
-    if (len && len.Completion) {
-      if (len.Abrupt) return len; else len = len.value;
-    }
-
-    var count = len - index;
-    for (var i=0; i < count; i++) {
-      var value = target.Get(index + i);
-      if (value && value.Completion) {
-        if (value.Abrupt) return value; else value = value.value;
-      }
-      array.set(i, value);
-    }
-
-    array.define('length', i, _CW);
-    return array;
   }
 
   function EnqueueChangeRecord(record, changeObservers){
@@ -4306,16 +4306,28 @@ var runtime = (function(GLOBAL, exports, undefined){
       function hasBinding(name){
         return this.LexicalEnvironment.HasBinding(name);
       },
-      function popBlock(){
-        var block = this.LexicalEnvironment;
+      function popScope(){
+        var scope = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
-        return block;
+        return scope;
       },
-      function pushBlock(decls){
+      function pushScope(){
         this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
-        if (decls) {
-          return BlockDeclarationInstantiation(decls, this.LexicalEnvironment);
+      },
+      function cloneScope(){
+        var scope = this.LexicalEnvironment,
+            clone = new DeclarativeEnvironmentRecord(scope.outer);
+        for (var k in scope.bindings) {
+          clone.bindings[k] = scope.bindings[k];
         }
+        for (var k in scope.deletables) {
+          clone.deletables[k] = scope.deletables[k];
+        }
+        for (var k in scope.consts) {
+          clone.consts[k] = scope.consts[k];
+        }
+        this.LexicalEnvironment = clone;
+        return scope;
       },
       function pushWith(obj){
         this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
