@@ -320,10 +320,12 @@ export class String {
   }
 
   toString(){
-    if (this.@@GetBuiltinBrand() === 'String') {
+    if (typeof this === 'string') {
+      return this;
+    } else if (this.@@GetBuiltinBrand() === 'String') {
       return this.@@getInternal('PrimitiveValue');
     }
-    throw $__exception('not_generic', ['String.prototype.toString']);
+    throw $__Exception('not_generic', ['String.prototype.toString']);
   }
 
   toUpperCase(){
@@ -335,10 +337,12 @@ export class String {
   }
 
   valueOf(){
-    if (this.@@GetBuiltinBrand() === 'String') {
+    if (typeof this === 'string') {
+      return this;
+    } else if (this.@@GetBuiltinBrand() === 'String') {
       return this.@@getInternal('PrimitiveValue');
     }
-    throw $__Exception('not_generic', ['String.prototype.valueOf']);
+    throw $__Exception('not_generic', ['String.prototype.toString']);
   }
 }
 
