@@ -694,28 +694,16 @@ var operators = (function(exports){
 
 
   function EQUAL(x, y){
-    if (x && x.Completion) {
-      if (x.Abrupt) {
-        return x;
-      } else {
-        x = x.value;
-      }
-    }
-    if (y && y.Completion) {
-      if (y.Abrupt) {
-        return y;
-      } else {
-        y = y.value;
-      }
-    }
+    if (x && x.Abrupt) return x;
+    if (y && y.Abrupt) return y;
 
     var ltype = typeof x,
         rtype = typeof y;
 
     if (ltype === rtype) {
       return x === y;
-    } else if (x == null && y == null) {
-      return true;
+    } else if (x == null || y == null) {
+      return x == null && y == null;
     } else if (ltype === NUMBER || rtype === STRING) {
       return EQUAL(x, ToNumber(y));
     } else if (ltype === STRING || rtype === NUMBER) {
