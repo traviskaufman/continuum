@@ -8992,6 +8992,7 @@ exports.assembler = (function(exports){
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
       LOG              = new StandardOpCode(0, 'LOG'),
+      LOOP             = new StandardOpCode(0, 'LOOP'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
@@ -9045,6 +9046,19 @@ exports.assembler = (function(exports){
   }
 
   var Code = exports.code = (function(){
+    function Directives(){
+      this.length = 0;
+    }
+
+    inherit(Directives, Array, [
+      function inspect(){
+        var space = new Array((''+this.length).length + 1).join(' ');
+        return this.map(function(op, i){
+          return (space + i).slice(-space.length) + ' ' + op.inspect();
+        }).join('\n');
+      }
+    ]);
+
     var Directive = (function(){
       function Directive(op, args){
         this.op = op;
@@ -9205,7 +9219,7 @@ exports.assembler = (function(exports){
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
       }
-      this.ops = [];
+      this.ops = new Directives;
       if (node.params) {
         this.params = new Parameters(node);
         this.scope.varDeclare('arguments', 'arguments');
@@ -9724,7 +9738,6 @@ exports.assembler = (function(exports){
         HAS_BINDING(name);
         var jump = JTRUE(0);
         BINDING(name, false);
-        POP();
         adjust(jump);
       }
     }
@@ -9749,14 +9762,12 @@ exports.assembler = (function(exports){
       HAS_BINDING(name);
       var jump = JTRUE(0);
       BINDING(name, false);
-      POP();
       adjust(jump);
     });
 
     each(lexicalDecls(code.body), function(decl){
       each(decl.boundNames, function(name){
         BINDING(name, decl.IsConstantDeclaration);
-        POP();
       });
     });
 
@@ -10211,6 +10222,26 @@ exports.assembler = (function(exports){
     context.code.transfers.push(new Unwinder(type, begin, current()));
   }
 
+  var pushBlock, popBlock;
+
+  void function(){
+    var stack = [];
+
+    pushBlock = function(){
+      BLOCK();
+      context.currentScope = scope.create('block', context.currentScope);
+      stack.push(current());
+    };
+
+
+    popBlock = function(){
+      UPSCOPE();
+      context.currentScope.pop();
+      context.code.transfers.push(new Unwinder(ENTRY.ENV, stack.pop(), current()));
+    };
+  }();
+
+
   function move(node, set, pos){
     if (node.label) {
       var transfer = context.jumps.first(function(transfer){
@@ -10243,30 +10274,25 @@ exports.assembler = (function(exports){
       if (item.type === 'Property') {
         MEMBER(symbol(item.key));
         GET();
-      LOG();
         if (isPattern(item.value)) {
           destructure(item.value, STORE);
         } else if (item.value.type === 'Identifier') {
-          STORE(symbol(item.value));
-        } else {
-          STORE(symbol(item.value));
+          STORE(item.value.name);
         }
       } else if (item.type === 'ArrayPattern') {
         LITERAL(i);
         ELEMENT();
         GET();
-      LOG();
         destructure(item, STORE);
       } else if (item.type === 'Identifier') {
         LITERAL(i);
         ELEMENT();
         GET();
-        STORE(symbol(item));
+        STORE(item.name);
       } else if (item.type === 'SpreadElement') {
         GET();
-      LOG();
         SPREAD(i);
-        STORE(symbol(item.argument));
+        STORE(item.argument.name);
       }
     });
   }
@@ -10373,34 +10399,30 @@ exports.assembler = (function(exports){
   }
 
   function BlockStatement(node){
+    pushBlock();
     block(function(){
       lexical(function(){
-        var lexicals = lexicalDecls(node.body),
-            funcs = [];
-        if (lexicals.length) {
-          BLOCK([]);
-          each(lexicals, function(decl){
-            each(decl.boundNames, function(name){
-              BINDING(name, decl.IsConstantDeclaration);
-              if (decl.type === 'FunctionDeclaration') {
-                funcs.push(decl);
-              }
-            });
-          });
+        var funcs = [];
 
-          each(funcs, function(decl){
-            FunctionDeclaration(decl);
-            FUNCTION(false, decl.id.name, decl.code);
-            LET(decl.id.name);
+        each(lexicalDecls(node.body), function(decl){
+          each(decl.boundNames, function(name){
+            BINDING(name, decl.IsConstantDeclaration);
+            if (decl.type === 'FunctionDeclaration') {
+              funcs.push(decl);
+            }
           });
+        });
 
-          each(node.body, recurse);
-          UPSCOPE();
-        } else {
-          each(node.body, recurse);
-        }
+        each(funcs, function(decl){
+          FunctionDeclaration(decl);
+          FUNCTION(false, decl.id.name, decl.code);
+          LET(decl.id.name);
+        });
+
+        each(node.body, recurse);
       });
     });
+    popBlock();
   }
 
   function CallExpression(node){
@@ -10420,25 +10442,18 @@ exports.assembler = (function(exports){
 
   function CatchClause(node){
     lexical(ENTRY.CATCH, function(){
-      context.currentScope = scope.create('block', context.currentScope);
+      pushBlock();
       context.currentScope.lexDeclare(node.param.name, 'catch');
-
-      var lexicals = lexicalDecls(node.body);
-      BLOCK(null);
       BINDING(node.param.name, false);
-      POP();
       LET(node.param.name);
-      each(lexicals, function(decl){
+      each(lexicalDecls(node.body), function(decl){
         each(decl.boundNames, function(name){
           BINDING(name, decl.IsConstantDeclaration);
         });
       });
       each(node.body, recurse);
-
-
-      context.currentScope.pop();
+      popBlock();
     });
-    UPSCOPE();
   }
 
   function ClassBody(node){}
@@ -10478,6 +10493,7 @@ exports.assembler = (function(exports){
       var cond = current();
       recurse(node.test);
       GET();
+      //LOOP();
       JTRUE(start);
       return cond;
     });
@@ -10507,78 +10523,54 @@ exports.assembler = (function(exports){
 
   function ForStatement(node){
     control(function(){
-      lexical(function(){
-        var init = node.init;
-        if (init){
-          var isLexical = isLexicalDeclaration(init);
-          if (isLexical) {
-            var scoped = BLOCK([]);
-            context.currentScope = scope.create('block', context.currentScope);
-            recurse(init);
-            var decl = init.declarations[init.declarations.length - 1].id;
-            var lexicalDecl = {
-              type: 'VariableDeclaration',
-              kind: init.kind,
-              declarations: [{
-                type: 'VariableDeclarator',
-                id: decl,
-                init: null
-              }]
-            };
-            scoped[0] = lexicalDecl;
-            lexicalDecl.boundNames = boundNames(lexicalDecl);
-            recurse(decl);
-          } else {
-            recurse(init);
-            GET();
-            POP();
-          }
-        }
-
-        var test = current();
-
-        if (node.test) {
-          recurse(node.test);
-          GET();
-          var op = JFALSE(0);
-        }
-
-        var update = current();
-
-        if (node.body.body && decl) {
-          block(function(){
-            lexical(function(){
-              var lexicals = lexicalDecls(node.body.body);
-              lexicals.push(lexicalDecl);
-              GET();
-              BLOCK(lexicals);
-              recurse(decl);
-              ROTATE(1);
-              PUT();
-              each(node.body.body, recurse);
-              UPSCOPE();
+      if (node.init){
+        if (node.init.type === 'VariableDeclaration') {
+          if (node.init.kind !== 'var') {
+            var lexical = true;
+            pushBlock();
+            each(lexicalDecls(node.init), function(decl){
+              each(decl.boundNames, function(name){
+                BINDING(name, decl.IsConstantDeclaration);
+              });
             });
-          });
+          }
+          recurse(node.init);
         } else {
-          recurse(node.body);
-        }
-
-        if (node.update) {
-          recurse(node.update);
+          recurse(node.init);
           GET();
           POP();
         }
+      }
 
-        JUMP(test);
-        adjust(op);
-        if (isLexical) {
-          context.currentScope.pop();
-          UPSCOPE();
-        }
-        return update;
-      });
+      var repeat = current();
+
+      if (node.test) {
+        recurse(node.test);
+        GET();
+        var test = JFALSE(0);
+      }
+
+      recurse(node.body);
+
+      if (node.update) {
+        recurse(node.update);
+        GET();
+      }
+
+      POP();
+
+      JUMP(repeat);
+      adjust(test);
+
+      if (lexical) {
+        popScope();
+      }
+
+      return repeat;
     });
   }
+
+
 
   function ForInStatement(node){
     iter(node, ENUM);
@@ -10592,6 +10584,16 @@ exports.assembler = (function(exports){
     control(function(){
       var update;
       lexical(ENTRY.FOROF, function(){
+        if (isLexicalDeclaration(node.left)) {
+          var lexical = true;
+          context.currentScope = scope.create('block', context.currentScope);
+          BLOCK();
+          each(lexicalDecls(node.left), function(decl){
+            each(decl.boundNames, function(name){
+              BINDING(name, decl.IsConstantDeclaration);
+            });
+          });
+        }
         recurse(node.right);
         GET();
         KIND();
@@ -10602,27 +10604,20 @@ exports.assembler = (function(exports){
         GET();
         ARGS();
         CALL();
-        if (isLexicalDeclaration(node.left)) {
-          block(function(){
-            lexical(function(){
-              BLOCK(lexicalDecls(node.left));
-              VariableDeclaration(node.left, true);
-              recurse(node.body);
-              UPSCOPE();
-            });
-          });
+        if (node.left.type === 'VariableDeclaration') {
+          VariableDeclaration(node.left, true);
         } else {
-          if (node.left.type === 'VariableDeclaration') {
-            VariableDeclaration(node.left, true);
-          } else {
-            recurse(node.left);
-            ROTATE(1);
-            PUT();
-            POP();
-          }
-          recurse(node.body);
+          recurse(node.left);
+          ROTATE(1);
+          PUT();
+          POP();
         }
+        recurse(node.body);
         JUMP(update);
+        if (lexical) {
+          context.currentScope.pop();
+          UPSCOPE();
+        }
       });
       return update;
     });
@@ -11028,6 +11023,7 @@ exports.assembler = (function(exports){
       GET();
       var op = JFALSE(0)
       recurse(node.body);
+      //LOOP();
       JUMP(start);
       adjust(op);
       return start;
@@ -12022,7 +12018,8 @@ exports.thunk = (function(exports){
       Emitter   = require('../lib/Emitter');
 
   var define  = objects.define,
-      inherit = objects.inherit;
+      inherit = objects.inherit,
+      Hash    = objects.Hash;
 
   var operators    = require('./operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
@@ -12094,23 +12091,61 @@ exports.thunk = (function(exports){
 
 
   function instructions(ops, opcodes){
-    var out = [];
+    var out = [],
+        traceNext;
+
     for (var i=0; i < ops.length; i++) {
       out[i] = opcodes[+ops[i].op];
       out[i].ip = i;
       if (out[i].name === 'LOG') {
         out.log = true;
+      } else if (out[i].name === 'LOOP' ) {
+        traceNext = true;
+      } else if (traceNext) {
+        out[i].count = out[i].total = 0;
+        traceNext = false;
       }
     }
     return out;
   }
 
+  function Action(op, result){
+    this.ip = op.ip;
+    this.op = op;
+    this.result = result;
+  }
+
+  function Trace(context, ip, jump){
+    this.context = context;
+    this.start = jump[0];
+    this.end = ip;
+    this.total = this.end - this.start;
+    this.record = [];
+    this.count = 0;
+    this.index = new Array(this.total);
+    this.complete = false;
+  }
+
+  define(Trace.prototype, [
+    function record(op, result){
+      var offset = op.ip - this.start;
+      if (!(offset in this.index)) {
+        var action = new Action(op, result);
+        this.record[this.count++] = action;
+        this.index[offset] = action;
+      } else if (op.ip === this.end) {
+        this.complete = true;
+      }
+      return this.complete;
+    }
+  ]);
 
   function Thunk(code, instrumented){
+
     var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
-      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG,
+      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
       MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
       REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
       SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
@@ -12173,10 +12208,11 @@ exports.thunk = (function(exports){
           }
         }
       }
-      console.log(error);
+
       completion = error;
       return false;
     }
+
 
 
 
@@ -12189,6 +12225,7 @@ exports.thunk = (function(exports){
         return cmds[ip];
       }
     }
+
 
     function ARGS(){
       stack[sp++] = [];
@@ -12565,6 +12602,18 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function LOOP(){
+      var jump = cmds[++ip];
+      return jump;
+
+      if (jump.count++ > 50) {
+        jump.total += jump.count;
+        jump.count = 0;
+        return TRACE_STACK;
+      }
+      return jump;
+    }
+
     function MEMBER(){
       var obj = stack[--sp],
           key = getKey(ops[ip][0]);
@@ -12935,6 +12984,129 @@ exports.thunk = (function(exports){
     function trace(unwound){
       stacktrace || (stacktrace = []);
       stacktrace.push(unwound);
+    }
+
+    function Change(type, from, to){
+      this.type = type;
+      if (to === undefined) {
+        this.index = from;
+      } else {
+        this.from = from;
+        this.to = to;
+      }
+    }
+
+    define(Change.prototype, [
+      function compare(change){
+        if (change.type === this.type) {
+          if ('index' in this) {
+            return change.index === this.index;
+          } else {
+            return change.from - change.to === this.from - this.to;
+          }
+        }
+        return false;
+      }
+    ]);
+
+    function StackTrace(sp, stack){
+      this.stack = stack.slice(0, sp);
+      this.sp = sp;
+      this.ops = new Hash;
+    }
+
+    define(StackTrace.prototype, [
+      function record(op, sp, stack){
+        var ops = this.ops[op.op.name] || (this.ops[op.op.name] = []);
+        ops.push(this.diff(sp, stack));
+      },
+      function diff(sp, stack){
+        var max = Math.max(sp, this.sp),
+            diffs = [];
+
+        stack = stack.slice(0, sp);
+
+        for (var i=0; i < max; i++) {
+          if (this.stack[i] !== stack[i]) {
+            diffs.push(i);
+          }
+        }
+
+        if (!diffs.length) {
+          return diffs;
+        }
+
+        var changes = [];
+
+        for (var i=0; i < diffs.length; i++) {
+          if (diffs[i] > sp) {
+            var index = stack.indexOf(this.stack[diffs[i]]);
+            if (~index) {
+              changes.push(new Change('move', diffs[i], index));
+            } else {
+              changes.push(new Change('remove', diffs[i]));
+            }
+          } else if (diffs[i] > this.sp) {
+            var index = this.stack.indexOf(stack[diffs[i]]);
+            if (~index) {
+              changes.push(new Change('move', index, diffs[i]));
+            } else {
+              changes.push(new Change('add', diffs[i]));
+            }
+          } else {
+            var index1 = this.stack.indexOf(stack[diffs[i]]);
+            var index2 = stack.indexOf(this.stack[diffs[i]]);
+            if (~index1) {
+              if (~index2) {
+                if (index1 === index2) {
+                  changes.push(new Change('replace', index1));
+                } else {
+                  changes.push(new Change('swap', index1, diffs[i]));
+                }
+              } else {
+                changes.push(new Change('remove', index1));
+              }
+            } else if (~index2) {
+              changes.push(new Change('add', index2));
+            } else if (this.sp < sp) {
+              changes.push(new Change('push', sp));
+            } else {
+              changes.push(new Change('pop', this.sp));
+            }
+          }
+        }
+
+        this.sp = sp;
+        this.stack = stack.slice(0, sp);
+        return changes;
+      },
+      function summary(){
+        for (var k in this.ops) {
+
+        }
+      }
+    ]);
+
+    function TRACE_STACK(){
+      var tracer = new StackTrace(sp, stack);
+      var f = cmds[ip],
+          lastip;
+      while (f) {
+        lastip = ip;
+        f = f();
+        tracer.record(ops[lastip], sp, stack);
+      }
+      console.log(tracer);
+    }
+
+    function TRACE(){
+      var tracer = new Trace(context, ip, cmds[ip]),
+          _stack = stack.slice(0, sp);
+      var f = cmds[ip];
+      while (f) {
+        f = f();
+      }
+
     }
 
     function normalPrepare(newContext){
@@ -19397,7 +19569,11 @@ exports.debug = (function(exports){
 
     inherit(MirrorError, MirrorObject, {
       kind: 'Error'
-    });
+    }, [
+      function label(){
+        return this.getValue('name');
+      }
+    ]);
 
     return MirrorError;
   })();
@@ -20528,9 +20704,9 @@ exports.index = (function(exports){
 
 
 
-exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n    this.@@DefineOwnProperty(key, desc);\n    if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
+exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n    this.@@DefineOwnProperty(key, desc);\n    if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
 
-exports.modules["@array"] = "import Iterator from '@iter';\n\nfunction joinArray(array, separator){\n  array = $__ToObject(array);\n\n  var result = '',\n      len = $__ToUint32(array.length);\n\n  if (len === 0) {\n    return result;\n  }\n\n  if (typeof separator !== 'string') {\n    separator = $__ToString(separator);\n  }\n\n  for (var i=0; i < len; i++) {\n    if (i) result += separator;\n    result += $__ToString(array[i]);\n  }\n\n  return result;\n}\n\ninternalFunction(joinArray);\n\n\nvar K = 0x01,\n    V = 0x02,\n    S = 0x04;\n\nvar kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!(this.@@has(@array) && this.@@has(@index) && this.@@has(@kind))) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    var array = this.@array,\n        index = this.@index,\n        kind  = this.@kind,\n        len   = $__ToUint32(array.length),\n        key   = $__ToString(index);\n\n    if (kind & S) {\n      var found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n\n    if (kind & V) {\n      var value = array[key];\n      if (kind & K) {\n        return [key, value];\n      }\n      return value;\n    }\n    return key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      var out = [];\n      out.length = values[0];\n      return out;\n    } else {\n      return values;\n    }\n  }\n\n  concat(...items){\n    var obj   = $__ToObject(this),\n        array = [],\n        count = items.length,\n        n     = 0,\n        i     = 0;\n\n    do {\n      if (obj && typeof obj === 'object' && obj.@@GetBuiltinBrand() === 'BuiltinArray') {\n        var len = obj.length;\n        for (var j=0; j < len; j++) {\n          if (j in obj) {\n            array[n++] = obj[j];\n          }\n        }\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[i++];\n    } while (i <= count)\n\n    return array;\n  }\n\n  every(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && !callback.@@Call(context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  }\n\n  filter(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [],\n        count  = 0;\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.filter']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array) {\n        var element = array[i];\n        if (callback.@@Call(context, [element, i, this])) {\n          result[count++] = element;\n        }\n      }\n    }\n\n    return result;\n  }\n\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = $__ToInteger(fromIndex);\n    if (i > len) {\n      return -1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (i >= len) {\n      i = len - 1;\n    } else if (i < 0) {\n      i += i;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  map(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n    return result;\n  }\n\n  pop(){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  }\n\n  push(...values){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length),\n        count = values.length;\n\n    for (var i=0; i < valuesLen; i++) {\n      array[len++] = count[i];\n    }\n    return len;\n  }\n\n  reduce(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  reduceRight(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  slice(start, end){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  }\n\n  some(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && callback.@@Call(context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  }\n\n  toString(){\n    return joinArray(this, ',');\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n[ 'every', 'filter', 'forEach', 'indexOf', 'lastIndexOf',\n  'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return array ? array.@@GetBuiltinBrand() === 'BuiltinArray' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n  var len   = $__ToUint32(arrayLike.length),\n      Ctor  = $__IsConstructor(this) ? this : Array,\n      out   = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  var len  = $__ToInteger(items.length),\n      Ctor = $__IsConstructor(this) ? this : Array,\n      out  = new Ctor(len);\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
+exports.modules["@array"] = "import Iterator from '@iter';\n\nconst joinArray = (target, separator) => {\n  const array = $__ToObject(target),\n        len   = $__ToUint32(array.length),\n        sep   = $__ToString(separator);\n\n  if (len === 0) return '';\n\n  var result = $__ToString(array[0]),\n      i = 0;\n\n  while (++i < len) {\n    result += sep + array[i];\n  }\n  return result;\n};\n\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    var obj = $__ToObject(this),\n        n   = 0,\n        i   = 0;\n\n    do {\n      if (isArray(obj)) {\n        var len = $__ToInt32(obj.length),\n            j   = 0;\n\n        while (j < len) {\n          if (j in obj) {\n            array[n++] = obj[j];\n          }\n        }\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[i];\n    } while (i++ < count)\n\n    return array;\n  }\n\n  every(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array && !callback.@@Call(context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  }\n\n  filter(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array) {\n        var element = array[i];\n        if (i in array && !callback.@@Call(context, [element, i, array])) {\n          result[count++] = element;\n        }\n      }\n    }\n    return result;\n  }\n\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = $__ToInteger(fromIndex);\n    if (i > len) {\n      return -1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (i >= len) {\n      i = len - 1;\n    } else if (i < 0) {\n      i += i;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  map(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n    return result;\n  }\n\n  pop(){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  }\n\n  push(...values){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length),\n        count = values.length;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[len++] = values[i];\n    }\n\n    return len;\n  }\n\n  reduce(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  reduceRight(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  slice(start, end){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  }\n\n  some(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && callback.@@Call(context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  }\n\n  toString(){\n    return joinArray(this, ',');\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n[ 'every', 'filter', 'forEach', 'indexOf', 'lastIndexOf',\n  'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return array ? array.@@GetBuiltinBrand() === 'BuiltinArray' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n  var len   = $__ToUint32(arrayLike.length),\n      Ctor  = $__IsConstructor(this) ? this : Array,\n      out   = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  var len  = $__ToInteger(items.length),\n      Ctor = $__IsConstructor(this) ? this : Array,\n      out  = new Ctor(len);\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
 
 exports.modules["@boolean"] = "export class Boolean {\n  constructor(value){\n    value = $__ToBoolean(value);\n    return $__IsConstructCall() ? $__BooleanCreate(value) : value;\n  }\n\n  toString(){\n    var type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'BuiltinBoolean') {\n      return this.@@PrimitiveValue ? 'true' : 'false';\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    var type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'BuiltinBoolean') {\n      return this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Boolean);\n\nBoolean.prototype.@@DefineOwnProperty(@@PrimitiveValue, {\n  configurable: true,\n  enumerable: false,\n  get: $__GetPrimitiveValue,\n  set: $__SetPrimitiveValue\n});\n";
 
