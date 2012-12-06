@@ -483,18 +483,32 @@ var debug = (function(exports){
   })();
 
 
+  var MirrorPrimitiveWrapper = (function(){
+    function MirrorPrimitiveWrapper(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorPrimitiveWrapper, MirrorObject, {
+      kind: 'PrimitiveWrapper'
+    }, [
+      function primitiveValue(){
+        return this.subject.PrimitiveValue
+      }
+    ]);
+
+    return MirrorPrimitiveWrapper;
+  })();
+
+
+
   var MirrorBoolean = (function(){
     function MirrorBoolean(subject){
       MirrorObject.call(this, subject);
     }
 
-    inherit(MirrorBoolean, MirrorObject, {
+    inherit(MirrorBoolean, MirrorPrimitiveWrapper, {
       kind: 'Boolean'
-    }, [
-      function label(){
-        return 'Boolean('+this.subject.PrimitiveValue+')';
-      }
-    ]);
+    });
 
     return MirrorBoolean;
   })();
@@ -731,19 +745,9 @@ var debug = (function(exports){
       MirrorObject.call(this, subject);
     }
 
-    inherit(MirrorNumber, MirrorObject, {
+    inherit(MirrorNumber, MirrorPrimitiveWrapper, {
       kind: 'Number'
-    }, [
-      function label(){
-        var value = this.subject.PrimitiveValue;
-        if (isNegativeZero(value)) {
-          value = '-0';
-        } else {
-          value += '';
-        }
-        return value;
-      }
-    ]);
+    });
 
     return MirrorNumber;
   })();
@@ -770,46 +774,13 @@ var debug = (function(exports){
   var MirrorString = (function(){
     function MirrorString(subject){
       MirrorObject.call(this, subject);
-      this.primitive = this.subject.PrimitiveValue;
     }
 
-    inherit(MirrorString, MirrorObject,{
+    inherit(MirrorString, MirrorPrimitiveWrapper,{
       kind: 'String'
     }, [
-      function get(key){
-        if (key < this.subject.get('length') && key >= 0) {
-          return this.primitive[key];
-        } else {
-          return MirrorObject.prototype.get.call(this, key);
-        }
-      },
-      function ownAttrs(props){
-        var len = this.primitive.length;
-        props || (props = new Hash);
-
-        for (var i=0; i < len; i++) {
-          props[i] = [i+'', this.primitive[i], 1];
-        }
-
-        this.subject.each(function(prop){
-          var key = prop[0] === '__proto__' ? proto : prop[0];
-          props[key] = prop;
-        });
-
-        return props;
-      },
-      function query(key){
-        if (key < this.subject.get('length') && key >= 0) {
-          return 1;
-        } else {
-          return MirrorObject.prototype.query.call(this, key);
-        }
-      },
-      function label(){
-        return 'String('+quotes(this.primitive)+')';
-      }
+      MirrorArray.prototype.list
     ]);
-
 
     return MirrorString;
   })();

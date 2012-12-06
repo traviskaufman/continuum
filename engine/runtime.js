@@ -2924,15 +2924,50 @@ var runtime = (function(GLOBAL, exports, undefined){
       PrimitiveValue: undefined
     }, [
       primitiveWrapperSave,
-      function GetOwnProperty(key){
-        var desc = $Object.prototype.GetOwnProperty.call(this, key);
-        if (desc) {
-          return desc;
+      function each(callback){
+        var str = this.PrimitiveValue;
+        for (var i=0; i < str.length; i++) {
+          callback([i+'', str[i], E__]);
         }
-
+        $Object.prototype.each.call(this, callback);
+      },
+      function has(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return true;
+        }
+        return $Object.prototype.has.call(this, key);
+      },
+      function get(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return str[key];
+        }
+        return $Object.prototype.get.call(this, key);
+      },
+      function query(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return E__;
+        }
+        return $Object.prototype.query.call(this, key);
+      },
+      function describe(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return [key, str[key], E__];
+        }
+        return $Object.prototype.describe.call(this, key);
+      },
+      function GetOwnProperty(key){
         var str = this.PrimitiveValue;
         if (key < str.length && key >= 0) {
           return new StringIndice(str[key]);
+        }
+
+        var desc = $Object.prototype.GetOwnProperty.call(this, key);
+        if (desc) {
+          return desc;
         }
       },
       function Get(key){
@@ -2941,29 +2976,6 @@ var runtime = (function(GLOBAL, exports, undefined){
           return str[key];
         }
         return this.GetP(this, key);
-      },
-      function HasOwnProperty(key){
-        key = ToPropertyName(key);
-        if (key && key.Completion) {
-          if (key.Abrupt) return key; else key = key.value;
-        }
-        if (typeof key === 'string') {
-          if (key < this.get('length') && key >= 0) {
-            return true;
-          }
-        }
-        return $Object.prototype.HasOwnProperty.call(this, key);
-      },
-      function HasProperty(key){
-        var ret = this.HasOwnProperty(key);
-        if (ret && ret.Completion) {
-          if (ret.Abrupt) return ret; else ret = ret.value;
-        }
-        if (ret === true) {
-          return true;
-        } else {
-          return $Object.prototype.HasProperty.call(this, key);
-        }
       },
       function Enumerate(includePrototype, onlyEnumerable){
         var props = $Object.prototype.Enumerate.call(this, includePrototype, onlyEnumerable);
