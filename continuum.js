@@ -13614,11 +13614,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     var func = obj.Get(key);
     if (func && func.Completion) {
-      if (func.Abrupt) return func; else func = func.value;
+      if (func && func.Abrupt) return func; else func = func.value;
     }
 
-    if (!IsCallable(func))
+    if (!IsCallable(func)) {
       return ThrowException('called_non_callable', key);
+    }
 
     return func.Call(obj, args || emptyArgs);
   }
@@ -14079,23 +14080,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   function ObjectBindingInitialization(pattern, object, env){
     for (var i=0, property; property = pattern.properties[i]; i++) {
       var value = object.HasProperty(property.key.name) ? object.Get(property.key.name) : undefined;
-      if (value && value.Completion) {
-        if (value.Abrupt) {
-          return value;
-        } else {
-          value = value.value;
-        }
-      }
+      if (value && value.Abrupt) return value;
       BindingInitialization(property.value, value, env);
     }
   }
 
 
-
-
   function CollectionInitializer(Data, name){
     var data = name + 'Data';
-    return function(object, iterable){
+    return function(_, args){
+      var object = args[0],
+          iterable = args[1];
+
       object[data] = new Data;
 
       if (iterable === undefined) {
@@ -14103,55 +14099,34 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       iterable = ToObject(iterable);
-      if (iterable && iterable.Completion) {
-        if (iterable.Abrupt) {
-          return iterable;
-        } else {
-          iterable = iterable.value;
-        }
-      }
+      if (iterable && iterable.Abrupt) return iterable;
 
       var iterator = Invoke(intrinsics.iterator, iterable);
+      if (iterator && iterator.Abrupt) return iterator;
 
       var adder = object.Get('set');
-      if (adder && adder.Completion) {
-        if (adder.Abrupt) {
-          return adder;
-        } else {
-          adder = adder.value;
-        }
-      }
+      if (adder && adder.Abrupt) return adder;
 
       if (!IsCallable(adder)) {
         return ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
       }
 
       var next;
-      while (next = Invoke('next', iterator)) {
+      while (next = ToObject(Invoke('next', iterator))) {
         if (IsStopIteration(next)) {
           return object;
         }
 
-        if (next && next.Completion) {
-          if (next.Abrupt) return next; else next = next.value;
-        }
+        if (next && next.Abrupt) return next;
 
-        next = ToObject(next);
+        var key = next.Get(0);
+        if (key && key.Abrupt) return key;
 
-        var k = next.Get(0);
-        if (k && k.Completion) {
-          if (k.Abrupt) return k; else k = k.value;
-        }
+        var value = next.Get(1);
+        if (value && value.Abrupt) return value;
 
-        var v = next.Get(1);
-        if (v && v.Completion) {
-          if (v.Abrupt) return v; else v = v.value;
-        }
-
-        var status = adder.Call(object, [k, v]);
-        if (status && status.Abrupt) {
-          return status;
-        }
+        var status = adder.Call(object, [key, value]);
+        if (status && status.Abrupt) return status;
       }
       return object;
     };
@@ -18507,8 +18482,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         sin: Math.sin,
         sqrt: Math.sqrt,
         tan: Math.tan,
-        MapInitialization: CollectionInitializer(MapData, 'Map'),
-        MapSigil: function(){
+        _MapInitialization: CollectionInitializer(MapData, 'Map'),
+        _MapSigil: function(){
           return MapData.sigil;
         },
         _MapSize: function(obj, args){
@@ -18534,7 +18509,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return result instanceof Array ? FromInternalArray(result) : result;
         },
 
-        WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
+        _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
         _WeakMapGet: function(obj, args){
           return args[0].WeakMapData.get(args[1]);
         },
