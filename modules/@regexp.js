@@ -1,3 +1,5 @@
+private @test, @exec, @toString;
+
 export class RegExp {
   constructor(pattern, flags){
     if ($__IsConstructCall()) {
@@ -24,31 +26,34 @@ export class RegExp {
 
   exec(string){
     if (this.@@GetBuiltinBrand() === 'RegExp') {
-      return $__RegExpExec(this, $__ToString(string));
+      return this.@exec($__ToString(string));
     }
     throw $__Exception('not_generic', ['RegExp.prototype.exec']);
   }
 
   test(string){
     if (this.@@GetBuiltinBrand() === 'RegExp') {
-      return $__RegExpTest(this, $__ToString(string));
+      return this.@test($__ToString(string));
     }
     throw $__Exception('not_generic', ['RegExp.prototype.test']);
   }
 
   toString(){
     if (this.@@GetBuiltinBrand() === 'RegExp') {
-      return $__RegExpToString(this);
+      return this.@toString();
     }
     throw $__Exception('not_generic', ['RegExp.prototype.toString']);
   }
 }
 
 builtinClass(RegExp);
+RegExp.prototype.@test = $__RegExpTest;
+RegExp.prototype.@exec = $__RegExpExec;
+RegExp.prototype.@toString = $__RegExpToString;
 
 export function exec(regexp, string){
   if (regexp && regexp.@@GetBuiltinBrand() === 'RegExp') {
-    return $__RegExpExec(regexp, $__ToString(string));
+    return $__RegExpExec.@@Call(regexp, $__ToString(string));
   }
   throw $__Exception('not_generic', ['@regexp.exec']);
 }
@@ -58,7 +63,7 @@ builtinFunction(exec);
 
 export function test(regexp, string){
   if (regexp && regexp.@@GetBuiltinBrand() === 'RegExp') {
-    return $__RegExpTest(regexp, $__ToString(string));
+    return $__RegExpTest.@@Call(regexp, [$__ToString(string)]);
   }
   throw $__Exception('not_generic', ['@regexp.test']);
 }
