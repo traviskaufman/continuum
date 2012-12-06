@@ -1,4 +1,4 @@
-export let iterator = @iterator;
+export const iterator = @iterator;
 
 export class Iterator {
   @iterator(){

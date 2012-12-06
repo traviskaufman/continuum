@@ -1,6 +1,3 @@
-const Infinity = 1 / 0,
-      NaN = +'NaN';
-
 export const
   E       = 2.718281828459045,
   LN10    = 2.302585092994046,
@@ -266,7 +263,7 @@ export function trunc(x){
   return isFiniteNonZero(x) ? ~~x : x;
 }
 
-export var Math = {
+export const Math = {
   E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,
   abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,
   cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,

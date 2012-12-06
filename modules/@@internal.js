@@ -99,7 +99,10 @@ function extend(properties){
 
 
 let HIDDEN = 6,
-    FROZEN = 0;
+    FROZEN = 0,
+    Infinity = 1 / 0,
+    NaN = +'NaN',
+    undefined;
 
 
 function internalFunction(func){
@@ -164,7 +167,7 @@ function hideEverything(o){
       i = keys.length;
 
   while (i--) {
-    o.@@update(keys[i], o[keys[i]] === 'number' ? FROZEN : HIDDEN);
+    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);
   }
 
   if (type === 'function') {

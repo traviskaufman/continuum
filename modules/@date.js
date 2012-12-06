@@ -32,6 +32,6 @@ Date.prototype.@@extend({
 $__wrapDateMethods(Date.prototype);
 
 
-export let now = $__now;
+export const now = $__now;
 Date.@@extend({ now });
 

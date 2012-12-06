@@ -1,11 +1,11 @@
-export let
+export const
   EPSILON           = 2.220446049250313e-16,
   MAX_INTEGER       = 9007199254740992,
   MAX_VALUE         = 1.7976931348623157e+308,
   MIN_VALUE         = 5e-324,
-  NaN               = +'NaN',
-  NEGATIVE_INFINITY = 1 / 0,
-  POSITIVE_INFINITY = 1 / -0;
+  NaN               = NaN,
+  NEGATIVE_INFINITY = Infinity,
+  POSITIVE_INFINITY = -Infinity;
 
 
 export class Number {

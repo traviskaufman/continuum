@@ -1,5 +1,3 @@
-let Infinity = 1 / 0;
-
 export function decodeURI(value){
   return $__decodeURI($__ToString(value));
 }

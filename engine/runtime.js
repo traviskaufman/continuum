@@ -77,7 +77,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   var BINARYOPS = constants.BINARYOPS.array,
       UNARYOPS  = constants.UNARYOPS.array,
       BRANDS    = constants.BRANDS,
-      ENTRY     = constants.ENTRY.hash,
       SCOPE     = constants.SCOPE.hash,
       AST       = constants.AST.array;
 

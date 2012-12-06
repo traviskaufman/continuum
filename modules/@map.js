@@ -123,6 +123,6 @@ export class Map {
 }
 
 builtinClass(Map);
-var MapPrototype = Map.prototype;
+const MapPrototype = Map.prototype;
 
 
