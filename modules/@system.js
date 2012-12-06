@@ -168,3 +168,4 @@ for (let k in internalLoader.@modules) {
   System.@modules[k] = internalLoader.@modules[k];
 }
 
+$__global.@toStringTag = 'global';
