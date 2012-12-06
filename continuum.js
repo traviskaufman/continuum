@@ -8525,7 +8525,6 @@ exports.constants = (function(exports){
   exports.BINARYOPS = new Constants(['instanceof', 'in', '==', '!=', '===', '!==', '<', '>',
                                    '<=', '>=', '*', '/','%', '+', '-', '<<', '>>', '>>>', '|', '&', '^', 'string+']);
   exports.UNARYOPS = new Constants(['delete', 'void', 'typeof', '+', '-', '~', '!']);
-  exports.ENTRY = new Constants(['ENV', 'FOROF', 'TRY', 'CATCH', 'FINALLY' ]);
   exports.FUNCTYPE = new Constants(['NORMAL', 'METHOD', 'ARROW' ]);
   exports.SCOPE = new Constants(['EVAL', 'FUNCTION', 'GLOBAL', 'MODULE' ]);
 
@@ -8852,7 +8851,6 @@ exports.assembler = (function(exports){
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.hash,
       UNARYOPS  = constants.UNARYOPS.hash,
-      ENTRY     = constants.ENTRY.hash,
       SCOPE     = constants.SCOPE.hash,
       AST       = constants.AST,
       FUNCTYPE  = constants.FUNCTYPE.hash;
@@ -8959,7 +8957,6 @@ exports.assembler = (function(exports){
       ARRAY_DONE       = new StandardOpCode(0, 'ARRAY_DONE'),
       BINARY           = new StandardOpCode(1, 'BINARY'),
       BINDING          = new StandardOpCode(2, 'BINDING'),
-      BLOCK            = new StandardOpCode(1, 'BLOCK'),
       CALL             = new StandardOpCode(1, 'CALL'),
       CASE             = new StandardOpCode(1, 'CASE'),
       CLASS_DECL       = new StandardOpCode(1, 'CLASS_DECL'),
@@ -9011,6 +9008,9 @@ exports.assembler = (function(exports){
       RETURN           = new StandardOpCode(0, 'RETURN'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
+      SCOPE_CLONE      = new StandardOpCode(0, 'SCOPE_CLONE'),
+      SCOPE_POP        = new StandardOpCode(0, 'SCOPE_POP'),
+      SCOPE_PUSH       = new StandardOpCode(0, 'SCOPE_PUSH'),
       SPREAD           = new StandardOpCode(1, 'SPREAD'),
       SPREAD_ARG       = new StandardOpCode(0, 'SPREAD_ARG'),
       SPREAD_ARRAY     = new StandardOpCode(1, 'SPREAD_ARRAY'),
@@ -9025,7 +9025,6 @@ exports.assembler = (function(exports){
       UNARY            = new StandardOpCode(1, 'UNARY'),
       UNDEFINED        = new StandardOpCode(0, 'UNDEFINED'),
       UPDATE           = new StandardOpCode(1, 'UPDATE'),
-      UPSCOPE          = new StandardOpCode(0, 'UPSCOPE'),
       VAR              = new StandardOpCode(1, 'VAR'),
       WITH             = new StandardOpCode(0, 'WITH'),
       YIELD            = new StandardOpCode(1, 'YIELD');
@@ -9211,7 +9210,7 @@ exports.assembler = (function(exports){
         this.flags.generator = true;
       }
 
-      this.transfers = [];
+      this.unwinders = [];
       this.scopeType = scopeType;
       this.lexicalType = lexicalType || FUNCTYPE.NORMAL;
       this.varDecls = [];
@@ -9259,10 +9258,10 @@ exports.assembler = (function(exports){
           serialized.lexicalType = constants.FUNCTYPE.array[this.lexicalType].toLowerCase();
         }
 
-        if (this.transfers.length) {
-          serialized.transfers = [];
-          each(this.transfers, function(transfer){
-            serialized.transfers.push(serializer.serialize(transfer));
+        if (this.unwinders.length) {
+          serialized.unwinders = [];
+          each(this.unwinders, function(transfer){
+            serialized.unwinders.push(serializer.serialize(transfer));
           })
         }
 
@@ -9660,32 +9659,40 @@ exports.assembler = (function(exports){
     return boundNamesCollector(node);
   }
 
-
-  var lexicalDecls = (function(lexical){
-    return collector({
-      ClassDeclaration: lexical(false),
-      FunctionDeclaration: lexical(false),
-      ExportDeclaration: RECURSE,
-      SwitchCase: RECURSE,
-      Program: RECURSE,
-      VariableDeclaration: lexical(function(node){
-        return node.kind === 'const';
-      })
-    });
-  })(function(isConst){
-    if (typeof isConst !== 'function') {
-      isConst = (function(v){
-        return function(){ return v };
-      })(isConst);
-    }
-    return function(node){
-      node.IsConstantDeclaration = isConst(node);
-      node.boundNames || (node.boundNames = boundNames(node));
-      if (node.kind !== 'var') {
-        return node;
+  var lexicalDecls = (function(){
+    var LexicalDeclarations = (function(lexical){
+      return collector({
+        ClassDeclaration: lexical(false),
+        FunctionDeclaration: lexical(false),
+        ExportDeclaration: RECURSE,
+        SwitchCase: RECURSE,
+        Program: RECURSE,
+        VariableDeclaration: lexical(function(node){
+          return node.kind === 'const';
+        })
+      });
+    })(function(isConst){
+      if (typeof isConst !== 'function') {
+        isConst = (function(v){
+          return function(){ return v };
+        })(isConst);
       }
+      return function(node){
+        node.IsConstantDeclaration = isConst(node);
+        node.boundNames || (node.boundNames = boundNames(node));
+        if (node.kind !== 'var') {
+          return node;
+        }
+      };
+    });
+
+    return function lexicalDecls(node){
+      if (!node.LexicalDeclarations) {
+        node.LexicalDeclarations = LexicalDeclarations(node);
+      }
+      return node.LexicalDeclarations;
     };
-  });
+  })();
 
   var varDecls = collector({
     VariableDeclaration: function(node){
@@ -9767,11 +9774,7 @@ exports.assembler = (function(exports){
       adjust(jump);
     });
 
-    each(lexicalDecls(code.body), function(decl){
-      each(decl.boundNames, function(name){
-        BINDING(name, decl.IsConstantDeclaration);
-      });
-    });
+    lexicalInit(code.body);
 
     each(funcs, function(decl){
       FunctionDeclaration(decl);
@@ -10193,56 +10196,91 @@ exports.assembler = (function(exports){
     };
   })();
 
-
-  function block(callback){
-      var entry = new ControlTransfer(context.labels);
-      context.jumps.push(entry);
-      context.labels = new Hash;
-      context.currentScope = scope.create('block', context.currentScope);
-      callback();
-      entry.updateBreaks(current());
-      context.currentScope.pop();
-      context.jumps.pop();
+  function lexicalInit(node){
+    each(lexicalDecls(node), function(decl){
+      each(decl.boundNames, function(name){
+        BINDING(name, decl.IsConstantDeclaration);
+      });
+    });
   }
 
-  function control(callback){
-    var entry = new ControlTransfer(context.labels);
-    context.jumps.push(entry);
+  function block(callback){
+    var transfer = new ControlTransfer(context.labels);
+    context.jumps.push(transfer);
     context.labels = new Hash;
-    entry.updateContinues(callback());
-    entry.updateBreaks(current());
+    pushScope('block');
+    callback();
+    transfer.updateBreaks(current());
+    context.jumps.pop();
+    popScope();
+  }
+
+  function loop(callback){
+    var transfer = new ControlTransfer(context.labels);
+    context.jumps.push(transfer);
+    context.labels = new Hash;
+    transfer.updateContinues(callback());
+    transfer.updateBreaks(current());
     context.jumps.pop();
   }
 
-  function lexical(type, callback){
-    if (typeof type === 'function') {
-      callback = type;
-      type = ENTRY.ENV;
-    }
+  function unwinder(type, callback){
     var begin = current();
     callback();
-    context.code.transfers.push(new Unwinder(type, begin, current()));
+    context.code.unwinders.push(new Unwinder(type, begin, current()));
   }
 
-  var pushBlock, popBlock;
+  var scopeStack = [];
 
-  void function(){
-    var stack = [];
-
-    pushBlock = function(){
-      BLOCK();
-      context.currentScope = scope.create('block', context.currentScope);
-      stack.push(current());
-    };
+  function pushScope(type){
+    type === 'with' ? WITH() : SCOPE_PUSH();
+    context.currentScope = scope.create('block', context.currentScope);
+    scopeStack.push(current());
+  }
 
 
-    popBlock = function(){
-      UPSCOPE();
-      context.currentScope.pop();
-      context.code.transfers.push(new Unwinder(ENTRY.ENV, stack.pop(), current()));
-    };
-  }();
+   function popScope(){
+    context.currentScope.pop();
+    context.code.unwinders.push(new Unwinder('scope', scopeStack.pop(), current()));
+    SCOPE_POP();
+  }
 
+
+  function iter(node, KIND){
+    loop(function(){
+      var update;
+      unwinder('iteration', function(){
+        if (isLexicalDeclaration(node.left)) {
+          var lexical = true;
+          pushScope('block');
+          lexicalInit(node.left);
+        }
+        recurse(node.right);
+        GET();
+        KIND();
+        MEMBER('next');
+        update = current();
+        DUP();
+        DUP();
+        GET();
+        ARGS();
+        CALL();
+        if (node.left.type === 'VariableDeclaration') {
+          VariableDeclaration(node.left, true);
+        } else {
+          recurse(node.left);
+          ROTATE(1);
+          PUT();
+          POP();
+        }
+        recurse(node.body);
+        lexical && SCOPE_CLONE();
+        JUMP(update);
+        lexical && popScope();
+      });
+      return update;
+    });
+  }
 
   function move(node, set, pos){
     if (node.label) {
@@ -10401,30 +10439,19 @@ exports.assembler = (function(exports){
   }
 
   function BlockStatement(node){
-    pushBlock();
     block(function(){
-      lexical(function(){
-        var funcs = [];
-
-        each(lexicalDecls(node.body), function(decl){
-          each(decl.boundNames, function(name){
-            BINDING(name, decl.IsConstantDeclaration);
-            if (decl.type === 'FunctionDeclaration') {
-              funcs.push(decl);
-            }
-          });
+      lexicalInit(node.body);
+      each(lexicalDecls(node.body), function(decl){
+        each(decl.boundNames, function(name){
+          if (decl.type === 'FunctionDeclaration') {
+            FunctionDeclaration(decl);
+            FUNCTION(false, decl.id.name, decl.code);
+            LET(decl.id.name);
+          }
         });
-
-        each(funcs, function(decl){
-          FunctionDeclaration(decl);
-          FUNCTION(false, decl.id.name, decl.code);
-          LET(decl.id.name);
-        });
-
-        each(node.body, recurse);
       });
+      each(node.body, recurse);
     });
-    popBlock();
   }
 
   function CallExpression(node){
@@ -10443,18 +10470,14 @@ exports.assembler = (function(exports){
   }
 
   function CatchClause(node){
-    lexical(ENTRY.CATCH, function(){
-      pushBlock();
+    unwinder('catch', function(){
+      pushScope('block');
       context.currentScope.lexDeclare(node.param.name, 'catch');
       BINDING(node.param.name, false);
       LET(node.param.name);
-      each(lexicalDecls(node.body), function(decl){
-        each(decl.boundNames, function(name){
-          BINDING(name, decl.IsConstantDeclaration);
-        });
-      });
+      lexicalInit(node.body);
       each(node.body, recurse);
-      popBlock();
+      popScope();
     });
   }
 
@@ -10489,13 +10512,12 @@ exports.assembler = (function(exports){
   }
 
   function DoWhileStatement(node){
-    control(function(){
+    loop(function(){
       var start = current();
       recurse(node.body);
       var cond = current();
       recurse(node.test);
       GET();
-      //LOOP();
       JTRUE(start);
       return cond;
     });
@@ -10524,17 +10546,13 @@ exports.assembler = (function(exports){
   }
 
   function ForStatement(node){
-    control(function(){
+    loop(function(){
       if (node.init){
         if (node.init.type === 'VariableDeclaration') {
           if (node.init.kind !== 'var') {
             var lexical = true;
-            pushBlock();
-            each(lexicalDecls(node.init), function(decl){
-              each(decl.boundNames, function(name){
-                BINDING(name, decl.IsConstantDeclaration);
-              });
-            });
+            pushScope('block');
+            lexicalInit(node.init);
           }
           recurse(node.init);
         } else {
@@ -10554,25 +10572,20 @@ exports.assembler = (function(exports){
 
       recurse(node.body);
 
+      lexical && SCOPE_CLONE();
       if (node.update) {
         recurse(node.update);
         GET();
       }
 
       POP();
-
       JUMP(repeat);
       adjust(test);
-
-      if (lexical) {
-        popScope();
-      }
+      lexical && popScope();
 
       return repeat;
     });
   }
-
-
 
   function ForInStatement(node){
     iter(node, ENUM);
@@ -10580,49 +10593,6 @@ exports.assembler = (function(exports){
 
   function ForOfStatement(node){
     iter(node, ITERATE);
-  }
-
-  function iter(node, KIND){
-    control(function(){
-      var update;
-      lexical(ENTRY.FOROF, function(){
-        if (isLexicalDeclaration(node.left)) {
-          var lexical = true;
-          context.currentScope = scope.create('block', context.currentScope);
-          BLOCK();
-          each(lexicalDecls(node.left), function(decl){
-            each(decl.boundNames, function(name){
-              BINDING(name, decl.IsConstantDeclaration);
-            });
-          });
-        }
-        recurse(node.right);
-        GET();
-        KIND();
-        MEMBER('next');
-        update = current();
-        DUP();
-        DUP();
-        GET();
-        ARGS();
-        CALL();
-        if (node.left.type === 'VariableDeclaration') {
-          VariableDeclaration(node.left, true);
-        } else {
-          recurse(node.left);
-          ROTATE(1);
-          PUT();
-          POP();
-        }
-        recurse(node.body);
-        JUMP(update);
-        if (lexical) {
-          context.currentScope.pop();
-          UPSCOPE();
-        }
-      });
-      return update;
-    });
   }
 
   function FunctionDeclaration(node){
@@ -10809,48 +10779,47 @@ exports.assembler = (function(exports){
   }
 
   function SwitchStatement(node){
-    control(function(){
+    loop(function(){
+      var defaultFound;
       recurse(node.discriminant);
       GET();
 
-      lexical(function(){
-        BLOCK(lexicalDecls(node.cases));
-        var defaultFound;
+      pushScope('block');
 
-        if (node.cases){
-          var cases = [];
-          each(node.cases, function(item, i){
-            if (item.test){
-              recurse(item.test);
-              GET();
-              cases.push(CASE(0));
-            } else {
-              defaultFound = i;
-              cases.push(0);
-            }
-          });
-
-          if (defaultFound != null){
-            DEFAULT(cases[defaultFound]);
+      if (node.cases){
+        each(node.cases, lexicalInit);
+        var cases = [];
+        each(node.cases, function(item, i){
+          if (item.test){
+            recurse(item.test);
+            GET();
+            cases.push(CASE(0));
           } else {
-            POP();
-            var last = JUMP(0);
+            defaultFound = i;
+            cases.push(0);
           }
+        });
 
-          each(node.cases, function(item, i){
-            adjust(cases[i])
-            each(item.consequent, recurse);
-          });
-
-          if (last) {
-            adjust(last);
-          }
+        if (defaultFound != null){
+          DEFAULT(cases[defaultFound]);
         } else {
           POP();
+          var last = JUMP(0);
         }
 
-        UPSCOPE();
-      });
+        each(node.cases, function(item, i){
+          adjust(cases[i])
+          each(item.consequent, recurse);
+        });
+
+        if (last) {
+          adjust(last);
+        }
+      } else {
+        POP();
+      }
+
+      popScope();
     });
   }
 
@@ -10940,7 +10909,7 @@ exports.assembler = (function(exports){
   }
 
   function TryStatement(node){
-    lexical(ENTRY.TRY, function(){
+    unwinder('try', function(){
       each(node.block.body, recurse);
     });
 
@@ -11019,26 +10988,23 @@ exports.assembler = (function(exports){
   function VariableDeclarator(node){}
 
   function WhileStatement(node){
-    control(function(){
+    loop(function(){
       var start = current();
       recurse(node.test);
       GET();
-      var op = JFALSE(0)
+      var test = JFALSE(0)
       recurse(node.body);
-      //LOOP();
       JUMP(start);
-      adjust(op);
+      adjust(test);
       return start;
     });
   }
 
   function WithStatement(node){
-    recurse(node.object)
-    lexical(function(){
-      WITH();
-      recurse(node.body);
-      UPSCOPE();
-    });
+    recurse(node.object);
+    pushScope('with');
+    recurse(node.body);
+    popScope();
   }
 
   function YieldExpression(node){
@@ -12039,7 +12005,6 @@ exports.thunk = (function(exports){
   var constants = require('./constants'),
       BINARYOPS = constants.BINARYOPS.array,
       UNARYOPS  = constants.UNARYOPS.array,
-      ENTRY     = constants.ENTRY.hash,
       AST       = constants.AST.array,
       Pause     = constants.SYMBOLS.Pause,
       Empty     = constants.SYMBOLS.Empty,
@@ -12145,14 +12110,14 @@ exports.thunk = (function(exports){
 
   function Thunk(code, instrumented){
 
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, BLOCK, CALL, CASE,
+    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
       JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
-      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF,
-      REFSYMBOL, REGEXP, RETURN, ROTATE, SAVE, SPREAD, SPREAD_ARG, SPREAD_ARRAY, STRING,
-      SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY,
-      UNDEFINED, UPDATE, UPSCOPE, VAR, WITH, YIELD];
+      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
+      REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
+      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY, UNDEFINED,
+      UPDATE, VAR, WITH, YIELD];
 
 
     var thunk = this,
@@ -12171,16 +12136,16 @@ exports.thunk = (function(exports){
     }
 
     function unwind(){
-      for (var i = 0, entry; entry = code.transfers[i]; i++) {
+      for (var i = 0, entry; entry = code.unwinders[i]; i++) {
         if (entry.begin <= ip && ip <= entry.end) {
-          if (entry.type === ENTRY.ENV) {
-            trace(context.popBlock());
-          } else if (entry.type === ENTRY.TRY) {
+          if (entry.type === 'scope') {
+            trace(context.popScope());
+          } else if (entry.type === 'try') {
             stack[sp++] = error.value;
             ip = entry.end + 1;
-          } else if (entry.type === ENTRY.CATCH) {
+          } else if (entry.type === 'catch') {
             return cmds[ip];
-          } else if (entry.type === ENTRY.FOROF) {
+          } else if (entry.type === 'iteration') {
             if (error && error.value && error.value.BuiltinBrand === StopIteration) {
               ip = entry.end;
               return cmds[ip];
@@ -12293,11 +12258,6 @@ exports.thunk = (function(exports){
       }
 
       stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function BLOCK(){
-      context.pushBlock(ops[ip][0]);
       return cmds[++ip];
     }
 
@@ -12781,6 +12741,21 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function SCOPE_CLONE(){
+      context.cloneScope();
+      return cmds[++ip];
+    }
+
+    function SCOPE_POP(){
+      context.popScope();
+      return cmds[++ip];
+    }
+
+    function SCOPE_PUSH(){
+      context.pushScope();
+      return cmds[++ip];
+    }
+
     function SPREAD(){
       var obj    = stack[--sp],
           index  = ops[ip][0],
@@ -12948,11 +12923,6 @@ exports.thunk = (function(exports){
       }
 
       stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function UPSCOPE(){
-      context.popBlock();
       return cmds[++ip];
     }
 
@@ -13331,7 +13301,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   var BINARYOPS = constants.BINARYOPS.array,
       UNARYOPS  = constants.UNARYOPS.array,
       BRANDS    = constants.BRANDS,
-      ENTRY     = constants.ENTRY.hash,
       SCOPE     = constants.SCOPE.hash,
       AST       = constants.AST.array;
 
@@ -14469,11 +14438,38 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (value.Abrupt) return value; else value = value.value;
       }
 
-      array.set(offset++, value);
+      array.set(offset++ + '', value);
     }
 
     array.define('length', offset, _CW);
     return offset;
+  }
+
+  function SpreadDestructuring(context, target, index){
+    var array = context.createArray(0);
+    if (target == null) {
+      return array;
+    }
+    if (typeof target !== 'object') {
+      return ThrowException('spread_non_object', typeof target);
+    }
+
+    var len = ToUint32(target.Get('length'));
+    if (len && len.Completion) {
+      if (len.Abrupt) return len; else len = len.value;
+    }
+
+    var count = len - index;
+    for (var i=0; i < count; i++) {
+      var value = target.Get(index + i);
+      if (value && value.Completion) {
+        if (value.Abrupt) return value; else value = value.value;
+      }
+      array.set(i+'', value);
+    }
+
+    array.define('length', i, _CW);
+    return array;
   }
 
   function GetTemplateCallSite(context, template){
@@ -14501,33 +14497,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     raw.PreventExtensions(false);
     realm.templates[template.id] = site;
     return site;
-  }
-
-  function SpreadDestructuring(context, target, index){
-    var array = context.createArray(0);
-    if (target == null) {
-      return array;
-    }
-    if (typeof target !== 'object') {
-      return ThrowException('spread_non_object', typeof target);
-    }
-
-    var len = ToUint32(target.Get('length'));
-    if (len && len.Completion) {
-      if (len.Abrupt) return len; else len = len.value;
-    }
-
-    var count = len - index;
-    for (var i=0; i < count; i++) {
-      var value = target.Get(index + i);
-      if (value && value.Completion) {
-        if (value.Abrupt) return value; else value = value.value;
-      }
-      array.set(i, value);
-    }
-
-    array.define('length', i, _CW);
-    return array;
   }
 
   function EnqueueChangeRecord(record, changeObservers){
@@ -16179,15 +16148,50 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       PrimitiveValue: undefined
     }, [
       primitiveWrapperSave,
-      function GetOwnProperty(key){
-        var desc = $Object.prototype.GetOwnProperty.call(this, key);
-        if (desc) {
-          return desc;
+      function each(callback){
+        var str = this.PrimitiveValue;
+        for (var i=0; i < str.length; i++) {
+          callback([i+'', str[i], E__]);
         }
-
+        $Object.prototype.each.call(this, callback);
+      },
+      function has(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return true;
+        }
+        return $Object.prototype.has.call(this, key);
+      },
+      function get(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return str[key];
+        }
+        return $Object.prototype.get.call(this, key);
+      },
+      function query(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return E__;
+        }
+        return $Object.prototype.query.call(this, key);
+      },
+      function describe(key){
+        var str = this.PrimitiveValue;
+        if (key < str.length && key >= 0) {
+          return [key, str[key], E__];
+        }
+        return $Object.prototype.describe.call(this, key);
+      },
+      function GetOwnProperty(key){
         var str = this.PrimitiveValue;
         if (key < str.length && key >= 0) {
           return new StringIndice(str[key]);
+        }
+
+        var desc = $Object.prototype.GetOwnProperty.call(this, key);
+        if (desc) {
+          return desc;
         }
       },
       function Get(key){
@@ -16196,29 +16200,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return str[key];
         }
         return this.GetP(this, key);
-      },
-      function HasOwnProperty(key){
-        key = ToPropertyName(key);
-        if (key && key.Completion) {
-          if (key.Abrupt) return key; else key = key.value;
-        }
-        if (typeof key === 'string') {
-          if (key < this.get('length') && key >= 0) {
-            return true;
-          }
-        }
-        return $Object.prototype.HasOwnProperty.call(this, key);
-      },
-      function HasProperty(key){
-        var ret = this.HasOwnProperty(key);
-        if (ret && ret.Completion) {
-          if (ret.Abrupt) return ret; else ret = ret.value;
-        }
-        if (ret === true) {
-          return true;
-        } else {
-          return $Object.prototype.HasProperty.call(this, key);
-        }
       },
       function Enumerate(includePrototype, onlyEnumerable){
         var props = $Object.prototype.Enumerate.call(this, includePrototype, onlyEnumerable);
@@ -17560,16 +17541,28 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function hasBinding(name){
         return this.LexicalEnvironment.HasBinding(name);
       },
-      function popBlock(){
-        var block = this.LexicalEnvironment;
+      function popScope(){
+        var scope = this.LexicalEnvironment;
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
-        return block;
+        return scope;
       },
-      function pushBlock(decls){
+      function pushScope(){
         this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
-        if (decls) {
-          return BlockDeclarationInstantiation(decls, this.LexicalEnvironment);
+      },
+      function cloneScope(){
+        var scope = this.LexicalEnvironment,
+            clone = new DeclarativeEnvironmentRecord(scope.outer);
+        for (var k in scope.bindings) {
+          clone.bindings[k] = scope.bindings[k];
         }
+        for (var k in scope.deletables) {
+          clone.deletables[k] = scope.deletables[k];
+        }
+        for (var k in scope.consts) {
+          clone.consts[k] = scope.consts[k];
+        }
+        this.LexicalEnvironment = clone;
+        return scope;
       },
       function pushWith(obj){
         this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
@@ -19489,18 +19482,32 @@ exports.debug = (function(exports){
   })();
 
 
+  var MirrorPrimitiveWrapper = (function(){
+    function MirrorPrimitiveWrapper(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorPrimitiveWrapper, MirrorObject, {
+      kind: 'PrimitiveWrapper'
+    }, [
+      function primitiveValue(){
+        return this.subject.PrimitiveValue
+      }
+    ]);
+
+    return MirrorPrimitiveWrapper;
+  })();
+
+
+
   var MirrorBoolean = (function(){
     function MirrorBoolean(subject){
       MirrorObject.call(this, subject);
     }
 
-    inherit(MirrorBoolean, MirrorObject, {
+    inherit(MirrorBoolean, MirrorPrimitiveWrapper, {
       kind: 'Boolean'
-    }, [
-      function label(){
-        return 'Boolean('+this.subject.PrimitiveValue+')';
-      }
-    ]);
+    });
 
     return MirrorBoolean;
   })();
@@ -19737,19 +19744,9 @@ exports.debug = (function(exports){
       MirrorObject.call(this, subject);
     }
 
-    inherit(MirrorNumber, MirrorObject, {
+    inherit(MirrorNumber, MirrorPrimitiveWrapper, {
       kind: 'Number'
-    }, [
-      function label(){
-        var value = this.subject.PrimitiveValue;
-        if (isNegativeZero(value)) {
-          value = '-0';
-        } else {
-          value += '';
-        }
-        return value;
-      }
-    ]);
+    });
 
     return MirrorNumber;
   })();
@@ -19776,46 +19773,13 @@ exports.debug = (function(exports){
   var MirrorString = (function(){
     function MirrorString(subject){
       MirrorObject.call(this, subject);
-      this.primitive = this.subject.PrimitiveValue;
     }
 
-    inherit(MirrorString, MirrorObject,{
+    inherit(MirrorString, MirrorPrimitiveWrapper,{
       kind: 'String'
     }, [
-      function get(key){
-        if (key < this.subject.get('length') && key >= 0) {
-          return this.primitive[key];
-        } else {
-          return MirrorObject.prototype.get.call(this, key);
-        }
-      },
-      function ownAttrs(props){
-        var len = this.primitive.length;
-        props || (props = new Hash);
-
-        for (var i=0; i < len; i++) {
-          props[i] = [i+'', this.primitive[i], 1];
-        }
-
-        this.subject.each(function(prop){
-          var key = prop[0] === '__proto__' ? proto : prop[0];
-          props[key] = prop;
-        });
-
-        return props;
-      },
-      function query(key){
-        if (key < this.subject.get('length') && key >= 0) {
-          return 1;
-        } else {
-          return MirrorObject.prototype.query.call(this, key);
-        }
-      },
-      function label(){
-        return 'String('+quotes(this.primitive)+')';
-      }
+      MirrorArray.prototype.list
     ]);
-
 
     return MirrorString;
   })();
@@ -20683,7 +20647,7 @@ exports.index = (function(exports){
 
 
 
-exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n    this.@@DefineOwnProperty(key, desc);\n    if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
+exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n    this.@@DefineOwnProperty(key, desc);\n    if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0,\n    Infinity = 1 / 0,\n    NaN = +'NaN',\n    undefined;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
 
 exports.modules["@array"] = "import Iterator from '@iter';\n\nconst joinArray = (target, separator) => {\n  const array = $__ToObject(target),\n        len   = $__ToUint32(array.length),\n        sep   = $__ToString(separator);\n\n  if (len === 0) return '';\n\n  var result = $__ToString(array[0]),\n      i = 0;\n\n  while (++i < len) {\n    result += sep + array[i];\n  }\n  return result;\n};\n\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    var obj = $__ToObject(this),\n        n   = 0,\n        i   = 0;\n\n    do {\n      if (isArray(obj)) {\n        var len = $__ToInt32(obj.length),\n            j   = 0;\n\n        while (j < len) {\n          if (j in obj) {\n            array[n++] = obj[j];\n          }\n        }\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[i];\n    } while (i++ < count)\n\n    return array;\n  }\n\n  every(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array && !callback.@@Call(context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  }\n\n  filter(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array) {\n        var element = array[i];\n        if (i in array && !callback.@@Call(context, [element, i, array])) {\n          result[count++] = element;\n        }\n      }\n    }\n    return result;\n  }\n\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = $__ToInteger(fromIndex);\n    if (i > len) {\n      return -1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (i >= len) {\n      i = len - 1;\n    } else if (i < 0) {\n      i += i;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  map(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n    return result;\n  }\n\n  pop(){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  }\n\n  push(...values){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length),\n        count = values.length;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[len++] = values[i];\n    }\n\n    return len;\n  }\n\n  reduce(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  reduceRight(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  slice(start, end){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  }\n\n  some(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && callback.@@Call(context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  }\n\n  toString(){\n    return joinArray(this, ',');\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n[ 'every', 'filter', 'forEach', 'indexOf', 'lastIndexOf',\n  'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return array ? array.@@GetBuiltinBrand() === 'BuiltinArray' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n  var len   = $__ToUint32(arrayLike.length),\n      Ctor  = $__IsConstructor(this) ? this : Array,\n      out   = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  var len  = $__ToInteger(items.length),\n      Ctor = $__IsConstructor(this) ? this : Array,\n      out  = new Ctor(len);\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
 
@@ -20691,23 +20655,23 @@ exports.modules["@boolean"] = "export class Boolean {\n  constructor(value){\n  
 
 exports.modules["@console"] = "import now from '@date';\nimport Map from '@map';\n\nfunction join(values){\n  var text = '';\n  for (var i=0; i < values.length; i++) {\n    text += values[i];\n  }\n  return text;\n}\n\n\n\nexport class Console {\n  private @output, @timers, @write, @writeln;\n\n  constructor(output){\n    this.@output = output;\n    this.@timers = new Map;\n  }\n\n  @write(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', '' + value, '' + color);\n  }\n\n  @writeln(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', value + '\\n', '' + color);\n  }\n\n  assert(expression, ...values){\n    if (!expression) {\n      values = join(values);\n      this.@writeln(values);\n      throw new Error('Assertion failed: '+values);\n    }\n  }\n\n  clear(){\n    this.@output.signal('clear');\n  }\n\n  count(title){\n    // TODO\n  }\n\n  debug(){\n    this.@writeln(join(values));\n  }\n\n  dir(object){\n    this.@output.signal('inspect', object);\n  }\n\n  dirxml(){\n    // TODO\n  }\n\n  error(...values){\n    this.@writeln('× '+join(values), '#f04');\n  }\n\n  group(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group');\n  }\n\n  groupCollapsed(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group-collapsed');\n  }\n\n  groupEnd(){\n    this.@output.signal('group-end');\n  }\n\n  info(...values){\n    this.@writeln('† '+join(values), '#09f');\n  }\n\n  log(...values){\n    this.@writeln('» '+join(values));\n  }\n\n  profile(){\n    // TODO\n  }\n\n  profileEnd(){\n    // TODO\n  }\n\n  table(data, columns){\n    // TODO\n  }\n\n  time(name){\n    this.@timers[name] = now();\n  }\n\n  timeEnd(name){\n    if (this.@timers.has(name)) {\n      var duration = now() - this.@timers.get(name);\n      this.@writeln(name + ': ' + duration + 'ms');\n    }\n  }\n\n  timeStamp(name){\n    this.@writeln(name + ': ' + now());\n  }\n\n  trace(error){\n    // TODO\n  }\n\n  warn(...values){\n    this.@writeln('! '+join(values), '#ff6');\n  }\n}\n\n\nexport let console = new Console({ signal: $__Signal });\n";
 
-exports.modules["@date"] = "private @toString, @valueOf;\n\nexport class Date {\n  constructor(...values){\n    return $__DateCreate(...values);\n  }\n\n  toString(){\n    if (this && this.@@GetBuiltinBrand() === 'BuiltinDate') {\n      return this.@@toString();\n    } else {\n      throw $__Exception('not_generic', ['Date.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    if (this && this.@@GetBuiltinBrand() === 'BuiltinDate') {\n      return this.@@valueOf();\n    } else {\n      throw $__Exception('not_generic', ['Date.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Date);\n\nDate.prototype.@@extend({\n  @toString: $__DateToString,\n  @valueOf: $__DateToNumber\n});\n\n$__wrapDateMethods(Date.prototype);\n\n\nexport let now = $__now;\nDate.@@extend({ now });\n\n";
+exports.modules["@date"] = "private @toString, @valueOf;\n\nexport class Date {\n  constructor(...values){\n    return $__DateCreate(...values);\n  }\n\n  toString(){\n    if (this && this.@@GetBuiltinBrand() === 'BuiltinDate') {\n      return this.@@toString();\n    } else {\n      throw $__Exception('not_generic', ['Date.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    if (this && this.@@GetBuiltinBrand() === 'BuiltinDate') {\n      return this.@@valueOf();\n    } else {\n      throw $__Exception('not_generic', ['Date.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Date);\n\nDate.prototype.@@extend({\n  @toString: $__DateToString,\n  @valueOf: $__DateToNumber\n});\n\n$__wrapDateMethods(Date.prototype);\n\n\nexport const now = $__now;\nDate.@@extend({ now });\n\n";
 
 exports.modules["@error"] = "export class Error {\n  constructor(message){\n    this.message = message;\n  }\n\n  toString(){\n    return this.name + ': ' + this.message;\n  }\n}\n\nbuiltinClass(Error, 'BuiltinError');\n\n\nexport class EvalError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(EvalError, 'BuiltinError');\n\n\nexport class RangeError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(RangeError, 'BuiltinError');\n\nexport class ReferenceError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(ReferenceError, 'BuiltinError');\n\nexport class SyntaxError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(SyntaxError, 'BuiltinError');\n\nexport class TypeError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(TypeError, 'BuiltinError');\n\nexport class URIError extends Error {\n  constructor(message){\n    this.message = message;\n  }\n}\n\nbuiltinClass(URIError, 'BuiltinError');\n";
 
 exports.modules["@function"] = "private @toString;\n\nexport class Function {\n  constructor(...args){\n    return $__FunctionCreate(...args);\n  }\n\n  apply(thisArg, args){\n    ensureFunction(this, 'Function.prototype.apply');\n    return this.@@Call(thisArg, ensureArgs(args));\n  }\n\n  bind(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.bind');\n    return $__BoundFunctionCreate(this, thisArg, args);\n  }\n\n  call(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.call');\n    return this.@@Call(thisArg, args);\n  }\n\n  toString(){\n    ensureFunction(this, 'Function.prototype.toString');\n    return this.@toString();\n  }\n}\n\nbuiltinClass(Function);\n\nFunction.prototype.@@define('name', '', 0);\nFunction.prototype.@toString = $__FunctionToString;\n\n\n\nexport function apply(func, thisArg, args){\n  ensureFunction(func, '@function.apply');\n  return func.@@Call(thisArg, ensureArgs(args));\n}\n\nbuiltinFunction(apply);\n\nexport function bind(func, thisArg, ...args){\n  ensureFunction(func, '@function.bind');\n  return $__BoundFunctionCreate(func, thisArg, args);\n}\n\nbuiltinFunction(bind);\n\nexport function call(func, thisArg, ...args){\n  ensureFunction(func, '@function.call');\n  return func.@@Call(thisArg, args);\n}\n\nbuiltinFunction(call);\n\n";
 
-exports.modules["@globals"] = "let Infinity = 1 / 0;\n\nexport function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport let eval = $__eval;\nbuiltinFunction(eval);\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
+exports.modules["@globals"] = "export function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport let eval = $__eval;\nbuiltinFunction(eval);\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
 
-exports.modules["@iter"] = "export let iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
+exports.modules["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
 
 exports.modules["@json"] = "let ReplacerFunction,\n    PropertyList,\n    stack,\n    indent,\n    gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  var stepback = indent,\n      partial = [],\n      brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if (value.@@GetBuiltinBrand() === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || value.@@Enumerate(false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  if (!partial.length) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + brackets[1];\n  } else if (!gap) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + partial.join(',') + brackets[1];\n  } else {\n    var final = '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback;\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + final + brackets[1];\n  }\n}\n\ninternalFunction(J);\n\nfunction Str(key, holder){\n  var value = holder[key];\n  if ($__Type(value) === 'Object') {\n    var toJSON = value.toJSON;\n    if (typeof toJSON === 'function') {\n      value = toJSON.@@Call(value, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    value = ReplacerFunction.@@Call(holder, [key, value]);\n  }\n\n  if ($__Type(value) === 'Object') {\n    var brand = value.@@GetBuiltinBrand();\n    if (brand === 'Number') {\n      value = $__ToNumber(value);\n    } else if (brand === 'String') {\n      value = $__ToString(value);\n    } else if (brand === 'Boolean') {\n      value = value.@@PrimitiveValue;\n    }\n  }\n\n\n  if (value === null) {\n    return 'null';\n  } else if (value === true) {\n    return 'true';\n  } else if (value === false) {\n    return 'false';\n  }\n\n  var type = typeof value;\n  if (type === 'string') {\n    return $__Quote(value);\n  } else if (type === 'number') {\n    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;\n  } else if (type === 'object') {\n    return J(value);\n  }\n\n}\n\ninternalFunction(Str);\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if (replacer.@@GetBuiltinBrand() === 'Array') {\n      let props = new Set;\n\n      for (let value of replacer) {\n        var item,\n            type = $__Type(value);\n\n        if (type === 'String') {\n          item = value;\n        } else if (type === 'Number') {\n          item = value + '';\n        } else if (type === 'Object') {\n          let brand = value.@@GetBuiltinBrand();\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(value);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = space.@@PrimitiveValue;\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\nexport function parse(source, reviver){\n  return $__JSONParse(source, reviver);\n}\n\n\n\nexport let JSON = {};\nJSON.@@SetBuiltinBrand('BuiltinJSON');\nJSON.@@extend({ stringify, parse });\n";
 
-exports.modules["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    } else {\n      return item[1];\n    }\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map;\n    if ($__IsConstructCall()) {\n      map = this;\n    } else {\n      if (this == null || this === MapPrototype) {\n        map = $__ObjectCreate(MapPrototype) ;\n      } else {\n        map = $__ToObject(this);\n      }\n    }\n\n    if (map.@@hasInternal('MapData')) {\n      throw $__Exception('double_initialization', ['Map'])\n    }\n\n    $__MapInitialization(map, iterable);\n    return map;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n\n  get size(){\n    return this === MapPrototype ? 0 : $__MapSize(this);\n  }\n\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Map);\nvar MapPrototype = Map.prototype;\n\n\n";
+exports.modules["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    } else {\n      return item[1];\n    }\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map;\n    if ($__IsConstructCall()) {\n      map = this;\n    } else {\n      if (this == null || this === MapPrototype) {\n        map = $__ObjectCreate(MapPrototype) ;\n      } else {\n        map = $__ToObject(this);\n      }\n    }\n\n    if (map.@@hasInternal('MapData')) {\n      throw $__Exception('double_initialization', ['Map'])\n    }\n\n    $__MapInitialization(map, iterable);\n    return map;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n\n  get size(){\n    return this === MapPrototype ? 0 : $__MapSize(this);\n  }\n\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n\n\n";
 
-exports.modules["@math"] = "const Infinity = 1 / 0,\n      NaN = +'NaN';\n\nexport const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== -Infinity\n      && value !== Infinity\n      && value | 0 === value;\n}\n\ninternalFunction(isFiniteNonZero);\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\ninternalFunction(factorial);\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nmax.@@set('length', 2);\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = $__ToNumber(values[i]);\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nmin.@@set('length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport var Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\nMath.@@SetBuiltinBrand('BuiltinMath');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    Math.@@update(k, 6);\n  } else {\n    Math.@@update(k, 0);\n  }\n}\n\n";
+exports.modules["@math"] = "export const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== -Infinity\n      && value !== Infinity\n      && value | 0 === value;\n}\n\ninternalFunction(isFiniteNonZero);\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\ninternalFunction(factorial);\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nmax.@@set('length', 2);\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = $__ToNumber(values[i]);\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nmin.@@set('length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\nMath.@@SetBuiltinBrand('BuiltinMath');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    Math.@@update(k, 6);\n  } else {\n    Math.@@update(k, 0);\n  }\n}\n\n";
 
-exports.modules["@number"] = "export let\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = +'NaN',\n  NEGATIVE_INFINITY = 1 / 0,\n  POSITIVE_INFINITY = 1 / -0;\n\n\nexport class Number {\n  constructor(value){\n    value = $__ToNumber(value);\n    return $__IsConstructCall() ? $__NumberCreate(value) : value;\n  }\n\n  toString(radix){\n    if (typeof this === 'number') {\n      var number = this;\n    } else if (this.@@GetBuiltinBrand() === 'NumberWrapper') {\n      var number = this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.toString']);\n    }\n    return $__NumberToString(number, $__ToInteger(radix));\n  }\n\n  valueOf(){\n    if (typeof this === 'number') {\n      return this;\n    }\n    if (this.@@GetBuiltinBrand() === 'Number') {\n      return this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  }\n\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n}\n\nbuiltinClass(Number);\n\nNumber.prototype.@@DefineOwnProperty(@@PrimitiveValue, {\n  configurable: true,\n  enumerable: false,\n  get: $__GetPrimitiveValue,\n  set: $__SetPrimitiveValue\n});\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\nNumber.@@extend({ isNaN, isFinite, isInteger, toInteger,\n                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,\n                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });\n\n";
+exports.modules["@number"] = "export const\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = NaN,\n  NEGATIVE_INFINITY = Infinity,\n  POSITIVE_INFINITY = -Infinity;\n\n\nexport class Number {\n  constructor(value){\n    value = $__ToNumber(value);\n    return $__IsConstructCall() ? $__NumberCreate(value) : value;\n  }\n\n  toString(radix){\n    if (typeof this === 'number') {\n      var number = this;\n    } else if (this.@@GetBuiltinBrand() === 'NumberWrapper') {\n      var number = this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.toString']);\n    }\n    return $__NumberToString(number, $__ToInteger(radix));\n  }\n\n  valueOf(){\n    if (typeof this === 'number') {\n      return this;\n    }\n    if (this.@@GetBuiltinBrand() === 'Number') {\n      return this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  }\n\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n}\n\nbuiltinClass(Number);\n\nNumber.prototype.@@DefineOwnProperty(@@PrimitiveValue, {\n  configurable: true,\n  enumerable: false,\n  get: $__GetPrimitiveValue,\n  set: $__SetPrimitiveValue\n});\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\nNumber.@@extend({ isNaN, isFinite, isInteger, toInteger,\n                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,\n                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });\n\n";
 
 exports.modules["@object"] = "export class Object {\n  constructor(value){\n    return $__IsConstructCall() || value == null ? {} : $__ToObject(value);\n  }\n\n  toString(){\n    if (this === undefined) {\n      return '[object Undefined]';\n    } else if (this === null) {\n      return '[object Null]';\n    } else {\n      return '[object ' + $__ToObject(this).@toStringTag + ']';\n    }\n  }\n\n  isPrototypeOf(object){\n    while ($__Type(object) === 'Object') {\n      object = object.@@GetPrototype();\n      if (object === this) {\n        return true;\n      }\n    }\n    return false;\n  }\n\n  toLocaleString(){\n    return this.toString();\n  }\n\n  valueOf(){\n    return $__ToObject(this);\n  }\n\n  hasOwnProperty(key){\n    return $__ToObject(this).@@HasOwnProperty($__ToPropertyName(key));\n  }\n\n  propertyIsEnumerable(key){\n    return !!($__ToObject(this).@@query(key) & 1);\n  }\n}\n\nbuiltinClass(Object);\n\n\nexport function assign(target, source){\n  ensureObject(target, 'Object.assign');\n  source = $__ToObject(source);\n  for (let [i, key] of source.@@Enumerate(false, true)) {\n    let prop = source[key];\n    if (typeof prop === 'function' && prop.@@get('HomeObject')) {\n      // TODO\n    }\n    target[key] = prop;\n  }\n  return target;\n}\n\nexport function create(prototype, properties){\n  if (typeof prototype !== 'object') {\n    throw $__Exception('proto_object_or_null', [])\n  }\n\n  var object = $__ObjectCreate(prototype);\n\n  if (properties !== undefined) {\n    ensureDescriptor(properties);\n\n    for (var key in properties) {\n      var desc = properties[key];\n      ensureDescriptor(desc);\n      object.@@DefineOwnProperty(key, desc);\n    }\n  }\n\n  return object;\n}\n\nexport function defineProperty(object, key, property){\n  ensureObject(object, 'Object.defineProperty');\n  ensureDescriptor(property);\n  object.@@DefineOwnProperty($__ToPropertyName(key), property);\n  return object;\n}\n\nexport function defineProperties(object, properties){\n  ensureObject(object, 'Object.defineProperties');\n  ensureDescriptor(properties);\n\n  for (var key in properties) {\n    var desc = properties[key];\n    ensureDescriptor(desc);\n    object.@@DefineOwnProperty(key, desc);\n  }\n\n  return object;\n}\n\nexport function freeze(object){\n  ensureObject(object, 'Object.freeze');\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc.configurable) {\n      desc.configurable = false;\n      if ('writable' in desc) {\n        desc.writable = false;\n      }\n      object.@@DefineOwnProperty(props[i], desc);\n    }\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function getOwnPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getOwnPropertyDescriptor');\n  return object.@@GetOwnProperty($__ToPropertyName(key));\n}\n\nexport function getOwnPropertyNames(object){\n  ensureObject(object, 'Object.getOwnPropertyNames');\n  return object.@@Enumerate(false, false);\n}\n\nexport function getPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getPropertyDescriptor');\n  return object.@@GetProperty($__ToPropertyName(key));\n}\n\nexport function getPropertyNames(object){\n  ensureObject(object, 'Object.getPropertyNames');\n  return object.@@Enumerate(true, false);\n}\n\nexport function getPrototypeOf(object){\n  ensureObject(object, 'Object.getPrototypeOf');\n  return object.@@GetPrototype();\n}\n\nexport function is(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;\n}\n\nexport function isnt(x, y){\n  return x === y ? x === 0 && 1 / x !== 1 / y : x === x || y === y;\n}\n\nexport function isExtensible(object){\n  ensureObject(object, 'Object.isExtensible');\n  return object.@@IsExtensible();\n}\n\nexport function isFrozen(object){\n  ensureObject(object, 'Object.isFrozen');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc) {\n      if (desc.configurable || 'writable' in desc && desc.writable) {\n        return false;\n      }\n    }\n  }\n\n  return true;\n}\n\nexport function isSealed(object){\n  ensureObject(object, 'Object.isSealed');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nexport function keys(object){\n  ensureObject(object, 'Object.keys');\n  return object.@@Enumerate(false, true);\n}\n\nexport function preventExtensions(object){\n  ensureObject(object, 'Object.preventExtensions');\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function seal(object){\n  ensureObject(object, 'Object.seal');\n\n  var desc = { configurable: false },\n      props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    object.@@DefineOwnProperty(props[i], desc);\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\n\nexport function observe(object, callback){\n  ensureObject(object, 'Object.observe');\n  ensureFunction(callback, 'Object.observe');\n  if (isFrozen(callback)) {\n\n  }\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@get('ChangeObservers');\n\n  $__AddObserver(changeObservers, callback);\n  $__AddObserver($__ObserverCallbacks, callback);\n  return object;\n}\n\nexport function unobserve(object, callback){\n  ensureObject(object, 'Object.unobserve');\n  ensureFunction(callback, 'Object.unobserve');\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@get('ChangeObservers');\n\n  $__RemoveObserver(changeObservers, callback);\n  return object;\n}\n\nexport function deliverChangeRecords(callback){\n  ensureFunction(callback, 'Object.deliverChangeRecords');\n  callback.@@DeliverChangeRecords();\n}\n\nexport function getNotifier(object){\n  ensureObject(object, 'Object.getNotifier');\n  if (isFrozen(object)) {\n    return null;\n  }\n  return $__GetNotifier(object);\n}\n\n\nObject.@@extend({ assign, create, defineProperty, defineProperties, deliverChangeRecords,\n  freeze, getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor,\n  getPropertyNames, getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe,\n  preventExtensions, seal, unobserve\n});\n\n\n\nexport function isPrototypeOf(object, prototype){\n  while (prototype) {\n    prototype = prototype.@@GetPrototype();\n    if (prototype === object) {\n      return true;\n    }\n  }\n  return false;\n}\n\nbuiltinFunction(isPrototypeOf);\n\n\nexport function hasOwnProperty(object, key){\n  return $__ToObject(object).@@HasOwnProperty($__ToPropertyNames(key));\n}\n\nbuiltinFunction(hasOwnProperty);\n\n\nexport function propertyIsEnumerable(object, key){\n  return !!($__ToObject(object).@@query(key) & 1);\n}\n\nbuiltinFunction(propertyIsEnumerable);\n\n";
 
