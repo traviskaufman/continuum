@@ -1572,6 +1572,14 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit(DeclarativeEnvironmentRecord, EnvironmentRecord, {
       type: 'DeclarativeEnv'
     }, [
+      function destroy(){
+        this.destroy = null;
+        for (var k in this.bindings) {
+          if (this.bindings[k] && this.bindings[k].destroy) {
+            this.bindings[k].destroy();
+          }
+        }
+      },
       function save(serializer){
         serializer || (serializer = new Serializer);
         var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
@@ -1669,6 +1677,10 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit(ObjectEnvironmentRecord, EnvironmentRecord, {
       type: 'ObjectEnv'
     }, [
+      function destroy(){
+        this.destroy = null;
+        this.bindings.destroy && this.bindings.destroy();
+      },
       function save(serializer){
         serializer || (serializer = new Serializer);
         var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
@@ -1971,6 +1983,22 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         function each(callback){
           this.properties.each(callback, this);
+        },
+        function destroy(){
+          this.destroy = null;
+          this.properties.each(function(prop){
+            var val = prop[1];
+            this.remove(prop[0]);
+            prop.length = 0;
+            if (val && val.destroy) {
+              val.destroy();
+            }
+          });
+          for (var k in this) {
+            if (this[k] && this[k].destroy) {
+              this[k].destroy();
+            }
+          }
         },
         function save(serializer){
           if (!serializer) {

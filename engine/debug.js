@@ -39,6 +39,10 @@ var debug = (function(exports){
   function Mirror(){}
 
   define(Mirror.prototype, {
+    destroy: function(){
+      this.subject = null;
+      this.destroy = null;
+    },
     type: null,
     getPrototype: function(){
       return _Null;
@@ -122,6 +126,13 @@ var debug = (function(exports){
     inherit(MirrorAccessor, Mirror, {
       accessor: true
     }, [
+      function destroy(){
+        this.introspected && this.introspected.destroy && this.introspected.destroy();
+        this.subject = null;
+        this.destroy = null;
+        this.holder = null;
+        this.key = null;
+      },
       function getValue(key){
         return this.introspected.getValue(key);
       },
@@ -190,7 +201,6 @@ var debug = (function(exports){
     function MirrorObject(subject){
       subject.__introspected = this;
       this.subject = subject;
-      this.props = subject.properties;
       this.accessors = new Hash;
     }
 
@@ -201,6 +211,10 @@ var debug = (function(exports){
       attrs: null,
       props: null
     }, [
+      function destroy(){
+        this.__introspected = null;
+        this.destroy = null;
+      },
       function get(key){
         if (this.isAccessor(key)) {
           var prop = this.describe(key),
@@ -897,7 +911,6 @@ var debug = (function(exports){
         this.type = 'function';
       }
       this.attrs = new Hash;
-      this.props = new Hash;
       this.kind = introspect(subject.Target).kind;
     }
 
@@ -967,7 +980,6 @@ var debug = (function(exports){
         var key, keys = this.subject.Enumerate(false, true);
 
         props || (props = new Hash);
-        this.props = new Hash;
         this.attrs = new Hash;
 
         for (var i=0; i < keys.length; i++) {
