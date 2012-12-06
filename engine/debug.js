@@ -236,6 +236,7 @@ var debug = (function(exports){
         return this.get(key).subject;
       },
       function getPrototype(){
+        //return introspect(this.subject.GetInheritance());
         var obj = this.subject;
         do {
           obj = obj.GetInheritance();
@@ -540,7 +541,11 @@ var debug = (function(exports){
 
     inherit(MirrorError, MirrorObject, {
       kind: 'Error'
-    });
+    }, [
+      function label(){
+        return this.getValue('name');
+      }
+    ]);
 
     return MirrorError;
   })();
