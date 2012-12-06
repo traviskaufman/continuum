@@ -222,7 +222,7 @@ var TestCase = (function(){
           throw new Error('duplicate: '+match);
         }
 
-        obj[match] = stripStars(text.slice(match.length));
+        obj[match] = stripStars(text.slice(match.length)).trim() || true;
       });
     }
   }
@@ -234,15 +234,6 @@ var TestCase = (function(){
   }
 
   define(TestCase.prototype, [
-    function isNegative(){
-      return 'negative' in this.record;
-    },
-    function isOnlyStrict(){
-      return 'onlyStrict' in this.record;
-    },
-    function isNonStrict(){
-      return 'noStrict' in this.record;
-    },
     function getSource(){
       var source = 'var strict_mode = ';
       if (this.strict || this.onlyStrict) {
@@ -321,7 +312,9 @@ define(TestRunner.prototype, [
     realm.evaluate(src);
     realm.evaluate(this.executeAfter);
 
-    return toObject(current);
+    var result = toObject(current);
+    realm.global.destroy();
+    return result;
   }
 ]);
 
@@ -435,7 +428,7 @@ var TestSuite = (function(){
       }
     },
     function run(count){
-      count = +count || Math.min(10, this.queue.length);
+      count = +count || Math.min(40, this.queue.length);
       var record = path(__dirname+'/tested.json');
       var tested = record.exists() ? require(record.path) : {};
 
@@ -443,6 +436,7 @@ var TestSuite = (function(){
         var name = formatPath(this.queue.front().relativeTo(__dirname));
         if (name in tested) {
           this.queue.shift();
+          count++;
           continue;
         }
 
@@ -470,5 +464,5 @@ var TestSuite = (function(){
 })();
 
 var x = new TestSuite;
-x.chapter('8.7');
+x.chapter('11');
 print(x.run());
