@@ -4907,7 +4907,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return MakeException(type, ToInternalArray(args));
         },
         _Signal: function(obj, args){
-          realm.emit.apply(realm, arguments);
+          realm.emit.apply(realm, args);
         },
         _now: Date.now || function(){ return +new Date },
 

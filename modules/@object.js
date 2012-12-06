@@ -225,7 +225,7 @@ export function observe(object, callback){
   }
 
   var notifier = $__GetNotifier(object),
-      changeObservers = notifier.@@get('ChangeObservers');
+      changeObservers = notifier.@@getInternal('ChangeObservers');
 
   $__AddObserver(changeObservers, callback);
   $__AddObserver($__ObserverCallbacks, callback);
@@ -237,7 +237,7 @@ export function unobserve(object, callback){
   ensureFunction(callback, 'Object.unobserve');
 
   var notifier = $__GetNotifier(object),
-      changeObservers = notifier.@@get('ChangeObservers');
+      changeObservers = notifier.@@getInternal('ChangeObservers');
 
   $__RemoveObserver(changeObservers, callback);
   return object;
@@ -245,7 +245,7 @@ export function unobserve(object, callback){
 
 export function deliverChangeRecords(callback){
   ensureFunction(callback, 'Object.deliverChangeRecords');
-  callback.@@DeliverChangeRecords();
+  $__DeliverChangeRecords(callback);
 }
 
 export function getNotifier(object){

@@ -51,6 +51,7 @@ Genesis.@@GetPrototype      = $__GetPrototype;
 Genesis.@@HasOwnProperty    = $__HasOwnProperty;
 Genesis.@@HasOwnProperty    = $__HasOwnProperty;
 Genesis.@@HasProperty       = $__HasProperty;
+Genesis.@@IsExtensible      = $__IsExtensible;
 Genesis.@@PreventExtensions = $__PreventExtensions;
 Genesis.@@Put               = $__Put;
 Genesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;
