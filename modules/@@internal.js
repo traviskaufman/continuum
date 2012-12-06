@@ -88,10 +88,14 @@ function extend(properties){
     var key = keys[i];
     var desc = properties.@@GetOwnProperty(key);
     desc.enumerable = false;
-    this.@@DefineOwnProperty(key, desc);
-    if (typeof desc.value === 'function') {
+
+    if (typeof desc.value === 'number') {
+      desc.configurable = desc.writable = false;
+    } else if (typeof desc.value === 'function') {
       builtinFunction(desc.value);
     }
+
+    this.@@DefineOwnProperty(key, desc);
   }
 };
 
