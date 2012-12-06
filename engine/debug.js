@@ -535,7 +535,7 @@ var debug = (function(exports){
       kind: 'Date'
     }, [
       function label(){
-        var date = this.subject.PrimitiveValue;
+        var date = this.subject.Date;
         if (!date || date === Date.prototype || ''+date === 'Invalid Date') {
           return 'Invalid Date';
         } else {

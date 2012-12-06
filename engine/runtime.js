@@ -2892,7 +2892,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Date = (function(){
     function $Date(value){
       $Object.call(this, intrinsics.DateProto);
-      this.PrimitiveValue = value;
+      this.Date = value;
     }
 
     inherit($Date, $Object, {
@@ -4742,41 +4742,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
       }
 
-      function wrapBuiltins(source, target){
-        each(ownProperties(source), function(key){
-          if (typeof source[key] === 'function'
-                          && key !== 'constructor'
-                          && key !== 'toString'
-                          && key !== 'valueOf') {
-            var func = new $NativeFunction({
-              name: key,
-              length: source[key].length,
-              call: function(a, b, c, d){
-                var v = this;
-                if (v == null) {
-                  try { v = source.constructor(v) }
-                  catch (e) { v = new source.constructor }
-                }
-                if (v instanceof source.constructor || typeof v !== 'object') {
-                  var result =  v[key](a, b, c, d);
-                } else if (v.PrimitiveValue) {
-                  var result = v.PrimitiveValue[key](a, b, c, d);
-                }
-                if (!isObject(result)) {
-                  return result;
-                }
-                if (result instanceof Array) {
-                  return FromInternalArray(result);
-                }
-              }
-            });
-            target.define(key, func, _CW);
-          }
-        });
-      }
-
       var timers = {};
-
       var nativeCode = ['function ', '() { [native code] }'];
 
       return {
@@ -4943,9 +4909,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         _Signal: function(obj, args){
           realm.emit.apply(realm, arguments);
         },
-        wrapDateMethods: function(target){
-          wrapBuiltins(Date.prototype, target);
-        },
         _now: Date.now || function(){ return +new Date },
 
 
@@ -5111,17 +5074,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         _RegExpTest: function(obj, args){
           return obj.PrimitiveValue.test(args[0]);
         },
-        _DateToNumber: function(obj, args){
-          return +obj.PrimitiveValue;
-        },
-        _DateToString: function(obj, args){
-          return ''+obj.PrimitiveValue;
-        },
-        CallBuiltin: function(target, name, args){
-          if (args) {
-            return target[name].apply(target, ToInternalArray(args));
+        _CallBuiltin: function(obj, args){
+          if (args[2]) {
+            return args[0][args[1]].apply(args[0], ToInternalArray(args[2]));
           } else {
-            return target[name]();
+            return args[0][args[1]]();
           }
         },
 
