@@ -4890,6 +4890,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
+      thrower.IsStrictThrower = true;
       thrower.strict = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);

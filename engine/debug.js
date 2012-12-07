@@ -110,16 +110,20 @@ var debug = (function(exports){
       this.holder = holder;
       this.accessor = accessor;
       this.key = key;
-      realm().enterMutationContext();
-      this.subject = accessor.Get.Call(holder, []);
-      if (this.subject && this.subject.__introspected) {
-        this.introspected = this.subject.__introspected;
+      if (accessor.Get) {
+        if (accessor.Get.IsStrictThrower) {
+          this.subject = accessor.Get;
+        } else {
+          realm().enterMutationContext();
+          this.subject = accessor.Get.Call(holder, []);
+          realm().exitMutationContext();
+        }
       } else {
-        this.introspected = introspect(this.subject);
+        this.subject = undefined;
       }
+      this.introspected = introspect(this.subject);
       this.kind = this.introspected.kind;
       this.type = this.introspected.type;
-      realm().exitMutationContext();
     }
 
 
@@ -672,7 +676,7 @@ var debug = (function(exports){
         var strict = this.isStrict();
         props || (props = new Hash);
         this.subject.each(function(prop){
-          if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
+          if (!prop[0].Private) {
             var key = prop[0] === '__proto__' ? proto : prop[0];
             props[key] = prop;
           }
