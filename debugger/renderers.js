@@ -413,7 +413,18 @@ var Branch = (function(){
   return Branch;
 })();
 
+function functionName(name){
+  if (typeof name === 'string') {
+    return inline(name, 'FunctionName');
+  } else if (name) {
+    var symbol = introspect(name),
+        label = inline(symbol.label(), 'FunctionName');
 
+    label.addClass('Symbol');
+    label.addClass(symbol.isPrivate() ? 'PrivateSymbol' : 'PublicSymbol');
+    return label;
+  }
+}
 
 var FunctionBranch = (function(){
   var atoms = {
@@ -499,16 +510,7 @@ var FunctionBranch = (function(){
           offset = params.length - defaults.length;
 
 
-      if (typeof name === 'string') {
-        label.append(inline(name, 'FunctionName'));
-      } else if (name) {
-        var symbol = introspect(name),
-            nameElement = inline(symbol.label(), 'FunctionName');
-
-        nameElement.addClass('Symbol');
-        nameElement.addClass(symbol.isPrivate() ? 'PrivateSymbol' : 'PublicSymbol');
-        label.append(nameElement);
-      }
+      label.append(functionName(name));
 
       var container = inline('', 'Params');
       for (var i=0; i < params.length; i++) {
@@ -690,7 +692,7 @@ var FunctionPreview = (function(){
   creator(FunctionPreview);
   inherit(FunctionPreview, Preview, [
     function createPreview(){
-      this.text(this.mirror.getName());
+      this.append(functionName(this.mirror.getName()));
     }
   ]);
 
