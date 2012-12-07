@@ -228,7 +228,7 @@ var thunk = (function(exports){
     }
 
     function ARGUMENTS(){
-      if (code.strict) {
+      if (code.flags.strict) {
         var args = context.args;
         stack[sp++] = context.createArguments(args);
         stack[sp++] = args;
@@ -785,7 +785,7 @@ var thunk = (function(exports){
     function RETURN(){
       completion = stack[--sp];
       ip++;
-      if (code.generator) {
+      if (code.flags.generator) {
         context.currentGenerator.ExecutionContext = context;
         context.currentGenerator.State = 'closed';
         error = new AbruptCompletion('throw', context.Realm.intrinsics.StopIteration);
@@ -1280,10 +1280,10 @@ var thunk = (function(exports){
     }
 
     function send(ctx, value){
-      if (stack) {
-        stack[sp++] = value;
-      }
-      return run(ctx);
+      prepare(ctx);
+      stack[sp++] = value;
+      execute();
+      return cleanup();
     }
 
 

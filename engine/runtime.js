@@ -632,7 +632,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function InstantiateFunctionDeclaration(decl, env){
     var code = decl.code,
-        $F = code.generator ? $GeneratorFunction : $Function,
+        $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
     MakeConstructor(func);
@@ -3971,7 +3971,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return ctor;
       },
       function createFunction(isExpression, name, code){
-        var $F = code.generator ? $GeneratorFunction : $Function,
+        var $F = code.flags.generator ? $GeneratorFunction : $Function,
             env = this.LexicalEnvironment;
 
         if (isExpression && name) {
