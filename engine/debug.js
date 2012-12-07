@@ -573,17 +573,12 @@ var debug = (function(exports){
       function getName(){
         return this.subject.get('name');
       },
-      function getParams(){
+      function getDetails(){
         var params = this.subject.FormalParameters;
-        if (params && params.boundNames) {
-          var names = params.boundNames.slice();
-          if (params.Rest) {
-            names.rest = true;
-          }
-          return names;
-        } else {
-          return [];
+        if (params && params.reduced) {
+          return params.reduced;
         }
+        return { params: [], defaults: [], name: this.getName(), rest: null };
       },
       function apply(receiver, args){
         if (receiver.subject) {
@@ -957,8 +952,8 @@ var debug = (function(exports){
       function getName(){
         return this.subject.Get('name');
       },
-      function getParams(){
-        return this.target.getParams();
+      function getDetails(){
+        return this.target.getDetails();
       },
       function getScope(){
         return this.target.getScope();

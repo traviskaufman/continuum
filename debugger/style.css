@@ -319,7 +319,7 @@ h1, h2
 
 
 
-.ƒBooleanValue   { color: #ff8 } /* hsl( 60, 100%, 77%) */
+.ƒBooleanValue   { color: #8f4 } /* hsl( 60, 100%, 77%) */
 .ƒNullValue      { color: #668 } /* hsl(240,  14%, 47%) */
 .ƒNumberValue    { color: #a6f } /* hsl(267, 100%, 70%) */
 .ƒStringValue    { color: #0f6 } /* hsl(144, 100%, 50%) */
@@ -338,7 +338,7 @@ h1, h2
 .ƒMath           { color: #fc8 } /* hsl( 34, 100%, 77%) */
 .ƒModule         { color: #80f }
 .ƒNumber         { color: #a0f } /* hsl(280, 100%, 50%) */
-.ƒObject         { color: #ffa } /* hsl( 60, 100%, 83%) */
+.ƒObject         { color: #ff8 } /* hsl( 60, 100%, 83%) */
 .ƒRegExp         { color: #6c0 } /* hsl( 90, 100%, 40%) */
 .ƒSet            { color: #fa6 } /* hsl( 27, 100%, 70%) */
 .ƒString         { color: #0fa } /* hsl(160, 100%, 50%) */
@@ -361,11 +361,52 @@ h1, h2
 .ƒColumn         { color: #f09 }
 .ƒUncaught       { color: #bfb }
 
-.ƒParams         { color: #08f } /* hsl(208, 100%, 50%) */
-.ƒParams:before  { color: #8cf; content: '('; } /* hsl(206, 100%, 77%) */
-.ƒParams:after   { color: #8cf; content: ')'; } /* hsl(206, 100%, 77%) */
-.ƒParam:before    { color: #8cf; content: ', ' } /* hsl(206, 100%, 77%) */
-.ƒParam:first-child:before { content: '' }
+.ƒParams               { color: #08f;  }
+.ƒParams:before,
+.ƒParams:after,
+.ƒParam:before         { color: #8cf; }
+.ƒArrayPattern:before,
+.ƒArrayPattern:after,
+.ƒElement:before       { color: #f68; }
+.ƒObjectPattern:before,
+.ƒObjectPattern:after,
+.ƒProperty:before      { color: #ff8; }
+.ƒKey                  { color: #ffc; }
+
+
+.ƒArrayPattern:after,
+.ƒObjectPattern:after  { padding-left: 4px }
+
+.ƒArrayPattern:before,
+.ƒObjectPattern:before,
+.ƒProperty:before,
+.ƒElement:before,
+.ƒParam:before         { padding-right: 4px }
+
+.ƒKey:after            { padding-right: 2px }
+
+.ƒParam:first-child:before,
+.ƒElement:first-child:before,
+.ƒProperty:first-child:before { content: ''; padding-right: 0; }
+
+.ƒParams:before        { content: '('; }
+.ƒParams:after         { content: ')'; }
+.ƒArrayPattern:before  { content: '['; }
+.ƒArrayPattern:after   { content: ']'; }
+.ƒObjectPattern:before { content: '{'; }
+.ƒObjectPattern:after  { content: '}'; }
+.ƒKey:after            { content: ':'; }
+.ƒrest:before          { content: '...'; }
+.ƒParam:before,
+.ƒProperty:before,
+.ƒElement:before       { content: ','; }
+
+.ƒParam         { font-size: .8em; }
+.ƒIdentifier    {}
+.ƒArrayPattern  {}
+.ƒObjectPattern {}
+.ƒProperty      {}
+.ƒElement       {}
 
 
 

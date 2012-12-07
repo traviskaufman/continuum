@@ -4,6 +4,7 @@ var Component  = continuum.Component,
     utility    = continuum.utility,
     inherit    = utility.inherit,
     each       = utility.each,
+    isObject   = utility.isObject,
     inline     = continuum.inline,
     block      = continuum.block,
     introspect = continuum.introspect,
@@ -414,6 +415,36 @@ var Branch = (function(){
 
 
 var FunctionBranch = (function(){
+  function destructure(param){
+    if (typeof param === 'string') {
+      return inline(param, 'Identifier')
+    } else if (param instanceof Array) {
+      var array = inline('', 'ArrayPattern');
+      each(param, function(param){
+        var prop = inline('', 'Element');
+        prop.append(destructure(param));
+        array.append(prop);
+      });
+      return array;
+    } else if (isObject(param)) {
+      var object = inline('', 'ObjectPattern');
+      each(param, function(val, key){
+        var prop = inline('', 'Property');
+
+        if (key === val) {
+          prop.append(inline(key, 'Identifier'));
+        } else {
+          prop.append(inline(key, 'Key'));
+          prop.append(destructure(val));
+        }
+        object.append(prop);
+      });
+      return object;
+    } else {
+      return render('preview', introspect(param));
+    }
+  }
+
   function FunctionBranch(mirror){
     Branch.call(this, mirror);
   }
@@ -423,11 +454,13 @@ var FunctionBranch = (function(){
     function createLabel(){
       var label = Branch.prototype.createLabel.call(this),
           name = this.mirror.getName(),
-          params = this.mirror.getParams();
+          details = this.mirror.getDetails(),
+          rest = details.rest,
+          params = details.params,
+          defaults = details.defaults,
+          offset = params.length - defaults.length;
 
-      if (params.rest) {
-        params.push('...'+params.pop());
-      }
+
       if (typeof name === 'string') {
         label.append(inline(name, 'FunctionName'));
       } else if (name) {
@@ -438,9 +471,21 @@ var FunctionBranch = (function(){
         nameElement.addClass(symbol.isPrivate() ? 'PrivateSymbol' : 'PublicSymbol');
         label.append(nameElement);
       }
+
       var container = inline('', 'Params');
       for (var i=0; i < params.length; i++) {
-        container.append(inline(params[i], 'Param'))
+        var param = inline('', 'Param');
+        param.append(destructure(params[i]));
+        if (offset <= i) {
+          param.append(inline(' = ', 'Operator'));
+          param.append(destructure(defaults[i - offset])).addClass('default');
+        }
+        container.append(param);
+      }
+      if (rest) {
+        var param = inline('', 'Param');
+        param.append(destructure(rest)).addClass('rest');
+        container.append(param);
       }
       label.append(container);
       return label;
