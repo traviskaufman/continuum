@@ -262,21 +262,25 @@ var debug = (function(exports){
         var proto = this.subject.Prototype;
 
         if (proto && proto.HiddenPrototype) {
-          var ret = proto.SetInheritance(value);
+          var result = proto.SetInheritance(value);
         } else {
-          var ret = this.subject.SetInheritance(value);
+          var result = this.subject.SetInheritance(value);
         }
 
         realm().exitMutationContext();
-        return ret;
+        return introspect(result);
       },
       function set(key, value){
-        var ret;
-        ret = this.subject.set(key, value);
-        return ret;
+        realm().enterMutationContext();
+        var result = introspect(this.subject.set(key, value));
+        realm().exitMutationContext();
+        return result;
       },
       function update(key, attr){
-        return this.subject.update(key, attr);
+        realm().enterMutationContext();
+        var result = introspect(this.subject.update(key, attr));
+        realm().exitMutationContext();
+        return result;
       },
       function defineProperty(key, desc){
         desc = Object(desc);
@@ -900,18 +904,17 @@ var debug = (function(exports){
   })();
 
 
-
-
-
-
   var MirrorProxy = (function(){
     function MirrorProxy(subject){
       this.subject = subject;
       if ('Call' in subject) {
         this.type = 'function';
       }
-      this.attrs = new Hash;
-      this.kind = introspect(subject.Target).kind;
+      this.target = introspect(subject.ProxyTarget);
+      this.kind = this.target.kind;
+      if (this.kind === 'Scope' || this.kind === 'Global') {
+        this.kind = 'Object';
+      }
     }
 
     function descToAttrs(desc){
@@ -923,14 +926,63 @@ var debug = (function(exports){
       }
     }
 
+    function attrsToDesc(attrs){
+      var desc = {};
+      if (attrs > 0) {
+        if (attrs & ENUMERABLE) desc.Enumerable = true;
+        if (attrs & CONFIGURABLE) desc.Configurable = true;
+        if (attrs & WRITABLE) desc.Writable = true;
+      }
+      return desc;
+    }
+
     inherit(MirrorProxy, Mirror, {
       type: 'object'
     }, [
+      MirrorObject.prototype.getInternal,
       MirrorObject.prototype.isExtensible,
       MirrorObject.prototype.getPrototype,
-      MirrorObject.prototype.list,
+      MirrorObject.prototype.setPrototype,
       MirrorObject.prototype.inheritedAttrs,
       MirrorObject.prototype.getterAttrs,
+      MirrorObject.prototype.isEnumerable,
+      MirrorObject.prototype.isConfigurable,
+      MirrorObject.prototype.isAccessor,
+      MirrorObject.prototype.isWritable,
+      MirrorObject.prototype.getDescriptor,
+      MirrorObject.prototype.defineProperty,
+      MirrorFunction.prototype.apply,
+      MirrorFunction.prototype.construct,
+      function getName(){
+        return this.subject.Get('name');
+      },
+      function getParams(){
+        return this.target.getParams();
+      },
+      function getScope(){
+        return this.target.getScope();
+      },
+      function isStrict(){
+        return this.target.isStrict();
+      },
+      function list(hidden, own){
+        return this.target.list.call(this, hidden, own);
+      },
+      function set(key, value){
+        realm().enterMutationContext();
+        var result = introspect(this.subject.Set(key, value));
+        realm().exitMutationContext();
+        return result;
+      },
+      function update(key, attr){
+        realm().enterMutationContext();
+        var result = introspect(this.subject.DefineOwnProperty(key, attrsToDesc(attr)));
+        realm().exitMutationContext();
+        return result;
+      },
+      function query(key){
+        return descToAttrs(this.subject.GetOwnProperty(key));
+      },
       function getOwnDescriptor(key){
         var desc = this.subject.GetOwnProperty(key);
         var out =  {};
@@ -940,7 +992,7 @@ var debug = (function(exports){
         return out;
       },
       function label(){
-        return 'Proxy' + MirrorObject.prototype.label.call(this);
+        return MirrorObject.prototype.label.call(this);
       },
       function get(key){
         return introspect(this.subject.Get(key));
@@ -954,39 +1006,24 @@ var debug = (function(exports){
       function has(key){
         return this.subject.HasProperty(key);
       },
-      function isEnumerable(key){
-        var desc = this.subject.GetOwnProperty(key);
-        return !!(desc && desc.Enumerable);
-      },
-      function isConfigurable(key){
-        var desc = this.subject.GetOwnProperty(key);
-        return !!(desc && desc.Configurable);
-      },
-      function isAccessor(key){
-        var desc = this.subject.GetOwnProperty(key);
-        return !!(desc && desc.Get || desc.Set);
-      },
-      function isWritable(key){
-        var desc = this.subject.GetOwnProperty(key);
-        return !!(desc && desc.Writable);
-      },
-      function query(key){
+      function describe(key){
         var desc = this.subject.GetOwnProperty(key);
         if (desc) {
-          return descToAttrs(desc);
+          if ('Get' in desc || 'Set' in desc) {
+            var val = { Get: desc.Get, Set: desc.Set };
+          } else {
+            var val = desc.Value;
+          }
+          return [key, val, descToAttrs(desc)];
         }
       },
       function ownAttrs(props){
-        var key, keys = this.subject.Enumerate(false, true);
+        var keys = this.subject.Enumerate(false, false);
 
         props || (props = new Hash);
-        this.attrs = new Hash;
 
         for (var i=0; i < keys.length; i++) {
-          var desc = this.subject.GetOwnProperty(key);
-          if (desc) {
-            props[keys[i]] = [keys[i], desc.Value, descToAttrs(desc)];
-          }
+          props[keys[i]] = this.describe(keys[i]);
         }
 
         return props;
@@ -1015,6 +1052,9 @@ var debug = (function(exports){
       isEnumerable: always(true),
       isAccessor: always(false)
     }, [
+      function outer(){
+        return introspect(this.subject.outer);
+      },
       function isAccessor(key){
         return this.getPrototype().isAccessor(key) || false;
       },
