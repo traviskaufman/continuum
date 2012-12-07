@@ -8944,7 +8944,8 @@ exports.assembler = (function(exports){
 
 
 
-  var AND              = new StandardOpCode(1, 'AND'),
+  var ADD              = new StandardOpCode(1, 'ADD'),
+      AND              = new StandardOpCode(1, 'AND'),
       ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
@@ -8977,12 +8978,14 @@ exports.assembler = (function(exports){
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
       JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
+      JEQ_UNDEFINED    = new StandardOpCode(1, 'JEQ_UNDEFINED'),
       JFALSE           = new StandardOpCode(1, 'JFALSE'),
       JLT              = new StandardOpCode(2, 'JLT'),
       JLTE             = new StandardOpCode(2, 'JLTE'),
       JGT              = new StandardOpCode(2, 'JGT'),
       JGTE             = new StandardOpCode(2, 'JGTE'),
       JNEQ_NULL        = new StandardOpCode(1, 'JNEQ_NULL'),
+      JNEQ_UNDEFINED   = new StandardOpCode(1, 'JNEQ_UNDEFINED'),
       JTRUE            = new StandardOpCode(1, 'JTRUE'),
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
@@ -9001,6 +9004,7 @@ exports.assembler = (function(exports){
       REF              = new InternedOpCode(1, 'REF'),
       REFSYMBOL        = new InternedOpCode(1, 'REFSYMBOL'),
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
+      REST             = new StandardOpCode(1, 'REST'),
       RETURN           = new StandardOpCode(0, 'RETURN'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
@@ -9018,6 +9022,7 @@ exports.assembler = (function(exports){
       TEMPLATE         = new StandardOpCode(1, 'TEMPLATE'),
       THIS             = new StandardOpCode(0, 'THIS'),
       THROW            = new StandardOpCode(0, 'THROW'),
+      TO_OBJECT        = new StandardOpCode(0, 'TO_OBJECT'),
       UNARY            = new StandardOpCode(1, 'UNARY'),
       UNDEFINED        = new StandardOpCode(0, 'UNDEFINED'),
       UPDATE           = new StandardOpCode(1, 'UPDATE'),
@@ -9874,34 +9879,57 @@ exports.assembler = (function(exports){
 
   var reducer = (function(){
     function convert(node){
+      if (!node) return node;
       var handler = handlers[node.type];
       if (handler) return handler(node);
     }
+
+    function functions(node){
+      return {
+        name: convert(node.id),
+        params: map(node.params, convert),
+        defaults: map(node.defaults || [], convert),
+        rest: convert(node.rest)
+      };
+    }
+    function objects(node){
+      var out = {};
+      each(node.properties, function(prop){
+        out[convert(prop.key)] = convert(prop.value);
+      });
+      return out;
+    }
+    function arrays(node){
+      return map(node.elements, convert);
+    }
+
     var handlers = {
-      ArrayPattern: function(node){
-        return map(node.elements, convert);
-      },
+      ArrayExpression: arrays,
+      ArrayPattern: arrays,
       Identifier: function(node){
         return node.name;
       },
       Literal: function(node){
         return node.value;
       },
-      ObjectPattern: function(node){
-        var out = {};
-        each(node.properties, function(prop){
-          out[convert(prop.key)] = convert(prop.value);
-        });
-        return out;
+      ObjectExpression: objects,
+      ObjectPattern: objects,
+      FunctionDeclaration: functions,
+      FunctionExpression: functions,
+      ArrowFunctionExpression: functions,
+      CallExpression: function(node){
+        return {
+          callee: convert(node.callee),
+          args: map(node.arguments, convert)
+        }
       },
-      FunctionDeclaration: function(node){
-        return map(node.params, convert);
+      MemberExpression: function(node){
+        var obj = {};
+        obj[convert(node.object)] = convert(node.property);
+        return obj;
       },
-      FunctionExpression: function(node){
-        return map(node.params, convert);
-      },
-      ArrowFunctionExpression: function(node){
-        return map(node.params, convert);
+      SpreadElement: function(node){
+        return { spread: convert(node.arguments) };
       },
       Program: function(node){
         var out = {
@@ -9910,11 +9938,10 @@ exports.assembler = (function(exports){
         };
         each(node.body, function(node){
           if (node.type === 'FunctionDeclaration') {
-            out.functions.push({ name: convert(node.id), params: convert(node) });
+            out.functions.push(convert(node));
           } else if (node.type === 'VariableDeclaration' && node.kind === 'var') {
             each(node.declarations, function(decl){
-
-              out.vars.push(convert(decl.id));
+              out.vars.push({ binding: convert(decl.id), init: convert(decl.init) });
             });
           }
         });
@@ -10178,7 +10205,7 @@ exports.assembler = (function(exports){
       BINDING('arguments', strict);
     }
 
-    each(code.varNames, function(name){
+    each(code.varDecls, function(name){
       HAS_BINDING(name);
       var jump = JTRUE(0);
       BINDING(name, false);
@@ -10191,16 +10218,43 @@ exports.assembler = (function(exports){
       FunctionDeclaration(decl);
       FUNCTION(false, decl.id.name, decl.code);
       VAR(decl.id.name);
+      POP();
     });
 
-    POP();
     ARGUMENTS();
+    var defaultStart = code.params.length - code.params.defaults.length;
     each(code.params, function(param, i){
       DUP();
       INTERNAL_MEMBER(i);
-      destructure(param, VAR);
+      if (i >= defaultStart) {
+        var skipDefault = JNEQ_UNDEFINED(0);
+        recurse(code.params.defaults[i - defaultStart]);
+        GET();
+        adjust(skipDefault);
+      }
+      ROTATE(1);
+      ROTATE(2);
+      if (param.type === 'Identifier') {
+        VAR(param.name);
+      } else {
+        destructure(param, VAR);
+        POP();
+      }
+      ROTATE(1);
     });
-    POP();
+
+    var rest = code.params.Rest;
+    if (rest) {
+      REST(code.params.ExpectedArgumentCount);
+      if (rest.type === 'Identifier') {
+        VAR(rest.name);
+      } else {
+        destructure(rest, VAR);
+        POP();
+      }
+    } else {
+      POP();
+    }
 
     if (!argumentsObjectNotNeeded) {
       VAR('arguments');
@@ -10320,7 +10374,7 @@ exports.assembler = (function(exports){
 
     return function destructure(left, STORE){
       var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
-
+      TO_OBJECT();
       each(left[key], function(item, i){
         if (!item) return;
         DUP();
@@ -11142,9 +11196,9 @@ exports.assembler = (function(exports){
         parent && code.derive(parent);
         this.currentScope = code.scope;
 
-        //if (code.params) {
-        //  FunctionDeclarationInstantiation(code);
-        //}
+        if (code.params) {
+          FunctionDeclarationInstantiation(code);
+        }
 
         recurse(code.body);
 
@@ -12500,13 +12554,13 @@ exports.thunk = (function(exports){
   function Thunk(code, instrumented){
     ToObject || (ToObject = operators.ToObject);
 
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
+    var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
-      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
-      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
-      REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
-      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY, UNDEFINED,
+      JUMP, JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET,
+      LITERAL, LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
+      REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
+      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT, UNARY, UNDEFINED,
       UPDATE, VAR, WITH, YIELD];
 
 
@@ -12572,6 +12626,11 @@ exports.thunk = (function(exports){
 
 
 
+    function ADD(){
+      stack[sp - 1] += ops[ip][0];
+      return cmds[++ip];
+    }
+
 
     function AND(){
       if (stack[sp - 1]) {
@@ -12605,7 +12664,7 @@ exports.thunk = (function(exports){
             env = context.LexicalEnvironment,
             args = context.args,
             func = context.callee;
-        stack[sp++] = context.createArguments(args, env, params, func);
+        stack[sp++] = context.arguments = context.createArguments(args, env, params, func);
         stack[sp++] = args;
       }
 
@@ -12646,7 +12705,6 @@ exports.thunk = (function(exports){
         return unwind;
       }
 
-      stack[sp++] = result;
       return cmds[++ip];
     }
 
@@ -12915,9 +12973,27 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function JEQ_UNDEFINED(){
+      if (stack[sp - 1] === undefined) {
+        sp--;
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JNEQ_UNDEFINED(){
+      if (stack[sp - 1] !== undefined) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      sp--;
+      return cmds[++ip];
+    }
+
     function JEQ_NULL(){
-      var cmp = stack[--sp];
-      if (cmp === null) {
+      if (stack[sp - 1] === null) {
+        sp--;
         ip = ops[ip][0];
         return cmds[ip];
       }
@@ -12925,11 +13001,11 @@ exports.thunk = (function(exports){
     }
 
     function JNEQ_NULL(){
-      var cmp = stack[--sp];
-      if (cmp !== null) {
+      if (stack[sp - 1] !== null) {
         ip = ops[ip][0];
         return cmds[ip];
       }
+      sp--;
       return cmds[++ip];
     }
 
@@ -13116,6 +13192,20 @@ exports.thunk = (function(exports){
     function REFSYMBOL(){
       var symbol = code.lookup(ops[ip][0]);
       stack[sp++] = context.getSymbol(symbol);
+      return cmds[++ip];
+    }
+
+    function REST(){
+      var args = stack[--sp],
+          offset = ops[ip][0],
+          count = args.length - offset,
+          array = context.createArray(0);
+
+      for (var i=0; i < count; i++) {
+        array.set(i+'', args[offset + i]);
+      }
+      array.set('length', i);
+      stack[sp++] = array;
       return cmds[++ip];
     }
 
@@ -13306,6 +13396,17 @@ exports.thunk = (function(exports){
     function THROW(){
       error = new AbruptCompletion('throw', stack[--sp]);
       return unwind;
+    }
+
+    function TO_OBJECT(){
+      var result = stack[sp - 1] = ToObject(stack[sp - 1]);
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      return cmds[++ip];
     }
 
     function UNARY(){
@@ -14173,80 +14274,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
   }
 
-
-  // ## FunctionDeclarationInstantiation
-
-  function FunctionDeclarationInstantiation(func, args, env){
-    var formals = func.FormalParameters,
-        params = formals.boundNames;
-
-    for (var i=0; i < params.length; i++) {
-      if (!env.HasBinding(params[i])) {
-        env.CreateMutableBinding(params[i]);
-        env.InitializeBinding(params[i], undefined);
-      }
-    }
-
-    var decls = func.code.lexDecls;
-
-    for (var i=0, decl; decl = decls[i]; i++) {
-      var names = decl.boundNames;
-      for (var j=0; j < names.length; j++) {
-        if (!env.HasBinding(names[j])) {
-          if (decl.IsConstantDeclaration) {
-            env.CreateImmutableBinding(names[j]);
-          } else {
-            env.CreateMutableBinding(names[j], false);
-          }
-        }
-      }
-    }
-
-    if (func.strict) {
-      var ao = new $StrictArguments(args);
-      var status = ArgumentBindingInitialization(formals, ao, env);
-    } else {
-      var ao = env.arguments = new $MappedArguments(args, env, params, func);
-      var status = ArgumentBindingInitialization(formals, ao);
-    }
-
-    if (status && status.Abrupt) {
-      return status;
-    }
-
-    if (!env.HasBinding('arguments')) {
-      if (func.strict) {
-        env.CreateImmutableBinding('arguments');
-      } else {
-        env.CreateMutableBinding('arguments');
-      }
-      env.InitializeBinding('arguments', ao);
-    }
-
-
-    var vardecls = func.code.varDecls;
-    for (var i=0; i < vardecls.length; i++) {
-      if (!env.HasBinding(vardecls[i])) {
-        env.CreateMutableBinding(vardecls[i]);
-        env.InitializeBinding(vardecls[i], undefined);
-      }
-    }
-
-    var funcs = create(null);
-
-    for (var i=0; i < decls.length; i++) {
-      if (decls[i].type === 'FunctionDeclaration') {
-        var decl = decls[i],
-            name = decl.id.name;
-
-        if (!(name in funcs)) {
-          funcs[name] = true;
-          env.InitializeBinding(name, InstantiateFunctionDeclaration(decl, env));
-        }
-      }
-    }
-  }
-
   function Brand(name){
     this.name = name;
   }
@@ -14343,116 +14370,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ## InstantiateFunctionDeclaration
 
   function InstantiateFunctionDeclaration(decl, env){
-    var code = decl.code;
-    var $F = code.generator ? $GeneratorFunction : $Function;
-    var func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
+    var code = decl.code,
+        $F = code.generator ? $GeneratorFunction : $Function,
+        func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
+
     MakeConstructor(func);
     return func;
-  }
-
-
-  /*
-  // ## BlockDeclarationInstantiation
-
-  function BlockDeclarationInstantiation(decls, env){
-    for (var i=0, decl; decl = decls[i]; i++) {
-      for (var j=0, name; name = decl.boundNames[j]; j++) {
-        if (decl.IsConstantDeclaration) {
-          env.CreateImmutableBinding(name);
-        } else {
-          env.CreateMutableBinding(name, false);
-        }
-      }
-    }
-
-    for (i=0; decl = decls[i]; i++) {
-      if (decl.type === 'FunctionDeclaration') {
-        env.InitializeBinding(decl.id.name, InstantiateFunctionDeclaration(decl, env));
-      }
-    }
-  }
-  */
-
-
-
-  // ## BindingInitialization
-
-  function BindingInitialization(pattern, value, env){
-    if (pattern.type === 'Identifier') {
-      if (env) {
-        env.InitializeBinding(pattern.name, value);
-      } else {
-        return PutValue(IdentifierResolution(context, pattern.name), value);
-      }
-    } else if (pattern.type === 'ArrayPattern') {
-      return IndexedBindingInitialization(pattern, value, 0, env);
-    } else if (pattern.type === 'ObjectPattern') {
-      return ObjectBindingInitialization(pattern, value, env);
-    }
-  }
-
-  // ## ArgumentBindingInitialization
-
-  function ArgumentBindingInitialization(params, args, env){
-    for (var i = 0, arg; arg = params[i]; i++) {
-      var value = args.HasProperty(i) ? args.Get(i) : undefined;
-      if (value && value.Completion) {
-        if (value.Abrupt) {
-          return value;
-        } else {
-          value = value.value;
-        }
-      }
-      BindingInitialization(arg, value, env);
-    }
-    if (params.Rest) {
-      var len = args.get('length') - params.length,
-          array = new $Array(0);
-
-      if (len > 0) {
-        for (var i=0; i < len; i++) {
-          array.set(i, args.get(params.length + i));
-        }
-        array.define('length', len, 4);
-      }
-      BindingInitialization(params.Rest, array, env);
-    }
-  }
-
-
-  // ## IndexedBindingInitialization
-
-  function IndexedBindingInitialization(pattern, array, i, env){
-    for (var element; element = pattern.elements[i]; i++) {
-      if (element.type === 'SpreadElement') {
-        var value = context.destructureSpread(array, i);
-        if (value.Abrupt) {
-          return value;
-        }
-        return BindingInitialization(element.argument, value, env);
-      }
-
-      var value = array.HasProperty(i) ? array.Get(i) : undefined;
-      if (value && value.Completion) {
-        if (value.Abrupt) {
-          return value;
-        } else {
-          value = value.value;
-        }
-      }
-      BindingInitialization(element, value, env);
-    }
-    return i;
-  }
-
-  // ## ObjectBindingInitialization
-
-  function ObjectBindingInitialization(pattern, object, env){
-    for (var i=0, property; property = pattern.properties[i]; i++) {
-      var value = object.HasProperty(property.key.name) ? object.Get(property.key.name) : undefined;
-      if (value && value.Abrupt) return value;
-      BindingInitialization(property.value, value, env);
-    }
   }
 
 
@@ -15807,7 +15730,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     inherit($Function, $Object, {
       BuiltinBrand: BRANDS.BuiltinFunction,
       FormalParameters: null,
-      Code: null,
+      code: null,
       Scope: null,
       strict: false,
       ThisMode: 'global',
@@ -15865,13 +15788,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         var caller = context ? context.callee : null;
-
         ExecutionContext.push(new ExecutionContext(context, local, realm, this.code, this, args, isConstruct));
-        var status = FunctionDeclarationInstantiation(this, args, local);
-        if (status && status.Abrupt) {
-          ExecutionContext.pop();
-          return status;
-        }
 
         if (!this.thunk) {
           this.thunk = new Thunk(this.code);
@@ -16042,12 +15959,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
         var ctx = new ExecutionContext(context, local, this.Realm, this.code, this, args, isConstruct);
         ExecutionContext.push(ctx);
-
-        var status = FunctionDeclarationInstantiation(this, args, local);
-        if (status && status.Abrupt) {
-          ExecutionContext.pop();
-          return status;
-        }
 
         if (!this.thunk) {
           this.thunk = new Thunk(this.code);
@@ -20914,6 +20825,8 @@ exports.modules["@math"] = "export const\n  E       = 2.718281828459045,\n  LN10
 exports.modules["@number"] = "export const\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = NaN,\n  NEGATIVE_INFINITY = -Infinity,\n  POSITIVE_INFINITY = Infinity;\n\n\nexport class Number {\n  constructor(value){\n    value = arguments.length ? $__ToNumber(value) : 0;\n    return $__IsConstructCall() ? $__NumberCreate(value) : value;\n  }\n\n  toString(radix){\n    radix = $__ToInteger(radix || 10);\n    if (typeof this === 'number') {\n      return $__NumberToString(this, radix);\n    } else if (this.@@GetBuiltinBrand() === 'Number') {\n      return $__NumberToString(this.@@getInternal('PrimitiveValue'), radix);\n    }\n    throw $__Exception('not_generic', ['Number.prototype.toString']);\n  }\n\n  valueOf(){\n    if (typeof this === 'number') {\n      return this;\n    }\n    if (this.@@GetBuiltinBrand() === 'Number') {\n      return this.@@getInternal('PrimitiveValue');\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  }\n\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n}\n\nbuiltinClass(Number);\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\nNumber.@@extend({ isNaN, isFinite, isInteger, toInteger,\n                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,\n                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });\n\n";
 
 exports.modules["@object"] = "export class Object {\n  constructor(value){\n    return value == null ? {} : $__ToObject(value);\n  }\n\n  toString(){\n    if (this === undefined) {\n      return '[object Undefined]';\n    } else if (this === null) {\n      return '[object Null]';\n    } else {\n      return '[object ' + $__ToObject(this).@toStringTag + ']';\n    }\n  }\n\n  isPrototypeOf(object){\n    while ($__Type(object) === 'Object') {\n      object = object.@@GetPrototype();\n      if (object === this) {\n        return true;\n      }\n    }\n    return false;\n  }\n\n  toLocaleString(){\n    return this.toString();\n  }\n\n  valueOf(){\n    return $__ToObject(this);\n  }\n\n  hasOwnProperty(key){\n    return $__ToObject(this).@@HasOwnProperty($__ToPropertyName(key));\n  }\n\n  propertyIsEnumerable(key){\n    return !!($__ToObject(this).@@query(key) & 1);\n  }\n}\n\nbuiltinClass(Object);\n\n\nexport function assign(target, source){\n  ensureObject(target, 'Object.assign');\n  source = $__ToObject(source);\n  for (let [i, key] of source.@@Enumerate(false, true)) {\n    let prop = source[key];\n    if (typeof prop === 'function' && prop.@@get('HomeObject')) {\n      // TODO\n    }\n    target[key] = prop;\n  }\n  return target;\n}\n\nexport function create(prototype, properties){\n  if (typeof prototype !== 'object') {\n    throw $__Exception('proto_object_or_null', [])\n  }\n\n  var object = $__ObjectCreate(prototype);\n\n  if (properties !== undefined) {\n    ensureDescriptor(properties);\n\n    for (var key in properties) {\n      var desc = properties[key];\n      ensureDescriptor(desc);\n      object.@@DefineOwnProperty(key, desc);\n    }\n  }\n\n  return object;\n}\n\nexport function defineProperty(object, key, property){\n  ensureObject(object, 'Object.defineProperty');\n  ensureDescriptor(property);\n  object.@@DefineOwnProperty($__ToPropertyName(key), property);\n  return object;\n}\n\nexport function defineProperties(object, properties){\n  ensureObject(object, 'Object.defineProperties');\n  ensureDescriptor(properties);\n\n  for (var key in properties) {\n    var desc = properties[key];\n    ensureDescriptor(desc);\n    object.@@DefineOwnProperty(key, desc);\n  }\n\n  return object;\n}\n\nexport function freeze(object){\n  ensureObject(object, 'Object.freeze');\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc.configurable) {\n      desc.configurable = false;\n      if ('writable' in desc) {\n        desc.writable = false;\n      }\n      object.@@DefineOwnProperty(props[i], desc);\n    }\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function getOwnPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getOwnPropertyDescriptor');\n  return object.@@GetOwnProperty($__ToPropertyName(key));\n}\n\nexport function getOwnPropertyNames(object){\n  ensureObject(object, 'Object.getOwnPropertyNames');\n  return object.@@Enumerate(false, false);\n}\n\nexport function getPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getPropertyDescriptor');\n  return object.@@GetProperty($__ToPropertyName(key));\n}\n\nexport function getPropertyNames(object){\n  ensureObject(object, 'Object.getPropertyNames');\n  return object.@@Enumerate(true, false);\n}\n\nexport function getPrototypeOf(object){\n  ensureObject(object, 'Object.getPrototypeOf');\n  return object.@@GetPrototype();\n}\n\nexport function is(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;\n}\n\nexport function isnt(x, y){\n  return x === y ? x === 0 && 1 / x !== 1 / y : x === x || y === y;\n}\n\nexport function isExtensible(object){\n  ensureObject(object, 'Object.isExtensible');\n  return object.@@IsExtensible();\n}\n\nexport function isFrozen(object){\n  ensureObject(object, 'Object.isFrozen');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc) {\n      if (desc.configurable || 'writable' in desc && desc.writable) {\n        return false;\n      }\n    }\n  }\n\n  return true;\n}\n\nexport function isSealed(object){\n  ensureObject(object, 'Object.isSealed');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nexport function keys(object){\n  ensureObject(object, 'Object.keys');\n  return object.@@Enumerate(false, true);\n}\n\nexport function preventExtensions(object){\n  ensureObject(object, 'Object.preventExtensions');\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function seal(object){\n  ensureObject(object, 'Object.seal');\n\n  var desc = { configurable: false },\n      props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    object.@@DefineOwnProperty(props[i], desc);\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\n\nexport function observe(object, callback){\n  ensureObject(object, 'Object.observe');\n  ensureFunction(callback, 'Object.observe');\n  if (isFrozen(callback)) {\n\n  }\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@getInternal('ChangeObservers');\n\n  $__AddObserver(changeObservers, callback);\n  $__AddObserver($__ObserverCallbacks, callback);\n  return object;\n}\n\nexport function unobserve(object, callback){\n  ensureObject(object, 'Object.unobserve');\n  ensureFunction(callback, 'Object.unobserve');\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@getInternal('ChangeObservers');\n\n  $__RemoveObserver(changeObservers, callback);\n  return object;\n}\n\nexport function deliverChangeRecords(callback){\n  ensureFunction(callback, 'Object.deliverChangeRecords');\n  $__DeliverChangeRecords(callback);\n}\n\nexport function getNotifier(object){\n  ensureObject(object, 'Object.getNotifier');\n  if (isFrozen(object)) {\n    return null;\n  }\n  return $__GetNotifier(object);\n}\n\n\nObject.@@extend({ assign, create, defineProperty, defineProperties, deliverChangeRecords,\n  freeze, getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor,\n  getPropertyNames, getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe,\n  preventExtensions, seal, unobserve\n});\n\n\n\nexport function isPrototypeOf(object, prototype){\n  while (prototype) {\n    prototype = prototype.@@GetPrototype();\n    if (prototype === object) {\n      return true;\n    }\n  }\n  return false;\n}\n\nbuiltinFunction(isPrototypeOf);\n\n\nexport function hasOwnProperty(object, key){\n  return $__ToObject(object).@@HasOwnProperty($__ToPropertyNames(key));\n}\n\nbuiltinFunction(hasOwnProperty);\n\n\nexport function propertyIsEnumerable(object, key){\n  return !!($__ToObject(object).@@query(key) & 1);\n}\n\nbuiltinFunction(propertyIsEnumerable);\n\n";
+
+exports.modules["@parser"] = "export function parse(src, { loc, source, line, builder } = { loc: true, source: null, line: 1, builder: null }){\n  var opts = { loc, source, line, builder };\n  return $__Parse(src, opts);\n}\n\n";
 
 exports.modules["@reflect"] = "export class Proxy {\n  constructor(target, handler){\n    ensureObject(target, 'Proxy');\n    ensureObject(handler, 'Proxy');\n    return $__ProxyCreate(target, handler);\n  }\n}\n\nbuiltinClass(Proxy);\n\nProxy.@@delete('prototype');\n\nexport class Handler {\n  getOwnPropertyDescriptor(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);\n    return getOwnPropertyDescriptor(target, name);\n  }\n\n  getOwnPropertyNames(target){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);\n    return getOwnPropertyNames(target);\n  }\n\n  getPrototypeOf(target){\n    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);\n    return getPrototypeOf(target);\n  }\n\n  defineProperty(target, name, desc){\n    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);\n    return defineProperty(target, name, desc);\n  }\n\n  deleteProperty(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);\n    return deleteProperty(target, name);\n  }\n\n  preventExtensions(target){\n    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);\n    return preventExtensions(target);\n  }\n\n  isExtensible(target){\n    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);\n    return isExtensible(target);\n  }\n\n  apply(target, thisArg, args){\n    //throw $__Exception('missing_fundamental_trap', ['apply']);\n    return apply(target, thisArg, args);\n  }\n\n  seal(target) {\n    if (!this.preventExtensions(target)) return false;\n\n    var props = this.getOwnPropertyNames(target),\n        len = +props.length;\n\n    for (var i = 0; i < len; i++) {\n      success = success && this.defineProperty(target, props[i], { configurable: false });\n    }\n    return success;\n  }\n\n  freeze(target){\n    if (!this.preventExtensions(target)) return false;\n\n    var props = this.getOwnPropertyNames(target),\n        len = +props.length;\n\n    for (var i = 0; i < len; i++) {\n      var name = props[i],\n          desc = this.getOwnPropertyDescriptor(target, name);\n\n      if (desc) {\n        desc = 'writable' in desc || 'value' in desc\n          ? { configurable: false, writable: false }\n          : { configurable: false };\n        success = success && this.defineProperty(target, name, desc);\n      }\n    }\n\n    return success;\n  }\n\n  isSealed(target){\n    var props = this.getOwnPropertyNames(target),\n        len = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      var desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc && desc.configurable) {\n        return false;\n      }\n    }\n    return !this.isExtensible(target);\n  }\n\n  isFrozen(target){\n    var props = this.getOwnPropertyNames(target),\n        len = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      var desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc.configurable || ('writable' in desc || 'value' in desc) && desc.writable) {\n        return false;\n      }\n    }\n    return !this.isExtensible(target);\n  }\n\n  has(target, name){\n    var desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc !== undefined) {\n      return true;\n    }\n\n    var proto = target.@@GetPrototype();\n    return proto === null ? false : this.has(proto, name);\n  }\n\n  hasOwn(target, name){\n    return this.getOwnPropertyDescriptor(target, name) !== undefined;\n  }\n\n  get(target, name, receiver){\n    receiver = receiver || target;\n\n    var desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc === undefined) {\n      var proto = target.@@GetPrototype();\n      return proto === null ? undefined : this.get(proto, name, receiver);\n    }\n\n    if ('writable' in desc || 'value' in desc) {\n      return desc.value;\n    }\n\n    var getter = desc.get;\n    return getter === undefined ? undefined : getter.@@Call(receiver, []);\n  }\n\n  set(target, name, value, receiver){\n    var ownDesc = this.getOwnPropertyDescriptor(target, name);\n\n    if (ownDesc !== undefined) {\n      if ('get' in ownDesc || 'set' in ownDesc) {\n        var setter = ownDesc.set;\n        if (setter === undefined) return false;\n        setter.@@Call(receiver, [value]);\n        return true;\n      }\n\n      if (ownDesc.writable === false) {\n        return false;\n      } else if (receiver === target) {\n        receiver.@@DefineOwnProperty(name, { value: value });\n        return true;\n      } else {\n        receiver.@@DefineOwnProperty(name, newDesc);\n        if (receiver.@@IsExtensible()) {\n          object.@@DefineOwnProperty(key, { writable: true,\n                                            enumerable: true,\n                                            configurable: true });\n          return true;\n        }\n        return false;\n      }\n    }\n\n    var proto = target.@@GetPrototype();\n    if (proto === null) {\n      if (receiver.@@IsExtensible()) {\n        receiver.@@DefineOwnProperty(key, { writable: true,\n                                            enumerable: true,\n                                            configurable: true });\n        return true;\n      }\n      return false;\n    }\n\n    return this.set(proto, name, value, receiver);\n  }\n\n  enumerate(target){\n    var result = this.getOwnPropertyNames(target),\n        len = +result.length,\n        out = [];\n\n    for (var i = 0; i < len; i++) {\n      var name = $__ToString(result[i]),\n          desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && !desc.enumerable) {\n        out.push(name);\n      }\n    }\n\n    var proto = target.@@GetPrototype();\n    return proto === null ? out : out.concat(enumerate(proto));\n  }\n\n  keys(target){\n    var result = this.getOwnPropertyNames(target),\n        len = +result.length,\n        result = [];\n\n    for (var i = 0; i < len; i++) {\n      var name = $__ToString(result[i]),\n          desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && desc.enumerable) {\n        result.push(name);\n      }\n    }\n    return result;\n  }\n\n  construct(target, args) {\n    var proto = this.get(target, 'prototype', target),\n        instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},\n        result = this.apply(target, instance, args);\n\n    return $__Type(result) === 'Object' ? result : instance;\n  }\n}\n\nbuiltinClass(Handler);\n\n\nexport function apply(target, thisArg, args){\n  ensureFunction(target, '@Reflect.apply');\n  return target.@@Call(thisArg, ensureArgs(args));\n}\nbuiltinFunction(apply);\n\nexport function construct(target, args){\n  ensureFunction(target, '@Reflect.construct');\n  return target.@@Construct(ensureArgs(args));\n}\nbuiltinFunction(construct);\n\nexport function defineProperty(target, name, desc){\n  ensureObject(target, '@Reflect.defineProperty');\n  ensureDescriptor(desc);\n  return target.@@DefineOwnProperty($__ToPropertyName(name), desc);\n}\nbuiltinFunction(defineProperty);\n\nexport function deleteProperty(target, name){\n  ensureObject(target, '@Reflect.deleteProperty');\n  return target.@@Delete($__ToPropertyName(name), false);\n}\nbuiltinFunction(deleteProperty);\n\nexport function enumerate(target){\n  return $__ToObject(target).@@Enumerate(false, false);\n}\nbuiltinFunction(enumerate);\n\nexport function freeze(target){\n  if ($__Type(target) !== 'Object' || !target.@@PreventExtensions()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n      len = props.length\n      success = true;\n\n  for (var i = 0; i < len; i++) {\n    var desc = target.@@GetOwnProperty(props[i]),\n        attrs = 'writable' in desc || 'value' in desc\n          ? { configurable: false, writable: false }\n          : desc !== undefined\n            ? { configurable: false }\n            : null;\n\n    if (attrs !== null) {\n      success = success && target.@@DefineOwnProperty(props[i], attrs);\n    }\n  }\n  return success;\n}\nbuiltinFunction(freeze);\n\nexport function get(target, name, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__ToObject(target).@@GetP($__ToPropertyName(name), receiver);\n}\nbuiltinFunction(get);\n\nexport function getOwnPropertyDescriptor(target, name){\n  ensureObject(target, '@Reflect.getOwnPropertyDescriptor');\n  return target.@@GetOwnProperty($__ToPropertyName(name));\n}\nbuiltinFunction(getOwnPropertyDescriptor);\n\nexport function getOwnPropertyNames(target){\n  ensureObject(target, '@Reflect.getOwnPropertyNames');\n  return target.@@Enumerate(false, false);\n}\nbuiltinFunction(getOwnPropertyNames);\n\nexport function getPrototypeOf(target){\n  ensureObject(target, '@Reflect.getPrototypeOf');\n  return target.@@GetPrototype();\n}\nbuiltinFunction(getPrototypeOf);\n\nexport function has(target, name){\n  return $__ToObject(target).@@HasProperty($__ToPropertyName(name));\n}\nbuiltinFunction(has);\n\nexport function hasOwn(target, name){\n  return $__ToObject(target).@@HasOwnProperty($__ToPropertyName(name));\n}\nbuiltinFunction(hasOwn);\n\nexport function isFrozen(target){\n  ensureObject(target, '@Reflect.isFrozen');\n  if (target.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = target.@@GetOwnProperty(props[i]);\n    if (desc) {\n      if (desc.configurable || 'writable' in desc && desc.writable) {\n        return false;\n      }\n    }\n  }\n\n  return true;\n}\nbuiltinFunction(isFrozen);\n\nexport function isSealed(target){\n  ensureObject(target, '@Reflect.isSealed');\n  if (target.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = target.@@GetOwnProperty(props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\nbuiltinFunction(isSealed);\n\nexport function isExtensible(target){\n  ensureObject(target, '@Reflect.isExtensible');\n  return target.@@IsExtensible();\n}\nbuiltinFunction(isExtensible);\n\nexport function keys(target){\n  ensureObject(target, '@Reflect.keys');\n  return target.@@Enumerate(false, true);\n}\nbuiltinFunction(keys);\n\nexport function preventExtensions(target){\n  if ($__Type(target) !== 'Object') return false;\n  return target.@@PreventExtensions();\n}\nbuiltinFunction(preventExtensions);\n\nexport function seal(target){\n  if ($__Type(target) !== 'Object') return false;\n  var success = target.@@PreventExtensions();\n  if (!success) return success;\n\n  var props = target.@@Enumerate(false, false),\n      len = props.length;\n\n  for (var i = 0; i < len; i++) {\n    success = success && target.@@DefineOwnProperty(props[i], { configurable: false });\n  }\n  return success;\n}\nbuiltinFunction(seal);\n\nexport function set(target, name, value, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__ToObject(target).@@SetP($__ToPropertyName(name), value, receiver);\n}\nbuiltinFunction(set);\n";
 
