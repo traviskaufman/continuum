@@ -104,6 +104,7 @@ builder.addFiles([
   '../engine/errors.js',
   '../engine/assembler.js',
   '../engine/operators.js',
+  '../engine/environments.js',
   '../engine/thunk.js',
   '../engine/runtime.js',
   '../engine/debug.js',
