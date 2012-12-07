@@ -12,35 +12,43 @@ Proxy.@@delete('prototype');
 
 export class Handler {
   getOwnPropertyDescriptor(target, name){
-    throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
+    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
+    return getOwnPropertyDescriptor(target, name);
   }
 
   getOwnPropertyNames(target){
-    throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);
+    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);
+    return getOwnPropertyNames(target);
   }
 
   getPrototypeOf(target){
-    throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);
+    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);
+    return getPrototypeOf(target);
   }
 
   defineProperty(target, name, desc){
-    throw $__Exception('missing_fundamental_trap', ['defineProperty']);
+    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);
+    return defineProperty(target, name, desc);
   }
 
   deleteProperty(target, name){
-    throw $__Exception('missing_fundamental_trap', ['deleteProperty']);
+    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);
+    return deleteProperty(target, name);
   }
 
   preventExtensions(target){
-    throw $__Exception('missing_fundamental_trap', ['preventExtensions']);
+    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);
+    return preventExtensions(target);
   }
 
   isExtensible(target){
-    throw $__Exception('missing_fundamental_trap', ['isExtensible']);
+    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);
+    return isExtensible(target);
   }
 
   apply(target, thisArg, args){
-    throw $__Exception('missing_fundamental_trap', ['apply']);
+    //throw $__Exception('missing_fundamental_trap', ['apply']);
+    return apply(target, thisArg, args);
   }
 
   seal(target) {
