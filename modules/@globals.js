@@ -36,8 +36,10 @@ export function escape(value){
 builtinFunction(escape);
 
 
-export let eval = $__eval;
+export function eval(source){}
 builtinFunction(eval);
+eval.@@setInternal('Call', $__eval.@@getInternal('Call'));
+eval.@@setInternal('Construct', $__eval.@@getInternal('Construct'));
 
 
 export function isFinite(number){
