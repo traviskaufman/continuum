@@ -1176,8 +1176,11 @@ var assembler = (function(exports){
         copyWrap = copier('wrapped'),
         copyTail = copier('tail');
 
+    function dispatcher(node){
+      return node.type || CONTINUE;
+    }
 
-    var tailVisitor = new Visitor([
+    var tailVisitor = new Visitor(dispatcher, [
       function __noSuchHandler__(node){
         return RECURSE;
       },
