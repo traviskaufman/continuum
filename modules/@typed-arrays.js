@@ -164,7 +164,7 @@ export class DataView {
     byteOffset = $__ToUint32(byteOffset);
     byteLength = $__ToUint32(byteLength);
 
-    if (byteOffset + byteLength > bufferLength) {
+    if (byteOffset + byteLength > buffer.byteLength) {
       throw $__Exception('buffer_out_of_bounds', ['DataView']);
     }
 
