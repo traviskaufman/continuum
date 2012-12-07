@@ -19670,17 +19670,12 @@ exports.debug = (function(exports){
       function getName(){
         return this.subject.get('name');
       },
-      function getParams(){
+      function getDetails(){
         var params = this.subject.FormalParameters;
-        if (params && params.boundNames) {
-          var names = params.boundNames.slice();
-          if (params.Rest) {
-            names.rest = true;
-          }
-          return names;
-        } else {
-          return [];
+        if (params && params.reduced) {
+          return params.reduced;
         }
+        return { params: [], defaults: [], name: this.getName(), rest: null };
       },
       function apply(receiver, args){
         if (receiver.subject) {
@@ -20054,8 +20049,8 @@ exports.debug = (function(exports){
       function getName(){
         return this.subject.Get('name');
       },
-      function getParams(){
-        return this.target.getParams();
+      function getDetails(){
+        return this.target.getDetails();
       },
       function getScope(){
         return this.target.getScope();
@@ -20812,7 +20807,7 @@ exports.modules["@error"] = "const global = this;\n\nexport class Error {\n  con
 
 exports.modules["@function"] = "private @toString;\n\nexport class Function {\n  constructor(...args){\n    return $__FunctionCreate(...args);\n  }\n\n  apply(thisArg, args){\n    ensureFunction(this, 'Function.prototype.apply');\n    return this.@@Call(thisArg, ensureArgs(args));\n  }\n\n  bind(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.bind');\n    return $__BoundFunctionCreate(this, thisArg, args);\n  }\n\n  call(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.call');\n    return this.@@Call(thisArg, args);\n  }\n\n  toString(){\n    ensureFunction(this, 'Function.prototype.toString');\n    return this.@toString();\n  }\n}\n\nbuiltinClass(Function);\n\nFunction.prototype.@@define('name', '', 0);\nFunction.prototype.@toString = $__FunctionToString;\n\n\n\nexport function apply(func, thisArg, args){\n  ensureFunction(func, '@function.apply');\n  return func.@@Call(thisArg, ensureArgs(args));\n}\n\nbuiltinFunction(apply);\n\nexport function bind(func, thisArg, ...args){\n  ensureFunction(func, '@function.bind');\n  return $__BoundFunctionCreate(func, thisArg, args);\n}\n\nbuiltinFunction(bind);\n\nexport function call(func, thisArg, ...args){\n  ensureFunction(func, '@function.call');\n  return func.@@Call(thisArg, args);\n}\n\nbuiltinFunction(call);\n\n";
 
-exports.modules["@globals"] = "$__global.@@define(@toStringTag, 'global');\n\n\nexport function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport let eval = $__eval;\nbuiltinFunction(eval);\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
+exports.modules["@globals"] = "$__global.@@define(@toStringTag, 'global');\n\n\nexport function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport function eval(source){}\nbuiltinFunction(eval);\neval.@@setInternal('Call', $__eval.@@getInternal('Call'));\neval.@@setInternal('Construct', $__eval.@@getInternal('Construct'));\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
 
 exports.modules["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
 
