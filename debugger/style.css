@@ -360,6 +360,8 @@ h1, h2
 .ƒLine           { color: #bfb }
 .ƒColumn         { color: #f09 }
 .ƒUncaught       { color: #bfb }
+.ƒThis           { color: #c05 }
+.ƒSuper          { color: #f08 }
 
 .ƒParams               { color: #08f;  }
 .ƒParams:before,
@@ -370,9 +372,11 @@ h1, h2
 .ƒElement:before       { color: #f68; }
 .ƒObjectPattern:before,
 .ƒObjectPattern:after,
-.ƒProperty:before      { color: #ff8; }
-.ƒKey                  { color: #ffc; }
+.ƒProperty:before     { color: #ff8; }
+.ƒKey,
+.ƒMemberExpression > :first-child:after { color: #ffc; }
 
+.ƒParam .ƒOperator, .ƒDefaultAssign { padding: 0 4px; color: #0ff }
 
 .ƒArrayPattern:after,
 .ƒObjectPattern:after  { padding-left: 4px }
@@ -400,6 +404,7 @@ h1, h2
 .ƒParam:before,
 .ƒProperty:before,
 .ƒElement:before       { content: ','; }
+.ƒMemberExpression > :first-child:after   { content: '.'; }
 
 .ƒParam         { font-size: .8em; }
 .ƒIdentifier    {}

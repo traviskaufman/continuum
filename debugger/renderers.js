@@ -414,10 +414,25 @@ var Branch = (function(){
 })();
 
 
+
 var FunctionBranch = (function(){
-  function destructure(param){
+  var atoms = {
+    'this': 'This',
+    'super': 'Super',
+    'byteOffset': 'NumberValue',
+    'byteLength': 'NumberValue',
+    'length': 'NumberValue',
+    'constructor': 'FunctionName',
+    'prototype': 'This'
+  };
+
+  function destructure(param, firstLevel){
     if (typeof param === 'string') {
-      return inline(param, 'Identifier')
+      if (!firstLevel && param in atoms) {
+        return inline(param, atoms[param]);
+      } else {
+        return inline(param, 'Identifier');
+      }
     } else if (param instanceof Array) {
       var array = inline('', 'ArrayPattern');
       each(param, function(param){
@@ -427,19 +442,42 @@ var FunctionBranch = (function(){
       });
       return array;
     } else if (isObject(param)) {
-      var object = inline('', 'ObjectPattern');
-      each(param, function(val, key){
-        var prop = inline('', 'Property');
-
-        if (key === val) {
-          prop.append(inline(key, 'Identifier'));
-        } else {
-          prop.append(inline(key, 'Key'));
-          prop.append(destructure(val));
+      if (param.operator && 'left' in param || 'right' in param) {
+        var op = inline('', 'Operation');
+        if ('left' in param) {
+          op.append(destructure(param.left));
         }
-        object.append(prop);
-      });
-      return object;
+        var operator = op.append(inline(param.operator, 'Operator'));
+        if ('right' in param) {
+          op.append(destructure(param.right));
+        }
+        if (/^[^\w]+$/.test(param.operator)) {
+          op.addClass('NumberValue')
+        } else if (param.operator === 'string+') {
+          operator.text('+');
+          op.addClass('StringValue');
+        }
+        return op;
+      } else if ('object' in param && 'member' in param) {
+        var object = inline('', 'MemberExpression');
+        object.append(destructure(param.object)).addClass('Object');
+        object.append(destructure(param.member));
+        return object;
+      } else {
+        var object = inline('', 'ObjectPattern');
+        each(param, function(val, key){
+          var prop = inline('', 'Property');
+
+          if (key === val) {
+            prop.append(inline(key, 'Identifier'));
+          } else {
+            prop.append(inline(key, 'Key'));
+            prop.append(destructure(val));
+          }
+          object.append(prop);
+        });
+        return object;
+      }
     } else {
       return render('preview', introspect(param));
     }
@@ -475,16 +513,16 @@ var FunctionBranch = (function(){
       var container = inline('', 'Params');
       for (var i=0; i < params.length; i++) {
         var param = inline('', 'Param');
-        param.append(destructure(params[i]));
+        param.append(destructure(params[i], true));
         if (offset <= i) {
-          param.append(inline(' = ', 'Operator'));
-          param.append(destructure(defaults[i - offset])).addClass('default');
+          param.append(inline('=', 'DefaultAssign'));
+          param.append(destructure(defaults[i - offset], true)).addClass('default');
         }
         container.append(param);
       }
       if (rest) {
         var param = inline('', 'Param');
-        param.append(destructure(rest)).addClass('rest');
+        param.append(destructure(rest, true)).addClass('rest');
         container.append(param);
       }
       label.append(container);
