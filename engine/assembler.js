@@ -1062,6 +1062,8 @@ var assembler = (function(exports){
 
 
   var reducer = (function(){
+    var _ = {};
+
     function convert(node){
       if (!node) return node;
       var handler = handlers[node.type];
@@ -1086,10 +1088,34 @@ var assembler = (function(exports){
     function arrays(node){
       return map(node.elements, convert);
     }
+    function operation(left, right, operator){
+      var result = { operator: operator };
+      if (left !== _) result.left = convert(left);
+      if (left !== _) result.right = convert(right);
+      return result;
+    }
+    function binary(node){
+      return { left: convert(node.left),
+               right: convert(node.right),
+               operator: node.operator };
+    }
 
     var handlers = {
       ArrayExpression: arrays,
       ArrayPattern: arrays,
+      BinaryExpression: binary,
+      AssignmentExpression: binary,
+      LogicalExpression: binary,
+      UnaryExpression: function(node){
+        return operation(_, node.argument, node.operator);
+      },
+      UpdateExpression: function(node){
+        if (node.prefix) {
+          return operation(_, node.argument, node.operator);
+        } else {
+          return operation(node.argument, _, node.operator);
+        }
+      },
       Identifier: function(node){
         return node.name;
       },
@@ -1108,9 +1134,13 @@ var assembler = (function(exports){
         }
       },
       MemberExpression: function(node){
-        var obj = {};
-        obj[convert(node.object)] = convert(node.property);
-        return obj;
+        return {
+          object: convert(node.object),
+          member: convert(node.property)
+        };
+      },
+      ThisExpression: function(node){
+        return 'this';
       },
       SpreadElement: function(node){
         return { spread: convert(node.arguments) };
