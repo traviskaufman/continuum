@@ -133,7 +133,7 @@ export class ArrayBuffer {
     return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);
   }
 
-  slice(begin, end){
+  slice(begin = 0, end = this.byteLength){
     var sourceBuffer = $__ToObject(this),
         sourceNativeBuffer = sourceBuffer.@@getInternal('NativeBuffer');
 
@@ -142,12 +142,8 @@ export class ArrayBuffer {
     }
 
     var byteLength = sourceBuffer.byteLength;
-
-    begin = $__ToInt32(begin);
-    end = end === undefined ? byteLength : $__ToInt32(end);
-
-    begin = wrappingClamp(begin, 0, byteLength);
-    end = wrappingClamp(end, 0, byteLength);
+    begin = wrappingClamp($__ToInt32(begin), 0, byteLength);
+    end = wrappingClamp($__ToInt32(end), 0, byteLength);
 
     return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);
   }
@@ -159,15 +155,14 @@ var ArrayBufferPrototype = ArrayBuffer.prototype;
 private @get, @set;
 
 export class DataView {
-  constructor(buffer, byteOffset, byteLength){
+  constructor(buffer, byteOffset = 0, byteLength = buffer.byteLength - byteOffset){
     buffer = $__ToObject(buffer);
     if (buffer.@@GetBuiltinBrand() !== 'ArrayBuffer') {
       throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);
     }
 
     byteOffset = $__ToUint32(byteOffset);
-    var bufferLength = buffer.byteLength,
-        byteLength = byteLength === undefined ? bufferLength - byteOffset : $__ToUint32(byteLength);
+    byteLength = $__ToUint32(byteLength);
 
     if (byteOffset + byteLength > bufferLength) {
       throw $__Exception('buffer_out_of_bounds', ['DataView']);
