@@ -127,13 +127,13 @@ var thunk = (function(exports){
   function Thunk(code, instrumented){
     ToObject || (ToObject = operators.ToObject);
 
-    var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
+    var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
-      JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
-      MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
-      REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
-      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, UNARY, UNDEFINED,
+      JUMP, JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET,
+      LITERAL, LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
+      REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
+      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT, UNARY, UNDEFINED,
       UPDATE, VAR, WITH, YIELD];
 
 
@@ -199,6 +199,11 @@ var thunk = (function(exports){
 
 
 
+    function ADD(){
+      stack[sp - 1] += ops[ip][0];
+      return cmds[++ip];
+    }
+
 
     function AND(){
       if (stack[sp - 1]) {
@@ -232,7 +237,7 @@ var thunk = (function(exports){
             env = context.LexicalEnvironment,
             args = context.args,
             func = context.callee;
-        stack[sp++] = context.createArguments(args, env, params, func);
+        stack[sp++] = context.arguments = context.createArguments(args, env, params, func);
         stack[sp++] = args;
       }
 
@@ -273,7 +278,6 @@ var thunk = (function(exports){
         return unwind;
       }
 
-      stack[sp++] = result;
       return cmds[++ip];
     }
 
@@ -542,9 +546,27 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
+    function JEQ_UNDEFINED(){
+      if (stack[sp - 1] === undefined) {
+        sp--;
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      return cmds[++ip];
+    }
+
+    function JNEQ_UNDEFINED(){
+      if (stack[sp - 1] !== undefined) {
+        ip = ops[ip][0];
+        return cmds[ip];
+      }
+      sp--;
+      return cmds[++ip];
+    }
+
     function JEQ_NULL(){
-      var cmp = stack[--sp];
-      if (cmp === null) {
+      if (stack[sp - 1] === null) {
+        sp--;
         ip = ops[ip][0];
         return cmds[ip];
       }
@@ -552,11 +574,11 @@ var thunk = (function(exports){
     }
 
     function JNEQ_NULL(){
-      var cmp = stack[--sp];
-      if (cmp !== null) {
+      if (stack[sp - 1] !== null) {
         ip = ops[ip][0];
         return cmds[ip];
       }
+      sp--;
       return cmds[++ip];
     }
 
@@ -743,6 +765,20 @@ var thunk = (function(exports){
     function REFSYMBOL(){
       var symbol = code.lookup(ops[ip][0]);
       stack[sp++] = context.getSymbol(symbol);
+      return cmds[++ip];
+    }
+
+    function REST(){
+      var args = stack[--sp],
+          offset = ops[ip][0],
+          count = args.length - offset,
+          array = context.createArray(0);
+
+      for (var i=0; i < count; i++) {
+        array.set(i+'', args[offset + i]);
+      }
+      array.set('length', i);
+      stack[sp++] = array;
       return cmds[++ip];
     }
 
@@ -933,6 +969,17 @@ var thunk = (function(exports){
     function THROW(){
       error = new AbruptCompletion('throw', stack[--sp]);
       return unwind;
+    }
+
+    function TO_OBJECT(){
+      var result = stack[sp - 1] = ToObject(stack[sp - 1]);
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      return cmds[++ip];
     }
 
     function UNARY(){

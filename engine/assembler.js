@@ -128,7 +128,8 @@ var assembler = (function(exports){
 
 
 
-  var AND              = new StandardOpCode(1, 'AND'),
+  var ADD              = new StandardOpCode(1, 'ADD'),
+      AND              = new StandardOpCode(1, 'AND'),
       ARRAY            = new StandardOpCode(0, 'ARRAY'),
       ARG              = new StandardOpCode(0, 'ARG'),
       ARGS             = new StandardOpCode(0, 'ARGS'),
@@ -161,12 +162,14 @@ var assembler = (function(exports){
       ITERATE          = new StandardOpCode(0, 'ITERATE'),
       JUMP             = new StandardOpCode(1, 'JUMP'),
       JEQ_NULL         = new StandardOpCode(1, 'JEQ_NULL'),
+      JEQ_UNDEFINED    = new StandardOpCode(1, 'JEQ_UNDEFINED'),
       JFALSE           = new StandardOpCode(1, 'JFALSE'),
       JLT              = new StandardOpCode(2, 'JLT'),
       JLTE             = new StandardOpCode(2, 'JLTE'),
       JGT              = new StandardOpCode(2, 'JGT'),
       JGTE             = new StandardOpCode(2, 'JGTE'),
       JNEQ_NULL        = new StandardOpCode(1, 'JNEQ_NULL'),
+      JNEQ_UNDEFINED   = new StandardOpCode(1, 'JNEQ_UNDEFINED'),
       JTRUE            = new StandardOpCode(1, 'JTRUE'),
       LET              = new StandardOpCode(1, 'LET'),
       LITERAL          = new StandardOpCode(1, 'LITERAL'),
@@ -185,6 +188,7 @@ var assembler = (function(exports){
       REF              = new InternedOpCode(1, 'REF'),
       REFSYMBOL        = new InternedOpCode(1, 'REFSYMBOL'),
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
+      REST             = new StandardOpCode(1, 'REST'),
       RETURN           = new StandardOpCode(0, 'RETURN'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
@@ -202,6 +206,7 @@ var assembler = (function(exports){
       TEMPLATE         = new StandardOpCode(1, 'TEMPLATE'),
       THIS             = new StandardOpCode(0, 'THIS'),
       THROW            = new StandardOpCode(0, 'THROW'),
+      TO_OBJECT        = new StandardOpCode(0, 'TO_OBJECT'),
       UNARY            = new StandardOpCode(1, 'UNARY'),
       UNDEFINED        = new StandardOpCode(0, 'UNDEFINED'),
       UPDATE           = new StandardOpCode(1, 'UPDATE'),
@@ -1058,34 +1063,57 @@ var assembler = (function(exports){
 
   var reducer = (function(){
     function convert(node){
+      if (!node) return node;
       var handler = handlers[node.type];
       if (handler) return handler(node);
     }
+
+    function functions(node){
+      return {
+        name: convert(node.id),
+        params: map(node.params, convert),
+        defaults: map(node.defaults || [], convert),
+        rest: convert(node.rest)
+      };
+    }
+    function objects(node){
+      var out = {};
+      each(node.properties, function(prop){
+        out[convert(prop.key)] = convert(prop.value);
+      });
+      return out;
+    }
+    function arrays(node){
+      return map(node.elements, convert);
+    }
+
     var handlers = {
-      ArrayPattern: function(node){
-        return map(node.elements, convert);
-      },
+      ArrayExpression: arrays,
+      ArrayPattern: arrays,
       Identifier: function(node){
         return node.name;
       },
       Literal: function(node){
         return node.value;
       },
-      ObjectPattern: function(node){
-        var out = {};
-        each(node.properties, function(prop){
-          out[convert(prop.key)] = convert(prop.value);
-        });
-        return out;
+      ObjectExpression: objects,
+      ObjectPattern: objects,
+      FunctionDeclaration: functions,
+      FunctionExpression: functions,
+      ArrowFunctionExpression: functions,
+      CallExpression: function(node){
+        return {
+          callee: convert(node.callee),
+          args: map(node.arguments, convert)
+        }
       },
-      FunctionDeclaration: function(node){
-        return map(node.params, convert);
+      MemberExpression: function(node){
+        var obj = {};
+        obj[convert(node.object)] = convert(node.property);
+        return obj;
       },
-      FunctionExpression: function(node){
-        return map(node.params, convert);
-      },
-      ArrowFunctionExpression: function(node){
-        return map(node.params, convert);
+      SpreadElement: function(node){
+        return { spread: convert(node.arguments) };
       },
       Program: function(node){
         var out = {
@@ -1094,11 +1122,10 @@ var assembler = (function(exports){
         };
         each(node.body, function(node){
           if (node.type === 'FunctionDeclaration') {
-            out.functions.push({ name: convert(node.id), params: convert(node) });
+            out.functions.push(convert(node));
           } else if (node.type === 'VariableDeclaration' && node.kind === 'var') {
             each(node.declarations, function(decl){
-
-              out.vars.push(convert(decl.id));
+              out.vars.push({ binding: convert(decl.id), init: convert(decl.init) });
             });
           }
         });
@@ -1362,7 +1389,7 @@ var assembler = (function(exports){
       BINDING('arguments', strict);
     }
 
-    each(code.varNames, function(name){
+    each(code.varDecls, function(name){
       HAS_BINDING(name);
       var jump = JTRUE(0);
       BINDING(name, false);
@@ -1375,16 +1402,43 @@ var assembler = (function(exports){
       FunctionDeclaration(decl);
       FUNCTION(false, decl.id.name, decl.code);
       VAR(decl.id.name);
+      POP();
     });
 
-    POP();
     ARGUMENTS();
+    var defaultStart = code.params.length - code.params.defaults.length;
     each(code.params, function(param, i){
       DUP();
       INTERNAL_MEMBER(i);
-      destructure(param, VAR);
+      if (i >= defaultStart) {
+        var skipDefault = JNEQ_UNDEFINED(0);
+        recurse(code.params.defaults[i - defaultStart]);
+        GET();
+        adjust(skipDefault);
+      }
+      ROTATE(1);
+      ROTATE(2);
+      if (param.type === 'Identifier') {
+        VAR(param.name);
+      } else {
+        destructure(param, VAR);
+        POP();
+      }
+      ROTATE(1);
     });
-    POP();
+
+    var rest = code.params.Rest;
+    if (rest) {
+      REST(code.params.ExpectedArgumentCount);
+      if (rest.type === 'Identifier') {
+        VAR(rest.name);
+      } else {
+        destructure(rest, VAR);
+        POP();
+      }
+    } else {
+      POP();
+    }
 
     if (!argumentsObjectNotNeeded) {
       VAR('arguments');
@@ -1504,7 +1558,7 @@ var assembler = (function(exports){
 
     return function destructure(left, STORE){
       var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
-
+      TO_OBJECT();
       each(left[key], function(item, i){
         if (!item) return;
         DUP();
@@ -2326,9 +2380,9 @@ var assembler = (function(exports){
         parent && code.derive(parent);
         this.currentScope = code.scope;
 
-        //if (code.params) {
-        //  FunctionDeclarationInstantiation(code);
-        //}
+        if (code.params) {
+          FunctionDeclarationInstantiation(code);
+        }
 
         recurse(code.body);
 
