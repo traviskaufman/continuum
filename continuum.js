@@ -17786,6 +17786,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       bindings.FunctionProto.FormalParameters = [];
+      bindings.FunctionProto.Call = function(){};
+      bindings.FunctionProto.HasInstance = function(){ return false };
+      bindings.FunctionProto.BuiltinBrand = BRANDS.BuiltinFunction;
       bindings.ArrayProto.define('length', 0, __W);
       bindings.ErrorProto.define('name', 'Error', _CW);
       bindings.ErrorProto.define('message', '', _CW);
