@@ -77,45 +77,33 @@ var runtime = (function(GLOBAL, exports, undefined){
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
 
-  var StopIteration = constants.BRANDS.StopIteration;
-  var uid = (Math.random() * (1 << 30)) | 0;
+  AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
+  Completion.prototype.Completion   = SYMBOLS.Completion;
 
-  var BINARYOPS = constants.BINARYOPS.array,
-      UNARYOPS  = constants.UNARYOPS.array,
-      BRANDS    = constants.BRANDS,
-      SCOPE     = constants.SCOPE.hash,
-      AST       = constants.AST.array;
+  var BRANDS = constants.BRANDS;
 
-  var ARROW  = constants.FUNCTYPE.getIndex('ARROW'),
-      METHOD = constants.FUNCTYPE.getIndex('METHOD'),
-      NORMAL = constants.FUNCTYPE.getIndex('NORMAL');
-
-
-  var ATTRS = constants.ATTRIBUTES,
-      E = ATTRS.ENUMERABLE,
-      C = ATTRS.CONFIGURABLE,
-      W = ATTRS.WRITABLE,
-      A = ATTRS.ACCESSOR,
-      ___ = ATTRS.___,
-      E__ = ATTRS.E__,
-      _C_ = ATTRS._C_,
-      EC_ = ATTRS.EC_,
-      __W = ATTRS.__W,
-      E_W = ATTRS.E_W,
-      _CW = ATTRS._CW,
-      ECW = ATTRS.ECW,
-      __A = ATTRS.__A,
-      E_A = ATTRS.E_A,
-      _CA = ATTRS._CA,
-      ECA = ATTRS.ECA;
+  var E = 0x1,
+      C = 0x2,
+      W = 0x4,
+      A = 0x8,
+      ___ = 0,
+      E__ = 1,
+      _C_ = 2,
+      EC_ = 3,
+      __W = 4,
+      E_W = 5,
+      _CW = 6,
+      ECW = 7,
+      __A = 8,
+      E_A = 9,
+      _CA = 10,
+      ECA = 11;
 
 
   errors.createError = function(name, type, message){
     return new $Error(name, type, message);
   };
 
-  AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
-  Completion.prototype.Completion   = SYMBOLS.Completion;
 
 
   function noop(){}
@@ -444,7 +432,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
   function IsStopIteration(o){
-    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === StopIteration);
+    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === BRANDS.StopIteration);
   }
 
 
@@ -456,7 +444,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             lex = context.LexicalEnvironment,
             home = sup ? obj : undefined,
             $F = code.flags.generator ? $GeneratorFunction : $Function,
-            func = new $F(METHOD, key, code.params, code, lex, code.flags.strict, undefined, home, sup);
+            func = new $F('method', key, code.params, code, lex, code.flags.strict, undefined, home, sup);
 
         constructs && MakeConstructor(func);
         desc[field] = func;
@@ -510,8 +498,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
-        configurable = code.scopeType === SCOPE.EVAL,
-        decls = code.lexicalDecls;
+        configurable = code.scopeType === 'eval',
+        decls = code.lexDecls;
 
     var desc = configurable ? mutable : immutable;
 
@@ -561,7 +549,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var decls = func.code.lexicalDecls;
+    var decls = func.code.lexDecls;
 
     for (var i=0, decl; decl = decls[i]; i++) {
       var names = decl.boundNames;
@@ -719,7 +707,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   function InstantiateFunctionDeclaration(decl, env){
     var code = decl.code;
     var $F = code.generator ? $GeneratorFunction : $Function;
-    var func = new $F(NORMAL, decl.id.name, code.params, code, env, code.flags.strict);
+    var func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
     MakeConstructor(func);
     return func;
   }
@@ -2153,7 +2141,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       $Object.call(this, proto);
       this.FormalParameters = params;
-      this.ThisMode = kind === ARROW ? 'lexical' : strict ? 'strict' : 'global';
+      this.ThisMode = kind === 'arrow' ? 'lexical' : strict ? 'strict' : 'global';
       this.strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
@@ -4156,9 +4144,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = clone;
         return scope;
       },
+      function replaceScope(scope){
+        var oldScope = this.LexicalEnvironment;
+        this.LexicalEnvironment = scope;
+        return oldScope;
+      },
       function pushWith(obj){
-        this.LexicalEnvironment = new ObjectEnv(obj, this.LexicalEnvironment);
-        this.LexicalEnvironment.withEnvironment = true;
+        this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
+        this.LexicalEnvironment.withBase = obj;
         return obj;
       },
       function createClass(def, superclass){
@@ -4178,7 +4171,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var func = new $F(code.lexicalType, name, code.params, code, env, code.flags.strict);
 
-        if (code.lexicalType !== ARROW) {
+        if (code.lexicalType !== 'arrow') {
           MakeConstructor(func);
           isExpression && name && env.InitializeBinding(name, func);
         }
@@ -4356,7 +4349,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       bindings.StopIteration = new $Object(bindings.ObjectProto);
-      bindings.StopIteration.BuiltinBrand = StopIteration;
+      bindings.StopIteration.BuiltinBrand = BRANDS.StopIteration;
 
       for (var i=0; i < 6; i++) {
         var prototype = bindings[$errors[i] + 'Proto'] = create($Error.prototype);
@@ -4461,14 +4454,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         var fs = require('fs');
         return function load(source){
           if (!~source.indexOf('\n') && fs.existsSync(source)) {
-            return { scope: SCOPE.GLOBAL, source: fs.readFileSync(source, 'utf8'), filename: source };
+            return { scope: 'global', source: fs.readFileSync(source, 'utf8'), filename: source };
           } else {
-            return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+            return { scope: 'global', source: source, filename: '' };
           }
         };
       }
       return function load(source){
-        return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+        return { scope: 'global', source: source, filename: '' };
       };
     })();
 
@@ -4482,13 +4475,13 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.type = 'recompiled function';
         if (!fname(options)) {
           options = {
-            scope: SCOPE.FUNCTION,
+            scope: 'function',
             filename: '',
             source: '('+options+')()'
           }
         } else {
           options = {
-            scope: SCOPE.FUNCTION,
+            scope: 'function',
             filename: fname(options),
             source: options+''
           };
@@ -4501,7 +4494,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.natives = true;
         this.type = 'native';
       }
-      if (options.eval || options.scope === SCOPE.EVAL) {
+      if (options.eval || options.scope === 'eval') {
         this.eval = true;
         this.type = 'eval';
       }
@@ -4757,26 +4750,42 @@ var runtime = (function(GLOBAL, exports, undefined){
         SetDefaultLoader: function(loader){
           realm.loader = loader;
         },
-        eval: function(code){
-          if (typeof code !== 'string') {
-            return code;
+        _eval: (function(){
+          function builtinEval(obj, args, direct){
+            var code = args[0];
+            if (typeof code !== 'string') {
+              return code;
+            }
+
+            var script = new Script({
+              scope: 'eval',
+              natives: false,
+              strict: context.strict,
+              source: code
+            });
+
+            if (script.error) {
+              return script.error;
+            }
+
+            if (direct) {
+              console.log(arguments);
+              return script.thunk.run(context);
+            }
+
+            ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
+            var result = script.thunk.run(context);
+            ExecutionContext.pop();
+            return result;
           }
-          var script = new Script({
-            scope: SCOPE.EVAL,
-            natives: false,
-            source: code
-          });
-          if (script.error) {
-            return script.error;
-          } else if (script.thunk) {
-            return script.thunk.run(context);
-          }
-        },
+          builtinEval.isBuiltinEval = true;
+          return builtinEval;
+        })(),
         _FunctionCreate: function(obj, args){
           var body = args.pop();
 
           var script = new Script({
-            scope: SCOPE.GLOBAL,
+            scope: 'global',
             natives: false,
             source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
           });
@@ -4785,9 +4794,8 @@ var runtime = (function(GLOBAL, exports, undefined){
             return script.error;
           }
 
-          var ctx = new ExecutionContext(context, new DeclarativeEnv(realm.globalEnv), realm, script.bytecode);
-          ExecutionContext.push(ctx);
-          var func = script.thunk.run(ctx);
+          ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
+          var func = script.thunk.run(context);
           ExecutionContext.pop();
           return func;
         },
@@ -5114,13 +5122,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var globals = new Script({
-      scope: SCOPE.GLOBAL,
-      natives: true,
-      filename: 'module-init.js',
-      source: 'import * from "@std"; $__hideEverything(this); $__update.call(this, "undefined", 0);'
-    });
-
     var mutationScopeInit = new Script('void 0');
 
     function initialize(realm, Ω, ƒ){
@@ -5132,12 +5133,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           modules = require('../modules'),
           init = modules['@@internal'] + '\n\n'+ modules['@system'];
 
-      resolveModule(fakeLoader, init, '@system', function(){
-        runScript(realm, globals, function(){
-          realm.state = 'idle';
-          Ω();
-        }, ƒ);
-      }, ƒ);
+      resolveModule(fakeLoader, init, '@system', Ω, ƒ);
     }
 
     function prepareToRun(bytecode, scope){
@@ -5336,7 +5332,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         name: name,
         natives: true,
         source: source,
-        scope: SCOPE.MODULE
+        scope: 'module'
       });
 
 

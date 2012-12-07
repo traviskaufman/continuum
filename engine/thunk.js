@@ -20,8 +20,6 @@ var thunk = (function(exports){
       POST_DEC     = operators.POST_DEC;
 
   var constants = require('./constants'),
-      BINARYOPS = constants.BINARYOPS.array,
-      UNARYOPS  = constants.UNARYOPS.array,
       AST       = constants.AST.array,
       Pause     = constants.SYMBOLS.Pause,
       Empty     = constants.SYMBOLS.Empty,
@@ -125,11 +123,13 @@ var thunk = (function(exports){
     }
   ]);
 
+  var ToObject;
   function Thunk(code, instrumented){
+    ToObject || (ToObject = operators.ToObject);
 
     var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
-      ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
+      ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
       JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
       MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
       REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
@@ -254,7 +254,7 @@ var thunk = (function(exports){
     function BINARY(){
       var right  = stack[--sp],
           left   = stack[--sp],
-          result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
+          result = BinaryOp(ops[ip][0], GetValue(left), GetValue(right));
 
       if (result && result.Abrupt) {
         error = result;
@@ -279,9 +279,9 @@ var thunk = (function(exports){
 
     function CALL(){
       var args     = stack[--sp],
-          receiver = stack[--sp],
           func     = stack[--sp],
-          result   = context.callFunction(func, receiver, args, ops[ip][0]);
+          receiver = stack[--sp],
+          result   = context.callFunction(receiver, func, args, ops[ip][0]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -419,6 +419,31 @@ var thunk = (function(exports){
 
     function EXTENSIBLE(){
       stack[sp - 1].SetExtensible(!!ops[ip][0]);
+      return cmds[++ip];
+    }
+
+
+    function EVAL(){
+      var args     = stack[--sp],
+          func     = stack[--sp],
+          receiver = stack[--sp];
+
+      if (func && func.Call && func.Call.isBuiltinEval) {
+        if (context.strict) {
+          var scope = context.cloneScope();
+        }
+        var result = func.Call(null, args, true);
+        scope && context.replaceScope(scope);
+      } else {
+        var result = context.callFunction(receiver, func, args, ops[ip][0]);
+      }
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
       return cmds[++ip];
     }
 
@@ -911,7 +936,7 @@ var thunk = (function(exports){
     }
 
     function UNARY(){
-      var result = UnaryOp(UNARYOPS[ops[ip][0]], stack[--sp]);
+      var result = UnaryOp(ops[ip][0], stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;

@@ -256,10 +256,8 @@ var Instructions = (function(){
           this.batchAppend(result);
         }
       }
-    } else if (op.name === 'BINARY') {
-      this.batchAppend(inline(constants.BINARYOPS.getKey(instruction[0]), 'Operator'));
-    } else if (op.name === 'UNARY') {
-      this.batchAppend(inline(constants.UNARYOPS.getKey(instruction[0]), 'Operator'));
+    } else if (op.name === 'BINARY' || op.name === 'UNARY') {
+      this.batchAppend(inline(instruction[0], 'Operator'));
     } else {
       for (var i=0; i < op.params; i++) {
         var param = instruction[i];
