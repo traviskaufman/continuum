@@ -8850,13 +8850,6 @@ exports.assembler = (function(exports){
       uid           = utility.uid,
       pushAll       = utility.pushAll;
 
-  var constants = require('./constants'),
-      BINARYOPS = constants.BINARYOPS.hash,
-      UNARYOPS  = constants.UNARYOPS.hash,
-      SCOPE     = constants.SCOPE.hash,
-      AST       = constants.AST,
-      FUNCTYPE  = constants.FUNCTYPE.hash;
-
   var CONTINUE = walk.CONTINUE,
       RECURSE  = walk.RECURSE,
       BREAK    = walk.BREAK;
@@ -8973,6 +8966,7 @@ exports.assembler = (function(exports){
       ELEMENT          = new StandardOpCode(0, 'ELEMENT'),
       ENUM             = new StandardOpCode(0, 'ENUM'),
       EXTENSIBLE       = new StandardOpCode(1, 'EXTENSIBLE'),
+      EVAL             = new StandardOpCode(0, 'EVAL'),
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
@@ -9178,15 +9172,14 @@ exports.assembler = (function(exports){
         body = body.body;
         if (node.type === 'ModuleDeclaration') {
           this.imports = getImports(body);
-          this.scope = scope.create('module', context.currentScope)
+          this.scope = scope.create('module', context.currentScope);
           body = body.body;
+        } else if (scopeType === 'eval') {
+          this.scope = scope.create('eval', context.currentScope);
         } else {
           this.scope = scope.create('normal', context.currentScope);
         }
       }
-
-      this.path = [];
-
 
       define(this, {
         body: body,
@@ -9199,11 +9192,6 @@ exports.assembler = (function(exports){
         }
       });
 
-      this.range = node.range;
-      this.loc = node.loc;
-      this.lexicalDecls = lexicalDecls(body);
-
-
       if (node.id) {
         this.name = node.id.name;
       }
@@ -9212,13 +9200,17 @@ exports.assembler = (function(exports){
         this.flags.generator = true;
       }
 
+      this.path = [];
+      this.range = node.range;
+      this.loc = node.loc;
       this.unwinders = [];
       this.scopeType = scopeType;
-      this.lexicalType = lexicalType || FUNCTYPE.NORMAL;
+      this.lexicalType = lexicalType || 'normal';
+      this.flags.usesSuper = referencesSuper(this.body);
+      this.lexDecls = lexDecls(body);
       this.varDecls = [];
-      this.flags.usesSuper = ReferencesSuper(this.body);
       this.flags.strict = strict || (context.code && context.code.flags.strict) || isStrict(node);
-      if (scopeType === SCOPE.MODULE) {
+      if (scopeType === 'module') {
         this.exportedNames = getExports(this.body);
         this.flags.strict = true;
       }
@@ -9254,10 +9246,10 @@ exports.assembler = (function(exports){
           this.classDefinition = this.classDefinition.id;
         }
         if (this.scopeType !== undefined) {
-          serialized.scopeType = constants.SCOPE.array[this.scopeType].toLowerCase();
+          serialized.scopeType = this.scopeType;
         }
         if (this.lexicalType !== undefined) {
-          serialized.lexicalType = constants.FUNCTYPE.array[this.lexicalType].toLowerCase();
+          serialized.lexicalType = this.lexicalType;
         }
 
         if (this.unwinders.length) {
@@ -9396,7 +9388,7 @@ exports.assembler = (function(exports){
         });
       },
       function defineMethod(node){
-        var code = new Code(node.value, context.source, FUNCTYPE.METHOD, SCOPE.CLASS, context.code.flags.strict),
+        var code = new Code(node.value, context.source, 'method', 'class', context.code.flags.strict),
             name = code.name = symbol(node.key);
         code.scope.outer = this.scope;
 
@@ -9472,10 +9464,14 @@ exports.assembler = (function(exports){
 
     var Scope = types.normal = (function(){
       function Scope(outer){
-        this.varNames = create(null);
-        this.lexNames = create(null);
+        this.varNames = new Hash;
+        this.lexNames = new Hash;
         this.outer = outer;
       }
+
+      define(Scope.prototype, {
+        type: 'normal'
+      });
 
       define(Scope.prototype, [
         function varDeclare(name, type){
@@ -9504,11 +9500,13 @@ exports.assembler = (function(exports){
 
     var BlockScope = types.block = (function(){
       function BlockScope(outer){
-        this.lexNames = create(null);
+        this.lexNames = new Hash;
         this.outer = outer;
       }
 
-      inherit(BlockScope, Scope, [
+      inherit(BlockScope, Scope, {
+        type: 'block'
+      }, [
         function varDeclare(name, type){
           this.outer.varDeclare(name, type);
         },
@@ -9526,11 +9524,12 @@ exports.assembler = (function(exports){
 
     var GlobalScope = types.global = (function(){
       function GlobalScope(){
-        this.varNames = create(null);
-        this.lexNames = create(null);
+        Scope.call(this, null);
       }
 
-      inherit(GlobalScope, Scope, [
+      inherit(GlobalScope, Scope, {
+        type: 'global'
+      }, [
 
       ]);
 
@@ -9539,12 +9538,12 @@ exports.assembler = (function(exports){
 
     var ModuleScope = types.module = (function(){
       function ModuleScope(outer){
-        this.outer = outer;
-        this.varNames = create(null);
-        this.lexNames = create(null);
+        Scope.call(this, outer);
       }
 
-      inherit(ModuleScope, GlobalScope, [
+      inherit(ModuleScope, GlobalScope, {
+        type: 'module'
+      }, [
 
       ]);
 
@@ -9554,12 +9553,12 @@ exports.assembler = (function(exports){
 
     var EvalScope = types.eval = (function(){
       function EvalScope(outer){
-        this.outer = outer;
-        this.varNames = create(null);
-        this.lexNames = create(null);
+        Scope.call(this, outer);
       }
 
-      inherit(EvalScope, Scope, [
+      inherit(EvalScope, Scope, {
+        type: 'eval'
+      }, [
 
       ]);
 
@@ -9638,6 +9637,37 @@ exports.assembler = (function(exports){
     return false;
   }
 
+  function isGlobalOrEval(){
+    return context.code.scopeType === 'eval' || context.code.scopeType === 'global';
+  }
+
+  var referencesSuper = (function(found){
+    function nodeReferencesSuper(node){
+      if (node.type === 'MemberExpression') {
+        if (isSuperReference(node.object)) {
+          found = true;
+          return BREAK;
+        }
+        return RECURSE;
+      } else if (node.type === 'CallExpression') {
+        if (isSuperReference(node.callee)) {
+          found = true;
+          return BREAK;
+        }
+        return RECURSE;
+      } else if (isFunction(node)) {
+        return CONTINUE;
+      } else {
+        return RECURSE;
+      }
+    }
+
+    return function referencesSuper(node){
+      found = false;
+      walk(node, nodeReferencesSuper);
+      return found;
+    };
+  })()
 
   var boundNamesCollector = collector({
     ObjectPattern      : 'properties',
@@ -9664,7 +9694,7 @@ exports.assembler = (function(exports){
     return boundNamesCollector(node);
   }
 
-  var lexicalDecls = (function(){
+  var lexDecls = (function(){
     var LexicalDeclarations = (function(lexical){
       return collector({
         ClassDeclaration: lexical(false),
@@ -9691,7 +9721,7 @@ exports.assembler = (function(exports){
       };
     });
 
-    return function lexicalDecls(node){
+    return function lexDecls(node){
       if (!node.LexicalDeclarations) {
         node.LexicalDeclarations = LexicalDeclarations(node);
       }
@@ -9699,107 +9729,40 @@ exports.assembler = (function(exports){
     };
   })();
 
-  var varDecls = collector({
-    VariableDeclaration: function(node){
-      if (node.type === 'var') {
-        return node;
-      }
-    },
-    BlockStatement: RECURSE,
-    IfStatement: RECURSE,
-    ForStatement: RECURSE,
-    ForOfStatement: RECURSE,
-    ForInStatement: RECURSE,
-    DoWhileStatement: RECURSE,
-    WhileStatement: RECURSE,
-    ExportDeclaration: RECURSE,
-    CatchClause: RECURSE,
-    SwitchCase: RECURSE,
-    SwitchStatement: RECURSE,
-    TryStatement: RECURSE,
-    WithStatement: RECURSE
-  });
-
-  function VarScopedDeclarations(node){
-    var decls = varDecls(node);
-    each(node.body, function(statement){
-      if (statement.type === 'FunctionDeclaration') {
-        decls.push(statement);
-      }
-    });
-
-    return decls;
-  }
-
-
-  function FunctionDeclarationInstantiation(code){
-    var varDeclarations = VarScopedDeclarations(code.body),
-        len = varDeclarations.length,
-        argumentsObjectNotNeeded = false,
-        strict = code.strict,
-        funcs = [];
-
-    while (len--) {
-      var decl = varDeclarations[len];
-      if (decl.type === 'FunctionDeclaration') {
-        funcs.push(decl);
-
-        decl.boundNames || (decl.boundNames = boundNames(decl));
-        var name = decl.boundNames[0];
-        if (name === 'arguments') {
-          argumentsObjectNotNeeded = true;
+  var varDecls = (function(){
+    var VarScopedDeclarations = collector({
+      VariableDeclaration: function(node){
+        if (node.type === 'var') {
+          return node;
         }
-        HAS_BINDING(name);
-        var jump = JTRUE(0);
-        BINDING(name, false);
-        adjust(jump);
-      }
-    }
-
-    each(code.params.boundNames, function(name){
-      if (name === 'arguments') {
-        argumentsObjectNotNeeded = true;
-      }
-      HAS_BINDING(name);
-      var jump = JTRUE(0);
-      BINDING(name, false);
-      UNDEFINED();
-      VAR(name);
-      adjust(jump);
+      },
+      BlockStatement   : RECURSE,
+      CatchClause      : RECURSE,
+      DoWhileStatement : RECURSE,
+      ExportDeclaration: RECURSE,
+      ForInStatement   : RECURSE,
+      ForOfStatement   : RECURSE,
+      ForStatement     : RECURSE,
+      IfStatement      : RECURSE,
+      SwitchCase       : RECURSE,
+      SwitchStatement  : RECURSE,
+      TryStatement     : RECURSE,
+      WhileStatement   : RECURSE,
+      WithStatement    : RECURSE
     });
 
-    if (!argumentsObjectNotNeeded) {
-      BINDING('arguments', strict);
-    }
+    return function varDecls(node){
+      var decls = VarScopedDeclarations(node);
+      each(node.body, function(statement){
+        if (statement.type === 'FunctionDeclaration') {
+          decls.push(statement);
+        }
+      });
 
-    each(code.varNames, function(name){
-      HAS_BINDING(name);
-      var jump = JTRUE(0);
-      BINDING(name, false);
-      adjust(jump);
-    });
+      return decls;
+    };
+  })();
 
-    lexicalInit(code.body);
-
-    each(funcs, function(decl){
-      FunctionDeclaration(decl);
-      FUNCTION(false, decl.id.name, decl.code);
-      VAR(decl.id.name);
-    });
-
-    POP();
-    ARGUMENTS();
-    each(code.params, function(param, i){
-      DUP();
-      INTERNAL_MEMBER(i);
-      destructure(param, VAR);
-    });
-    POP();
-
-    if (!argumentsObjectNotNeeded) {
-      VAR('arguments');
-    }
-  }
 
   var getExports = (function(){
     var collectExportDecls = collector({
@@ -10103,36 +10066,6 @@ exports.assembler = (function(exports){
   })();
 
 
-  var ReferencesSuper = (function(){
-    var found;
-
-    function nodeReferencesSuper(node){
-      if (node.type === 'MemberExpression') {
-        if (isSuperReference(node.object)) {
-          found = true;
-          return BREAK;
-        }
-        return RECURSE;
-      } else if (node.type === 'CallExpression') {
-        if (isSuperReference(node.callee)) {
-          found = true;
-          return BREAK;
-        }
-        return RECURSE;
-      } else if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') {
-        return CONTINUE;
-      } else {
-        return RECURSE;
-      }
-    }
-
-    return function ReferencesSuper(node){
-      found = false;
-      walk(node, nodeReferencesSuper);
-      return found;
-    };
-  })()
-
 
 
   var currentNode;
@@ -10204,8 +10137,79 @@ exports.assembler = (function(exports){
     };
   })();
 
+
+  function FunctionDeclarationInstantiation(code){
+    var varDeclarations = varDecls(code.body),
+        len = varDeclarations.length,
+        argumentsObjectNotNeeded = false,
+        strict = code.strict,
+        funcs = [];
+
+    while (len--) {
+      var decl = varDeclarations[len];
+      if (decl.type === 'FunctionDeclaration') {
+        funcs.push(decl);
+
+        decl.boundNames || (decl.boundNames = boundNames(decl));
+        var name = decl.boundNames[0];
+        if (name === 'arguments') {
+          argumentsObjectNotNeeded = true;
+        }
+        HAS_BINDING(name);
+        var jump = JTRUE(0);
+        BINDING(name, false);
+        adjust(jump);
+      }
+    }
+
+    each(code.params.boundNames, function(name){
+      if (name === 'arguments') {
+        argumentsObjectNotNeeded = true;
+      }
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      BINDING(name, false);
+      UNDEFINED();
+      VAR(name);
+      adjust(jump);
+    });
+
+    if (!argumentsObjectNotNeeded) {
+      BINDING('arguments', strict);
+    }
+
+    each(code.varNames, function(name){
+      HAS_BINDING(name);
+      var jump = JTRUE(0);
+      BINDING(name, false);
+      adjust(jump);
+    });
+
+    lexicalInit(code.body);
+
+    each(funcs, function(decl){
+      FunctionDeclaration(decl);
+      FUNCTION(false, decl.id.name, decl.code);
+      VAR(decl.id.name);
+    });
+
+    POP();
+    ARGUMENTS();
+    each(code.params, function(param, i){
+      DUP();
+      INTERNAL_MEMBER(i);
+      destructure(param, VAR);
+    });
+    POP();
+
+    if (!argumentsObjectNotNeeded) {
+      VAR('arguments');
+    }
+  }
+
+
   function lexicalInit(node){
-    each(lexicalDecls(node), function(decl){
+    each(lexDecls(node), function(decl){
       each(decl.boundNames, function(name){
         BINDING(name, decl.IsConstantDeclaration);
       });
@@ -10304,46 +10308,48 @@ exports.assembler = (function(exports){
     transfer && transfer[set].push(pos);
   }
 
-  var elementAt = {
-    elements: function(node, index){
-      return node.elements[index];
-    },
-    properties: function(node, index){
-      return node.properties[index].value;
-    }
-  };
-
-  function destructure(left, STORE){
-    var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
-
-    each(left[key], function(item, i){
-      if (!item) return;
-      DUP();
-      if (item.type === 'Property') {
-        MEMBER(symbol(item.key));
-        GET();
-        if (isPattern(item.value)) {
-          destructure(item.value, STORE);
-        } else if (item.value.type === 'Identifier') {
-          STORE(item.value.name);
-        }
-      } else if (item.type === 'ArrayPattern') {
-        LITERAL(i);
-        ELEMENT();
-        GET();
-        destructure(item, STORE);
-      } else if (item.type === 'Identifier') {
-        LITERAL(i);
-        ELEMENT();
-        GET();
-        STORE(item.name);
-      } else if (item.type === 'SpreadElement') {
-        GET();
-        SPREAD(i);
-        STORE(item.argument.name);
+  var destructure = (function(){
+    var elementAt = {
+      elements: function(node, index){
+        return node.elements[index];
+      },
+      properties: function(node, index){
+        return node.properties[index].value;
       }
-    });
-  }
+    };
+
+    return function destructure(left, STORE){
+      var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
+
+      each(left[key], function(item, i){
+        if (!item) return;
+        DUP();
+        if (item.type === 'Property') {
+          MEMBER(symbol(item.key));
+          GET();
+          if (isPattern(item.value)) {
+            destructure(item.value, STORE);
+          } else if (item.value.type === 'Identifier') {
+            STORE(item.value.name);
+          }
+        } else if (item.type === 'ArrayPattern') {
+          LITERAL(i);
+          ELEMENT();
+          GET();
+          destructure(item, STORE);
+        } else if (item.type === 'Identifier') {
+          LITERAL(i);
+          ELEMENT();
+          GET();
+          STORE(item.name);
+        } else if (item.type === 'SpreadElement') {
+          GET();
+          SPREAD(i);
+          STORE(item.argument.name);
+        }
+      });
+    };
+  })();
 
 
   function args(node){
@@ -10359,10 +10365,6 @@ exports.assembler = (function(exports){
         ARG();
       }
     });
-  }
-
-  function isGlobalOrEval(){
-    return context.code.scopeType === SCOPE.EVAL || context.code.scopeType === SCOPE.GLOBAL;
   }
 
 
@@ -10384,7 +10386,7 @@ exports.assembler = (function(exports){
       GET();
       recurse(node.right);
       GET();
-      BINARY(BINARYOPS[node.operator.slice(0, -1)]);
+      BINARY(node.operator.slice(0, -1));
       PUT();
     }
   }
@@ -10413,7 +10415,7 @@ exports.assembler = (function(exports){
   function ArrayPattern(node){}
 
   function ArrowFunctionExpression(node, name){
-    var code = new Code(node, null, FUNCTYPE.ARROW, SCOPE.FUNCTION);
+    var code = new Code(node, null, 'arrow', 'function');
     if (name) {
       code.name = name.name || name;
     }
@@ -10439,7 +10441,7 @@ exports.assembler = (function(exports){
     GET();
     recurse(node.right);
     GET();
-    BINARY(BINARYOPS[node.operator]);
+    BINARY(node.operator);
   }
 
   function BreakStatement(node){
@@ -10449,7 +10451,7 @@ exports.assembler = (function(exports){
   function BlockStatement(node){
     block(function(){
       lexicalInit(node.body);
-      each(lexicalDecls(node.body), function(decl){
+      each(lexDecls(node.body), function(decl){
         each(decl.boundNames, function(name){
           if (decl.type === 'FunctionDeclaration') {
             FunctionDeclaration(decl);
@@ -10464,7 +10466,7 @@ exports.assembler = (function(exports){
 
   function CallExpression(node){
     if (isSuperReference(node.callee)) {
-      if (context.code.scopeType !== SCOPE.FUNCTION) {
+      if (context.code.scopeType !== 'function') {
         context.earlyError(node, 'illegal_super');
       }
       SUPER_CALL();
@@ -10474,7 +10476,11 @@ exports.assembler = (function(exports){
     DUP();
     GET();
     args(node.arguments);
-    (node.callee.type === 'NativieIdentifier' ? NATIVE_CALL : CALL)(!!node.tail);
+    if (node.callee.type === 'Identifier' && node.callee.name === 'eval') {
+      EVAL();
+    } else {
+      (node.callee.type === 'NativieIdentifier' ? NATIVE_CALL : CALL)(!!node.tail);
+    }
   }
 
   function CatchClause(node){
@@ -10604,14 +10610,14 @@ exports.assembler = (function(exports){
   function FunctionDeclaration(node){
     if (!node.code) {
       context.currentScope.lexDeclare(node.id.name, 'function');
-      node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+      node.code = new Code(node, null, 'normal', 'function');
       context.queue(node.code);
     }
     return node.code;
   }
 
   function FunctionExpression(node, methodName){
-    var code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+    var code = new Code(node, null, 'normal', 'function');
     if (node.id) {
       code.scope.varDeclare(node.id.name, 'funcname');
     }
@@ -10690,7 +10696,7 @@ exports.assembler = (function(exports){
   function MemberExpression(node){
     var isSuper = isSuperReference(node.object);
     if (isSuper){
-      if (context.code.scopeType !== SCOPE.FUNCTION) {
+      if (context.code.scopeType !== 'function') {
         context.earlyError(node, 'illegal_super_reference');
       }
     } else {
@@ -10711,7 +10717,7 @@ exports.assembler = (function(exports){
 
   function ModuleDeclaration(node){
     if (node.body) {
-      node.code = new Code(node, null, FUNCTYPE.NORMAL, SCOPE.MODULE);
+      node.code = new Code(node, null, 'normal', 'module');
       node.code.path = context.code.path.concat(node.id.name);
       context.queue(node.code);
     }
@@ -10757,7 +10763,7 @@ exports.assembler = (function(exports){
       GET();
       PROPERTY(symbol(node.key));
     } else {
-      var code = new Code(value, null, FUNCTYPE.NORMAL, SCOPE.FUNCTION);
+      var code = new Code(value, null, 'normal', 'function');
       context.queue(code);
       METHOD(node.kind, code, symbol(node.key));
     }
@@ -10870,10 +10876,10 @@ exports.assembler = (function(exports){
       if (!element.tail) {
         recurse(node.expressions[i]);
         GET();
-        BINARY(BINARYOPS['string+']);
+        BINARY('string+');
       }
       if (i) {
-        BINARY(BINARYOPS['string+']);
+        BINARY('string+');
       }
     });
   }
@@ -10941,7 +10947,7 @@ exports.assembler = (function(exports){
 
   function UnaryExpression(node){
     recurse(node.argument);
-    UNARY(UNARYOPS[node.operator]);
+    UNARY(node.operator);
   }
 
   function UpdateExpression(node){
@@ -11074,7 +11080,7 @@ exports.assembler = (function(exports){
     }
 
     AssemblerOptions.prototype = {
-      scope: SCOPE.GLOBAL,
+      scope: 'global',
       natives: false,
       filename: null
     };
@@ -11105,11 +11111,11 @@ exports.assembler = (function(exports){
         this.labels = null;
         this.source = source;
 
-        if (this.options.scope === SCOPE.FUNCTION) {
+        if (this.options.scope === 'function') {
           node = node.body[0].expression;
         }
 
-        var code = new Code(node, source, FUNCTYPE.NORMAL, this.options.scope);
+        var code = new Code(node, source, 'normal', this.options.scope);
         define(code, {
           strings: this.strings,
           hash: this.hash
@@ -11144,11 +11150,11 @@ exports.assembler = (function(exports){
 
         var lastOp = last();
 
-        if (code.scopeType === SCOPE.GLOBAL || code.scopeType === SCOPE.EVAL){
+        if (code.scopeType === 'global' || code.scopeType === 'eval'){
           COMPLETE();
         } else {
           if (lastOp && lastOp.op.name !== 'RETURN') {
-            if (code.lexicalType === FUNCTYPE.ARROW && code.body.type !== 'BlockStatement') {
+            if (code.lexicalType === 'arrow' && code.body.type !== 'BlockStatement') {
               GET();
               RETURN();
             } else {
@@ -11214,7 +11220,7 @@ exports.operators = (function(exports){
       Resume        = SYMBOLS.Resume,
       Return        = SYMBOLS.Return,
       Abrupt        = SYMBOLS.Abrupt,
-      Builtin        = SYMBOLS.Builtin,
+      Builtin       = SYMBOLS.Builtin,
       Continue      = SYMBOLS.Continue,
       Reference     = SYMBOLS.Reference,
       Completion    = SYMBOLS.Completion,
@@ -12387,8 +12393,6 @@ exports.thunk = (function(exports){
       POST_DEC     = operators.POST_DEC;
 
   var constants = require('./constants'),
-      BINARYOPS = constants.BINARYOPS.array,
-      UNARYOPS  = constants.UNARYOPS.array,
       AST       = constants.AST.array,
       Pause     = constants.SYMBOLS.Pause,
       Empty     = constants.SYMBOLS.Empty,
@@ -12492,11 +12496,13 @@ exports.thunk = (function(exports){
     }
   ]);
 
+  var ToObject;
   function Thunk(code, instrumented){
+    ToObject || (ToObject = operators.ToObject);
 
     var opcodes = [AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
-      ELEMENT, ENUM, EXTENSIBLE, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
+      ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
       JUMP, JEQ_NULL, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JTRUE, LET, LITERAL, LOG, LOOP,
       MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
       REGEXP, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
@@ -12621,7 +12627,7 @@ exports.thunk = (function(exports){
     function BINARY(){
       var right  = stack[--sp],
           left   = stack[--sp],
-          result = BinaryOp(BINARYOPS[ops[ip][0]], GetValue(left), GetValue(right));
+          result = BinaryOp(ops[ip][0], GetValue(left), GetValue(right));
 
       if (result && result.Abrupt) {
         error = result;
@@ -12646,9 +12652,9 @@ exports.thunk = (function(exports){
 
     function CALL(){
       var args     = stack[--sp],
-          receiver = stack[--sp],
           func     = stack[--sp],
-          result   = context.callFunction(func, receiver, args, ops[ip][0]);
+          receiver = stack[--sp],
+          result   = context.callFunction(receiver, func, args, ops[ip][0]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -12786,6 +12792,31 @@ exports.thunk = (function(exports){
 
     function EXTENSIBLE(){
       stack[sp - 1].SetExtensible(!!ops[ip][0]);
+      return cmds[++ip];
+    }
+
+
+    function EVAL(){
+      var args     = stack[--sp],
+          func     = stack[--sp],
+          receiver = stack[--sp];
+
+      if (func && func.Call && func.Call.isBuiltinEval) {
+        if (context.strict) {
+          var scope = context.cloneScope();
+        }
+        var result = func.Call(null, args, true);
+        scope && context.replaceScope(scope);
+      } else {
+        var result = context.callFunction(receiver, func, args, ops[ip][0]);
+      }
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
       return cmds[++ip];
     }
 
@@ -13278,7 +13309,7 @@ exports.thunk = (function(exports){
     }
 
     function UNARY(){
-      var result = UnaryOp(UNARYOPS[ops[ip][0]], stack[--sp]);
+      var result = UnaryOp(ops[ip][0], stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -13684,45 +13715,33 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
 
-  var StopIteration = constants.BRANDS.StopIteration;
-  var uid = (Math.random() * (1 << 30)) | 0;
+  AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
+  Completion.prototype.Completion   = SYMBOLS.Completion;
 
-  var BINARYOPS = constants.BINARYOPS.array,
-      UNARYOPS  = constants.UNARYOPS.array,
-      BRANDS    = constants.BRANDS,
-      SCOPE     = constants.SCOPE.hash,
-      AST       = constants.AST.array;
+  var BRANDS = constants.BRANDS;
 
-  var ARROW  = constants.FUNCTYPE.getIndex('ARROW'),
-      METHOD = constants.FUNCTYPE.getIndex('METHOD'),
-      NORMAL = constants.FUNCTYPE.getIndex('NORMAL');
-
-
-  var ATTRS = constants.ATTRIBUTES,
-      E = ATTRS.ENUMERABLE,
-      C = ATTRS.CONFIGURABLE,
-      W = ATTRS.WRITABLE,
-      A = ATTRS.ACCESSOR,
-      ___ = ATTRS.___,
-      E__ = ATTRS.E__,
-      _C_ = ATTRS._C_,
-      EC_ = ATTRS.EC_,
-      __W = ATTRS.__W,
-      E_W = ATTRS.E_W,
-      _CW = ATTRS._CW,
-      ECW = ATTRS.ECW,
-      __A = ATTRS.__A,
-      E_A = ATTRS.E_A,
-      _CA = ATTRS._CA,
-      ECA = ATTRS.ECA;
+  var E = 0x1,
+      C = 0x2,
+      W = 0x4,
+      A = 0x8,
+      ___ = 0,
+      E__ = 1,
+      _C_ = 2,
+      EC_ = 3,
+      __W = 4,
+      E_W = 5,
+      _CW = 6,
+      ECW = 7,
+      __A = 8,
+      E_A = 9,
+      _CA = 10,
+      ECA = 11;
 
 
   errors.createError = function(name, type, message){
     return new $Error(name, type, message);
   };
 
-  AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
-  Completion.prototype.Completion   = SYMBOLS.Completion;
 
 
   function noop(){}
@@ -14051,7 +14070,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   }
 
   function IsStopIteration(o){
-    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === StopIteration);
+    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === BRANDS.StopIteration);
   }
 
 
@@ -14063,7 +14082,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             lex = context.LexicalEnvironment,
             home = sup ? obj : undefined,
             $F = code.flags.generator ? $GeneratorFunction : $Function,
-            func = new $F(METHOD, key, code.params, code, lex, code.flags.strict, undefined, home, sup);
+            func = new $F('method', key, code.params, code, lex, code.flags.strict, undefined, home, sup);
 
         constructs && MakeConstructor(func);
         desc[field] = func;
@@ -14117,8 +14136,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   function TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
-        configurable = code.scopeType === SCOPE.EVAL,
-        decls = code.lexicalDecls;
+        configurable = code.scopeType === 'eval',
+        decls = code.lexDecls;
 
     var desc = configurable ? mutable : immutable;
 
@@ -14168,7 +14187,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var decls = func.code.lexicalDecls;
+    var decls = func.code.lexDecls;
 
     for (var i=0, decl; decl = decls[i]; i++) {
       var names = decl.boundNames;
@@ -14326,7 +14345,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   function InstantiateFunctionDeclaration(decl, env){
     var code = decl.code;
     var $F = code.generator ? $GeneratorFunction : $Function;
-    var func = new $F(NORMAL, decl.id.name, code.params, code, env, code.flags.strict);
+    var func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
     MakeConstructor(func);
     return func;
   }
@@ -15760,7 +15779,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       $Object.call(this, proto);
       this.FormalParameters = params;
-      this.ThisMode = kind === ARROW ? 'lexical' : strict ? 'strict' : 'global';
+      this.ThisMode = kind === 'arrow' ? 'lexical' : strict ? 'strict' : 'global';
       this.strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
@@ -17763,9 +17782,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.LexicalEnvironment = clone;
         return scope;
       },
+      function replaceScope(scope){
+        var oldScope = this.LexicalEnvironment;
+        this.LexicalEnvironment = scope;
+        return oldScope;
+      },
       function pushWith(obj){
-        this.LexicalEnvironment = new ObjectEnv(obj, this.LexicalEnvironment);
-        this.LexicalEnvironment.withEnvironment = true;
+        this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
+        this.LexicalEnvironment.withBase = obj;
         return obj;
       },
       function createClass(def, superclass){
@@ -17785,7 +17809,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
         var func = new $F(code.lexicalType, name, code.params, code, env, code.flags.strict);
 
-        if (code.lexicalType !== ARROW) {
+        if (code.lexicalType !== 'arrow') {
           MakeConstructor(func);
           isExpression && name && env.InitializeBinding(name, func);
         }
@@ -17963,7 +17987,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       bindings.StopIteration = new $Object(bindings.ObjectProto);
-      bindings.StopIteration.BuiltinBrand = StopIteration;
+      bindings.StopIteration.BuiltinBrand = BRANDS.StopIteration;
 
       for (var i=0; i < 6; i++) {
         var prototype = bindings[$errors[i] + 'Proto'] = create($Error.prototype);
@@ -18068,14 +18092,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var fs = require('fs');
         return function load(source){
           if (!~source.indexOf('\n') && fs.existsSync(source)) {
-            return { scope: SCOPE.GLOBAL, source: fs.readFileSync(source, 'utf8'), filename: source };
+            return { scope: 'global', source: fs.readFileSync(source, 'utf8'), filename: source };
           } else {
-            return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+            return { scope: 'global', source: source, filename: '' };
           }
         };
       }
       return function load(source){
-        return { scope: SCOPE.GLOBAL, source: source, filename: '' };
+        return { scope: 'global', source: source, filename: '' };
       };
     })();
 
@@ -18089,13 +18113,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.type = 'recompiled function';
         if (!fname(options)) {
           options = {
-            scope: SCOPE.FUNCTION,
+            scope: 'function',
             filename: '',
             source: '('+options+')()'
           }
         } else {
           options = {
-            scope: SCOPE.FUNCTION,
+            scope: 'function',
             filename: fname(options),
             source: options+''
           };
@@ -18108,7 +18132,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.natives = true;
         this.type = 'native';
       }
-      if (options.eval || options.scope === SCOPE.EVAL) {
+      if (options.eval || options.scope === 'eval') {
         this.eval = true;
         this.type = 'eval';
       }
@@ -18364,26 +18388,42 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         SetDefaultLoader: function(loader){
           realm.loader = loader;
         },
-        eval: function(code){
-          if (typeof code !== 'string') {
-            return code;
+        _eval: (function(){
+          function builtinEval(obj, args, direct){
+            var code = args[0];
+            if (typeof code !== 'string') {
+              return code;
+            }
+
+            var script = new Script({
+              scope: 'eval',
+              natives: false,
+              strict: context.strict,
+              source: code
+            });
+
+            if (script.error) {
+              return script.error;
+            }
+
+            if (direct) {
+              console.log(arguments);
+              return script.thunk.run(context);
+            }
+
+            ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
+            var result = script.thunk.run(context);
+            ExecutionContext.pop();
+            return result;
           }
-          var script = new Script({
-            scope: SCOPE.EVAL,
-            natives: false,
-            source: code
-          });
-          if (script.error) {
-            return script.error;
-          } else if (script.thunk) {
-            return script.thunk.run(context);
-          }
-        },
+          builtinEval.isBuiltinEval = true;
+          return builtinEval;
+        })(),
         _FunctionCreate: function(obj, args){
           var body = args.pop();
 
           var script = new Script({
-            scope: SCOPE.GLOBAL,
+            scope: 'global',
             natives: false,
             source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
           });
@@ -18392,9 +18432,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             return script.error;
           }
 
-          var ctx = new ExecutionContext(context, new DeclarativeEnv(realm.globalEnv), realm, script.bytecode);
-          ExecutionContext.push(ctx);
-          var func = script.thunk.run(ctx);
+          ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
+          var func = script.thunk.run(context);
           ExecutionContext.pop();
           return func;
         },
@@ -18721,13 +18760,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    var globals = new Script({
-      scope: SCOPE.GLOBAL,
-      natives: true,
-      filename: 'module-init.js',
-      source: 'import * from "@std"; $__hideEverything(this); $__update.call(this, "undefined", 0);'
-    });
-
     var mutationScopeInit = new Script('void 0');
 
     function initialize(realm, Ω, ƒ){
@@ -18739,12 +18771,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           modules = require('../modules'),
           init = modules['@@internal'] + '\n\n'+ modules['@system'];
 
-      resolveModule(fakeLoader, init, '@system', function(){
-        runScript(realm, globals, function(){
-          realm.state = 'idle';
-          Ω();
-        }, ƒ);
-      }, ƒ);
+      resolveModule(fakeLoader, init, '@system', Ω, ƒ);
     }
 
     function prepareToRun(bytecode, scope){
@@ -18943,7 +18970,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         name: name,
         natives: true,
         source: source,
-        scope: SCOPE.MODULE
+        scope: 'module'
       });
 
 
@@ -20040,7 +20067,6 @@ exports.debug = (function(exports){
         this.key = null;
       }
     ]);
-    var template = ['(function ', , ]
 
     function forward(func, key){
       if (hasOwn(MirrorAccessor.prototype, key)) return;
@@ -20861,7 +20887,7 @@ exports.index = (function(exports){
 
 
 
-exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@IsExtensible      = $__IsExtensible;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n\n    if (typeof desc.value === 'number') {\n      desc.configurable = desc.writable = false;\n    } else if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n\n    this.@@DefineOwnProperty(key, desc);\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0,\n    Infinity = 1 / 0,\n    NaN = +'NaN',\n    undefined;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'Array' || brand === 'Arguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
+exports.modules["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@IsExtensible      = $__IsExtensible;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n\n    if (typeof desc.value === 'number') {\n      desc.configurable = desc.writable = false;\n    } else if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n\n    this.@@DefineOwnProperty(key, desc);\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0,\n    Infinity = 1 / 0,\n    NaN = +'NaN',\n    undefined;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@setInternal('strict', false);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n  Ctor.@@define('caller', null, 0);\n  Ctor.@@define('arguments', null, 0);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n  func.@@define('caller', null, 0);\n  func.@@define('arguments', null, 0);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'Array' || brand === 'Arguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\n\n$__EmptyClass = function(...args){ super(...args) };\n";
 
 exports.modules["@array"] = "import Iterator from '@iter';\n\nconst joinArray = (target, separator) => {\n  const array = $__ToObject(target),\n        len   = $__ToUint32(array.length),\n        sep   = $__ToString(separator);\n\n  if (len === 0) return '';\n\n  var result = $__ToString(array[0]),\n      i = 0;\n\n  while (++i < len) {\n    result += sep + array[i];\n  }\n  return result;\n};\n\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);\n    }\n    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    var obj = $__ToObject(this),\n        n   = 0,\n        i   = 0;\n\n    do {\n      if (isArray(obj)) {\n        var len = $__ToInt32(obj.length),\n            j   = 0;\n\n        while (j < len) {\n          if (j in obj) {\n            array[n++] = obj[j];\n          }\n        }\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[i];\n    } while (i++ < count)\n\n    return array;\n  }\n\n  every(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array && !callback.@@Call(context, [array[i], i, array])) {\n        return false;\n      }\n    }\n\n    return true;\n  }\n\n  filter(callback, context){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);\n    }\n\n    var i = 0;\n    while (i < len) {\n      if (i in array) {\n        var element = array[i];\n        if (i in array && !callback.@@Call(context, [element, i, array])) {\n          result[count++] = element;\n        }\n      }\n    }\n    return result;\n  }\n\n  forEach(callback, context){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = $__ToInteger(fromIndex);\n    if (i > len) {\n      return -1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  items(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  join(separator){\n    return joinArray(this, arguments.length ? separator : ',');\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var i = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;\n\n    if (i >= len) {\n      i = len - 1;\n    } else if (i < 0) {\n      i += i;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array && array[i] === search) {\n        return i;\n      }\n    }\n\n    return -1;\n  }\n\n  map(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);\n    }\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callback.@@Call(context, [array[i], i, this]);\n      }\n    }\n    return result;\n  }\n\n  pop(){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = array[len - 1];\n\n    array.length = len - 1;\n    return result;\n  }\n\n  push(...values){\n    var array = $__ToObject(this),\n        len   = $__ToUint32(array.length),\n        count = values.length;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[len++] = values[i];\n    }\n\n    return len;\n  }\n\n  reduce(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);\n    }\n\n    var i = 0;\n    if (arguments.length === 1) {\n      initial = array[0];\n      i = 1;\n    }\n\n    for (; i < len; i++) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  reduceRight(callback, initial){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);\n    }\n\n    var i = len - 1;\n    if (arguments.length === 1) {\n      initial = array[i];\n      i--;\n    }\n\n    for (; i >= 0; i--) {\n      if (i in array) {\n        initial = callback.@@Call(this, [initial, array[i], array]);\n      }\n    }\n    return initial;\n  }\n\n  slice(start, end){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    start = start === undefined ? 0 : +start || 0;\n    end = end === undefined ? len - 1 : +end || 0;\n\n    if (start < 0) {\n      start += len;\n    }\n\n    if (end < 0) {\n      end += len;\n    } else if (end >= len) {\n      end = len - 1;\n    }\n\n    if (start > end || end < start || start === end) {\n      return [];\n    }\n\n    for (var i=0, count = start - end; i < count; i++) {\n      result[i] = array[i + start];\n    }\n\n    return result;\n  }\n\n  some(callback, context){\n    var array  = $__ToObject(this),\n        len    = $__ToUint32(array.length),\n        result = [];\n\n    if (typeof callback !== 'function') {\n      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);\n    }\n\n    for (var i = 0; i < len; i++) {\n      if (i in array && callback.@@Call(context, [array[i], i, array])) {\n        return true;\n      }\n    }\n\n    return false;\n  }\n\n  toString(){\n    return joinArray(this, ',');\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n[ 'every', 'filter', 'forEach', 'indexOf', 'lastIndexOf',\n  'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return array ? array.@@GetBuiltinBrand() === 'Array' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n  var len   = $__ToUint32(arrayLike.length),\n      Ctor  = $__IsConstructor(this) ? this : Array,\n      out   = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  var len  = $__ToInteger(items.length),\n      Ctor = $__IsConstructor(this) ? this : Array,\n      out  = new Ctor(len);\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
 
@@ -20875,7 +20901,7 @@ exports.modules["@error"] = "const global = this;\n\nexport class Error {\n  con
 
 exports.modules["@function"] = "private @toString;\n\nexport class Function {\n  constructor(...args){\n    return $__FunctionCreate(...args);\n  }\n\n  apply(thisArg, args){\n    ensureFunction(this, 'Function.prototype.apply');\n    return this.@@Call(thisArg, ensureArgs(args));\n  }\n\n  bind(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.bind');\n    return $__BoundFunctionCreate(this, thisArg, args);\n  }\n\n  call(thisArg, ...args){\n    ensureFunction(this, 'Function.prototype.call');\n    return this.@@Call(thisArg, args);\n  }\n\n  toString(){\n    ensureFunction(this, 'Function.prototype.toString');\n    return this.@toString();\n  }\n}\n\nbuiltinClass(Function);\n\nFunction.prototype.@@define('name', '', 0);\nFunction.prototype.@toString = $__FunctionToString;\n\n\n\nexport function apply(func, thisArg, args){\n  ensureFunction(func, '@function.apply');\n  return func.@@Call(thisArg, ensureArgs(args));\n}\n\nbuiltinFunction(apply);\n\nexport function bind(func, thisArg, ...args){\n  ensureFunction(func, '@function.bind');\n  return $__BoundFunctionCreate(func, thisArg, args);\n}\n\nbuiltinFunction(bind);\n\nexport function call(func, thisArg, ...args){\n  ensureFunction(func, '@function.call');\n  return func.@@Call(thisArg, args);\n}\n\nbuiltinFunction(call);\n\n";
 
-exports.modules["@globals"] = "export function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport let eval = $__eval;\nbuiltinFunction(eval);\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
+exports.modules["@globals"] = "$__global.@@define(@toStringTag, 'global');\n\n\nexport function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport let eval = $__eval;\nbuiltinFunction(eval);\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
 
 exports.modules["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
 
@@ -20901,7 +20927,7 @@ exports.modules["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp 
 
 exports.modules["@symbol"] = "export class Symbol {\n  constructor(name, isPublic){\n    if (name == null) {\n      throw $__Exception('unnamed_symbol', []);\n    }\n    return $__SymbolCreate(name, !!isPublic);\n  }\n}\n\nbuiltinClass(Symbol);\n";
 
-exports.modules["@system"] = "class Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    loader.@evaluate(translated, this.@resolved, module => {\n      module.@@setInternal('loader', loader);\n      module.@@setInternal('resolved', this.@resolved);\n      module.@@setInternal('mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @modules, @evaluate;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.@translate;\n    this.@resolve   = options.resolve   || parent.@resolve;\n    this.@fetch     = options.fetch     || parent.@fetch;\n    this.@@setInternal('global', options.global || (parent ? parent.global : $__global));\n    this.@@setInternal('baseURL', options.baseURL || (parent ? parent.baseURL : ''));\n  }\n\n  get global(){\n    return this.@@getInternal('global');\n  }\n\n  get baseURL(){\n    return this.@@getInternal('baseURL');\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return this.@evaluate(src);\n  }\n\n  evalAsync(src, callback, errback){\n    this.@evaluate(src, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.global);\n    for (var k in std) {\n      desc.value = std[k];\n      object.@@DefineOwnProperty(k, desc);\n    }\n\n    return object;\n  }\n}\nLoader.prototype.@evaluate = $__EvaluateModule;\n\n\nexport function Module(object){\n  if (object.@@GetBuiltinBrand() === 'BuiltinModule') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\nbuiltinFunction(Module);\n\n\nexport let System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__SetDefaultLoader(System);\n\n\nlet internalLoader = $__internalLoader = new Loader(System, { global: this });\ninternalLoader.@strict = false;\n\nlet std = internalLoader.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\n\nfor (let k in internalLoader.@modules) {\n  System.@modules[k] = internalLoader.@modules[k];\n}\n\n$__global.@toStringTag = 'global';\n";
+exports.modules["@system"] = "class Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    loader.@evaluate(translated, this.@resolved, module => {\n      module.@@setInternal('loader', loader);\n      module.@@setInternal('resolved', this.@resolved);\n      module.@@setInternal('mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @modules, @evaluate;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.@translate;\n    this.@resolve   = options.resolve   || parent.@resolve;\n    this.@fetch     = options.fetch     || parent.@fetch;\n    this.@@setInternal('global', options.global || (parent ? parent.global : $__global));\n    this.@@setInternal('baseURL', options.baseURL || (parent ? parent.baseURL : ''));\n  }\n\n  get global(){\n    return this.@@getInternal('global');\n  }\n\n  get baseURL(){\n    return this.@@getInternal('baseURL');\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return this.@evaluate(src);\n  }\n\n  evalAsync(src, callback, errback){\n    this.@evaluate(src, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.global);\n    for (var k in std) {\n      desc.value = std[k];\n      object.@@DefineOwnProperty(k, desc);\n    }\n\n    return object;\n  }\n}\nLoader.prototype.@evaluate = $__EvaluateModule;\n\n\nexport function Module(object){\n  if (object.@@GetBuiltinBrand() === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\nbuiltinFunction(Module);\n\n\nexport let System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__SetDefaultLoader(System);\n\n\nlet internalLoader = $__internalLoader = new Loader(System, { global: this });\ninternalLoader.@strict = false;\n\nlet std = internalLoader.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\n\nfor (let k in internalLoader.@modules) {\n  System.@modules[k] = internalLoader.@modules[k];\n}\n\nstd.@@each((key, value, attr) => {\n  value = std[key];\n  $__global.@@define(key, value, $__Type(value) === 'Object' ? 6 : 0);\n});\n\n";
 
 exports.modules["@timers"] = "export function clearInterval(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearInterval);\n\n\nexport function clearTimeout(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearTimeout);\n\n\nexport function setInterval(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, true);\n}\n\nbuiltinFunction(setInterval);\n\n\nexport function setTimeout(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, false);\n}\n\nbuiltinFunction(setTimeout);\n";
 
