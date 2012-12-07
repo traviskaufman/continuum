@@ -271,7 +271,7 @@ var debug = (function(exports){
         if (prop) {
           if (prop[2] & ACCESSOR) {
             return {
-              name: key,
+              name: prop[0],
               get: prop[1].Get,
               set: prop[1].Set,
               enumerable: (prop[2] & ENUMERABLE) > 0,
@@ -279,7 +279,7 @@ var debug = (function(exports){
             }
           } else {
             return {
-              name: key,
+              name: prop[0],
               value: prop[1],
               writable: (prop[2] & WRITABLE) > 0,
               enumerable: (prop[2] & ENUMERABLE) > 0,
