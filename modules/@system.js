@@ -123,7 +123,7 @@ Loader.prototype.@evaluate = $__EvaluateModule;
 
 
 export function Module(object){
-  if (object.@@GetBuiltinBrand() === 'BuiltinModule') {
+  if (object.@@GetBuiltinBrand() === 'Module') {
     return object;
   }
   return $__ToModule($__ToObject(object));
@@ -168,4 +168,8 @@ for (let k in internalLoader.@modules) {
   System.@modules[k] = internalLoader.@modules[k];
 }
 
-$__global.@toStringTag = 'global';
+std.@@each((key, value, attr) => {
+  value = std[key];
+  $__global.@@define(key, value, $__Type(value) === 'Object' ? 6 : 0);
+});
+

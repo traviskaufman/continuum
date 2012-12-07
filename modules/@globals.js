@@ -1,3 +1,6 @@
+$__global.@@define(@toStringTag, 'global');
+
+
 export function decodeURI(value){
   return $__decodeURI($__ToString(value));
 }
