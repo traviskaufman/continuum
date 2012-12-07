@@ -137,8 +137,11 @@ function builtinClass(Ctor, brand){
 
   Ctor.@@setInternal('BuiltinConstructor', true);
   Ctor.@@setInternal('BuiltinFunction', true);
+  Ctor.@@setInternal('strict', false);
   Ctor.@@update('prototype', FROZEN);
   Ctor.@@set('length', 1);
+  Ctor.@@define('caller', null, 0);
+  Ctor.@@define('arguments', null, 0);
 
   if (!isSymbol) {
     brand || (brand = 'Builtin'+Ctor.name);
@@ -156,6 +159,8 @@ function builtinFunction(func){
   func.@@setInternal('BuiltinFunction', true);
   func.@@delete('prototype');
   func.@@update('name', FROZEN);
+  func.@@define('caller', null, 0);
+  func.@@define('arguments', null, 0);
 }
 
 internalFunction(builtinFunction);
