@@ -9282,6 +9282,9 @@ exports.assembler = (function(exports){
           this.strings = code.strings;
           this.hash = code.hash;
           this.natives = code.natives;
+          if (this.natives) {
+            this.strict = false;
+          }
         }
       },
       function lookup(id){
@@ -11107,6 +11110,7 @@ exports.assembler = (function(exports){
 
         if (this.options.natives) {
           code.natives = true;
+          code.strict = false;
         }
 
         this.queue(code);
@@ -18095,6 +18099,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
+      thrower.IsStrictThrower = true;
       thrower.strict = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);
@@ -19217,16 +19222,20 @@ exports.debug = (function(exports){
       this.holder = holder;
       this.accessor = accessor;
       this.key = key;
-      realm().enterMutationContext();
-      this.subject = accessor.Get.Call(holder, []);
-      if (this.subject && this.subject.__introspected) {
-        this.introspected = this.subject.__introspected;
+      if (accessor.Get) {
+        if (accessor.Get.IsStrictThrower) {
+          this.subject = accessor.Get;
+        } else {
+          realm().enterMutationContext();
+          this.subject = accessor.Get.Call(holder, []);
+          realm().exitMutationContext();
+        }
       } else {
-        this.introspected = introspect(this.subject);
+        this.subject = undefined;
       }
+      this.introspected = introspect(this.subject);
       this.kind = this.introspected.kind;
       this.type = this.introspected.type;
-      realm().exitMutationContext();
     }
 
 
@@ -19779,7 +19788,7 @@ exports.debug = (function(exports){
         var strict = this.isStrict();
         props || (props = new Hash);
         this.subject.each(function(prop){
-          if (!prop[0].Private && !strict || prop[0] !== 'arguments' && prop[0] !== 'caller' && prop[0] !== 'callee') {
+          if (!prop[0].Private) {
             var key = prop[0] === '__proto__' ? proto : prop[0];
             props[key] = prop;
           }
