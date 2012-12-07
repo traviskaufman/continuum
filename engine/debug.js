@@ -10,6 +10,8 @@ var debug = (function(exports){
       create     = objects.create,
       define     = objects.define,
       assign     = objects.assign,
+      properties = objects.properties,
+      hasOwn     = objects.hasOwn,
       getBrandOf = objects.getBrandOf,
       Hash       = objects.Hash,
       each       = iteration.each,
@@ -104,70 +106,6 @@ var debug = (function(exports){
     type: 'number'
   });
 
-
-  var MirrorAccessor = (function(){
-    function MirrorAccessor(holder, accessor, key){
-      this.holder = holder;
-      this.accessor = accessor;
-      this.key = key;
-      if (accessor.Get) {
-        if (accessor.Get.IsStrictThrower) {
-          this.subject = accessor.Get;
-        } else {
-          realm().enterMutationContext();
-          this.subject = accessor.Get.Call(holder, []);
-          realm().exitMutationContext();
-        }
-      } else {
-        this.subject = undefined;
-      }
-      this.introspected = introspect(this.subject);
-      this.kind = this.introspected.kind;
-      this.type = this.introspected.type;
-    }
-
-
-    inherit(MirrorAccessor, Mirror, {
-      accessor: true
-    }, [
-      function destroy(){
-        this.introspected && this.introspected.destroy && this.introspected.destroy();
-        this.subject = null;
-        this.destroy = null;
-        this.holder = null;
-        this.key = null;
-      },
-      function getValue(key){
-        return this.introspected.getValue(key);
-      },
-      function getError(){
-        return this.introspected.getError && this.introspected.getError();
-      },
-      function origin(){
-        return this.introspected.origin && this.introspected.origin();
-      },
-      function label(){
-        return this.introspected.label();
-      },
-      function getName(){
-        return this.subject.get('name');
-      },
-      function getParams(){
-        var params = this.subject.FormalParameters;
-        if (params && params.ArgNames) {
-          var names = params.ArgNames.slice();
-          if (params.Rest) {
-            names.rest = true;
-          }
-          return names;
-        } else {
-          return [];
-        }
-      }
-    ]);
-
-    return MirrorAccessor;
-  })();
 
   var proto = uid();
 
@@ -907,6 +845,65 @@ var debug = (function(exports){
     return MirrorWeakMap;
   })();
 
+
+  var MirrorAccessor = (function(){
+    function MirrorAccessor(holder, accessor, key){
+      this.holder = holder;
+      this.accessor = accessor;
+      this.key = key;
+      if (accessor.Get) {
+        if (accessor.Get.IsStrictThrower) {
+          this.subject = accessor.Get;
+        } else {
+          realm().enterMutationContext();
+          this.subject = accessor.Get.Call(holder, []);
+          realm().exitMutationContext();
+        }
+      } else {
+        this.subject = undefined;
+      }
+      this.introspected = introspect(this.subject);
+      this.kind = this.introspected.kind;
+      this.type = this.introspected.type;
+    }
+
+
+    inherit(MirrorAccessor, Mirror, {
+      accessor: true
+    }, [
+      function destroy(){
+        if (this.introspected.destroy) {
+          this.introspected.destroy();
+        }
+        this.subject = null;
+        this.destroy = null;
+        this.holder = null;
+        this.key = null;
+      }
+    ]);
+
+    function forward(func, key){
+      if (hasOwn(MirrorAccessor.prototype, key)) return;
+      var src = func+'',
+          paren = src.indexOf('('),
+          name = src.slice(src.indexOf(' ') + 1, paren),
+          args = src.slice(paren, src.indexOf(')') + 1),
+          ref = 'this.introspected.'+name,
+          forwarder = new Function('return function '+name+args+'{ if ('+ref+') return '+ref+args+' }')();
+
+      define(MirrorAccessor.prototype, forwarder);
+    }
+
+    each([MirrorObject, MirrorFunction, MirrorThrown, MirrorPrimitiveWrapper], function(Mirror){
+      each(properties(Mirror.prototype), function(key){
+        if (typeof Mirror.prototype[key] === 'function') {
+          forward(Mirror.prototype[key], key);
+        }
+      });
+    });
+
+    return MirrorAccessor;
+  })();
 
   var MirrorProxy = (function(){
     function MirrorProxy(subject){
