@@ -248,8 +248,8 @@ var assembler = (function(exports){
     var Directive = (function(){
       function Directive(op, args){
         this.op = op;
-        this.loc = currentNode.loc;
-        this.range = currentNode.range;
+        this.loc = loc();
+        this.range = range();
         for (var i=0; i < op.params; i++) {
           this[i] = args[i];
         }
@@ -317,6 +317,8 @@ var assembler = (function(exports){
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
+        this.loc = node.loc;
+        this.range = node.range;
         this.defaults = node.defaults || [];
       }
 
@@ -911,6 +913,7 @@ var assembler = (function(exports){
     });
 
     return function lexDecls(node){
+      if (!node) return [];
       if (!node.LexicalDeclarations) {
         node.LexicalDeclarations = LexicalDeclarations(node);
       }
@@ -1308,21 +1311,56 @@ var assembler = (function(exports){
 
 
 
+  var nodeStack = [],
+      currentNode;
 
-  var currentNode;
+  function pushNode(node){
+    currentNode && nodeStack.push(currentNode);
+    currentNode = node;
+  }
+  function popNode(){
+    var node = nodeStack.pop();
+    if (node) currentNode = node;
+  }
+
   function recurse(node){
     if (node) {
+      pushNode(node);
       if (node.type) {
-        var lastNode = currentNode;
-        currentNode = node;
         handlers[node.type](node);
-        if (lastNode) {
-          currentNode = lastNode;
-        }
       } else if (node.length) {
         each(node, recurse);
       }
+      popNode();
     }
+  }
+
+  var emptyLoc = { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
+      emptyRange = [0, 0];
+
+  function loc(){
+    var node = currentNode,
+        index = nodeStack.length;
+    while (node) {
+      if (node.loc) {
+        return node.loc;
+      }
+      node = nodeStack[--index];
+    }
+    return emptyLoc;
+  }
+
+  function range(){
+    var node = currentNode,
+        index = nodeStack.length;
+
+    while (node) {
+      if (node.range) {
+        return node.range;
+      }
+      node = nodeStack[--index];
+    }
+    return emptyRange;
   }
 
 
@@ -1346,6 +1384,36 @@ var assembler = (function(exports){
     if (op) {
       return op[0] = context.code.ops.length;
     }
+  }
+
+  function initBindingIfNew(name){
+    HAS_BINDING(name);
+    var jump = JTRUE(0);
+    BINDING(name, false);
+    UNDEFINED();
+    VAR(name);
+    adjust(jump);
+  }
+
+  function createBindingIfNew(name){
+    HAS_BINDING(name);
+    var jump = JTRUE(0);
+    BINDING(name, false);
+    adjust(jump);
+  }
+
+  function bindingDestructuring(node){
+    pushNode(node);
+    if (node.type === 'Identifier') {
+      initBindingIfNew(node.name);
+    } else if (node.type === 'ObjectPattern') {
+      each(node.properties, bindingDestructuring);
+    } else if (node.type === 'Property') {
+      bindingDestructuring(node.value);
+    } else if (node.type === 'ArrayPattern') {
+      each(node.elements, bindingDestructuring);
+    }
+    popNode();
   }
 
   var symbol = (function(){
@@ -1380,6 +1448,7 @@ var assembler = (function(exports){
 
 
   function FunctionDeclarationInstantiation(code){
+    pushNode(code.body);
     var varDeclarations = varDecls(code.body),
         len = varDeclarations.length,
         argumentsObjectNotNeeded = false,
@@ -1388,6 +1457,7 @@ var assembler = (function(exports){
 
     while (len--) {
       var decl = varDeclarations[len];
+      pushNode(decl);
       if (decl.type === 'FunctionDeclaration') {
         funcs.push(decl);
 
@@ -1401,43 +1471,33 @@ var assembler = (function(exports){
         BINDING(name, false);
         adjust(jump);
       }
+      popNode();
     }
 
-    each(code.params.boundNames, function(name){
-      if (name === 'arguments') {
-        argumentsObjectNotNeeded = true;
-      }
-      HAS_BINDING(name);
-      var jump = JTRUE(0);
-      BINDING(name, false);
-      UNDEFINED();
-      VAR(name);
-      adjust(jump);
-    });
+    each(code.params, bindingDestructuring);
 
-    if (!argumentsObjectNotNeeded) {
+    //if (!argumentsObjectNotNeeded) {
       BINDING('arguments', strict);
-    }
+    //}
 
-    each(code.varDecls, function(name){
-      HAS_BINDING(name);
-      var jump = JTRUE(0);
-      BINDING(name, false);
-      adjust(jump);
-    });
+    each(code.varDecls, createBindingIfNew);
 
     lexicalInit(code.body);
 
     each(funcs, function(decl){
+      pushNode(decl);
       FunctionDeclaration(decl);
       FUNCTION(false, decl.id.name, decl.code);
       VAR(decl.id.name);
       POP();
+      popNode();
     });
 
+    pushNode(code.params);
     ARGUMENTS();
     var defaultStart = code.params.length - code.params.defaults.length;
     each(code.params, function(param, i){
+      pushNode(param);
       DUP();
       INTERNAL_MEMBER(i);
       if (i >= defaultStart) {
@@ -1455,10 +1515,12 @@ var assembler = (function(exports){
         POP();
       }
       ROTATE(1);
+      popNode();
     });
 
     var rest = code.params.Rest;
     if (rest) {
+      pushNode(rest);
       REST(code.params.ExpectedArgumentCount);
       if (rest.type === 'Identifier') {
         VAR(rest.name);
@@ -1466,6 +1528,7 @@ var assembler = (function(exports){
         destructure(rest, VAR);
         POP();
       }
+      popNode();
     } else {
       POP();
     }
@@ -1473,14 +1536,18 @@ var assembler = (function(exports){
     if (!argumentsObjectNotNeeded) {
       VAR('arguments');
     }
+    popNode();
+    popNode();
   }
 
 
   function lexicalInit(node){
     each(lexDecls(node), function(decl){
+      pushNode(decl);
       each(decl.boundNames, function(name){
         BINDING(name, decl.IsConstantDeclaration);
       });
+      popNode();
     });
   }
 
@@ -1588,18 +1655,25 @@ var assembler = (function(exports){
 
     return function destructure(left, STORE){
       var key = left.type === 'ArrayPattern' ? 'elements' : 'properties';
+      pushNode(left);
       TO_OBJECT();
+      pushNode(left[key]);
       each(left[key], function(item, i){
         if (!item) return;
+        pushNode(item);
         DUP();
         if (item.type === 'Property') {
+          pushNode(item.key);
           MEMBER(symbol(item.key));
           GET();
+          popNode();
+          pushNode(item.value);
           if (isPattern(item.value)) {
             destructure(item.value, STORE);
           } else if (item.value.type === 'Identifier') {
             STORE(item.value.name);
           }
+          popNode();
         } else if (item.type === 'ArrayPattern') {
           LITERAL(i);
           ELEMENT();
@@ -1611,18 +1685,25 @@ var assembler = (function(exports){
           GET();
           STORE(item.name);
         } else if (item.type === 'SpreadElement') {
+          pushNode(item.argument);
           GET();
           SPREAD(i);
           STORE(item.argument.name);
+          popNode();
         }
+        popNode();
       });
+      popNode();
+      popNode();
     };
   })();
 
 
   function args(node){
+    pushNode(node)
     ARGS();
     each(node, function(item, i){
+      pushNode(item);
       if (item && item.type === 'SpreadElement') {
         recurse(item.argument);
         GET();
@@ -1632,7 +1713,9 @@ var assembler = (function(exports){
         GET();
         ARG();
       }
+      popNode();
     });
+    popNode();
   }
 
 
@@ -1717,9 +1800,11 @@ var assembler = (function(exports){
   }
 
   function BlockStatement(node){
+    pushNode(node.body);
     block(function(){
       lexicalInit(node.body);
       each(lexDecls(node.body), function(decl){
+        pushNode(decl);
         each(decl.boundNames, function(name){
           if (decl.type === 'FunctionDeclaration') {
             FunctionDeclaration(decl);
@@ -1727,9 +1812,11 @@ var assembler = (function(exports){
             LET(decl.id.name);
           }
         });
+        popNode();
       });
       each(node.body, recurse);
     });
+    popNode();
   }
 
   function CallExpression(node){
@@ -1752,13 +1839,17 @@ var assembler = (function(exports){
   }
 
   function CatchClause(node){
+    pushNode(node.body);
     pushScope('block');
+    pushNode(node.param);
     context.currentScope.lexDeclare(node.param.name, 'catch');
     BINDING(node.param.name, false);
     LET(node.param.name);
+    popNode();
     lexicalInit(node.body);
     each(node.body, recurse);
     popScope();
+    popNode();
   }
 
   function ClassBody(node){}
@@ -2012,7 +2103,9 @@ var assembler = (function(exports){
   function Path(node){}
 
   function Program(node){
+    pushNode(node.body);
     each(node.body, recurse);
+    popNode();
   }
 
   function Property(node){
@@ -2020,7 +2113,9 @@ var assembler = (function(exports){
     if (node.kind === 'init'){
       var key = node.key.type === 'Identifier' ? node.key : node.key.value;
       if (node.method) {
+        pushNode(value);
         FunctionExpression(value, intern(key));
+        popNode();
       } else if (isAnonymousFunction(value)) {
         var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
         var code = Expr(value, key);
