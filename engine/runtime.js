@@ -9,6 +9,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       assemble     = require('./assembler').assemble,
       constants    = require('./constants'),
       operators    = require('./operators'),
+      environments = require('./environments'),
       Emitter      = require('../lib/Emitter'),
       buffers      = require('../lib/buffers'),
       PropertyList = require('../lib/PropertyList'),
@@ -34,6 +35,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       map           = iteration.map,
       numbers       = utility.numbers,
       nextTick      = utility.nextTick,
+      tag           = utility.tag,
       unique        = utility.unique;
 
   var ThrowException   = errors.ThrowException,
@@ -59,6 +61,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       EQUAL            = operators.EQUAL,
       STRICT_EQUAL     = operators.STRICT_EQUAL;
 
+  var DeclarativeEnv = environments.DeclarativeEnvironmentRecord,
+      ObjectEnv      = environments.ObjectEnvironmentRecord,
+      FunctionEnv    = environments.FunctionEnvironmentRecord,
+      GlobalEnv      = environments.GlobalEnvironmentRecord;
 
   var SYMBOLS       = constants.SYMBOLS,
       Break         = SYMBOLS.Break,
@@ -67,7 +73,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Empty         = SYMBOLS.Empty,
       Return        = SYMBOLS.Return,
       Normal        = SYMBOLS.Normal,
-      Builtin        = SYMBOLS.Builtin,
+      Builtin       = SYMBOLS.Builtin,
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
 
@@ -492,21 +498,15 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  var mutable = { Value: undefined,
+                  Writable: true,
+                  Enumerable: true,
+                  Configurable: true };
 
-  var mutable = {
-    Value: undefined,
-    Writable: true,
-    Enumerable: true,
-    Configurable: true
-  };
-
-  var immutable = {
-    Value: undefined,
-    Writable: true,
-    Enumerable: true,
-    Configurable: false
-  };
-
+  var immutable = { Value: undefined,
+                    Writable: true,
+                    Enumerable: true,
+                    Configurable: false };
 
   function TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
@@ -725,6 +725,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
 
+  /*
   // ## BlockDeclarationInstantiation
 
   function BlockDeclarationInstantiation(decls, env){
@@ -744,14 +745,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
   }
+  */
 
 
-
-  // ## IdentifierResolution
-
-  function IdentifierResolution(context, name) {
-    return GetIdentifierReference(context.LexicalEnvironment, name, context.strict);
-  }
 
   // ## BindingInitialization
 
@@ -834,265 +830,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
 
-  function CollectionInitializer(Data, name){
-    var data = name + 'Data';
-    return function(_, args){
-      var object = args[0],
-          iterable = args[1];
-
-      object[data] = new Data;
-
-      if (iterable === undefined) {
-        return object;
-      }
-
-      iterable = ToObject(iterable);
-      if (iterable && iterable.Abrupt) return iterable;
-
-      var iterator = Invoke(intrinsics.iterator, iterable);
-      if (iterator && iterator.Abrupt) return iterator;
-
-      var adder = object.Get('set');
-      if (adder && adder.Abrupt) return adder;
-
-      if (!IsCallable(adder)) {
-        return ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
-      }
-
-      var next;
-      while (next = ToObject(Invoke('next', iterator))) {
-        if (IsStopIteration(next)) {
-          return object;
-        }
-
-        if (next && next.Abrupt) return next;
-
-        var key = next.Get(0);
-        if (key && key.Abrupt) return key;
-
-        var value = next.Get(1);
-        if (value && value.Abrupt) return value;
-
-        var status = adder.Call(object, [key, value]);
-        if (status && status.Abrupt) return status;
-      }
-      return object;
-    };
-  }
-
-
-  var MapData = (function(){
-    function LinkedItem(key, next){
-      this.key = key;
-      this.next = next;
-      this.previous = next.previous;
-      next.previous = next.previous.next = this;
-    }
-
-    define(LinkedItem.prototype, [
-      function unlink(){
-        this.next.previous = this.previous;
-        this.previous.next = this.next;
-        this.next = this.previous = this.data = this.key = null;
-        return this.data;
-      }
-    ]);
-
-
-    function MapData(){
-      $Object.tag(this);
-      this.guard = create(LinkedItem.prototype);
-      this.guard.key = {};
-      this.reset();
-    }
-
-    MapData.sigil = create(null);
-
-    define(MapData.prototype, [
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-
-        var serialized = serializer.set(this.id, {
-          type: 'MapData',
-          size: this.size,
-          items: []
-        });
-        this.forEach(function(value, key){
-          serialized.items.push(map([key, value], function(item){
-            if (isObject(item)) {
-              serializer.add(item);
-              return item.id;
-            } else {
-              item = serializer.serialize(item);
-              return typeof item === 'number' ? [item] : item;
-            }
-          }));
-        });
-        return serialized;
-      },
-      function reset(){
-        this.size = 0;
-        this.strings = create(null);
-        this.numbers = create(null);
-        this.others = create(null);
-        this.lastLookup = this.guard.next = this.guard.previous = this.guard;
-      },
-      function forEach(callback, context){
-        var item = this.guard.next;
-        context = context || this;
-
-        while (item !== this.guard) {
-          callback.call(context, item.value, item.key);
-          item = item.next;
-        }
-      },
-      function clear(){
-        var next, item = this.guard.next;
-
-        while (item !== this.guard) {
-          next = item.next;
-          if (item.key !== null && typeof item.key === 'object') {
-            delete item.key.storage[this.id];
-          }
-          item.next = item.previous = item.data = item.key = null;
-          item = next;
-        }
-
-        this.reset();
-      },
-      function add(key){
-        this.size++;
-        return new LinkedItem(key, this.guard);
-      },
-      function lookup(key){
-        var type = typeof key;
-        if (key === this) {
-          return this.guard;
-        } else if (key !== null && type === 'object') {
-          return key.storage[this.id];
-        } else {
-          return this.getStorage(key)[key];
-        }
-      },
-      function getStorage(key){
-        var type = typeof key;
-        if (type === 'string') {
-          return this.strings;
-        } else if (type === 'number') {
-          return key === 0 && 1 / key === -Infinity ? this.others : this.numbers;
-        } else {
-          return this.others;
-        }
-      },
-      function set(key, value){
-        var type = typeof key;
-        if (key !== null && type === 'object') {
-          var item = key.storage[this.id] || (key.storage[this.id] = this.add(key));
-          item.value = value;
-        } else {
-          var container = this.getStorage(key);
-          var item = container[key] || (container[key] = this.add(key));
-          item.value = value;
-        }
-      },
-      function get(key){
-        var item = this.lookup(key);
-        if (item) {
-          return item.value;
-        }
-      },
-      function has(key){
-        return !!this.lookup(key);
-      },
-      function remove(key){
-        var item;
-        if (key !== null && typeof key === 'object') {
-          item = key.storage[this.id];
-          if (item) {
-            delete key.storage[this.id];
-          }
-        } else {
-          var container = this.getStorage(key);
-          item = container[key];
-          if (item) {
-            delete container[key];
-          }
-        }
-
-        if (item) {
-          item.unlink();
-          this.size--;
-          return true;
-        }
-        return false;
-      },
-      function after(key){
-        if (key === MapData.sigil) {
-          var item = this.guard;
-        } else if (key === this.lastLookup.key) {
-          var item = this.lastLookup;
-        } else {
-          var item = this.lookup(key);
-        }
-        if (item && item.next !== this.guard) {
-          this.lastLookup = item.next;
-          return [item.next.key, item.next.value];
-        }
-      }
-    ]);
-
-    return MapData;
-  })();
-
-
-  var WeakMapData = (function(){
-    function WeakMapData(){
-      $Object.tag(this);
-    }
-
-    define(WeakMapData.prototype, [
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-
-        return serializer.set(this.id, {
-          type: 'WeakMapData'
-        });
-      },
-      function set(key, value){
-        if (value === undefined) {
-          value = Empty;
-        }
-        key.storage[this.id] = value;
-      },
-      function get(key){
-        var value = key.storage[this.id];
-        if (value !== Empty) {
-          return value;
-        }
-      },
-      function has(key){
-        return key.storage[this.id] !== undefined;
-      },
-      function remove(key){
-        var item = key.storage[this.id];
-        if (item !== undefined) {
-          key.storage[this.id] = undefined;
-          return true;
-        }
-        return false;
-      }
-    ]);
-
-    return WeakMapData;
-  })();
-
-
   function Element(context, prop, base){
     var result = CheckObjectCoercible(base);
     if (result.Abrupt) {
@@ -1149,6 +886,12 @@ var runtime = (function(GLOBAL, exports, undefined){
   function ThisResolution(context){
     return GetThisEnvironment(context).GetThisBinding();
   }
+
+
+  function IdentifierResolution(context, name) {
+    return GetIdentifierReference(context.LexicalEnvironment, name, context.strict);
+  }
+
 
   function EvaluateConstruct(func, args) {
     if (typeof func !== 'object') {
@@ -1341,6 +1084,272 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
 
+
+  function CollectionInitializer(Data, name){
+    var data = name + 'Data';
+    return function(_, args){
+      var object = args[0],
+          iterable = args[1];
+
+      object[data] = new Data;
+
+      if (iterable === undefined) {
+        return object;
+      }
+
+      iterable = ToObject(iterable);
+      if (iterable && iterable.Abrupt) return iterable;
+
+      var iterator = Invoke(intrinsics.iterator, iterable);
+      if (iterator && iterator.Abrupt) return iterator;
+
+      var adder = object.Get('set');
+      if (adder && adder.Abrupt) return adder;
+
+      if (!IsCallable(adder)) {
+        return ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
+      }
+
+      var next;
+      while (next = ToObject(Invoke('next', iterator))) {
+        if (IsStopIteration(next)) {
+          return object;
+        }
+
+        if (next && next.Abrupt) return next;
+
+        var key = next.Get(0);
+        if (key && key.Abrupt) return key;
+
+        var value = next.Get(1);
+        if (value && value.Abrupt) return value;
+
+        var status = adder.Call(object, [key, value]);
+        if (status && status.Abrupt) return status;
+      }
+      return object;
+    };
+  }
+
+
+  var MapData = (function(){
+    function LinkedItem(key, next){
+      this.key = key;
+      this.next = next;
+      this.previous = next.previous;
+      next.previous = next.previous.next = this;
+    }
+
+    define(LinkedItem.prototype, [
+      function unlink(){
+        this.next.previous = this.previous;
+        this.previous.next = this.next;
+        this.next = this.previous = this.data = this.key = null;
+        return this.data;
+      }
+    ]);
+
+
+    function MapData(){
+      tag(this);
+      this.guard = create(LinkedItem.prototype);
+      this.guard.key = {};
+      this.reset();
+    }
+
+    MapData.sigil = create(null);
+
+    define(MapData.prototype, {
+      type: 'MapData'
+    });
+
+    define(MapData.prototype, [
+      function save(serializer){
+        serializer || (serializer = new Serializer);
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: 'MapData',
+          size: this.size,
+          items: []
+        });
+        this.forEach(function(value, key){
+          serialized.items.push(map([key, value], function(item){
+            if (isObject(item)) {
+              serializer.add(item);
+              return item.id;
+            } else {
+              item = serializer.serialize(item);
+              return typeof item === 'number' ? [item] : item;
+            }
+          }));
+        });
+        return serialized;
+      },
+      function reset(){
+        this.size = 0;
+        this.strings = new Hash;
+        this.numbers = new Hash;
+        this.others = new Hash;
+        this.lastLookup = this.guard.next = this.guard.previous = this.guard;
+      },
+      function forEach(callback, context){
+        var item = this.guard.next;
+        context = context || this;
+
+        while (item !== this.guard) {
+          callback.call(context, item.value, item.key);
+          item = item.next;
+        }
+      },
+      function clear(){
+        var next, item = this.guard.next;
+
+        while (item !== this.guard) {
+          next = item.next;
+          if (item.key !== null && typeof item.key === 'object') {
+            delete item.key.storage[this.id];
+          }
+          item.next = item.previous = item.data = item.key = null;
+          item = next;
+        }
+
+        this.reset();
+      },
+      function add(key){
+        this.size++;
+        return new LinkedItem(key, this.guard);
+      },
+      function lookup(key){
+        var type = typeof key;
+        if (key === this) {
+          return this.guard;
+        } else if (key !== null && type === 'object') {
+          return key.storage[this.id];
+        } else {
+          return this.getStorage(key)[key];
+        }
+      },
+      function getStorage(key){
+        var type = typeof key;
+        if (type === 'string') {
+          return this.strings;
+        } else if (type === 'number') {
+          return key === 0 && 1 / key === -Infinity ? this.others : this.numbers;
+        } else {
+          return this.others;
+        }
+      },
+      function set(key, value){
+        var type = typeof key;
+        if (key !== null && type === 'object') {
+          var item = key.storage[this.id] || (key.storage[this.id] = this.add(key));
+          item.value = value;
+        } else {
+          var container = this.getStorage(key);
+          var item = container[key] || (container[key] = this.add(key));
+          item.value = value;
+        }
+      },
+      function get(key){
+        var item = this.lookup(key);
+        if (item) {
+          return item.value;
+        }
+      },
+      function has(key){
+        return !!this.lookup(key);
+      },
+      function remove(key){
+        var item;
+        if (key !== null && typeof key === 'object') {
+          item = key.storage[this.id];
+          if (item) {
+            delete key.storage[this.id];
+          }
+        } else {
+          var container = this.getStorage(key);
+          item = container[key];
+          if (item) {
+            delete container[key];
+          }
+        }
+
+        if (item) {
+          item.unlink();
+          this.size--;
+          return true;
+        }
+        return false;
+      },
+      function after(key){
+        if (key === MapData.sigil) {
+          var item = this.guard;
+        } else if (key === this.lastLookup.key) {
+          var item = this.lastLookup;
+        } else {
+          var item = this.lookup(key);
+        }
+        if (item && item.next !== this.guard) {
+          this.lastLookup = item.next;
+          return [item.next.key, item.next.value];
+        }
+      }
+    ]);
+
+    return MapData;
+  })();
+
+
+  var WeakMapData = (function(){
+    function WeakMapData(){
+      tag(this);
+    }
+
+    define(WeakMapData.prototype, {
+      type: 'WeakMapData'
+    });
+    define(WeakMapData.prototype, [
+      function save(serializer){
+        if (serializer.has(this.id)) {
+          return this.id;
+        }
+
+        return serializer.set(this.id, {
+          type: 'WeakMapData'
+        });
+      },
+      function set(key, value){
+        if (value === undefined) {
+          value = Empty;
+        }
+        key.storage[this.id] = value;
+      },
+      function get(key){
+        var value = key.storage[this.id];
+        if (value !== Empty) {
+          return value;
+        }
+      },
+      function has(key){
+        return key.storage[this.id] !== undefined;
+      },
+      function remove(key){
+        var item = key.storage[this.id];
+        if (item !== undefined) {
+          key.storage[this.id] = undefined;
+          return true;
+        }
+        return false;
+      }
+    ]);
+
+    return WeakMapData;
+  })();
+
+
   // ###########################
   // ###########################
   // ### Specification Types ###
@@ -1357,16 +1366,21 @@ var runtime = (function(GLOBAL, exports, undefined){
     function Reference(base, name, strict){
       this.base = base;
       this.name = name;
-      this.strict = strict;
+      this.strict = !!strict;
     }
     define(Reference.prototype, {
       Reference: SYMBOLS.Reference
     });
 
+
+    define(environments.EnvironmentRecord.prototype, [
+      function reference(key, strict){
+        return new Reference(this, key, strict);
+      }
+    ]);
+
     return Reference;
   })();
-
-
 
 
 
@@ -1409,12 +1423,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     Set: undefined
   });
 
-  function NormalDescriptor(value){
-    this.Value = value;
-  }
-
-  var emptyValue = NormalDescriptor.prototype = new DataDescriptor(undefined, ECW);
-
   function StringIndice(value){
     this.Value = value;
   }
@@ -1436,7 +1444,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   function Accessor(get, set){
     this.Get = get;
     this.Set = set;
-    $Object.tag(this);
+    tag(this);
   }
 
   define(Accessor.prototype, {
@@ -1447,7 +1455,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   function BuiltinAccessor(get, set){
-    $Object.tag(this);
+    tag(this);
     if (get) this.Get = { Call: get };
     if (set) this.Set = { Call: set };
   }
@@ -1457,7 +1465,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function ArgAccessor(name, env){
     this.name = name;
-    $Object.tag(this);
+    tag(this);
     define(this, { env: env  });
   }
 
@@ -1468,355 +1476,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   });
 
 
-
-  // #########################
-  // ### EnvironmentRecord ###
-  // #########################
-
-  var EnvironmentRecord = (function(){
-    function EnvironmentRecord(bindings, outer){
-      this.bindings = bindings;
-      this.outer = outer;
-      this.cache = new Hash;
-      $Object.tag(this);
-    }
-
-    define(EnvironmentRecord.prototype, {
-      bindings: null,
-      withBase: undefined,
-      type: 'Env',
-      Environment: true
-    });
-
-    define(EnvironmentRecord.prototype, [
-      function save(serializer){
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-
-        var serialized = serializer.set(this.id, {
-          type: this.type
-        });
-
-        if (this.outer) {
-          serializer.add(this.outer);
-          serialized.outer = this.outer.id;
-        }
-
-        if (this.symbols) {
-          serialized.symbols = {};
-          each(this.symbols, function(symbol, name){
-            serializer.add(symbol);
-            serialized.symbols[name] = symbol.id;
-          });
-        }
-
-        return serialized;
-      },
-      function EnumerateBindings(){},
-      function HasBinding(name){},
-      function GetBindingValue(name, strict){},
-      function SetMutableBinding(name, value, strict){},
-      function DeleteBinding(name){},
-      function WithBaseObject(){
-        return this.withBase;
-      },
-      function HasThisBinding(){
-        return false;
-      },
-      function HasSuperBinding(){
-        return false;
-      },
-      function GetThisBinding(){},
-      function GetSuperBase(){},
-      function HasSymbolBinding(name){
-        if (this.symbols) {
-          return name in this.symbols;
-        }
-        return false;
-      },
-      function InitializeSymbolBinding(name, symbol){
-        if (!this.symbols) {
-          this.symbols = create(null);
-        }
-        if (name in this.symbols) {
-          return ThrowException('symbol_redefine', name);
-        }
-        this.symbols[name] = symbol;
-      },
-      function GetSymbol(name){
-        if (this.symbols && name in this.symbols) {
-          return this.symbols[name];
-        } else{
-          return ThrowException('symbol_not_defined', name);
-        }
-      },
-      function reference(name, strict){
-        return new Reference(this, name, strict);
-      }
-    ]);
-
-    return EnvironmentRecord;
-  })();
-
-  var DeclarativeEnvironmentRecord = (function(){
-    function DeclarativeEnvironmentRecord(outer){
-      this.outer = outer;
-      this.bindings = new Hash;
-      this.consts = new Hash;
-      this.deletables = new Hash;
-      this.cache = new Hash;
-      $Object.tag(this);
-    }
-
-    inherit(DeclarativeEnvironmentRecord, EnvironmentRecord, {
-      type: 'DeclarativeEnv'
-    }, [
-      function destroy(){
-        this.destroy = null;
-        for (var k in this.bindings) {
-          if (this.bindings[k] && this.bindings[k].destroy) {
-            this.bindings[k].destroy();
-          }
-        }
-      },
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serialized.bindings = {};
-        each(this.bindings, function(binding, name){
-          if (isObject(binding) && 'id' in binding) {
-            serializer.add(binding);
-            serialized.bindings[name] = binding.id;
-          } else {
-            serialized.bindings[name] = serializer.serialize(binding);
-          }
-        });
-        var deletables = ownKeys(this.deletables);
-        if (deletables.length) {
-          serialized.deletables = deletables;
-        }
-        var consts = ownKeys(this.consts);
-        if (deletables.length) {
-          serialized.consts = consts;
-        }
-        return serialized;
-      },
-      function EnumerateBindings(){
-        return ownKeys(this.bindings);
-      },
-      function HasBinding(name){
-        return name in this.bindings;
-      },
-      function CreateMutableBinding(name, deletable){
-        this.bindings[name] = undefined;
-        if (deletable)
-          this.deletables[name] = true;
-      },
-      function InitializeBinding(name, value){
-        this.bindings[name] = value;
-      },
-      function GetBindingValue(name, strict){
-        if (name in this.bindings) {
-          var value = this.bindings[name];
-          if (value === Uninitialized)
-            return ThrowException('uninitialized_const', name);
-          else
-            return value;
-        } else if (strict) {
-          return ThrowException('not_defined', name);
-        } else {
-          return false;
-        }
-      },
-      function SetMutableBinding(name, value, strict){
-        if (name in this.consts) {
-          if (this.bindings[name] === Uninitialized)
-            return ThrowException('uninitialized_const', name);
-          else if (strict)
-            return ThrowException('const_assign', name);
-        } else {
-          this.bindings[name] = value;
-        }
-      },
-      function CreateImmutableBinding(name){
-        this.bindings[name] = Uninitialized;
-        this.consts[name] = true;
-      },
-      function DeleteBinding(name){
-        if (name in this.bindings) {
-          if (name in this.deletables) {
-            delete this.bindings[name];
-            delete this.deletables[names];
-            return true;
-          } else {
-            return false;
-          }
-        } else {
-          return true;
-        }
-      }
-    ]);
-
-    return DeclarativeEnvironmentRecord;
-  })();
-
-
-
-  var ObjectEnvironmentRecord = (function(){
-    function ObjectEnvironmentRecord(object, outer){
-      this.bindings = object;
-      this.outer = outer;
-      this.cache = new Hash;
-      $Object.tag(this);
-    }
-
-    inherit(ObjectEnvironmentRecord, EnvironmentRecord, {
-      type: 'ObjectEnv'
-    }, [
-      function destroy(){
-        this.destroy = null;
-        this.bindings.destroy && this.bindings.destroy();
-      },
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serializer.add(this.bindings);
-        serialized.bindings = this.bindings.id;
-        return serialized;
-      },
-      function EnumerateBindings(){
-        return this.bindings.Enumerate(false, false);
-      },
-      function HasBinding(name){
-        return this.bindings.HasProperty(name);
-      },
-      function CreateMutableBinding(name, deletable){
-        return this.bindings.DefineOwnProperty(name, emptyValue, true);
-      },
-      function InitializeBinding(name, value){
-        return this.bindings.DefineOwnProperty(name, new NormalDescriptor(value), true);
-      },
-      function GetBindingValue(name, strict){
-        if (this.bindings.HasProperty(name)) {
-          return this.bindings.Get(name);
-        } else if (strict) {
-          return ThrowException('not_defined', name);
-        }
-      },
-      function SetMutableBinding(name, value, strict){
-        return this.bindings.Put(name, value, strict);
-      },
-      function DeleteBinding(name){
-       return this.bindings.Delete(name, false);
-      }
-    ]);
-
-    return ObjectEnvironmentRecord;
-  })();
-
-
-  var FunctionEnvironmentRecord = (function(){
-    function FunctionEnvironmentRecord(receiver, method){
-      this.outer = method.Scope;
-      this.bindings = new Hash;
-      this.consts = new Hash;
-      this.deletables = new Hash;
-      this.cache = new Hash;
-      this.thisValue = receiver;
-      this.HomeObject = method.HomeObject;
-      this.MethodName = method.MethodName;
-      $Object.tag(this);
-    }
-
-    inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
-      HomeObject: undefined,
-      MethodName: undefined,
-      thisValue: undefined,
-      type: 'FunctionEnv'
-    }, [
-      function save(serializer){
-        var serialized = DeclarativeEnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        if (isObject(this.thisValue)) {
-          serializer.add(this.thisValue);
-          serialized.thisValue = this.thisValue.id;
-        }
-        if (this.HomeObject) {
-          serializer.add(this.HomeObject);
-          serialized.HomeObject =this.HomeObject.id;
-        }
-        if (this.MethodName) {
-          serialized.MethodName = serializer.serialize(this.MethodName);
-        }
-        return serialized;
-      },
-      function HasThisBinding(){
-        return true;
-      },
-      function HasSuperBinding(){
-        return this.HomeObject !== undefined;
-      },
-      function GetThisBinding(){
-        return this.thisValue;
-      },
-      function GetSuperBase(){
-        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
-      },
-      function GetMethodName() {
-        return this.MethodName;
-      }
-    ]);
-
-    return FunctionEnvironmentRecord;
-  })();
-
-
-  var GlobalEnvironmentRecord = (function(){
-    function GlobalEnvironmentRecord(global){
-      this.thisValue = this.bindings = global;
-      this.outer = null;
-      this.cache = new Hash;
-      global.env = this;
-      hide(global, 'env');
-      $Object.tag(this);
-    }
-
-    inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {
-      outer: null,
-      type: 'GlobalEnv'
-    }, [
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        var serialized = ObjectEnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serializer.add(this.bindings.Realm.natives);
-        serialized.natives = this.bindings.Realm.natives.id;
-        return serialized;
-      },
-      function GetThisBinding(){
-        return this.bindings;
-      },
-      function HasThisBinding(){
-        return true;
-      },
-      function inspect(){
-        return '[GlobalEnvironmentRecord]';
-      }
-    ]);
-
-    return GlobalEnvironmentRecord;
-  })();
 
   function Serializer(){
     this.cache = new Hash;
@@ -1829,10 +1488,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         if ('id' in obj) {
           if (typeof obj.id !== 'number') {
             delete obj.id;
-            $Object.tag(obj);
+            tag(obj);
           }
         } else {
-          $Object.tag(obj);
+          tag(obj);
         }
       }
     },
@@ -1895,7 +1554,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   ]);
 
 
-
   // ###############
   // ### $Object ###
   // ###############
@@ -1930,7 +1588,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Prototype = proto;
       this.properties = new PropertyList;
       this.storage = new Hash;
-      $Object.tag(this);
+      tag(this);
       if (proto && proto.HiddenPrototype) {
         this.properties.setProperty(['__proto__', null, 6, Proto]);
       }
@@ -1940,17 +1598,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'Realm');
     }
 
-    var counter = 0;
-    define($Object, function tag(object){
-      if (object.id === undefined) {
-        object.id = counter++;
-        hide(object, 'id');
-      }
-    });
-
     define($Object.prototype, {
       Extensible: true,
-      BuiltinBrand: BRANDS.BuiltinObject
+      BuiltinBrand: BRANDS.BuiltinObject,
+      type: '$Object'
     });
 
     void function(){
@@ -2000,110 +1651,111 @@ var runtime = (function(GLOBAL, exports, undefined){
             }
           }
         },
-        function save(serializer){
-          if (!serializer) {
-            var returnRepo = true;
-            serializer = new Serializer;
-          }
 
-          if (serializer.has(this.id)) {
-            return this.id
-          }
-
-          var serialized = serializer.set(this.id, {
-            type: this.constructor.name,
-            BuiltinBrand: this.BuiltinBrand.name
-          });
-
-          if (IsCallable(this)) {
-            var name = this.get('name');
-            if (name && typeof name === 'string') {
-              serialized.name = name;
-            }
-            if (this.strict) {
-              serialized.Strict = this.strict;
-            }
-            serialized.Parameters = null;
-          }
-
-          if (!this.IsExtensible()) {
-            serialized.Extensible = false;
-          }
-
-          if (this.ConstructorName) {
-            serialized.ConstructorName = this.ConstructorName;
-          }
-
-          each(['MapData', 'SetData', 'WeakMapData'], function(data){
-            if (this[data]) {
-              serializer.add(this[data]);
-              serialized[data] = this[data].id;
-            }
-          }, this);
-
-          var objects = [],
-              functions = [],
-              self = this,
-              isFunction = IsCallable(this);
-
-          var props = [];
-          this.properties.each(function(prop){
-            if (isFunction) {
-              if (prop[0] === 'arguments' || prop[0] === 'caller') {
-                if (prop[1] === null || self.strict) {
-                  return;
-                }
-              } else if (prop[0] === 'length') {
-                return;
-              }
-            }
-            if (typeof prop[0] === 'string') {
-              var key = prop[0];
-            } else {
-              serializer.add(prop[0]);
-              var key = prop[0].id;
-            }
-            prop = [key, prop[2], 0, prop[1]];
-            props.push(prop);
-            if (isObject(prop[3])) {
-              if (prop[3].Scope) {
-                functions.push(prop);
-              } else {
-                objects.push(prop);
-              }
-            } else {
-              prop[3] = serializer.serialize(prop[3]);
-            }
-          });
-
-          each(objects, function(prop){
-            serializer.add(prop[3]);
-            prop[3] = prop[3].id;
-            prop[2] = 1;
-          });
-
-          var proto = this.GetInheritance();
-          if (proto) {
-            serializer.add(proto);
-            serialized.Prototype = proto.id;
-          } else {
-            serialized.Prototype = null;
-          }
-
-          each(functions, function(prop){
-            serializer.add(prop[3]);
-            prop[3] = prop[3].id;
-            prop[2] = 2;
-          });
-
-          serialized.properties = props;
-          return returnRepo ? serializer.repo : serialized;
-        }
       ]);
     }();
 
 
     define($Object.prototype, [
+      function save(serializer){
+        if (!serializer) {
+          var returnRepo = true;
+          serializer = new Serializer;
+        }
+
+        if (serializer.has(this.id)) {
+          return this.id
+        }
+
+        var serialized = serializer.set(this.id, {
+          type: this.constructor.name,
+          BuiltinBrand: this.BuiltinBrand.name
+        });
+
+        if (IsCallable(this)) {
+          var name = this.get('name');
+          if (name && typeof name === 'string') {
+            serialized.name = name;
+          }
+          if (this.strict) {
+            serialized.Strict = this.strict;
+          }
+          serialized.Parameters = null;
+        }
+
+        if (!this.IsExtensible()) {
+          serialized.Extensible = false;
+        }
+
+        if (this.ConstructorName) {
+          serialized.ConstructorName = this.ConstructorName;
+        }
+
+        each(['MapData', 'SetData', 'WeakMapData'], function(data){
+          if (this[data]) {
+            serializer.add(this[data]);
+            serialized[data] = this[data].id;
+          }
+        }, this);
+
+        var objects = [],
+            functions = [],
+            self = this,
+            isFunction = IsCallable(this);
+
+        var props = [];
+        this.properties.each(function(prop){
+          if (isFunction) {
+            if (prop[0] === 'arguments' || prop[0] === 'caller') {
+              if (prop[1] === null || self.strict) {
+                return;
+              }
+            } else if (prop[0] === 'length') {
+              return;
+            }
+          }
+          if (typeof prop[0] === 'string') {
+            var key = prop[0];
+          } else {
+            serializer.add(prop[0]);
+            var key = prop[0].id;
+          }
+          prop = [key, prop[2], 0, prop[1]];
+          props.push(prop);
+          if (isObject(prop[3])) {
+            if (prop[3].Scope) {
+              functions.push(prop);
+            } else {
+              objects.push(prop);
+            }
+          } else {
+            prop[3] = serializer.serialize(prop[3]);
+          }
+        });
+
+        each(objects, function(prop){
+          serializer.add(prop[3]);
+          prop[3] = prop[3].id;
+          prop[2] = 1;
+        });
+
+        var proto = this.GetInheritance();
+        if (proto) {
+          serializer.add(proto);
+          serialized.Prototype = proto.id;
+        } else {
+          serialized.Prototype = null;
+        }
+
+        each(functions, function(prop){
+          serializer.add(prop[3]);
+          prop[3] = prop[3].id;
+          prop[2] = 2;
+        });
+
+        serialized.properties = props;
+        return returnRepo ? serializer.repo : serialized;
+      },
       function GetInheritance(){
         return this.Prototype;
       },
@@ -2432,24 +2084,12 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         return ThrowException('cannot_convert_to_primitive', []);
       }
-      // function Keys(){
-
-      // },
-      // function OwnPropertyKeys(){
-
-      // },
-      // function Freeze(){
-
-      // },
-      // function Seal(){
-
-      // },
-      // function IsFrozen(){
-
-      // },
-      // function IsSealed(){
-
-      // }
+      // function Keys(){},
+      // function OwnPropertyKeys(){},
+      // function Freeze(){},
+      // function Seal(){},
+      // function IsFrozen(){},
+      // function IsSealed(){}
     ]);
 
 
@@ -2518,7 +2158,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Realm = realm;
       this.Scope = scope;
       this.code = code;
-      $Object.tag(code);
+      tag(code);
       if (holder !== undefined) {
         this.HomeObject = holder;
       }
@@ -2545,7 +2185,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       Scope: null,
       strict: false,
       ThisMode: 'global',
-      Realm: null
+      Realm: null,
+      type: '$Function'
     }, [
       function save(serializer){
         serializer || (serializer = new Serializer);
@@ -2582,7 +2223,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           activate(this.Realm);
         }
         if (this.ThisMode === 'lexical') {
-          var local = new DeclarativeEnvironmentRecord(this.Scope);
+          var local = new DeclarativeEnv(this.Scope);
         } else {
           if (this.ThisMode !== 'strict') {
             if (receiver == null) {
@@ -2594,7 +2235,7 @@ var runtime = (function(GLOBAL, exports, undefined){
               }
             }
           }
-          var local = new FunctionEnvironmentRecord(receiver, this);
+          var local = new FunctionEnv(receiver, this);
         }
 
         var caller = context ? context.callee : null;
@@ -2692,7 +2333,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($BoundFunction, $Function, {
       TargetFunction: null,
       BoundThis: null,
-      BoundArgs: null
+      BoundArgs: null,
+      type: '$BoundFunction'
     }, [
       function save(serializer){
         if (!serializer) {
@@ -2757,7 +2399,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           activate(this.Realm);
         }
         if (this.ThisMode === 'lexical') {
-          var local = new DeclarativeEnvironmentRecord(this.Scope);
+          var local = new DeclarativeEnv(this.Scope);
         } else {
           if (this.ThisMode !== 'strict') {
             if (receiver == null) {
@@ -2769,7 +2411,7 @@ var runtime = (function(GLOBAL, exports, undefined){
               }
             }
           }
-          var local = new FunctionEnvironmentRecord(receiver, this);
+          var local = new FunctionEnv(receiver, this);
         }
 
         var ctx = new ExecutionContext(context, local, this.Realm, this.code, this, args, isConstruct);
@@ -2819,10 +2461,10 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       var self = this;
       setFunction(this, intrinsics.iterator, function(){ return self });
-      setFunction(this, 'next',     function(){ return self.Send() });
-      setFunction(this, 'close',    function(){ return self.Close() });
-      setFunction(this, 'send',     function(v){ return self.Send(v) });
-      setFunction(this, 'throw',    function(v){ return self.Throw(v) });
+      setFunction(this, 'next',  function(){ return self.Send() });
+      setFunction(this, 'close', function(){ return self.Close() });
+      setFunction(this, 'send',  function(v){ return self.Send(v) });
+      setFunction(this, 'throw', function(v){ return self.Throw(v) });
     }
 
     inherit($Generator, $Object, {
@@ -2924,7 +2566,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Date, $Object, {
-      BuiltinBrand: BRANDS.BuiltinDate
+      BuiltinBrand: BRANDS.BuiltinDate,
+      type: '$Date'
     }, [
       function save(serializer){
         return +primitiveWrapperSave.call(this, serializer);
@@ -2949,7 +2592,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($String, $Object, {
       BuiltinBrand: BRANDS.StringWrapper,
-      PrimitiveValue: undefined
+      PrimitiveValue: undefined,
+      type: '$String'
     }, [
       primitiveWrapperSave,
       function each(callback){
@@ -3027,7 +2671,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
-      PrimitiveValue: undefined
+      PrimitiveValue: undefined,
+      type: '$Number'
     }, [primitiveWrapperSave]);
 
     return $Number;
@@ -3046,7 +2691,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
-      PrimitiveValue: undefined
+      PrimitiveValue: undefined,
+      type: '$Boolean'
     }, [primitiveWrapperSave]);
 
     return $Boolean;
@@ -3334,7 +2980,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       BuiltinBrand: BRANDS.BuiltinSymbol,
       Extensible: false,
       Private: true,
-      Name: null
+      Name: null,
+      type: '$Symbol'
     }, [
       function save(serializer){
         serializer || (serializer = new Serializer);
@@ -3561,7 +3208,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Module, $Object, {
       BuiltinBrand: BRANDS.BuiltinModule,
-      Extensible: false
+      Extensible: false,
+      type: '$Module'
     }, [
       function save(serializer){
         var props = this.properties;
@@ -4389,7 +4037,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($NativeFunction, $Function, {
-      Builtin: true
+      Builtin: true,
+      type: '$NativeFunction'
     }, [
       function save(serializer){
         var serialized = $Object.prototype.save.call(this, serializer);
@@ -4490,11 +4139,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         return scope;
       },
       function pushScope(){
-        this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
+        this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
       },
       function cloneScope(){
         var scope = this.LexicalEnvironment,
-            clone = new DeclarativeEnvironmentRecord(scope.outer);
+            clone = new DeclarativeEnv(scope.outer);
         for (var k in scope.bindings) {
           clone.bindings[k] = scope.bindings[k];
         }
@@ -4508,12 +4157,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         return scope;
       },
       function pushWith(obj){
-        this.LexicalEnvironment = new ObjectEnvironmentRecord(obj, this.LexicalEnvironment);
+        this.LexicalEnvironment = new ObjectEnv(obj, this.LexicalEnvironment);
         this.LexicalEnvironment.withEnvironment = true;
         return obj;
       },
       function createClass(def, superclass){
-        this.LexicalEnvironment = new DeclarativeEnvironmentRecord(this.LexicalEnvironment);
+        this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
         var ctor = ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
         return ctor;
@@ -4523,7 +4172,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             env = this.LexicalEnvironment;
 
         if (isExpression && name) {
-          env = new DeclarativeEnvironmentRecord(env);
+          env = new DeclarativeEnv(env);
           env.CreateImmutableBinding(name);
         }
 
@@ -4652,33 +4301,33 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
 
     exports.builtins = {
-      $Array                : $Array,
-      $Boolean              : $Boolean,
-      $BoundFunction        : $BoundFunction,
-      $Date                 : $Date,
-      $Error                : $Error,
-      $Function             : $Function,
-      $Generator            : $Generator,
-      $GeneratorFunction    : $GeneratorFunction,
-      $Map                  : $Map,
-      $Module               : $Module,
-      $NativeFunction       : $NativeFunction,
-      $Number               : $Number,
-      $Object               : $Object,
-      $Proxy                : $Proxy,
-      $RegExp               : $RegExp,
-      $Set                  : $Set,
-      $Symbol               : $Symbol,
-      $String               : $String,
-      $TypedArray           : $TypedArray,
-      $WeakMap              : $WeakMap,
-      MapData               : MapData,
-      WeakMapData           : WeakMapData,
-      DeclarativeEnvironment: DeclarativeEnvironmentRecord,
-      ObjectEnvironment     : ObjectEnvironmentRecord,
-      FunctionEnvironment   : FunctionEnvironmentRecord,
-      GlobalEnvironment     : GlobalEnvironmentRecord,
-      ExecutionContext      : ExecutionContext
+      $Array            : $Array,
+      $Boolean          : $Boolean,
+      $BoundFunction    : $BoundFunction,
+      $Date             : $Date,
+      $Error            : $Error,
+      $Function         : $Function,
+      $Generator        : $Generator,
+      $GeneratorFunction: $GeneratorFunction,
+      $Map              : $Map,
+      $Module           : $Module,
+      $NativeFunction   : $NativeFunction,
+      $Number           : $Number,
+      $Object           : $Object,
+      $Proxy            : $Proxy,
+      $RegExp           : $RegExp,
+      $Set              : $Set,
+      $Symbol           : $Symbol,
+      $String           : $String,
+      $TypedArray       : $TypedArray,
+      $WeakMap          : $WeakMap,
+      MapData           : MapData,
+      WeakMapData       : WeakMapData,
+      DeclarativeEnv    : DeclarativeEnv,
+      ObjectEnv         : ObjectEnv,
+      FunctionEnv       : FunctionEnv,
+      GlobalEnv         : GlobalEnv,
+      ExecutionContext  : ExecutionContext
     };
 
 
@@ -4691,7 +4340,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
 
     function Intrinsics(realm){
-      DeclarativeEnvironmentRecord.call(this, null);
+      DeclarativeEnv.call(this, null);
       this.Realm = realm;
       var bindings = this.bindings;
       bindings.Genesis = new $Object(null);
@@ -4724,7 +4373,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       bindings.ErrorProto.define('message', '', _CW);
     }
 
-    inherit(Intrinsics, DeclarativeEnvironmentRecord, {
+    inherit(Intrinsics, DeclarativeEnv, {
       type: 'Intrinsics',
     }, [
       function binding(options){
@@ -4870,7 +4519,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.filename = options.filename || '';
       if (this.ast) {
         this.bytecode = assemble(this);
-        $Object.tag(this.bytecode);
+        tag(this.bytecode);
         this.thunk = new Thunk(this.bytecode);
       }
       return this;
@@ -5136,7 +4785,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             return script.error;
           }
 
-          var ctx = new ExecutionContext(context, new DeclarativeEnvironmentRecord(realm.globalEnv), realm, script.bytecode);
+          var ctx = new ExecutionContext(context, new DeclarativeEnv(realm.globalEnv), realm, script.bytecode);
           ExecutionContext.push(ctx);
           var func = script.thunk.run(ctx);
           ExecutionContext.pop();
@@ -5613,7 +5262,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     function createSandbox(object, loader){
       var outerRealm = object.Realm || object.Prototype.Realm,
           bindings = new $Object,
-          scope = new GlobalEnvironmentRecord(bindings),
+          scope = new GlobalEnv(bindings),
           realm = scope.Realm = bindings.Realm = create(outerRealm);
 
       bindings.BuiltinBrand = BRANDS.GlobalObject;
@@ -5723,7 +5372,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       intrinsics = this.intrinsics = this.natives.bindings;
       intrinsics.global = global = operators.global = this.global = new $Object(intrinsics.ObjectProto);
       global.BuiltinBrand = BRANDS.GlobalObject;
-      this.globalEnv = new GlobalEnvironmentRecord(global);
+      this.globalEnv = new GlobalEnv(global);
       this.globalEnv.Realm = this;
 
       intrinsics.FunctionProto.Scope = this.globalEnv;
