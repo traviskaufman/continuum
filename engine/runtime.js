@@ -4252,6 +4252,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       try {
         return esprima.parse(src, options || parseOptions);
       } catch (e) {
+        if (!realm || !intrinsics) return e;
         var err = new $Error('SyntaxError', undefined, e.message);
         err.setCode({ start: { line: e.lineNumber, column: e.column } }, src);
         err.setOrigin(origin, type);
@@ -4536,7 +4537,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
         Fetch: function(name, callback){
-          var result = require('../modules')[name];
+          var result = require('../builtins')[name];
           if (!result) {
             result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
           }
@@ -4940,8 +4941,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       realm.initialized = true;
       realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
       var fakeLoader = { global: realm.global, baseURL: '' },
-          modules = require('../modules'),
-          init = modules['@@internal'] + '\n\n'+ modules['@system'];
+          builtins = require('../builtins'),
+          init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
 
       resolveModule(fakeLoader, init, '@system', Ω, ƒ);
     }
@@ -5008,7 +5009,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     function resolveImports(loader, code, Ω, ƒ){
-      var modules = create(null);
+      var modules = new Hash;
       if (code.imports && code.imports.length) {
         var load = loader.Get('load'),
             count = code.imports.length,

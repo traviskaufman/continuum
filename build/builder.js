@@ -114,8 +114,8 @@ builder.addFiles([
 });
 
 
-builder.addDirectory('../modules', function(name, source){
-  return name === 'index' ? '' : 'exports.modules["'+name+'"] = '+escapeJS(source) + ';';
+builder.addDirectory('../builtins', function(name, source){
+  return name === 'index' ? '' : 'exports.builtins["'+name+'"] = '+escapeJS(source) + ';';
 });
 
 
