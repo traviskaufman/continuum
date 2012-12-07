@@ -472,6 +472,9 @@ var assembler = (function(exports){
           this.strings = code.strings;
           this.hash = code.hash;
           this.natives = code.natives;
+          if (this.natives) {
+            this.strict = false;
+          }
         }
       },
       function lookup(id){
@@ -2297,6 +2300,7 @@ var assembler = (function(exports){
 
         if (this.options.natives) {
           code.natives = true;
+          code.strict = false;
         }
 
         this.queue(code);
