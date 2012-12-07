@@ -12685,7 +12685,7 @@ exports.thunk = (function(exports){
     }
 
     function ARGUMENTS(){
-      if (code.strict) {
+      if (code.flags.strict) {
         var args = context.args;
         stack[sp++] = context.createArguments(args);
         stack[sp++] = args;
@@ -13242,7 +13242,7 @@ exports.thunk = (function(exports){
     function RETURN(){
       completion = stack[--sp];
       ip++;
-      if (code.generator) {
+      if (code.flags.generator) {
         context.currentGenerator.ExecutionContext = context;
         context.currentGenerator.State = 'closed';
         error = new AbruptCompletion('throw', context.Realm.intrinsics.StopIteration);
@@ -13737,10 +13737,10 @@ exports.thunk = (function(exports){
     }
 
     function send(ctx, value){
-      if (stack) {
-        stack[sp++] = value;
-      }
-      return run(ctx);
+      prepare(ctx);
+      stack[sp++] = value;
+      execute();
+      return cleanup();
     }
 
 
@@ -14401,7 +14401,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   function InstantiateFunctionDeclaration(decl, env){
     var code = decl.code,
-        $F = code.generator ? $GeneratorFunction : $Function,
+        $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
     MakeConstructor(func);
@@ -17740,7 +17740,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return ctor;
       },
       function createFunction(isExpression, name, code){
-        var $F = code.generator ? $GeneratorFunction : $Function,
+        var $F = code.flags.generator ? $GeneratorFunction : $Function,
             env = this.LexicalEnvironment;
 
         if (isExpression && name) {
