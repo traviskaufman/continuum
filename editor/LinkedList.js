@@ -2,7 +2,7 @@ import { iterator, Iterator } from '@iter';
 symbol @iterator = iterator;
 private @sentinel;
 
-class DoublyLinkedListIterator extends Iterator {
+class LinkedListIterator extends Iterator {
   private @current;
 
   constructor(list){
@@ -58,7 +58,7 @@ class Sentinel extends LinkedElement {
 }
 
 
-export class DoublyLinkedList {
+export class LinkedList {
   private @found, @find;
 
   constructor(iterable){
@@ -200,12 +200,16 @@ export class DoublyLinkedList {
   clone(){
     const sentinel = this.@sentinel;
     var found = sentinel,
-        list = new DoublyLinkedList;
+        list = new LinkedList;
 
     while ((found = found.next) !== sentinel) {
       list.push(found.data);
     }
     return list;
+  }
+
+  slice(){
+
   }
 
   @find(value){
@@ -227,6 +231,6 @@ export class DoublyLinkedList {
   }
 
   @iterator(){
-    return new DoublyLinkedListIterator(this);
+    return new LinkedListIterator(this);
   }
 }
