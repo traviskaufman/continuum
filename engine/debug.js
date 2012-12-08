@@ -37,6 +37,8 @@ var debug = (function(exports){
     return n === 0 && 1 / n === -Infinity;
   }
 
+  var now = Date.now || function now(){ return +new Date };
+
 
   function Mirror(){}
 
@@ -846,26 +848,38 @@ var debug = (function(exports){
       this.holder = holder;
       this.accessor = accessor;
       this.key = key;
-      if (accessor.Get) {
-        if (accessor.Get.IsStrictThrower) {
-          this.subject = accessor.Get;
-        } else {
-          realm().enterMutationContext();
-          this.subject = accessor.Get.Call(holder, []);
-          realm().exitMutationContext();
-        }
-      } else {
-        this.subject = undefined;
-      }
-      this.introspected = introspect(this.subject);
-      this.kind = this.introspected.kind;
-      this.type = this.introspected.type;
+      this.refresh();
     }
 
 
     inherit(MirrorAccessor, Mirror, {
       accessor: true
     }, [
+      function refresh(){
+        var timestamp = now();
+        if (this.cooldown && timestamp - this.cooldown < 10000) return;
+        this.cooldown = timestamp;
+        if (this.cooldown)
+        if (this.accessor.Get) {
+          if (this.accessor.Get.IsStrictThrower) {
+            var subject = this.accessor.Get;
+            this.refresh = function(){ return this }
+          } else {
+            realm().enterMutationContext();
+            var subject = this.accessor.Get.Call(this.holder, []);
+            realm().exitMutationContext();
+          }
+        } else {
+          var subject = undefined;
+        }
+        if (subject !== this.subject || !this.introspected) {
+          this.subject = subject;
+          this.introspected = introspect(subject);
+          this.kind = this.introspected.kind;
+          this.type = this.introspected.type;
+        }
+        return this;
+      },
       function destroy(){
         if (this.introspected.destroy) {
           this.introspected.destroy();
@@ -884,7 +898,7 @@ var debug = (function(exports){
           name = src.slice(src.indexOf(' ') + 1, paren),
           args = src.slice(paren, src.indexOf(')') + 1),
           ref = 'this.introspected.'+name,
-          forwarder = new Function('return function '+name+args+'{ if ('+ref+') return '+ref+args+' }')();
+          forwarder = new Function('return function '+name+args+'{ this.refresh(); if ('+ref+') return '+ref+args+' }')();
 
       define(MirrorAccessor.prototype, forwarder);
     }
@@ -1370,8 +1384,55 @@ var debug = (function(exports){
       return o instanceof Mirror;
     },
     introspect,
-    Renderer
+    Renderer,
   ]);
+
+
+  define(exports, 'mirrors', {
+    Mirror                 :Mirror,
+    MirrorValue            :  MirrorValue,
+    MirrorNull             :    _Null,
+    MirrorUndefined        :    _Undefined,
+    MirrorTrue             :    _True,
+    MirrorFalse            :    _False,
+    MirrorStringValue      :    MirrorStringValue,
+    MirrorEmpty            :      _Empty,
+    MirrorNumberValue      :    MirrorNumberValue,
+    MirrorInfinity         :      _Infinity,
+    MirrorNaN              :      _NaN,
+    MirrorNegInfinity      :      _NegInfinity,
+    MirrorZero             :      _Zero,
+    MirrorNegZero          :      _NegZero,
+    MirrorOne              :      _One,
+    MirrorNegOne           :      _NegOne,
+    MirrorPrototypeAccessor:  MirrorPrototypeAccessor,
+    MirrorObject           :  MirrorObject,
+    MirrorArray            :    MirrorArray,
+    MirrorArguments        :      MirrorArguments,
+    MirrorArrayBufferView  :      MirrorArrayBufferView,
+    MirrorPrimitiveWrapper :    MirrorPrimitiveWrapper,
+    MirrorBoolean          :      MirrorBoolean,
+    MirrorNumber           :      MirrorNumber,
+    MirrorString           :      MirrorString,
+    MirrorDate             :    MirrorDate,
+    MirrorError            :    MirrorError,
+    MirrorThrown           :      MirrorThrown,
+    MirrorFunction         :    MirrorFunction,
+    MirrorGlobal           :    MirrorGlobal,
+    MirrorJSON             :    MirrorJSON,
+    MirrorMath             :    MirrorMath,
+    MirrorModule           :    MirrorModule,
+    MirrorRegExp           :    MirrorRegExp,
+    MirrorSymbol           :    MirrorSymbol,
+    MirrorCollection       :    MirrorCollection,
+    MirrorSet              :      MirrorSet,
+    MirrorMap              :      MirrorMap,
+    MirrorWeakMap          :    MirrorWeakMap,
+    MirrorAccessor         :  MirrorAccessor,
+    MirrorProxy            :  MirrorProxy,
+    MirrorScope            :  MirrorScope,
+    MirrorGlobalScope      :    MirrorGlobalScope
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
