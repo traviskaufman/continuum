@@ -309,7 +309,8 @@ var index = (function(exports){
       require('../lib/PropertyList'),
       require('../lib/Queue'),
       require('../lib/Stack')
-    ])
+    ]),
+    debug: debug
   });
 
   return exports;
