@@ -4216,7 +4216,27 @@ var runtime = (function(GLOBAL, exports, undefined){
     return Intrinsics;
   })();
 
-
+  function FromJSON(object){
+    if (object instanceof Array) {
+      var $array = new $Array,
+          len = object.length;
+      for (var i=0; i < len; i++) {
+        $array.define(i+'', FromJSON(object[i]), ECW);
+      }
+      $array.define('length', object.length, __W);
+      return $array;
+    } else if (typeof object === 'function') {
+      return new $NativeFunction(object);
+    } else if (object === null || typeof object !== 'object') {
+      return object;
+    } else {
+      var out = new $Object;
+      each(object, function(val, key){
+        out.set(key, FromJSON(val));
+      });
+      return out;
+    }
+  }
 
   function FromInternalArray(array){
     var $array = new $Array,
@@ -4328,6 +4348,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
       return this;
     }
+
+    define(Script, [parse]);
 
     return Script;
   })();
@@ -4580,7 +4602,6 @@ var runtime = (function(GLOBAL, exports, undefined){
             }
 
             if (direct) {
-              console.log(arguments);
               return script.thunk.run(context);
             }
 
@@ -4889,6 +4910,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         _WeakMapHas: function(obj, args){
           return args[0].WeakMapData.has(args[1]);
+        },
+        parse: function(src, loc, range, raw, tokens, comment, source){
+          var ast = Script.parse(src, source, 'script', {
+            loc    : !!loc,
+            range  : !!range,
+            raw    : !!raw,
+            tokens : !!tokens,
+            comment: !!comment
+          });
+          if (ast.Abrupt) {
+            return ast;
+          }
+          return FromJSON(ast);
         },
         AddObserver: function(data, callback){
           data.set(callback, callback);
