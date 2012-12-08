@@ -6851,12 +6851,14 @@ exports.Stack = (function(module){
       this.items = [];
       this.top = undefined;
     },
-    function first(callback, context){
+    function find(callback, context){
       var i = this.length;
       context || (context = this);
-      while (i--)
-        if (callback.call(context, this[i], i, this))
-          return this[i];
+      while (i--) {
+        if (callback.call(context, this.items[i], i, this)) {
+          return this.items[i];
+        }
+      }
     },
     function filter(callback, context){
       var i = this.length,
@@ -10375,6 +10377,7 @@ exports.assembler = (function(exports){
     callback();
     transfer.updateBreaks(current());
     context.jumps.pop();
+    context.labels = transfer.labels;
     popScope();
   }
 
@@ -10385,6 +10388,7 @@ exports.assembler = (function(exports){
     transfer.updateContinues(callback());
     transfer.updateBreaks(current());
     context.jumps.pop();
+    context.labels = transfer.labels;
   }
 
   function unwinder(type, callback){
@@ -10447,13 +10451,13 @@ exports.assembler = (function(exports){
 
   function move(node, set, pos){
     if (node.label) {
-      var transfer = context.jumps.first(function(transfer){
-        return node.label.name in transfer.labels;
+      var transfer = context.jumps.find(function(jump){
+        return node.label.name in jump.labels;
       });
 
     } else {
-      var transfer = context.jumps.first(function(transfer){
-        return transfer && transfer.continues;
+      var transfer = context.jumps.find(function(jump){
+        return transfer && jump.continues;
       });
     }
     transfer && transfer[set].push(pos);
@@ -18080,7 +18084,27 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return Intrinsics;
   })();
 
-
+  function FromJSON(object){
+    if (object instanceof Array) {
+      var $array = new $Array,
+          len = object.length;
+      for (var i=0; i < len; i++) {
+        $array.define(i+'', FromJSON(object[i]), ECW);
+      }
+      $array.define('length', object.length, __W);
+      return $array;
+    } else if (typeof object === 'function') {
+      return new $NativeFunction(object);
+    } else if (object === null || typeof object !== 'object') {
+      return object;
+    } else {
+      var out = new $Object;
+      each(object, function(val, key){
+        out.set(key, FromJSON(val));
+      });
+      return out;
+    }
+  }
 
   function FromInternalArray(array){
     var $array = new $Array,
@@ -18192,6 +18216,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
       return this;
     }
+
+    define(Script, [parse]);
 
     return Script;
   })();
@@ -18444,7 +18470,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             }
 
             if (direct) {
-              console.log(arguments);
               return script.thunk.run(context);
             }
 
@@ -18753,6 +18778,19 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         },
         _WeakMapHas: function(obj, args){
           return args[0].WeakMapData.has(args[1]);
+        },
+        parse: function(src, loc, range, raw, tokens, comment, source){
+          var ast = Script.parse(src, source, 'script', {
+            loc    : !!loc,
+            range  : !!range,
+            raw    : !!raw,
+            tokens : !!tokens,
+            comment: !!comment
+          });
+          if (ast.Abrupt) {
+            return ast;
+          }
+          return FromJSON(ast);
         },
         AddObserver: function(data, callback){
           data.set(callback, callback);
@@ -19259,6 +19297,8 @@ exports.debug = (function(exports){
   function isNegativeZero(n){
     return n === 0 && 1 / n === -Infinity;
   }
+
+  var now = Date.now || function now(){ return +new Date };
 
 
   function Mirror(){}
@@ -20069,26 +20109,38 @@ exports.debug = (function(exports){
       this.holder = holder;
       this.accessor = accessor;
       this.key = key;
-      if (accessor.Get) {
-        if (accessor.Get.IsStrictThrower) {
-          this.subject = accessor.Get;
-        } else {
-          realm().enterMutationContext();
-          this.subject = accessor.Get.Call(holder, []);
-          realm().exitMutationContext();
-        }
-      } else {
-        this.subject = undefined;
-      }
-      this.introspected = introspect(this.subject);
-      this.kind = this.introspected.kind;
-      this.type = this.introspected.type;
+      this.refresh();
     }
 
 
     inherit(MirrorAccessor, Mirror, {
       accessor: true
     }, [
+      function refresh(){
+        var timestamp = now();
+        if (this.cooldown && timestamp - this.cooldown < 10000) return;
+        this.cooldown = timestamp;
+        if (this.cooldown)
+        if (this.accessor.Get) {
+          if (this.accessor.Get.IsStrictThrower) {
+            var subject = this.accessor.Get;
+            this.refresh = function(){ return this }
+          } else {
+            realm().enterMutationContext();
+            var subject = this.accessor.Get.Call(this.holder, []);
+            realm().exitMutationContext();
+          }
+        } else {
+          var subject = undefined;
+        }
+        if (subject !== this.subject || !this.introspected) {
+          this.subject = subject;
+          this.introspected = introspect(subject);
+          this.kind = this.introspected.kind;
+          this.type = this.introspected.type;
+        }
+        return this;
+      },
       function destroy(){
         if (this.introspected.destroy) {
           this.introspected.destroy();
@@ -20107,7 +20159,7 @@ exports.debug = (function(exports){
           name = src.slice(src.indexOf(' ') + 1, paren),
           args = src.slice(paren, src.indexOf(')') + 1),
           ref = 'this.introspected.'+name,
-          forwarder = new Function('return function '+name+args+'{ if ('+ref+') return '+ref+args+' }')();
+          forwarder = new Function('return function '+name+args+'{ this.refresh(); if ('+ref+') return '+ref+args+' }')();
 
       define(MirrorAccessor.prototype, forwarder);
     }
@@ -20593,8 +20645,55 @@ exports.debug = (function(exports){
       return o instanceof Mirror;
     },
     introspect,
-    Renderer
+    Renderer,
   ]);
+
+
+  define(exports, 'mirrors', {
+    Mirror                 :Mirror,
+    MirrorValue            :  MirrorValue,
+    MirrorNull             :    _Null,
+    MirrorUndefined        :    _Undefined,
+    MirrorTrue             :    _True,
+    MirrorFalse            :    _False,
+    MirrorStringValue      :    MirrorStringValue,
+    MirrorEmpty            :      _Empty,
+    MirrorNumberValue      :    MirrorNumberValue,
+    MirrorInfinity         :      _Infinity,
+    MirrorNaN              :      _NaN,
+    MirrorNegInfinity      :      _NegInfinity,
+    MirrorZero             :      _Zero,
+    MirrorNegZero          :      _NegZero,
+    MirrorOne              :      _One,
+    MirrorNegOne           :      _NegOne,
+    MirrorPrototypeAccessor:  MirrorPrototypeAccessor,
+    MirrorObject           :  MirrorObject,
+    MirrorArray            :    MirrorArray,
+    MirrorArguments        :      MirrorArguments,
+    MirrorArrayBufferView  :      MirrorArrayBufferView,
+    MirrorPrimitiveWrapper :    MirrorPrimitiveWrapper,
+    MirrorBoolean          :      MirrorBoolean,
+    MirrorNumber           :      MirrorNumber,
+    MirrorString           :      MirrorString,
+    MirrorDate             :    MirrorDate,
+    MirrorError            :    MirrorError,
+    MirrorThrown           :      MirrorThrown,
+    MirrorFunction         :    MirrorFunction,
+    MirrorGlobal           :    MirrorGlobal,
+    MirrorJSON             :    MirrorJSON,
+    MirrorMath             :    MirrorMath,
+    MirrorModule           :    MirrorModule,
+    MirrorRegExp           :    MirrorRegExp,
+    MirrorSymbol           :    MirrorSymbol,
+    MirrorCollection       :    MirrorCollection,
+    MirrorSet              :      MirrorSet,
+    MirrorMap              :      MirrorMap,
+    MirrorWeakMap          :    MirrorWeakMap,
+    MirrorAccessor         :  MirrorAccessor,
+    MirrorProxy            :  MirrorProxy,
+    MirrorScope            :  MirrorScope,
+    MirrorGlobalScope      :    MirrorGlobalScope
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
@@ -20911,7 +21010,8 @@ exports.index = (function(exports){
       require('../lib/PropertyList'),
       require('../lib/Queue'),
       require('../lib/Stack')
-    ])
+    ]),
+    debug: debug
   });
 
   return exports;
@@ -20947,7 +21047,7 @@ exports.builtins["@number"] = "export const\n  EPSILON           = 2.22044604925
 
 exports.builtins["@object"] = "export class Object {\n  constructor(value){\n    return value == null ? {} : $__ToObject(value);\n  }\n\n  toString(){\n    if (this === undefined) {\n      return '[object Undefined]';\n    } else if (this === null) {\n      return '[object Null]';\n    } else {\n      return '[object ' + $__ToObject(this).@toStringTag + ']';\n    }\n  }\n\n  isPrototypeOf(object){\n    while ($__Type(object) === 'Object') {\n      object = object.@@GetPrototype();\n      if (object === this) {\n        return true;\n      }\n    }\n    return false;\n  }\n\n  toLocaleString(){\n    return this.toString();\n  }\n\n  valueOf(){\n    return $__ToObject(this);\n  }\n\n  hasOwnProperty(key){\n    return $__ToObject(this).@@HasOwnProperty($__ToPropertyName(key));\n  }\n\n  propertyIsEnumerable(key){\n    return !!($__ToObject(this).@@query(key) & 1);\n  }\n}\n\nbuiltinClass(Object);\n\n\nexport function assign(target, source){\n  ensureObject(target, 'Object.assign');\n  source = $__ToObject(source);\n  for (let [i, key] of source.@@Enumerate(false, true)) {\n    let prop = source[key];\n    if (typeof prop === 'function' && prop.@@get('HomeObject')) {\n      // TODO\n    }\n    target[key] = prop;\n  }\n  return target;\n}\n\nexport function create(prototype, properties){\n  if (typeof prototype !== 'object') {\n    throw $__Exception('proto_object_or_null', [])\n  }\n\n  var object = $__ObjectCreate(prototype);\n\n  if (properties !== undefined) {\n    ensureDescriptor(properties);\n\n    for (var key in properties) {\n      var desc = properties[key];\n      ensureDescriptor(desc);\n      object.@@DefineOwnProperty(key, desc);\n    }\n  }\n\n  return object;\n}\n\nexport function defineProperty(object, key, property){\n  ensureObject(object, 'Object.defineProperty');\n  ensureDescriptor(property);\n  object.@@DefineOwnProperty($__ToPropertyName(key), property);\n  return object;\n}\n\nexport function defineProperties(object, properties){\n  ensureObject(object, 'Object.defineProperties');\n  ensureDescriptor(properties);\n\n  for (var key in properties) {\n    var desc = properties[key];\n    ensureDescriptor(desc);\n    object.@@DefineOwnProperty(key, desc);\n  }\n\n  return object;\n}\n\nexport function freeze(object){\n  ensureObject(object, 'Object.freeze');\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc.configurable) {\n      desc.configurable = false;\n      if ('writable' in desc) {\n        desc.writable = false;\n      }\n      object.@@DefineOwnProperty(props[i], desc);\n    }\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function getOwnPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getOwnPropertyDescriptor');\n  return object.@@GetOwnProperty($__ToPropertyName(key));\n}\n\nexport function getOwnPropertyNames(object){\n  ensureObject(object, 'Object.getOwnPropertyNames');\n  return object.@@Enumerate(false, false);\n}\n\nexport function getPropertyDescriptor(object, key){\n  ensureObject(object, 'Object.getPropertyDescriptor');\n  return object.@@GetProperty($__ToPropertyName(key));\n}\n\nexport function getPropertyNames(object){\n  ensureObject(object, 'Object.getPropertyNames');\n  return object.@@Enumerate(true, false);\n}\n\nexport function getPrototypeOf(object){\n  ensureObject(object, 'Object.getPrototypeOf');\n  return object.@@GetPrototype();\n}\n\nexport function is(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;\n}\n\nexport function isnt(x, y){\n  return x === y ? x === 0 && 1 / x !== 1 / y : x === x || y === y;\n}\n\nexport function isExtensible(object){\n  ensureObject(object, 'Object.isExtensible');\n  return object.@@IsExtensible();\n}\n\nexport function isFrozen(object){\n  ensureObject(object, 'Object.isFrozen');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc) {\n      if (desc.configurable || 'writable' in desc && desc.writable) {\n        return false;\n      }\n    }\n  }\n\n  return true;\n}\n\nexport function isSealed(object){\n  ensureObject(object, 'Object.isSealed');\n  if (object.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = object.@@GetOwnProperty(props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nexport function keys(object){\n  ensureObject(object, 'Object.keys');\n  return object.@@Enumerate(false, true);\n}\n\nexport function preventExtensions(object){\n  ensureObject(object, 'Object.preventExtensions');\n  object.@@PreventExtensions();\n  return object;\n}\n\nexport function seal(object){\n  ensureObject(object, 'Object.seal');\n\n  var desc = { configurable: false },\n      props = object.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    object.@@DefineOwnProperty(props[i], desc);\n  }\n\n  object.@@PreventExtensions();\n  return object;\n}\n\n\nexport function observe(object, callback){\n  ensureObject(object, 'Object.observe');\n  ensureFunction(callback, 'Object.observe');\n  if (isFrozen(callback)) {\n\n  }\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@getInternal('ChangeObservers');\n\n  $__AddObserver(changeObservers, callback);\n  $__AddObserver($__ObserverCallbacks, callback);\n  return object;\n}\n\nexport function unobserve(object, callback){\n  ensureObject(object, 'Object.unobserve');\n  ensureFunction(callback, 'Object.unobserve');\n\n  var notifier = $__GetNotifier(object),\n      changeObservers = notifier.@@getInternal('ChangeObservers');\n\n  $__RemoveObserver(changeObservers, callback);\n  return object;\n}\n\nexport function deliverChangeRecords(callback){\n  ensureFunction(callback, 'Object.deliverChangeRecords');\n  $__DeliverChangeRecords(callback);\n}\n\nexport function getNotifier(object){\n  ensureObject(object, 'Object.getNotifier');\n  if (isFrozen(object)) {\n    return null;\n  }\n  return $__GetNotifier(object);\n}\n\n\nObject.@@extend({ assign, create, defineProperty, defineProperties, deliverChangeRecords,\n  freeze, getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor,\n  getPropertyNames, getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe,\n  preventExtensions, seal, unobserve\n});\n\n\n\nexport function isPrototypeOf(object, prototype){\n  while (prototype) {\n    prototype = prototype.@@GetPrototype();\n    if (prototype === object) {\n      return true;\n    }\n  }\n  return false;\n}\n\nbuiltinFunction(isPrototypeOf);\n\n\nexport function hasOwnProperty(object, key){\n  return $__ToObject(object).@@HasOwnProperty($__ToPropertyNames(key));\n}\n\nbuiltinFunction(hasOwnProperty);\n\n\nexport function propertyIsEnumerable(object, key){\n  return !!($__ToObject(object).@@query(key) & 1);\n}\n\nbuiltinFunction(propertyIsEnumerable);\n\n";
 
-exports.builtins["@parser"] = "export function parse(src, { loc, source, line, builder } = { loc: true, source: null, line: 1, builder: null }){\n  return $__Parse(src, loc, source, line, builder);\n}\n";
+exports.builtins["@parser"] = "export function parse(src, { loc, range, raw, tokens, comment, source } = { range: false, loc: false, raw: false, source: null, comment: false, tokens: false }){\n  return $__parse(src, loc, range, raw, tokens, comment, source);\n}\n\n\nclass ASTNode {\n  constructor(){\n\n  }\n}\n\nclass ASTCollection {\n\n}\n\n\nclass ArrayExpression extends ASTNode {\n  constructor(elements){\n  }\n}\n\nclass ArrowFunctionExpression extends ASTNode {\n  constructor(params, body){\n  }\n}\n\nclass ArrayPattern extends ASTNode {\n  constructor(elements){\n  }\n}\n\nclass AssignmentExpression extends ASTNode {\n  constructor(operator, left, right){\n  }\n}\n\nclass BinaryExpression extends ASTNode {\n  constructor(operator, left, right){\n  }\n}\n\nclass BlockStatement extends ASTNode {\n  constructor(body){\n  }\n}\n\nclass BreakStatement extends ASTNode {\n  constructor(label){\n  }\n}\n\nclass CallExpression extends ASTNode {\n  constructor(callee, args){\n  }\n}\n\nclass CatchClause extends ASTNode {\n  constructor(param, body){\n  }\n}\n\nclass ClassBody extends ASTNode {\n  constructor(body){\n  }\n}\n\nclass ClassDeclaration extends ASTNode {\n  constructor(id, params, body){\n  }\n}\n\nclass ClassExpression extends ASTNode {\n  constructor(id, params, body){\n  }\n}\n\n\nclass ConditionalExpression extends ASTNode {\n  constructor(test, consequent, alternate){\n  }\n}\n\nclass ContinueStatement extends ASTNode {\n  constructor(label){\n  }\n}\n\nclass EmptyStatement extends ASTNode {\n  constructor(){\n  }\n}\n\nclass ExportSpecifier extends ASTNode {\n  constructor(id, from){\n  }\n}\n\nclass ExportSpecifierSet extends ASTNode {\n  constructor(specifiers){\n  }\n}\n\nclass DebuggerStatement extends ASTNode {\n  constructor(){\n  }\n}\n\nclass DoWhileStatement extends ASTNode {\n  constructor(body, test){\n  }\n}\n\nclass ExportDeclaration extends ASTNode {\n  constructor(declaration){\n  }\n}\n\nclass ExpressionStatement extends ASTNode {\n  constructor(expression){\n  }\n}\n\nclass ForInStatement extends ASTNode {\n  constructor(left, right, body){\n  }\n}\n\nclass ForOfStatement extends ASTNode {\n  constructor(left, right, body){\n  }\n}\n\nclass ForStatement extends ASTNode {\n  constructor(init, test, update, body){\n  }\n}\n\nclass FunctionDeclaration extends ASTNode {\n  constructor(id, params, body){\n  }\n}\n\nclass FunctionExpression extends ASTNode {\n  constructor(id, params, body){\n  }\n}\n\nclass Glob extends ASTNode {\n  constructor(){\n  }\n}\n\nclass Identifier extends ASTNode {\n  constructor(name){\n  }\n}\n\nclass IfStatement extends ASTNode {\n  constructor(test, consequent, alternate){\n  }\n}\n\nclass ImportDeclaration extends ASTNode {\n  constructor(specifiers, from){\n  }\n}\nclass ImportSpecifier extends ASTNode {\n  constructor(id, from){\n  }\n}\n\nclass LabeledStatement extends ASTNode {\n  constructor(label, body){\n  }\n}\n\nclass Literal extends ASTNode {\n  constructor(value){\n  }\n}\n\nclass LogicalExpression extends ASTNode {\n  constructor(operator, left, right){\n  }\n}\n\nclass MemberExpression extends ASTNode {\n  constructor(object, property){\n  }\n}\n\nclass MethodDefinition extends ASTNode {\n  constructor(kind, key, value){\n  }\n}\nclass ModuleDeclaration extends ASTNode {\n  constructor(id, body, from){\n  }\n}\n\nclass NewExpression extends ASTNode {\n  constructor(callee, args){\n  }\n}\n\nclass ObjectExpression extends ASTNode {\n  constructor(properties){\n  }\n}\n\nclass ObjectPattern extends ASTNode {\n  constructor(properties){\n  }\n}\n\nclass Path extends ASTNode {\n  constructor(body){\n  }\n}\n\nclass Program extends ASTNode {\n  constructor(body){\n  }\n}\n\nclass Property extends ASTNode {\n  constructor(kind, key, value){\n  }\n}\n\nclass ReturnStatement extends ASTNode {\n  constructor(argument){\n  }\n}\n\nclass SequenceExpression extends ASTNode {\n  constructor(expressions){\n  }\n}\n\nclass SpreadElement extends ASTNode {\n  constructor(argument){\n  }\n}\n\nclass SwitchCase extends ASTNode {\n  constructor(test, consequent){\n  }\n}\n\nclass SwitchStatement extends ASTNode {\n  constructor(descriminant, cases){\n  }\n}\n\nclass SymbolDeclaration extends ASTNode {\n  constructor(declarations){\n  }\n}\n\nclass SymbolDeclarator extends ASTNode {\n  constructor(id, init){\n  }\n}\n\nclass TaggedTemplateExpression extends ASTNode {\n  constructor(template){\n  }\n}\n\nclass TemplateElement extends ASTNode {\n  constructor(value, tail){\n  }\n}\n\nclass TemplateLiteral extends ASTNode {\n  constructor(templates, expressions){\n  }\n}\n\nclass ThisExpression extends ASTNode {\n  constructor(){\n  }\n}\n\nclass ThrowStatement extends ASTNode {\n  constructor(argument){\n  }\n}\n\nclass TryStatement extends ASTNode {\n  constructor(block, handlers, finalizer){\n  }\n}\n\nclass UnaryExpression extends ASTNode {\n  constructor(operator, argument){\n  }\n}\n\nclass UpdateExpression extends ASTNode {\n  constructor(operator, argument){\n  }\n}\n\nclass WithStatement extends ASTNode {\n  constructor(object, body){\n  }\n}\n\nclass WhileStatement extends ASTNode {\n  constructor(test, body){\n  }\n}\n\nclass VariableDeclaration extends ASTNode {\n  constructor(declarations){\n  }\n}\n\nclass VariableDeclarator extends ASTNode {\n  constructor(id, init){\n  }\n}\n\nclass YieldExpression extends ASTNode {\n  constructor(argument){\n  }\n}\n";
 
 exports.builtins["@reflect"] = "export class Proxy {\n  constructor(target, handler){\n    ensureObject(target, 'Proxy');\n    ensureObject(handler, 'Proxy');\n    return $__ProxyCreate(target, handler);\n  }\n}\n\nbuiltinClass(Proxy);\n\nProxy.@@delete('prototype');\n\nexport class Handler {\n  getOwnPropertyDescriptor(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);\n    return getOwnPropertyDescriptor(target, name);\n  }\n\n  getOwnPropertyNames(target){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);\n    return getOwnPropertyNames(target);\n  }\n\n  getPrototypeOf(target){\n    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);\n    return getPrototypeOf(target);\n  }\n\n  defineProperty(target, name, desc){\n    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);\n    return defineProperty(target, name, desc);\n  }\n\n  deleteProperty(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);\n    return deleteProperty(target, name);\n  }\n\n  preventExtensions(target){\n    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);\n    return preventExtensions(target);\n  }\n\n  isExtensible(target){\n    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);\n    return isExtensible(target);\n  }\n\n  apply(target, thisArg, args){\n    //throw $__Exception('missing_fundamental_trap', ['apply']);\n    return apply(target, thisArg, args);\n  }\n\n  seal(target) {\n    if (!this.preventExtensions(target)) return false;\n\n    var props = this.getOwnPropertyNames(target),\n        len = +props.length;\n\n    for (var i = 0; i < len; i++) {\n      success = success && this.defineProperty(target, props[i], { configurable: false });\n    }\n    return success;\n  }\n\n  freeze(target){\n    if (!this.preventExtensions(target)) return false;\n\n    var props = this.getOwnPropertyNames(target),\n        len = +props.length;\n\n    for (var i = 0; i < len; i++) {\n      var name = props[i],\n          desc = this.getOwnPropertyDescriptor(target, name);\n\n      if (desc) {\n        desc = 'writable' in desc || 'value' in desc\n          ? { configurable: false, writable: false }\n          : { configurable: false };\n        success = success && this.defineProperty(target, name, desc);\n      }\n    }\n\n    return success;\n  }\n\n  isSealed(target){\n    var props = this.getOwnPropertyNames(target),\n        len = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      var desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc && desc.configurable) {\n        return false;\n      }\n    }\n    return !this.isExtensible(target);\n  }\n\n  isFrozen(target){\n    var props = this.getOwnPropertyNames(target),\n        len = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      var desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc.configurable || ('writable' in desc || 'value' in desc) && desc.writable) {\n        return false;\n      }\n    }\n    return !this.isExtensible(target);\n  }\n\n  has(target, name){\n    var desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc !== undefined) {\n      return true;\n    }\n\n    var proto = target.@@GetPrototype();\n    return proto === null ? false : this.has(proto, name);\n  }\n\n  hasOwn(target, name){\n    return this.getOwnPropertyDescriptor(target, name) !== undefined;\n  }\n\n  get(target, name, receiver){\n    receiver = receiver || target;\n\n    var desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc === undefined) {\n      var proto = target.@@GetPrototype();\n      return proto === null ? undefined : this.get(proto, name, receiver);\n    }\n\n    if ('writable' in desc || 'value' in desc) {\n      return desc.value;\n    }\n\n    var getter = desc.get;\n    return getter === undefined ? undefined : getter.@@Call(receiver, []);\n  }\n\n  set(target, name, value, receiver){\n    var ownDesc = this.getOwnPropertyDescriptor(target, name);\n\n    if (ownDesc !== undefined) {\n      if ('get' in ownDesc || 'set' in ownDesc) {\n        var setter = ownDesc.set;\n        if (setter === undefined) return false;\n        setter.@@Call(receiver, [value]);\n        return true;\n      }\n\n      if (ownDesc.writable === false) {\n        return false;\n      } else if (receiver === target) {\n        receiver.@@DefineOwnProperty(name, { value: value });\n        return true;\n      } else {\n        receiver.@@DefineOwnProperty(name, newDesc);\n        if (receiver.@@IsExtensible()) {\n          object.@@DefineOwnProperty(key, { writable: true,\n                                            enumerable: true,\n                                            configurable: true });\n          return true;\n        }\n        return false;\n      }\n    }\n\n    var proto = target.@@GetPrototype();\n    if (proto === null) {\n      if (receiver.@@IsExtensible()) {\n        receiver.@@DefineOwnProperty(key, { writable: true,\n                                            enumerable: true,\n                                            configurable: true });\n        return true;\n      }\n      return false;\n    }\n\n    return this.set(proto, name, value, receiver);\n  }\n\n  enumerate(target){\n    var result = this.getOwnPropertyNames(target),\n        len = +result.length,\n        out = [];\n\n    for (var i = 0; i < len; i++) {\n      var name = $__ToString(result[i]),\n          desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && !desc.enumerable) {\n        out.push(name);\n      }\n    }\n\n    var proto = target.@@GetPrototype();\n    return proto === null ? out : out.concat(enumerate(proto));\n  }\n\n  keys(target){\n    var result = this.getOwnPropertyNames(target),\n        len = +result.length,\n        result = [];\n\n    for (var i = 0; i < len; i++) {\n      var name = $__ToString(result[i]),\n          desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && desc.enumerable) {\n        result.push(name);\n      }\n    }\n    return result;\n  }\n\n  construct(target, args) {\n    var proto = this.get(target, 'prototype', target),\n        instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},\n        result = this.apply(target, instance, args);\n\n    return $__Type(result) === 'Object' ? result : instance;\n  }\n}\n\nbuiltinClass(Handler);\n\n\nexport function apply(target, thisArg, args){\n  ensureFunction(target, '@Reflect.apply');\n  return target.@@Call(thisArg, ensureArgs(args));\n}\nbuiltinFunction(apply);\n\nexport function construct(target, args){\n  ensureFunction(target, '@Reflect.construct');\n  return target.@@Construct(ensureArgs(args));\n}\nbuiltinFunction(construct);\n\nexport function defineProperty(target, name, desc){\n  ensureObject(target, '@Reflect.defineProperty');\n  ensureDescriptor(desc);\n  return target.@@DefineOwnProperty($__ToPropertyName(name), desc);\n}\nbuiltinFunction(defineProperty);\n\nexport function deleteProperty(target, name){\n  ensureObject(target, '@Reflect.deleteProperty');\n  return target.@@Delete($__ToPropertyName(name), false);\n}\nbuiltinFunction(deleteProperty);\n\nexport function enumerate(target){\n  return $__ToObject(target).@@Enumerate(false, false);\n}\nbuiltinFunction(enumerate);\n\nexport function freeze(target){\n  if ($__Type(target) !== 'Object' || !target.@@PreventExtensions()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n      len = props.length\n      success = true;\n\n  for (var i = 0; i < len; i++) {\n    var desc = target.@@GetOwnProperty(props[i]),\n        attrs = 'writable' in desc || 'value' in desc\n          ? { configurable: false, writable: false }\n          : desc !== undefined\n            ? { configurable: false }\n            : null;\n\n    if (attrs !== null) {\n      success = success && target.@@DefineOwnProperty(props[i], attrs);\n    }\n  }\n  return success;\n}\nbuiltinFunction(freeze);\n\nexport function get(target, name, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__ToObject(target).@@GetP($__ToPropertyName(name), receiver);\n}\nbuiltinFunction(get);\n\nexport function getOwnPropertyDescriptor(target, name){\n  ensureObject(target, '@Reflect.getOwnPropertyDescriptor');\n  return target.@@GetOwnProperty($__ToPropertyName(name));\n}\nbuiltinFunction(getOwnPropertyDescriptor);\n\nexport function getOwnPropertyNames(target){\n  ensureObject(target, '@Reflect.getOwnPropertyNames');\n  return target.@@Enumerate(false, false);\n}\nbuiltinFunction(getOwnPropertyNames);\n\nexport function getPrototypeOf(target){\n  ensureObject(target, '@Reflect.getPrototypeOf');\n  return target.@@GetPrototype();\n}\nbuiltinFunction(getPrototypeOf);\n\nexport function has(target, name){\n  return $__ToObject(target).@@HasProperty($__ToPropertyName(name));\n}\nbuiltinFunction(has);\n\nexport function hasOwn(target, name){\n  return $__ToObject(target).@@HasOwnProperty($__ToPropertyName(name));\n}\nbuiltinFunction(hasOwn);\n\nexport function isFrozen(target){\n  ensureObject(target, '@Reflect.isFrozen');\n  if (target.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = target.@@GetOwnProperty(props[i]);\n    if (desc) {\n      if (desc.configurable || 'writable' in desc && desc.writable) {\n        return false;\n      }\n    }\n  }\n\n  return true;\n}\nbuiltinFunction(isFrozen);\n\nexport function isSealed(target){\n  ensureObject(target, '@Reflect.isSealed');\n  if (target.@@IsExtensible()) {\n    return false;\n  }\n\n  var props = target.@@Enumerate(false, false);\n\n  for (var i=0; i < props.length; i++) {\n    var desc = target.@@GetOwnProperty(props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\nbuiltinFunction(isSealed);\n\nexport function isExtensible(target){\n  ensureObject(target, '@Reflect.isExtensible');\n  return target.@@IsExtensible();\n}\nbuiltinFunction(isExtensible);\n\nexport function keys(target){\n  ensureObject(target, '@Reflect.keys');\n  return target.@@Enumerate(false, true);\n}\nbuiltinFunction(keys);\n\nexport function preventExtensions(target){\n  if ($__Type(target) !== 'Object') return false;\n  return target.@@PreventExtensions();\n}\nbuiltinFunction(preventExtensions);\n\nexport function seal(target){\n  if ($__Type(target) !== 'Object') return false;\n  var success = target.@@PreventExtensions();\n  if (!success) return success;\n\n  var props = target.@@Enumerate(false, false),\n      len = props.length;\n\n  for (var i = 0; i < len; i++) {\n    success = success && target.@@DefineOwnProperty(props[i], { configurable: false });\n  }\n  return success;\n}\nbuiltinFunction(seal);\n\nexport function set(target, name, value, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__ToObject(target).@@SetP($__ToPropertyName(name), value, receiver);\n}\nbuiltinFunction(set);\n";
 
