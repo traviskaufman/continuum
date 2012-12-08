@@ -1559,6 +1559,7 @@ var assembler = (function(exports){
     callback();
     transfer.updateBreaks(current());
     context.jumps.pop();
+    context.labels = transfer.labels;
     popScope();
   }
 
@@ -1569,6 +1570,7 @@ var assembler = (function(exports){
     transfer.updateContinues(callback());
     transfer.updateBreaks(current());
     context.jumps.pop();
+    context.labels = transfer.labels;
   }
 
   function unwinder(type, callback){
@@ -1631,13 +1633,13 @@ var assembler = (function(exports){
 
   function move(node, set, pos){
     if (node.label) {
-      var transfer = context.jumps.first(function(transfer){
-        return node.label.name in transfer.labels;
+      var transfer = context.jumps.find(function(jump){
+        return node.label.name in jump.labels;
       });
 
     } else {
-      var transfer = context.jumps.first(function(transfer){
-        return transfer && transfer.continues;
+      var transfer = context.jumps.find(function(jump){
+        return transfer && jump.continues;
       });
     }
     transfer && transfer[set].push(pos);
