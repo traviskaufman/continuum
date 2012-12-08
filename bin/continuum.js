@@ -16,7 +16,10 @@ if (!args.length) {
 }
 
 function log(o){
-  console.log(inspect(o, null, 10));
+  if (o !== undefined) {
+    console.log(inspect(o, null, 10));
+    console.log('');
+  }
 }
 
 var bytecode = false,
@@ -28,7 +31,6 @@ var flags = {
     execute = false;
   }
 };
-
 
 var scripts = args.filter(function(arg){
   if (arg[0] === '-' && arg[1] in flags) {
@@ -46,6 +48,9 @@ var scripts = args.filter(function(arg){
 
 if (execute) {
   var realm = continuum.createRealm();
+  realm.on('throw', log);
+  realm.on('write', log);
+  realm.on('inspect', log);
   scripts.forEach(function(script){
     realm.evaluateAsync(script, log);
   });
