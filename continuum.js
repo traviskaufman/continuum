@@ -5657,7 +5657,7 @@ exports.functions = (function(exports){
       }
 
       if (!hasOwn(f, 'name')) {
-        var match = toSource(f).match(/^\n?function\s?(\w*)?_?\(/);
+        var match = toSource(f).match(/^\n?function\s?([\w\$]*)?_?\(/);
         if (match) {
           hidden.value = match[1];
           defineProperty(f, 'name', hidden);
@@ -11621,36 +11621,18 @@ exports.operators = (function(exports){
   // ## ToPrimitive
 
   function ToPrimitive(argument, hint){
-    if (typeof argument === OBJECT) {
-      if (argument === null) {
-        return argument;
-      } else if (argument.Completion) {
-        if (argument.Abrupt) {
-          return argument;
-        }
-        return ToPrimitive(argument.value, hint);
-      }
+    if (argument && typeof argument === OBJECT && !argument.Abrupt) {
       return ToPrimitive(argument.DefaultValue(hint), hint);
-    } else {
-      return argument;
     }
+    return argument;
   }
   exports.ToPrimitive = ToPrimitive;
 
   // ## ToBoolean
 
   function ToBoolean(argument){
-    if (!argument) {
-      return false;
-    } else if (typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      } else {
-        return !!argument.value;
-      }
-    } else {
-      return !!argument;
-    }
+    if (argument && argument.Completion) return argument;
+    return !!argument;
   }
   exports.ToBoolean = ToBoolean;
 
@@ -11658,16 +11640,10 @@ exports.operators = (function(exports){
 
   function ToNumber(argument){
     if (argument !== null && typeof argument === OBJECT) {
-      if (argument.Completion) {
-        if (argument.Abrupt) {
-          return argument;
-        }
-        return ToNumber(argument.value);
-      }
+      if (argument.Abrupt) return argument;
       return ToNumber(ToPrimitive(argument, 'Number'));
-    } else {
-      return +argument;
     }
+    return +argument;
   }
   exports.ToNumber = ToNumber;
 
@@ -11676,12 +11652,7 @@ exports.operators = (function(exports){
   function ToInteger(argument){
     argument = ToNumber(argument);
 
-    if (argument && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      argument = argument.value;
-    }
+    if (argument && argument.Abrupt) return argument;
 
     if (argument !== argument) {
       return 0;
@@ -11699,12 +11670,7 @@ exports.operators = (function(exports){
 
   function ToUint32(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToUint32(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return argument >>> 0;
   }
   exports.ToUint32 = ToUint32;
@@ -11713,12 +11679,7 @@ exports.operators = (function(exports){
 
   function ToInt32(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToInt32(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return argument >> 0;
   }
   exports.ToInt32 = ToInt32;
@@ -11727,12 +11688,7 @@ exports.operators = (function(exports){
 
   function ToUint16(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToUint16(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return (argument >>> 0) % (1 << 16);
   }
   exports.ToUint16 = ToUint16;
@@ -11761,11 +11717,8 @@ exports.operators = (function(exports){
       case OBJECT:
         if (argument === null) {
           return 'null';
-        } else if (argument.Completion) {
-          if (argument.Abrupt) {
-            return argument;
-          }
-          return ToString(argument.value);
+        } else if (argument.Abrupt) {
+          return argument;
         }
         return ToString(ToPrimitive(argument, 'String'));
     }
@@ -11782,26 +11735,19 @@ exports.operators = (function(exports){
   }(function(pre, change){
     return function(ref) {
       var val = ToNumber(GetValue(ref));
-      if (val && val.Abrupt) {
-        return val;
-      }
+      if (val && val.Abrupt) return val;
 
       var newVal = val + change,
           result = PutValue(ref, newVal);
 
-      if (result && result.Abrupt) {
-        return result;
-      }
+      if (result && result.Abrupt) return result;
       return pre ? newVal : val;
     };
   });
 
   function VOID(ref){
     var val = GetValue(ref);
-    if (val && val.Abrupt) {
-      return val;
-    }
-    return undefined;
+    if (val && val.Abrupt) return val;
   }
   exports.VOID = VOID;
 
@@ -11817,13 +11763,7 @@ exports.operators = (function(exports){
           return OBJECT;
         }
 
-        if (val.Completion) {
-          if (val.Abrupt) {
-            return val;
-          } else {
-            return TYPEOF(val.value);
-          }
-        }
+        if (val.Abrupt) return val;
 
         if (val.Reference) {
           if (val.base === undefined) {
@@ -11834,9 +11774,8 @@ exports.operators = (function(exports){
 
         if ('Call' in val) {
           return FUNCTION;
-        } else {
-          return OBJECT;
         }
+        return OBJECT;
       }
   }
   exports.TYPEOF = TYPEOF;
@@ -11857,16 +11796,9 @@ exports.operators = (function(exports){
       if (!ref || typeof ref !== OBJECT) {
         return finalize(ref);
       }
+
       var val = convert(GetValue(ref));
-
-      if (val && val.Completion) {
-        if (val.Abrupt) {
-          return val;
-        } else {
-          val = val.value;
-        }
-      }
-
+      if (val && val.Abrupt) return val;
       return finalize(val);
     }
   });
@@ -11881,21 +11813,9 @@ exports.operators = (function(exports){
   }(function(finalize){
     return function(lval, rval) {
       lval = ToNumber(lval);
-      if (lval && lval.Completion) {
-        if (lval.Abrupt) {
-          return lval;
-        } else {
-          lval = lval.value;
-        }
-      }
+      if (lval && lval.Abrupt) return lval;
       rval = ToNumber(rval);
-      if (rval && rval.Completion) {
-        if (rval.Abrupt) {
-          return rval;
-        } else {
-          rval = rval.value;
-        }
-      }
+      if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval);
     };
   });
@@ -11903,22 +11823,10 @@ exports.operators = (function(exports){
   function convertAdd(a, b, type, converter){
     if (typeof a !== type) {
       a = converter(a);
-      if (a && a.Completion) {
-        if (a.Abrupt) {
-          return a;
-        } else {
-          a = a.value;
-        }
-      }
+      if (a && a.Abrupt) return a;
     } else if (typeof b !== type) {
       b = converter(b);
-      if (b && b.Completion) {
-        if (b.Abrupt) {
-          return b;
-        } else {
-          b = b.value;
-        }
-      }
+      if (b && b.Abrupt) return b;
     }
     return a + b;
   }
@@ -11927,22 +11835,10 @@ exports.operators = (function(exports){
 
   function ADD(lval, rval) {
     lval = ToPrimitive(lval);
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
-    }
+    if (lval && lval.Abrupt) return lval;
 
     rval = ToPrimitive(rval);
-    if (rval && rval.Completion) {
-      if (rval && rval.Abrupt) {
-        return rval;
-      } else {
-        rval = rval.value;
-      }
-    }
+    if (rval && rval.Abrupt) return rval;
 
     if (typeof lval === STRING || typeof rval === STRING) {
       var type = STRING,
@@ -11973,21 +11869,9 @@ exports.operators = (function(exports){
   }(function(finalize){
     return function(lval, rval) {
       lval = ToInt32(lval);
-      if (lval && lval.Completion) {
-        if (lval.Abrupt) {
-          return lval;
-        } else {
-          lval = lval.value;
-        }
-      }
+      if (lval && lval.Abrupt) return lval;
       rval = ToUint32(rval);
-      if (rval && rval.Completion) {
-        if (rval.Abrupt) {
-          return rval;
-        } else {
-          rval = rval.value;
-        }
-      }
+      if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval & 0x1F);
     };
   });
@@ -12004,22 +11888,10 @@ exports.operators = (function(exports){
     }
 
     lval = ToPrimitive(lval, 'Number');
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
-    }
+    if (lval && lval.Abrupt) return lval;
 
     rval = ToPrimitive(rval, 'Number');
-    if (rval && rval.Completion) {
-      if (rval.Abrupt) {
-        return rval;
-      } else {
-        rval = rval.value;
-      }
-    }
+    if (rval && rval.Abrupt) return rval;
 
     var ltype = typeof lval,
         rtype = typeof rval;
@@ -12027,22 +11899,10 @@ exports.operators = (function(exports){
     if (ltype === STRING || rtype === STRING) {
       if (ltype !== STRING) {
         lval = ToString(lval);
-        if (lval && lval.Completion) {
-          if (lval.Abrupt) {
-            return lval;
-          } else {
-            lval = lval.value;
-          }
-        }
+        if (lval && lval.Abrupt) return lval;
       } else if (rtype !== STRING) {
         rval = ToString(rval);
-        if (rval && rval.Completion) {
-          if (rval.Abrupt) {
-            return rval;
-          } else {
-            rval = rval.value;
-          }
-        }
+        if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === STRING && typeof rval === STRING) {
         return lval < rval;
@@ -12050,23 +11910,11 @@ exports.operators = (function(exports){
     } else {
       if (ltype !== NUMBER) {
         lval = ToNumber(lval);
-        if (lval && lval.Completion) {
-          if (lval.Abrupt) {
-            return lval;
-          } else {
-            lval = lval.value;
-          }
-        }
+        if (lval && lval.Abrupt) return lval;
       }
       if (rtype !== NUMBER) {
         rval = ToNumber(rval);
-        if (rval && rval.Completion) {
-          if (rval.Abrupt) {
-            return rval;
-          } else {
-            rval = rval.value;
-          }
-        }
+        if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === NUMBER && typeof rval === NUMBER) {
         return lval < rval;
@@ -12089,13 +11937,7 @@ exports.operators = (function(exports){
       }
 
       var result = COMPARE(rval, lval, left);
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          return result;
-        } else {
-          result = result.value;
-        }
-      }
+      if (result && result.Abrupt) return result;
 
       if (result === undefined) {
         return false;
@@ -12127,9 +11969,8 @@ exports.operators = (function(exports){
     if (base === undefined) {
       if (ref.strict) {
         return ThrowException('strict_delete_property', [ref.name, base]);
-      } else {
-        return true;
       }
+      return true;
     }
 
 
@@ -12153,9 +11994,7 @@ exports.operators = (function(exports){
     }
 
     lval = ToPropertyName(lval);
-    if (lval && lval.Abrupt) {
-      return lval;
-    }
+    if (lval && lval.Abrupt) return lval;
 
     return rval.HasProperty(lval);
   }
@@ -12165,20 +12004,8 @@ exports.operators = (function(exports){
 
 
   function STRICT_EQUAL(x, y) {
-    if (x && x.Completion) {
-      if (x.Abrupt) {
-        return x;
-      } else {
-        x = x.value;
-      }
-    }
-    if (y && y.Completion) {
-      if (y.Abrupt) {
-        return y;
-      } else {
-        y = y.value;
-      }
-    }
+    if (x && x.Abrupt) return x;
+    if (y && y.Abrupt) return y;
     return x === y;
   }
   exports.STRICT_EQUAL = STRICT_EQUAL;
@@ -13944,13 +13771,350 @@ exports.$Object = (function(module){
 })(typeof module !== 'undefined' ? module : {});
 
 
+exports.$Array = (function(module){
+  var objects      = require('../lib/objects'),
+      utility      = require('../lib/utility'),
+      errors       = require('../errors'),
+      constants    = require('../constants'),
+      operators    = require('./operators'),
+      operations   = require('./operations'),
+      PropertyList = require('../lib/PropertyList'),
+      $Object      = require('./$Object');
+
+  var inherit        = objects.inherit,
+      define         = objects.define,
+      copy           = objects.copy,
+      Hash           = objects.Hash,
+      tag            = utility.tag,
+      IsArrayIndex   = operations.isArrayIndex,
+      ThrowException = errors.ThrowException,
+      ToBoolean      = operators.ToBoolean,
+      ToUint32       = operators.ToUint32,
+      ToNumber       = operators.ToNumber;
+
+  var __W = 4,
+      ECW = 7;
+
+  var DefineOwn = $Object.prototype.DefineOwnProperty;
+
+  function $Array(array){
+    this.Prototype = intrinsics.ArrayProto;
+    this.Realm = realm;
+    this.properties = new PropertyList;
+    this.storage = new Hash;
+    tag(this);
+
+    if (typeof array === 'number') {
+      this.array = new Array(array);
+    } else if (array) {
+      this.array = array;
+    } else {
+      this.array = [];
+    }
+    this.length = ['length', this.array.length, __W];
+  }
+
+  inherit($Array, $Object, {
+    BuiltinBrand: constants.BRANDS.BuiltinArray
+  }, [
+    function has(key){
+      if (key === 'length') {
+        return true;
+      } else if ((key >>> 0) == key && key < this.array.length) {
+        return key in this.array;
+      }
+      return this.properties.has(key);
+    },
+    function remove(key){
+      if (key === 'length') {
+        return false;
+      } else if ((key >>> 0) == key && key < this.array.length) {
+        return delete this.array[key];
+      }
+      return this.properties.remove(key);
+    },
+    function get(key){
+      if (key === 'length') {
+        return this.array.length;
+      } else if ((key >>> 0) == key) {
+        return this.array[key];
+      }
+      return this.properties.get(key);
+    },
+    function set(key, value){
+      if (key === 'length') {
+        this.length[1] = this.array.length = value;
+        return true;
+      } else if ((key >>> 0) == key) {
+        this.array[key] = value;
+        return true;
+      }
+      return this.properties.set(key, value);
+    },
+    function describe(key){
+      if (key === 'length') {
+        this.length[1] = this.array.length;
+        return this.length;
+      } else if ((key >>> 0) == key && key < this.array.length) {
+        if (key in this.array) {
+          return [key, this.array[key], ECW];
+        }
+      } else {
+        return this.properties.describe(key);
+      }
+    },
+    function query(key){
+      if (key === 'length') {
+        return __W;
+      } else if ((key >>> 0) == key) {
+        return key in this.array ? ECW : null;
+      }
+      return this.properties.query(key);
+    },
+    function update(key, attr){
+      if (attr === __W && key === 'length') {
+        return true;
+      } else if ((key >>> 0) == key && key in this.array) {
+        if (attr === ECW) {
+          return true;
+        }
+        deoptimize(this);
+      }
+      return this.properties.update(key, attr);
+    },
+    function each(callback){
+      var len = this.length[1] = this.array.length;
+      callback(this.length);
+
+      for (var i=0; i < len; i++) {
+        if (i in this.array) {
+          callback([i+'', this.array[i], ECW]);
+        }
+      }
+
+      this.properties.each(callback);
+    },
+    (function(){
+      return function define(key, value, attr){
+        if (key === 'length' && attr === __W) {
+          this.length[1] = this.array.length = value;
+          return true;
+        } else if ((key >>> 0) == key) {
+          if (attr === ECW) {
+            this.array[key] = value;
+            return true;
+          }
+          deoptimize(this);
+        }
+        return this.properties.define(key, value, attr);
+      };
+    })(),
+    function DefineOwnProperty(key, desc, strict){
+      var oldLenDesc = this.GetOwnProperty('length'),
+          oldLen = oldLenDesc.Value,
+          reject = strict ? function(e, a){ return ThrowException(e, a) }
+                          : function(e, a){ return false };
+
+
+      if (key === 'length') {
+        if (!('Value' in desc)) {
+          return DefineOwn.call(this, 'length', desc, strict);
+        }
+
+        var newLenDesc = copy(desc),
+            newLen = ToUint32(desc.Value);
+
+        if (newLen.Abrupt) return newLen;
+
+        var value = ToNumber(desc.Value);
+        if (value.Abrupt) return value;
+
+        if (newLen !== value) {
+          return reject('invalid_array_length');
+        }
+
+        newLen = newLenDesc.Value;
+        if (newLen >= oldLen) {
+          return DefineOwn.call(this, 'length', newLenDesc, strict);
+        }
+
+        if (oldLenDesc.Writable === false) {
+          return reject('strict_cannot_assign')
+        }
+
+        if (!('Writable' in newLenDesc) || newLenDesc.Writable) {
+          var newWritable = true;
+        } else {
+          newWritable = false;
+          newLenDesc.Writable = true;
+        }
+
+        var success = DefineOwn.call(this, 'length', newLenDesc, strict);
+        if (success.Abrupt) return success;
+
+        if (success === false) {
+          return false;
+        }
+
+        while (newLen < oldLen) {
+          oldLen = oldLen - 1;
+          var deleted = this.Delete(''+oldLen, false);
+          if (deleted.Abrupt) return deleted;
+
+          if (!deleted) {
+            newLenDesc.Value = oldLen + 1;
+            if (!newWritable) {
+              newLenDesc.Writable = false;
+            }
+            DefineOwn.call(this, 'length', newLenDesc, false);
+            return reject('strict_delete_property');
+          }
+        }
+        if (!newWritable) {
+          DefineOwn.call(this, 'length', { Writable: false }, false);
+        }
+
+        return true;
+      }  else if (IsArrayIndex(key)) {
+        var index = ToUint32(key);
+        if (index.Abrupt) return index;
+
+        if (index >= oldLen && oldLenDesc.Writable === false) {
+          return reject('strict_cannot_assign');
+        }
+
+        success = DefineOwn.call(this, key, desc, false);
+        if (success.Abrupt) return success;
+
+        if (success === false) {
+          return reject('strict_cannot_assign');
+        }
+
+        if (index >= oldLen) {
+          oldLenDesc.Value = index + 1;
+          DefineOwn.call(this, 'length', oldLenDesc, false);
+        }
+        return true;
+      }
+
+      return DefineOwn.call(this, key, desc, key);
+    }
+  ]);
+
+  var deoptimize = (function(){
+    var deoptimized = [
+      function each(callback){
+        var len = this.array.length;
+
+        for (var i=0; i < len; i++) {
+          if (i in this.array) {
+            this.properties.set(i+'', this.array[i]);
+          } else {
+            this.properties.remove(i);
+          }
+        }
+
+        this.properties.set('length', this.array.length);
+        this.properties.each(callback);
+      },
+      function remove(key){
+        if ((key >>> 0) == key && key < this.array.length) {
+          delete this.array[key];
+        }
+        return this.properties.remove(key);
+      },
+      function update(key, attr){
+        if (!this.properties.has(key) && (key >>> 0) == key && key in this.array) {
+          return this.properties.define(key, this.array[i], attr);
+        }
+        return this.properties.update(key, attr);
+      },
+      function query(key){
+        var result = this.properties.query(key);
+        if (result === null && (key >>> 0) == key && key in this.array) {
+          this.properties.define(key, this.array[key], result = ECW);
+        }
+        return result;
+      },
+      function describe(key){
+        if (key === 'length') {
+          var index = this.properties.get('length'),
+              len = this.array.length;
+
+          if (index !== len) {
+            for (; index < len; index++) {
+              if (index in this.array) {
+                this.properties.set(index, this.array[index]);
+              }
+            }
+            this.properties.set('length', len);
+          }
+        } else if ((key >>> 0) == key && key < this.array.length) {
+          if (key in this.array) {
+            var prop = this.properties.describe(key);
+            if (prop) {
+              if (prop[1] !== this.array[key]) {
+                this.properties.set(key, this.array[key]);
+                prop[1] = this.array[key];
+              }
+            } else {
+              prop = [i+'', this.array[i], ECW];
+              this.properties.setProperty(i, prop);
+            }
+            return prop;
+          }
+          if (this.properties.has(key)) {
+            this.properties.delete(key);
+          }
+          return;
+        }
+        return this.properties.describe(key);
+      },
+      (function(){
+        return function define(key, value, attr){
+          if (key === 'length' || (key >>> 0) == key) {
+            this.array[key] = value;
+          }
+          return this.properties.define(key, value, attr);
+        };
+      })()
+    ];
+
+    return function deoptimize(target){
+      var len = target.array.length;
+      target.properties.define('length', len, __W);
+
+      for (var i=0; i < len; i++) {
+        if (i in target.array) {
+          target.properties.define(i+'', target.array[i], ECW);
+        }
+      }
+
+      define(target, deoptimized);
+    };
+  })();
+
+  var realm, intrinsics;
+
+  define($Array, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
+
+  return module.exports = $Array;
+})(typeof module !== 'undefined' ? module : {});
+
+
 exports.$Proxy = (function(module){
   var objects = require('../lib/objects'),
       errors = require('../errors'),
       operators = require('./operators'),
       descriptors = require('./descriptors'),
       operations = require('./operations'),
-      $Object = require('./$Object');
+      $Object = require('./$Object'),
+      $Array = require('./$Array');
 
   var inherit = objects.inherit,
       is = objects.is,
@@ -13972,17 +14136,11 @@ exports.$Proxy = (function(module){
     return true;
   }
 
-  function $Array(o){
-    $Array = require('../runtime').builtins.$Array;
-    return new $Array(o);
-  }
 
   function GetMethod(handler, trap){
     var result = handler.Get(trap);
 
-    if (result && result.Abrupt) {
-      return result;
-    }
+    if (result && result.Abrupt) return result;
 
     if (result !== undefined && !IsCallable(result)) {
       return ThrowException('proxy_non_callable_trap');
@@ -15763,6 +15921,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       operations   = require('./object-model/operations'),
       descriptors  = require('./object-model/descriptors'),
       $Object      = require('./object-model/$Object'),
+      $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
       Emitter      = require('./lib/Emitter'),
       buffers      = require('./lib/buffers'),
@@ -16037,9 +16196,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
     } else {
-      if (superclass && superclass.Completion) {
-        if (superclass.Abrupt) return superclass; else superclass = superclass.value;
-      }
+      if (superclass && superclass.Abrupt) return superclass;
 
       if (superclass === null) {
         superproto = null;
@@ -16051,9 +16208,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         superctor = intrinsics.FunctionProto;
       } else {
         superproto = superclass.Get('prototype');
-        if (superproto && superproto.Completion) {
-          if (superproto.Abrupt) return superproto; else superproto = superproto.value;
-        }
+        if (superproto && superproto.Abrupt) return superproto;
 
         if (typeof superproto !== 'object') {
           return ThrowException('non_object_superproto');
@@ -16070,9 +16225,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           isPublic = symbols[1][i],
           result   = context.initializeSymbolBinding(symbol, context.createSymbol(symbol, isPublic));
 
-      if (result && result.Abrupt) {
-        return result;
-      }
+      if (result && result.Abrupt) return result;
     }
 
 
@@ -16085,9 +16238,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
-    if (ctor && ctor.Completion) {
-      if (ctor.Abrupt) return ctor; else ctor = ctor.value;
-    }
+    if (ctor && ctor.Abrupt) return ctor;
 
     if (name) {
       context.initializeBinding(name, ctor);
@@ -16234,9 +16385,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
               receiver = ToObject(receiver);
-              if (receiver.Completion) {
-                if (receiver.Abrupt) return receiver; else receiver = receiver.value;
-              }
+              if (receiver.Abrupt) return receiver;
             }
           }
           var local = new FunctionEnv(receiver, this);
@@ -16271,9 +16420,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return ThrowException('construct_arrow_function');
         }
         var prototype = this.Get('prototype');
-        if (prototype && prototype.Completion) {
-          if (prototype.Abrupt) return prototype; else prototype = prototype.value;
-        }
+        if (prototype && prototype.Abrupt) return prototype;
 
         var instance = typeof prototype === 'object' ? new $Object(prototype) : new $Object;
         if (this.BuiltinConstructor) {
@@ -16284,9 +16431,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         instance.ConstructorName = this.get('name');
 
         var result = this.Call(instance, args, true);
-        if (result && result.Completion) {
-          if (result.Abrupt) return result; else result = result.value;
-        }
+        if (result && result.Abrupt) return result;
         return typeof result === 'object' ? result : instance;
       },
       function HasInstance(arg){
@@ -16295,9 +16440,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         var prototype = this.Get('prototype');
-        if (prototype.Completion) {
-          if (prototype.Abrupt) return prototype; else prototype = prototype.value;
-        }
+        if (prototype.Abrupt) return prototype;
 
         if (typeof prototype !== 'object') {
           return ThrowException('instanceof_nonobject_proto');
@@ -16372,9 +16515,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
               receiver = ToObject(receiver);
-              if (receiver.Completion) {
-                if (receiver.Abrupt) return receiver; else receiver = receiver.value;
-              }
+              if (receiver.Abrupt) return receiver;
             }
           }
           var local = new FunctionEnv(receiver, this);
@@ -16695,312 +16836,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
 
-  // ##############
-  // ### $Array ###
-  // ##############
-
-
-
-  var $Array = (function(){
-    function $Array(array){
-      this.Prototype = intrinsics.ArrayProto;
-      this.Realm = realm;
-      this.properties = new PropertyList;
-      this.storage = new Hash;
-      tag(this);
-
-      if (typeof array === 'number') {
-        this.array = new Array(array);
-      } else if (array) {
-        this.array = array;
-      } else {
-        this.array = [];
-      }
-      this.length = ['length', this.array.length, __W];
-    }
-
-    inherit($Array, $Object, {
-      BuiltinBrand: BRANDS.BuiltinArray
-    }, [
-      function has(key){
-        if (key === 'length') {
-          return true;
-        } else if ((key >>> 0) == key && key < this.array.length) {
-          return key in this.array;
-        }
-        return this.properties.has(key);
-      },
-      function remove(key){
-        if (key === 'length') {
-          return false;
-        } else if ((key >>> 0) == key && key < this.array.length) {
-          return delete this.array[key];
-        }
-        return this.properties.remove(key);
-      },
-      function get(key){
-        if (key === 'length') {
-          return this.array.length;
-        } else if ((key >>> 0) == key) {
-          return this.array[key];
-        }
-        return this.properties.get(key);
-      },
-      function set(key, value){
-        if (key === 'length') {
-          this.length[1] = this.array.length = value;
-          return true;
-        } else if ((key >>> 0) == key) {
-          this.array[key] = value;
-          return true;
-        }
-        return this.properties.set(key, value);
-      },
-      function describe(key){
-        if (key === 'length') {
-          this.length[1] = this.array.length;
-          return this.length;
-        } else if ((key >>> 0) == key && key < this.array.length) {
-          if (key in this.array) {
-            return [key, this.array[key], ECW];
-          }
-        } else {
-          return this.properties.describe(key);
-        }
-      },
-      function query(key){
-        if (key === 'length') {
-          return __W;
-        } else if ((key >>> 0) == key) {
-          return key in this.array ? ECW : null;
-        }
-        return this.properties.query(key);
-      },
-      function update(key, attr){
-        if (attr === __W && key === 'length') {
-          return true;
-        } else if ((key >>> 0) == key && key in this.array) {
-          if (attr === ECW) {
-            return true;
-          }
-          deoptimize(this);
-        }
-        return this.properties.update(key, attr);
-      },
-      function define(key, value, attr){
-        if (key === 'length' && attr === __W) {
-          this.length[1] = this.array.length = value;
-          return true;
-        } else if ((key >>> 0) == key) {
-          if (attr === ECW) {
-            this.array[key] = value;
-            return true;
-          }
-          deoptimize(this);
-        }
-        return this.properties.define(key, value, attr);
-      },
-      function each(callback){
-        var len = this.length[1] = this.array.length;
-        callback(this.length);
-
-        for (var i=0; i < len; i++) {
-          if (i in this.array) {
-            callback([i+'', this.array[i], ECW]);
-          }
-        }
-
-        this.properties.each(callback);
-      },
-      function DefineOwnProperty(key, desc, strict){
-        var oldLenDesc = this.GetOwnProperty('length'),
-            oldLen = oldLenDesc.Value,
-            reject = strict ? function(e, a){ return ThrowException(e, a) }
-                            : function(e, a){ return false };
-
-
-        if (key === 'length') {
-          if (!('Value' in desc)) {
-            return DefineOwn.call(this, 'length', desc, strict);
-          }
-
-          var newLenDesc = copy(desc),
-              newLen = ToUint32(desc.Value);
-
-          if (newLen.Abrupt) return newLen;
-
-          var value = ToNumber(desc.Value);
-          if (value.Abrupt) return value;
-
-          if (newLen !== value) {
-            return reject('invalid_array_length');
-          }
-
-          newLen = newLenDesc.Value;
-          if (newLen >= oldLen) {
-            return DefineOwn.call(this, 'length', newLenDesc, strict);
-          }
-
-          if (oldLenDesc.Writable === false) {
-            return reject('strict_cannot_assign')
-          }
-
-          if (!('Writable' in newLenDesc) || newLenDesc.Writable) {
-            var newWritable = true;
-          } else {
-            newWritable = false;
-            newLenDesc.Writable = true;
-          }
-
-          var success = DefineOwn.call(this, 'length', newLenDesc, strict);
-          if (success.Abrupt) return success;
-
-          if (success === false) {
-            return false;
-          }
-
-          while (newLen < oldLen) {
-            oldLen = oldLen - 1;
-            var deleted = this.Delete(''+oldLen, false);
-            if (deleted.Abrupt) return deleted;
-
-            if (!deleted) {
-              newLenDesc.Value = oldLen + 1;
-              if (!newWritable) {
-                newLenDesc.Writable = false;
-              }
-              DefineOwn.call(this, 'length', newLenDesc, false);
-              return reject('strict_delete_property');
-            }
-          }
-          if (!newWritable) {
-            DefineOwn.call(this, 'length', { Writable: false }, false);
-          }
-
-          return true;
-        }  else if (IsArrayIndex(key)) {
-          var index = ToUint32(key);
-          if (index.Abrupt) return index;
-
-          if (index >= oldLen && oldLenDesc.Writable === false) {
-            return reject('strict_cannot_assign');
-          }
-
-          success = DefineOwn.call(this, key, desc, false);
-          if (success.Abrupt) return success;
-
-          if (success === false) {
-            return reject('strict_cannot_assign');
-          }
-
-          if (index >= oldLen) {
-            oldLenDesc.Value = index + 1;
-            DefineOwn.call(this, 'length', oldLenDesc, false);
-          }
-          return true;
-        }
-
-        return DefineOwn.call(this, key, desc, key);
-      }
-    ]);
-
-    var deoptimize = (function(){
-      var deoptimized = [
-        function each(callback){
-          var len = this.array.length;
-
-          for (var i=0; i < len; i++) {
-            if (i in this.array) {
-              this.properties.set(i+'', this.array[i]);
-            } else {
-              this.properties.remove(i);
-            }
-          }
-
-          this.properties.set('length', this.array.length);
-          this.properties.each(callback);
-        },
-        function remove(key){
-          if ((key >>> 0) == key && key < this.array.length) {
-            delete this.array[key];
-          }
-          return this.properties.remove(key);
-        },
-        function update(key, attr){
-          if (!this.properties.has(key) && (key >>> 0) == key && key in this.array) {
-            return this.properties.define(key, this.array[i], attr);
-          }
-          return this.properties.update(key, attr);
-        },
-        function query(key){
-          var result = this.properties.query(key);
-          if (result === null && (key >>> 0) == key && key in this.array) {
-            this.properties.define(key, this.array[key], result = ECW);
-          }
-          return result;
-        },
-        function describe(key){
-          if (key === 'length') {
-            var index = this.properties.get('length'),
-                len = this.array.length;
-
-            if (index !== len) {
-              for (; index < len; index++) {
-                if (index in this.array) {
-                  this.properties.set(index, this.array[index]);
-                }
-              }
-              this.properties.set('length', len);
-            }
-          } else if ((key >>> 0) == key && key < this.array.length) {
-            if (key in this.array) {
-              var prop = this.properties.describe(key);
-              if (prop) {
-                if (prop[1] !== this.array[key]) {
-                  this.properties.set(key, this.array[key]);
-                  prop[1] = this.array[key];
-                }
-              } else {
-                prop = [i+'', this.array[i], ECW];
-                this.properties.setProperty(i, prop);
-              }
-              return prop;
-            }
-            if (this.properties.has(key)) {
-              this.properties.delete(key);
-            }
-            return;
-          }
-          return this.properties.describe(key);
-        },
-        (function(){
-          return function define(key, value, attr){
-            if (key === 'length' || (key >>> 0) == key) {
-              this.array[key] = value;
-            }
-            return this.properties.define(key, value, attr);
-          };
-        })()
-      ];
-
-      return function deoptimize(target){
-        var len = target.array.length;
-        target.properties.define('length', len, __W);
-
-        for (var i=0; i < len; i++) {
-          if (i in target.array) {
-            target.properties.define(i+'', target.array[i], ECW);
-          }
-        }
-
-        define(target, deoptimized);
-      };
-    })();
-
-    return $Array;
-  })();
-
-
 
   // ###############
   // ### $RegExp ###
@@ -17269,9 +17104,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function Delete(key, strict){
         var result = $Object.prototype.Delete.call(this, key, strict);
-        if (result.Abrupt) {
-          return result;
-        }
+        if (result.Abrupt) return result;
 
         if (result && this.isMapped && this.ParameterMap.has(key)) {
           this.ParameterMap.Delete(key, false);
@@ -19334,6 +19167,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       target.active = true;
       target.emit('activate');
       $Object.changeRealm(target);
+      $Array.changeRealm(target);
       operations.changeRealm(target);
     }
   }
