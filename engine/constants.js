@@ -1,6 +1,6 @@
 var constants = (function(exports){
   "use strict";
-  var objects = require('../lib/objects');
+  var objects = require('./lib/objects');
 
   var create  = objects.create,
       define  = objects.define,

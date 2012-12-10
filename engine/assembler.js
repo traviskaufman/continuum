@@ -2,13 +2,13 @@ var assembler = (function(exports){
   "use strict";
   var util      = require('util');
 
-  var objects   = require('../lib/objects'),
-      functions = require('../lib/functions'),
-      iteration = require('../lib/iteration'),
-      utility   = require('../lib/utility'),
-      traversal = require('../lib/traversal'),
-      Stack     = require('../lib/Stack'),
-      HashMap   = require('../lib/HashMap');
+  var objects   = require('./lib/objects'),
+      functions = require('./lib/functions'),
+      iteration = require('./lib/iteration'),
+      utility   = require('./lib/utility'),
+      traversal = require('./lib/traversal'),
+      Stack     = require('./lib/Stack'),
+      HashMap   = require('./lib/HashMap');
 
   var walk          = traversal.walk,
       collector     = traversal.collector,

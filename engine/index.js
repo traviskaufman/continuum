@@ -1,7 +1,7 @@
 var index = (function(exports){
   "use strict";
-  var objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration'),
+  var objects   = require('./lib/objects'),
+      iteration = require('./lib/iteration'),
       runtime   = require('./runtime'),
       assembler = require('./assembler'),
       debug     = require('./debug'),
@@ -294,21 +294,21 @@ var index = (function(exports){
     createInterceptor: createInterceptor,
     brainTransplant: brainTransplant,
     utility: assignAll({}, [
-      require('../lib/functions'),
-      require('../lib/iteration'),
-      require('../lib/objects'),
-      require('../lib/traversal'),
-      require('../lib/utility'),
-      require('../lib/DoublyLinkedList'),
-      require('../lib/Emitter'),
-      require('../lib/Feeder'),
-      require('../lib/HashMap'),
-      require('../lib/ObjectMap'),
-      require('../lib/HashSet'),
-      require('../lib/LinkedList'),
-      require('../lib/PropertyList'),
-      require('../lib/Queue'),
-      require('../lib/Stack')
+      require('./lib/functions'),
+      require('./lib/iteration'),
+      require('./lib/objects'),
+      require('./lib/traversal'),
+      require('./lib/utility'),
+      require('./lib/DoublyLinkedList'),
+      require('./lib/Emitter'),
+      require('./lib/Feeder'),
+      require('./lib/HashMap'),
+      require('./lib/ObjectMap'),
+      require('./lib/HashSet'),
+      require('./lib/LinkedList'),
+      require('./lib/PropertyList'),
+      require('./lib/Queue'),
+      require('./lib/Stack')
     ]),
     debug: debug
   });

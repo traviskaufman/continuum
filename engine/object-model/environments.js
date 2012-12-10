@@ -11,8 +11,8 @@ var environments = (function(exports, undefined){
       each     = require('../lib/iteration').each,
       tag      = require('../lib/utility').tag;
 
-  var ThrowException = require('../engine/errors').ThrowException,
-      Uninitialized = require('../engine/constants').SYMBOLS.Uninitialized;
+  var ThrowException = require('../errors').ThrowException,
+      Uninitialized = require('../constants').SYMBOLS.Uninitialized;
 
   var normal = { Configurable: true,
                  Enumerable: true,

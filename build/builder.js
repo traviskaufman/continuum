@@ -79,34 +79,34 @@ builder.addFiles('../third_party/esprima/esprima.js', function(name, source){
 });
 
 builder.addFiles([
-  '../lib/functions.js',
-  '../lib/objects.js',
-  '../lib/iteration.js',
-  '../lib/utility.js',
-  '../lib/Queue.js',
-  '../lib/traversal.js',
-  '../lib/Stack.js',
-  '../lib/LinkedList.js',
-  '../lib/DoublyLinkedList.js',
-  '../lib/HashMap.js',
-  '../lib/HashSet.js',
-  '../lib/ObjectMap.js',
-  '../lib/Emitter.js',
-  '../lib/Feeder.js',
-  '../lib/PropertyList.js',
-  '../lib/buffers.js',
+  '../engine/lib/functions.js',
+  '../engine/lib/objects.js',
+  '../engine/lib/iteration.js',
+  '../engine/lib/utility.js',
+  '../engine/lib/Queue.js',
+  '../engine/lib/traversal.js',
+  '../engine/lib/Stack.js',
+  '../engine/lib/LinkedList.js',
+  '../engine/lib/DoublyLinkedList.js',
+  '../engine/lib/HashMap.js',
+  '../engine/lib/HashSet.js',
+  '../engine/lib/ObjectMap.js',
+  '../engine/lib/Emitter.js',
+  '../engine/lib/Feeder.js',
+  '../engine/lib/PropertyList.js',
+  '../engine/lib/buffers.js',
 
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',
 
-  '../object-model/collections.js',
-  '../object-model/operators.js',
-  '../object-model/environments.js',
-  '../object-model/operations.js',
-  '../object-model/descriptors.js',
-  '../object-model/$Object.js',
-  '../object-model/$Proxy.js',
+  '../engine/object-model/collections.js',
+  '../engine/object-model/operators.js',
+  '../engine/object-model/environments.js',
+  '../engine/object-model/operations.js',
+  '../engine/object-model/descriptors.js',
+  '../engine/object-model/$Object.js',
+  '../engine/object-model/$Proxy.js',
 
   '../engine/thunk.js',
   '../engine/runtime.js',
@@ -117,7 +117,7 @@ builder.addFiles([
 });
 
 
-builder.addDirectory('../builtins', function(name, source){
+builder.addDirectory('../engine/builtins', function(name, source){
   return name === 'index' ? '' : 'exports.builtins["'+name+'"] = '+escapeJS(source) + ';';
 });
 
@@ -182,5 +182,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-builder.writeFile('../continuum');
-//builder.writeFile('../continuum', true);
+//builder.writeFile('../continuum');
+builder.writeFile('../continuum', true);

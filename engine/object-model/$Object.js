@@ -1,7 +1,7 @@
 var $Object = (function(module){
   var objects      = require('../lib/objects'),
-      errors       = require('../engine/errors'),
-      constants    = require('../engine/constants'),
+      errors       = require('../errors'),
+      constants    = require('../constants'),
       operators    = require('./operators'),
       descriptors  = require('./descriptors'),
       operations   = require('./operations'),

@@ -1,25 +1,25 @@
 var runtime = (function(GLOBAL, exports, undefined){
   "use strict";
   var esprima      = require('../third_party/esprima'),
-      objects      = require('../lib/objects'),
-      functions    = require('../lib/functions'),
-      iteration    = require('../lib/iteration'),
-      utility      = require('../lib/utility'),
+      objects      = require('./lib/objects'),
+      functions    = require('./lib/functions'),
+      iteration    = require('./lib/iteration'),
+      utility      = require('./lib/utility'),
       errors       = require('./errors'),
       assemble     = require('./assembler').assemble,
       constants    = require('./constants'),
-      collections  = require('../object-model/collections'),
-      operators    = require('../object-model/operators'),
-      environments = require('../object-model/environments'),
-      operations   = require('../object-model/operations'),
-      descriptors  = require('../object-model/descriptors'),
-      $Object      = require('../object-model/$Object'),
-      $Proxy       = require('../object-model/$Proxy'),
-      Emitter      = require('../lib/Emitter'),
-      buffers      = require('../lib/buffers'),
-      PropertyList = require('../lib/PropertyList'),
+      collections  = require('./object-model/collections'),
+      operators    = require('./object-model/operators'),
+      environments = require('./object-model/environments'),
+      operations   = require('./object-model/operations'),
+      descriptors  = require('./object-model/descriptors'),
+      $Object      = require('./object-model/$Object'),
+      $Proxy       = require('./object-model/$Proxy'),
+      Emitter      = require('./lib/Emitter'),
+      buffers      = require('./lib/buffers'),
+      PropertyList = require('./lib/PropertyList'),
       Thunk        = require('./thunk').Thunk,
-      Stack        = require('../lib/Stack');
+      Stack        = require('./lib/Stack');
 
   var Hash          = objects.Hash,
       DataView      = buffers.DataView,
@@ -2647,7 +2647,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
         Fetch: function(name, callback){
-          var result = require('../builtins')[name];
+          var result = require('./builtins')[name];
           if (!result) {
             result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
           }
@@ -3175,7 +3175,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       realm.initialized = true;
       realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
       var fakeLoader = { global: realm.global, baseURL: '' },
-          builtins = require('../builtins'),
+          builtins = require('./builtins'),
           init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
 
       resolveModule(fakeLoader, init, '@system', Ω, ƒ);

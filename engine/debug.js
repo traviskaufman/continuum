@@ -1,8 +1,8 @@
 var debug = (function(exports){
   "use strict";
-  var objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration'),
-      utility   = require('../lib/utility'),
+  var objects   = require('./lib/objects'),
+      iteration = require('./lib/iteration'),
+      utility   = require('./lib/utility'),
       runtime   = require('./runtime');
 
   var isObject   = objects.isObject,

@@ -1,13 +1,13 @@
 var thunk = (function(exports){
   "use strict";
-  var objects   = require('../lib/objects'),
-      Emitter   = require('../lib/Emitter');
+  var objects   = require('./lib/objects'),
+      Emitter   = require('./lib/Emitter');
 
   var define  = objects.define,
       inherit = objects.inherit,
       Hash    = objects.Hash;
 
-  var operators    = require('../object-model/operators'),
+  var operators    = require('./object-model/operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
       ToObject     = operators.ToObject,
       UnaryOp      = operators.UnaryOp,
@@ -123,9 +123,7 @@ var thunk = (function(exports){
     }
   ]);
 
-  var ToObject;
   function Thunk(code, instrumented){
-    ToObject || (ToObject = operators.ToObject);
 
     var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,

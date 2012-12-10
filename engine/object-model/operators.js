@@ -1,8 +1,8 @@
 var operators = (function(exports){
   "use strict";
-  var ThrowException = require('../engine/errors').ThrowException;
+  var ThrowException = require('../errors').ThrowException;
 
-  var SYMBOLS       = require('../engine/constants').SYMBOLS,
+  var SYMBOLS       = require('../constants').SYMBOLS,
       Break         = SYMBOLS.Break,
       Pause         = SYMBOLS.Pause,
       Throw         = SYMBOLS.Throw,
@@ -15,7 +15,7 @@ var operators = (function(exports){
       Reference     = SYMBOLS.Reference,
       Completion    = SYMBOLS.Completion,
       Uninitialized = SYMBOLS.Uninitialized,
-      BuiltinSymbol  = require('../engine/constants').BRANDS.BuiltinSymbol;
+      BuiltinSymbol  = require('../constants').BRANDS.BuiltinSymbol;
 
   var BOOLEAN   = 'boolean',
       FUNCTION  = 'function',
@@ -121,17 +121,17 @@ var operators = (function(exports){
 
 
   function $Boolean(o){
-    $Boolean = require('../engine/runtime').builtins.$Boolean;
+    $Boolean = require('../runtime').builtins.$Boolean;
     return new $Boolean(o);
   }
 
   function $Number(o){
-    $Number = require('../engine/runtime').builtins.$Number;
+    $Number = require('../runtime').builtins.$Number;
     return new $Number(o);
   }
 
   function $String(o){
-    $String = require('../engine/runtime').builtins.$String;
+    $String = require('../runtime').builtins.$String;
     return new $String(o);
   }
 

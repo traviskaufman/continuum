@@ -3,8 +3,8 @@ var operations = (function(exports){
       operators = require('./operators'),
       objects   = require('../lib/objects'),
       iteration = require('../lib/iteration'),
-      errors    = require('../engine/errors'),
-      constants = require('../engine/constants'),
+      errors    = require('../errors'),
+      constants = require('../constants'),
       MapData   = require('./collections').MapData;
 
   var is               = objects.is,

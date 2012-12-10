@@ -1,8 +1,8 @@
 var HashMap = (function(module){
-  var objects   = require('../lib/objects'),
-      functions = require('../lib/functions'),
-      iteration = require('../lib/iteration'),
-      DoublyLinkedList = require('../lib/DoublyLinkedList');
+  var objects   = require('./objects'),
+      functions = require('./functions'),
+      iteration = require('./iteration'),
+      DoublyLinkedList = require('./DoublyLinkedList');
 
   var define        = objects.define,
       inherit       = objects.inherit,

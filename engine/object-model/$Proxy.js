@@ -1,6 +1,6 @@
 var $Proxy = (function(module){
   var objects = require('../lib/objects'),
-      errors = require('../engine/errors'),
+      errors = require('../errors'),
       operators = require('./operators'),
       descriptors = require('./descriptors'),
       operations = require('./operations'),

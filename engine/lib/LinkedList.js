@@ -1,6 +1,6 @@
 var LinkedList = (function(module){
-  var objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration');
+  var objects   = require('./objects'),
+      iteration = require('./iteration');
 
   var define        = objects.define,
       inherit       = objects.inherit,

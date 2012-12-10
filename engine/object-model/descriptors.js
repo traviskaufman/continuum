@@ -1,7 +1,7 @@
 var descriptors = (function(exports){
   var objects   = require('../lib/objects'),
       iteration = require('../lib/iteration'),
-      errors    = require('../engine/errors'),
+      errors    = require('../errors'),
       utility   = require('../lib/utility');
 
 
