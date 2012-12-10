@@ -155,7 +155,7 @@ var collections = (function(exports){
   })();
 
 
-  var WeakMapData = (function(){
+  exports.WeakMapData = (function(){
     function WeakMapData(){
       tag(this);
     }
