@@ -53,13 +53,6 @@ var assembler = (function(exports){
   }
 
   define(StandardOpCode.prototype, [
-    function save(serializer){
-      var out = [this.name];
-      for (var i=0; i < this.params; i++) {
-        out[i+1] = serializer.serialize(this.params[i]);
-      }
-      return out;
-    },
     function creator(){
       var opcode = this;
       return function(){
@@ -256,25 +249,6 @@ var assembler = (function(exports){
       }
 
       define(Directive.prototype, [
-        function save(serializer){
-          var serialized = [this.op.name]//, serializeLocation(this.loc)];
-          if (this.op.params) {
-            var params = serialized[2] = [];
-            for (var i=0; i < this.op.params; i++) {
-              if (this[i] && this[i].id) {
-                serializer.add(this[i]);
-                params[i] = this[i].id;
-              } else if (this[i] instanceof Code) {
-                serializer.ident(this[i]);
-                serializer.add(this[i]);
-                params[i] = this[i].id;
-              } else {
-                params[i] = serializer.serialize(this[i]);
-              }
-            }
-          }
-          return serialized;
-        },
         function inspect(){
           var out = [];
           for (var i=0; i < this.op.params; i++) {
@@ -323,16 +297,6 @@ var assembler = (function(exports){
       }
 
       define(Parameters.prototype, [
-        function save(serializer){
-          var serialized = {
-            formals: this.reduced,
-            count: this.ExpectedArgumentCount
-          };
-          if (this.Rest) {
-            serialized.rest = reducer(this.Rest);
-          }
-          return serialized;
-        },
         function __iterator__(){
           return new ParametersIterator(this);
         }
@@ -417,55 +381,6 @@ var assembler = (function(exports){
 
 
     define(Code.prototype, [
-      function save(serializer){
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-
-        var serialized = serializer.set(this.id, {
-          type: 'Code',
-          varDecls: this.varDecls,
-          flags: this.flags,
-          range: this.range,
-          loc: serializeLocation(this.loc)
-        });
-        if (this.classDefinition) {
-          if (!this.classDefinition.id) {
-            serializer.ident(this.classDefinition);
-          }
-          serializer.add(this.classDefinition);
-          this.classDefinition = this.classDefinition.id;
-        }
-        if (this.scopeType !== undefined) {
-          serialized.scopeType = this.scopeType;
-        }
-        if (this.lexicalType !== undefined) {
-          serialized.lexicalType = this.lexicalType;
-        }
-
-        if (this.unwinders.length) {
-          serialized.unwinders = [];
-          each(this.unwinders, function(transfer){
-            serialized.unwinders.push(serializer.serialize(transfer));
-          })
-        }
-
-        if (this.exportedNames) {
-          serialized.exports = this.exportedNames;
-        }
-
-        if (this.imports) {
-          serialized.imports = this.imports;
-        }
-
-        if (this.params) {
-          serialized.params = serializer.serialize(this.params);
-        }
-
-        serialized.ops = map(this.ops, serializer.serialize, serializer);
-
-        return serialized;
-      },
       function derive(code){
         if (code) {
           this.strings = code.strings;
@@ -515,59 +430,6 @@ var assembler = (function(exports){
     }
 
     define(ClassDefinition.prototype, [
-      function save(serializer){
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-        var serialized = serializer.set(this.id, {
-          type: 'ClassDefinition',
-        });
-
-        if (this.name) {
-          serialized.name = serializer.serialize(this.name);
-        }
-        if (this.hasSuper) {
-          serializer.hasSuper = true;
-        }
-        var methods = {
-          method: [],
-          get: [],
-          set: []
-        };
-
-        each(this.methods, function(method){
-          serializer.add(method.code);
-          methods[method.kind].push([serializer.serialize(method.name), method.code.id]);
-        });
-        if (methods.method.length) {
-          serialized.methods = methods.method;
-        }
-        if (methods.get.length) {
-          serialized.getters = methods.get;
-        }
-        if (methods.set.length) {
-          serialized.setters = methods.set;
-        }
-        if (this.symbols[0].length) {
-          var privates = [],
-              publics = [];
-          each(this.symbols[0], function(symbol, i){
-            if (this.symbols[1][i]) {
-              publics.push(symbol);
-            } else {
-              privates.push(symbol);
-            }
-          }, this);
-          if (privates.length) {
-            serialized.privateSymbols = privates;
-          }
-          if (publics.length) {
-            serialized.publicSymbols = publics;
-          }
-        }
-
-        return serialized;
-      },
       function defineSymbols(node){
         var isPublic = node.kind !== 'private',
             self = this;
@@ -612,9 +474,6 @@ var assembler = (function(exports){
     }
 
     define(Unwinder.prototype, [
-      function save(serializer){
-        return [this.type, this.begin, this.end];
-      }
     ]);
 
     return Unwinder;
@@ -1433,12 +1292,6 @@ var assembler = (function(exports){
     define(Symbol.prototype, 'length', 2);
     define(Symbol.prototype, [
       Array.prototype.join,
-      function save(serializer){
-        if (this[0] === '@') {
-          return ['@', this[1]];
-        }
-        return this[1];
-      }
     ]);
 
     return function symbol(node){
@@ -1482,7 +1335,7 @@ var assembler = (function(exports){
 
     each(code.varDecls, createBindingIfNew);
 
-    lexicalInit(code.body);
+    initLexicalDecls(code.body);
 
     each(funcs, function(decl){
       pushNode(decl);
@@ -1541,7 +1394,7 @@ var assembler = (function(exports){
   }
 
 
-  function lexicalInit(node){
+  function initLexicalDecls(node){
     each(lexDecls(node), function(decl){
       pushNode(decl);
       each(decl.boundNames, function(name){
@@ -1602,7 +1455,7 @@ var assembler = (function(exports){
         if (isLexicalDeclaration(node.left)) {
           var lexical = true;
           pushScope('block');
-          lexicalInit(node.left);
+          initLexicalDecls(node.left);
         }
         recurse(node.right);
         GET();
@@ -1804,7 +1657,7 @@ var assembler = (function(exports){
   function BlockStatement(node){
     pushNode(node.body);
     block(function(){
-      lexicalInit(node.body);
+      initLexicalDecls(node.body);
       each(lexDecls(node.body), function(decl){
         pushNode(decl);
         each(decl.boundNames, function(name){
@@ -1848,7 +1701,7 @@ var assembler = (function(exports){
     BINDING(node.param.name, false);
     LET(node.param.name);
     popNode();
-    lexicalInit(node.body);
+    initLexicalDecls(node.body);
     each(node.body, recurse);
     popScope();
     popNode();
@@ -1925,7 +1778,7 @@ var assembler = (function(exports){
           if (node.init.kind !== 'var') {
             var lexical = true;
             pushScope('block');
-            lexicalInit(node.init);
+            initLexicalDecls(node.init);
           }
           recurse(node.init);
         } else {
@@ -2164,7 +2017,7 @@ var assembler = (function(exports){
       pushScope('block');
 
       if (node.cases){
-        each(node.cases, lexicalInit);
+        each(node.cases, initLexicalDecls);
         var cases = [];
         each(node.cases, function(item, i){
           if (item.test){
