@@ -660,32 +660,26 @@ var operators = (function(exports){
       return true;
     }
 
-    if (ref.base === undefined) {
+    var base = ref.base;
+    if (base === undefined) {
       if (ref.strict) {
-        return ThrowException('strict_delete_property', [ref.name, ref.base]);
+        return ThrowException('strict_delete_property', [ref.name, base]);
       } else {
         return true;
       }
     }
 
-    if (exports.IsPropertyReference(ref)) {
+
+    if (base.Delete) {
       if ('thisValue' in ref) {
         return ThrowException('super_delete_property', ref.name);
       } else {
-        var obj = exports.ToObject(ref.base)
-        if (obj && obj.Completion) {
-          if (obj.Abrupt) {
-            return obj;
-          } else {
-            obj = obj.value;
-          }
-        }
-
-        return obj.Delete(ref.name, ref.strict);
+        return base.Delete(ref.name, ref.strict);
       }
-    } else {
-      return ref.base.DeleteBinding(ref.name);
+    } else if (base.DeleteBinding) {
+      return base.DeleteBinding(ref.name);
     }
+    return true;
   }
   exports.DELETE = DELETE;
 

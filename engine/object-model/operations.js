@@ -31,9 +31,9 @@ var operations = (function(exports){
     return new $Object(o);
   }
 
-  function $InternalArray(o){
-    $InternalArray = require('../engine/runtime').builtins.$InternalArray;
-    return new $InternalArray(o);
+  function $Array(o){
+    $Array = require('../engine/runtime').builtins.$Array;
+    return new $Array(o);
   }
 
 
@@ -376,7 +376,7 @@ var operations = (function(exports){
   function DeliverChangeRecords(callback){
     var changeRecords = callback.PendingChangeRecords;
     if (changeRecords && changeRecords.length) {
-      var array = new $InternalArray(changeRecords);
+      var array = new $Array(changeRecords);
       changeRecords.length = 0;
       var result = callback.Call(undefined, [array]);
       if (result && result.Abrupt) {
@@ -450,6 +450,20 @@ var operations = (function(exports){
   exports.getKey = GetKey;
 
 
+  function ToInternalArray($array){
+    if ($array.array) {
+      return $array.array;
+    }
+    var array = [],
+        len = $array.get('length');
+
+    for (var i=0; i < len; i++) {
+      array[i] = $array.get(i+'');
+    }
+    return array;
+  }
+
+  exports.toInternalArray = ToInternalArray;
 
 
   var realm, intrinsics;

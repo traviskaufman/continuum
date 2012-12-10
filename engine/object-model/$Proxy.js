@@ -19,10 +19,16 @@ var $Proxy = (function(module){
       ToBoolean = operators.ToBoolean,
       ToString = operators.ToString,
       ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable
+      IsCallable = operations.isCallable,
+      ToInternalArray = operations.toInternalArray;
 
   function IsCompatibleDescriptor(){
     return true;
+  }
+
+  function $Array(o){
+    $Array = require('../runtime').builtins.$Array;
+    return new $Array(o);
   }
 
   function GetMethod(handler, trap){
@@ -123,14 +129,17 @@ var $Proxy = (function(module){
     }
   }
 
-
+  var HasInstance;
 
   function $Proxy(target, handler){
     this.ProxyHandler = handler;
     this.ProxyTarget = target;
     this.BuiltinBrand = target.BuiltinBrand;
     if ('Call' in target) {
-      this.HasInstance = $Function.prototype.HasInstance;
+      if (!HasInstance) {
+        HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
+      }
+      this.HasInstance = HasInstance;
       this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
     }
@@ -461,7 +470,7 @@ var $Proxy = (function(module){
       return this.ProxyTarget.Call(thisValue, args);
     }
 
-    return trap.Call(this.ProxyHandler, [this.ProxyTarget, thisValue, new $InternalArray(args)]);
+    return trap.Call(this.ProxyHandler, [this.ProxyTarget, thisValue, new $Array(args)]);
   }
 
   function ProxyConstruct(args){
@@ -474,7 +483,7 @@ var $Proxy = (function(module){
       return this.ProxyTarget.Construct(args);
     }
 
-    return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $InternalArray(args)]);
+    return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $Array(args)]);
   }
 
   return module.exports = $Proxy;
