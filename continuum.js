@@ -14064,7 +14064,7 @@ exports.$Array = (function(module){
             return prop;
           }
           if (this.properties.has(key)) {
-            this.properties.delete(key);
+            this.properties.remove(key);
           }
           return;
         }
