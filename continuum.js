@@ -12123,32 +12123,26 @@ exports.operators = (function(exports){
       return true;
     }
 
-    if (ref.base === undefined) {
+    var base = ref.base;
+    if (base === undefined) {
       if (ref.strict) {
-        return ThrowException('strict_delete_property', [ref.name, ref.base]);
+        return ThrowException('strict_delete_property', [ref.name, base]);
       } else {
         return true;
       }
     }
 
-    if (exports.IsPropertyReference(ref)) {
+
+    if (base.Delete) {
       if ('thisValue' in ref) {
         return ThrowException('super_delete_property', ref.name);
       } else {
-        var obj = exports.ToObject(ref.base)
-        if (obj && obj.Completion) {
-          if (obj.Abrupt) {
-            return obj;
-          } else {
-            obj = obj.value;
-          }
-        }
-
-        return obj.Delete(ref.name, ref.strict);
+        return base.Delete(ref.name, ref.strict);
       }
-    } else {
-      return ref.base.DeleteBinding(ref.name);
+    } else if (base.DeleteBinding) {
+      return base.DeleteBinding(ref.name);
     }
+    return true;
   }
   exports.DELETE = DELETE;
 
@@ -12606,9 +12600,9 @@ exports.operations = (function(exports){
     return new $Object(o);
   }
 
-  function $InternalArray(o){
-    $InternalArray = require('../engine/runtime').builtins.$InternalArray;
-    return new $InternalArray(o);
+  function $Array(o){
+    $Array = require('../engine/runtime').builtins.$Array;
+    return new $Array(o);
   }
 
 
@@ -12951,7 +12945,7 @@ exports.operations = (function(exports){
   function DeliverChangeRecords(callback){
     var changeRecords = callback.PendingChangeRecords;
     if (changeRecords && changeRecords.length) {
-      var array = new $InternalArray(changeRecords);
+      var array = new $Array(changeRecords);
       changeRecords.length = 0;
       var result = callback.Call(undefined, [array]);
       if (result && result.Abrupt) {
@@ -13025,6 +13019,20 @@ exports.operations = (function(exports){
   exports.getKey = GetKey;
 
 
+  function ToInternalArray($array){
+    if ($array.array) {
+      return $array.array;
+    }
+    var array = [],
+        len = $array.get('length');
+
+    for (var i=0; i < len; i++) {
+      array[i] = $array.get(i+'');
+    }
+    return array;
+  }
+
+  exports.toInternalArray = ToInternalArray;
 
 
   var realm, intrinsics;
@@ -13957,10 +13965,16 @@ exports.$Proxy = (function(module){
       ToBoolean = operators.ToBoolean,
       ToString = operators.ToString,
       ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable
+      IsCallable = operations.isCallable,
+      ToInternalArray = operations.toInternalArray;
 
   function IsCompatibleDescriptor(){
     return true;
+  }
+
+  function $Array(o){
+    $Array = require('../runtime').builtins.$Array;
+    return new $Array(o);
   }
 
   function GetMethod(handler, trap){
@@ -14061,14 +14075,17 @@ exports.$Proxy = (function(module){
     }
   }
 
-
+  var HasInstance;
 
   function $Proxy(target, handler){
     this.ProxyHandler = handler;
     this.ProxyTarget = target;
     this.BuiltinBrand = target.BuiltinBrand;
     if ('Call' in target) {
-      this.HasInstance = $Function.prototype.HasInstance;
+      if (!HasInstance) {
+        HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
+      }
+      this.HasInstance = HasInstance;
       this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
     }
@@ -14399,7 +14416,7 @@ exports.$Proxy = (function(module){
       return this.ProxyTarget.Call(thisValue, args);
     }
 
-    return trap.Call(this.ProxyHandler, [this.ProxyTarget, thisValue, new $InternalArray(args)]);
+    return trap.Call(this.ProxyHandler, [this.ProxyTarget, thisValue, new $Array(args)]);
   }
 
   function ProxyConstruct(args){
@@ -14412,7 +14429,7 @@ exports.$Proxy = (function(module){
       return this.ProxyTarget.Construct(args);
     }
 
-    return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $InternalArray(args)]);
+    return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $Array(args)]);
   }
 
   return module.exports = $Proxy;
@@ -15818,7 +15835,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       GetTemplateCallSite     = operations.getTemplateCallSite,
       EnqueueChangeRecord     = operations.enqueueChangeRecord,
       DeliverAllChangeRecords = operations.deliverAllChangeRecords,
-      IsStopIteration         = operations.isStopIteration;
+      IsStopIteration         = operations.isStopIteration,
+      ToInternalArray         = operations.toInternalArray;
 
   var StringIndex            = descriptors.StringIndex,
       ArrayBufferIndex       = descriptors.ArrayBufferIndex,
@@ -16681,23 +16699,119 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ### $Array ###
   // ##############
 
+
+
   var $Array = (function(){
-    function $Array(items){
-      $Object.call(this, intrinsics.ArrayProto);
-      if (items instanceof Array) {
-        var len = items.length;
-        for (var i=0; i < len; i++) {
-          this.set(i, items[i]);
-        }
+    function $Array(array){
+      this.Prototype = intrinsics.ArrayProto;
+      this.Realm = realm;
+      this.properties = new PropertyList;
+      this.storage = new Hash;
+      tag(this);
+
+      if (typeof array === 'number') {
+        this.array = new Array(array);
+      } else if (array) {
+        this.array = array;
       } else {
-        var len = 0;
+        this.array = [];
       }
-      this.define('length', len, __W);
+      this.length = ['length', this.array.length, __W];
     }
 
     inherit($Array, $Object, {
       BuiltinBrand: BRANDS.BuiltinArray
     }, [
+      function has(key){
+        if (key === 'length') {
+          return true;
+        } else if ((key >>> 0) == key && key < this.array.length) {
+          return key in this.array;
+        }
+        return this.properties.has(key);
+      },
+      function remove(key){
+        if (key === 'length') {
+          return false;
+        } else if ((key >>> 0) == key && key < this.array.length) {
+          return delete this.array[key];
+        }
+        return this.properties.remove(key);
+      },
+      function get(key){
+        if (key === 'length') {
+          return this.array.length;
+        } else if ((key >>> 0) == key) {
+          return this.array[key];
+        }
+        return this.properties.get(key);
+      },
+      function set(key, value){
+        if (key === 'length') {
+          this.length[1] = this.array.length = value;
+          return true;
+        } else if ((key >>> 0) == key) {
+          this.array[key] = value;
+          return true;
+        }
+        return this.properties.set(key, value);
+      },
+      function describe(key){
+        if (key === 'length') {
+          this.length[1] = this.array.length;
+          return this.length;
+        } else if ((key >>> 0) == key && key < this.array.length) {
+          if (key in this.array) {
+            return [key, this.array[key], ECW];
+          }
+        } else {
+          return this.properties.describe(key);
+        }
+      },
+      function query(key){
+        if (key === 'length') {
+          return __W;
+        } else if ((key >>> 0) == key) {
+          return key in this.array ? ECW : null;
+        }
+        return this.properties.query(key);
+      },
+      function update(key, attr){
+        if (attr === __W && key === 'length') {
+          return true;
+        } else if ((key >>> 0) == key && key in this.array) {
+          if (attr === ECW) {
+            return true;
+          }
+          deoptimize(this);
+        }
+        return this.properties.update(key, attr);
+      },
+      function define(key, value, attr){
+        if (key === 'length' && attr === __W) {
+          this.length[1] = this.array.length = value;
+          return true;
+        } else if ((key >>> 0) == key) {
+          if (attr === ECW) {
+            this.array[key] = value;
+            return true;
+          }
+          deoptimize(this);
+        }
+        return this.properties.define(key, value, attr);
+      },
+      function each(callback){
+        var len = this.length[1] = this.array.length;
+        callback(this.length);
+
+        for (var i=0; i < len; i++) {
+          if (i in this.array) {
+            callback([i+'', this.array[i], ECW]);
+          }
+        }
+
+        this.properties.each(callback);
+      },
       function DefineOwnProperty(key, desc, strict){
         var oldLenDesc = this.GetOwnProperty('length'),
             oldLen = oldLenDesc.Value,
@@ -16713,14 +16827,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           var newLenDesc = copy(desc),
               newLen = ToUint32(desc.Value);
 
-          if (newLen.Completion) {
-            if (newLen.Abrupt) return newLen; else newLen = newLen.value;
-          }
+          if (newLen.Abrupt) return newLen;
 
           var value = ToNumber(desc.Value);
-          if (value.Completion) {
-            if (value.Abrupt) return value; else value = value.value;
-          }
+          if (value.Abrupt) return value;
 
           if (newLen !== value) {
             return reject('invalid_array_length');
@@ -16743,9 +16853,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
 
           var success = DefineOwn.call(this, 'length', newLenDesc, strict);
-          if (success.Completion) {
-            if (success.Abrupt) return success; else success = success.value;
-          }
+          if (success.Abrupt) return success;
+
           if (success === false) {
             return false;
           }
@@ -16753,9 +16862,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           while (newLen < oldLen) {
             oldLen = oldLen - 1;
             var deleted = this.Delete(''+oldLen, false);
-            if (deleted.Completion) {
-              if (deleted.Abrupt) return deleted; else deleted = deleted.value;
-            }
+            if (deleted.Abrupt) return deleted;
 
             if (!deleted) {
               newLenDesc.Value = oldLen + 1;
@@ -16773,19 +16880,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return true;
         }  else if (IsArrayIndex(key)) {
           var index = ToUint32(key);
-
-          if (index.Completion) {
-            if (index.Abrupt) return index; else index = index.value;
-          }
+          if (index.Abrupt) return index;
 
           if (index >= oldLen && oldLenDesc.Writable === false) {
             return reject('strict_cannot_assign');
           }
 
           success = DefineOwn.call(this, key, desc, false);
-          if (success.Completion) {
-            if (success.Abrupt) return success; else success = success.value;
-          }
+          if (success.Abrupt) return success;
 
           if (success === false) {
             return reject('strict_cannot_assign');
@@ -16802,8 +16904,102 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     ]);
 
+    var deoptimize = (function(){
+      var deoptimized = [
+        function each(callback){
+          var len = this.array.length;
+
+          for (var i=0; i < len; i++) {
+            if (i in this.array) {
+              this.properties.set(i+'', this.array[i]);
+            } else {
+              this.properties.remove(i);
+            }
+          }
+
+          this.properties.set('length', this.array.length);
+          this.properties.each(callback);
+        },
+        function remove(key){
+          if ((key >>> 0) == key && key < this.array.length) {
+            delete this.array[key];
+          }
+          return this.properties.remove(key);
+        },
+        function update(key, attr){
+          if (!this.properties.has(key) && (key >>> 0) == key && key in this.array) {
+            return this.properties.define(key, this.array[i], attr);
+          }
+          return this.properties.update(key, attr);
+        },
+        function query(key){
+          var result = this.properties.query(key);
+          if (result === null && (key >>> 0) == key && key in this.array) {
+            this.properties.define(key, this.array[key], result = ECW);
+          }
+          return result;
+        },
+        function describe(key){
+          if (key === 'length') {
+            var index = this.properties.get('length'),
+                len = this.array.length;
+
+            if (index !== len) {
+              for (; index < len; index++) {
+                if (index in this.array) {
+                  this.properties.set(index, this.array[index]);
+                }
+              }
+              this.properties.set('length', len);
+            }
+          } else if ((key >>> 0) == key && key < this.array.length) {
+            if (key in this.array) {
+              var prop = this.properties.describe(key);
+              if (prop) {
+                if (prop[1] !== this.array[key]) {
+                  this.properties.set(key, this.array[key]);
+                  prop[1] = this.array[key];
+                }
+              } else {
+                prop = [i+'', this.array[i], ECW];
+                this.properties.setProperty(i, prop);
+              }
+              return prop;
+            }
+            if (this.properties.has(key)) {
+              this.properties.delete(key);
+            }
+            return;
+          }
+          return this.properties.describe(key);
+        },
+        (function(){
+          return function define(key, value, attr){
+            if (key === 'length' || (key >>> 0) == key) {
+              this.array[key] = value;
+            }
+            return this.properties.define(key, value, attr);
+          };
+        })()
+      ];
+
+      return function deoptimize(target){
+        var len = target.array.length;
+        target.properties.define('length', len, __W);
+
+        for (var i=0; i < len; i++) {
+          if (i in target.array) {
+            target.properties.define(i+'', target.array[i], ECW);
+          }
+        }
+
+        define(target, deoptimized);
+      };
+    })();
+
     return $Array;
   })();
+
 
 
   // ###############
@@ -16898,6 +17094,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, intrinsics.SymbolProto);
       this.Name = name;
       this.Private = !isPublic;
+      this.gensym = '_'+this.id;
     }
 
     inherit($Symbol, $Object, {
@@ -16908,7 +17105,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$Symbol'
     }, [
       function toString(){
-        return this.id;
+        return this.gensym;
       },
       function GetInheritance(){
         return null;
@@ -17477,117 +17674,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   var deopt = ['define', 'describe', 'get', 'set', 'query', 'update', 'has', 'remove', 'each'];
 
 
-  var $InternalArray = (function(){
-    function $InternalArray(array){
-      this.Prototype = intrinsics.ArrayProto;
-
-      if (typeof array === 'number') {
-        this.array = new Array(array);
-      } else if (array) {
-        this.array = array;
-      } else {
-        this.array = [];
-      }
-      this.length = ['length', this.array.length, __W];
-    }
-
-    function deoptimize(target){
-      target.properties = new PropertyList;
-      each(deopt, function(key){
-        target[key] = $Array.prototype[key];
-      });
-      var len = target.array.length;
-      for (var i=0; i < len; i++) {
-        if (i in target.array) {
-          target.define(i+'', target.array[i], ECW);
-        }
-      }
-      target.define('length', target.array.length, __W);
-    }
-
-    inherit($InternalArray, $Array, [
-      function get(key){
-        if (key === 'length') {
-          return this.array.length;
-        } else if ((key >>> 0) == key) {
-          return this.array[key];
-        }
-      },
-      function has(key){
-        return key === 'length' || (key >>> 0) == key && key in this.array;
-      },
-      function remove(key){
-        if (key === 'length') {
-          return false;
-        } else if ((key >>> 0) == key && key < this.array.length) {
-          delete this.array[key];
-          return true;
-        }
-        return false;
-      },
-      function describe(key){
-        if (key === 'length') {
-          this.length[1] = this.array.length;
-          return this.length;
-        } else if ((key >>> 0) == key) {
-          return [key, this.array[key], ECW];
-        }
-      },
-      function query(key){
-        if (key === 'length') {
-          return __W;
-        } else if ((key >>> 0) == key && key in this.array) {
-          return ECW;
-        }
-      },
-      function update(key, attr){
-        if (attr === __W && key === 'length') {
-          return true;
-        } else if (attr === ECW && (key >>> 0) == key) {
-          return true;
-        }
-        return false;
-      },
-      function set(key, value){
-        if (key === 'length') {
-          this.length[1] = this.array.length = value;
-          return true;
-        } else if ((key >>> 0) == key) {
-          this.array[key] = value;
-          return true;
-        }
-        deoptimize(this);
-        return this.set(key, value);
-      },
-      function define(key, value, attr){
-        if (key === 'length' && attr === __W) {
-          this.length[1] = this.array.length = value;
-          return true;
-        } else if (attr === ECW && (key >>> 0) == key) {
-          this.array[key] = value;
-          return true;
-        }
-        deoptimize(this);
-        return this.define(key, value, attr);
-      },
-      function each(callback){
-        var len = this.length[1] = this.array.length;
-
-        for (var i=0; i < len; i++) {
-          callback([i+'', this.array[i], ECW]);
-        }
-        callback(this.length);
-      },
-      function lower(){
-        return this.array;
-      }
-    ]);
-
-
-    return $InternalArray;
-  })();
-
-
   var $InternalFunction = (function(){
     function $InternalFunction(options){
       this.Prototype = intrinsics.FunctionProto;
@@ -17916,7 +18002,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Function         : $Function,
       $Generator        : $Generator,
       $GeneratorFunction: $GeneratorFunction,
-      $InternalArray    : $InternalArray,
       $InternalFunction : $InternalFunction,
       $Map              : $Map,
       $Module           : $Module,
@@ -18000,7 +18085,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       intrinsics.FunctionProto.BuiltinBrand = BRANDS.BuiltinFunction;
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;
-      intrinsics.ArrayProto.define('length', 0, __W);
+      intrinsics.ArrayProto.array = [];
+      intrinsics.ArrayProto.length = ['length', 0, __W];
       intrinsics.ErrorProto.define('name', 'Error', _CW);
       intrinsics.ErrorProto.define('message', '', _CW);
       intrinsics.ThrowTypeError = CreateThrowTypeError(realm);
@@ -18051,13 +18137,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   function FromJSON(object){
     if (object instanceof Array) {
-      var $array = new $Array,
-          len = object.length;
-      for (var i=0; i < len; i++) {
-        $array.define(i+'', FromJSON(object[i]), ECW);
-      }
-      $array.define('length', object.length, __W);
-      return $array;
+      return new $Array(object);
     } else if (typeof object === 'function') {
       return new $NativeFunction(object);
     } else if (object === null || typeof object !== 'object') {
@@ -18071,26 +18151,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
   }
 
-  function FromInternalArray(array){
-    var $array = new $Array,
-        len = array.length;
 
-    for (var i=0; i < len; i++) {
-      $array.define(i+'', array[i], ECW);
-    }
-    $array.define('length', array.length, __W);
-    return $array;
-  }
-
-  function ToInternalArray($array){
-    var array = [],
-        len = $array.get('length');
-
-    for (var i=0; i < len; i++) {
-      array[i] = $array.get(i+'');
-    }
-    return array;
-  }
 
   var Script = (function(){
     var parseOptions = {
@@ -18265,7 +18326,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return obj.DefineOwnProperty(args[0], ToPropertyDescriptor(args[1]), false);
         },
         _Enumerate: function(obj, args){
-          return new $InternalArray(obj.Enumerate(args[0], args[1]));
+          return new $Array(obj.Enumerate(args[0], args[1]));
         },
         _GetProperty: function(obj, args){
           return FromPropertyDescriptor(obj.GetProperty(args[0]));
@@ -18445,7 +18506,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
           if (type === 'describe') {
             var forward = new $InternalFunction(function(_, args){
-              return new $InternalArray(original.call(args[0], args[1]));
+              return new $Array(original.call(args[0], args[1]));
             });
 
             target.describe = function(key){
@@ -18655,7 +18716,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         _RegExpExec: function(obj, args){
           var result = obj.PrimitiveValue.exec(args[0]);
           if (result) {
-            var array = FromInternalArray(result);
+            var array = new $Array(result);
             array.set('index', result.index);
             array.set('input', args[0]);
             return array;
@@ -18686,7 +18747,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           if (typeof separator !== 'string') {
             separator = separator.PrimitiveValue;
           }
-          return new $InternalArray(str.split(separator, limit));
+          return new $Array(str.split(separator, limit));
         },
 
         StringSearch: function(str, regexp){
@@ -18827,7 +18888,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         },
         _MapNext: function(obj, args){
           var result = args[0].MapData.after(args[1]);
-          return result instanceof Array ? new $InternalArray(result) : result;
+          return result instanceof Array ? new $Array(result) : result;
         },
 
         _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
