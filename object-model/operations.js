@@ -440,6 +440,17 @@ var operations = (function(exports){
   exports.isStopIteration = IsStopIteration;
 
 
+  function GetKey(context, value){
+    if (!value || typeof value === 'string') {
+      return value;
+    }
+    return value[0] !== '@' ? value[1] : context.getSymbol(value[1]);
+  }
+
+  exports.getKey = GetKey;
+
+
+
 
   var realm, intrinsics;
 
@@ -447,8 +458,6 @@ var operations = (function(exports){
     realm = newRealm;
     intrinsics = realm ? realm.intrinsics : undefined;
   };
-
-
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
