@@ -1,8 +1,8 @@
 var operators = (function(exports){
   "use strict";
-  var ThrowException = require('./errors').ThrowException;
+  var ThrowException = require('../engine/errors').ThrowException;
 
-  var SYMBOLS       = require('./constants').SYMBOLS,
+  var SYMBOLS       = require('../engine/constants').SYMBOLS,
       Break         = SYMBOLS.Break,
       Pause         = SYMBOLS.Pause,
       Throw         = SYMBOLS.Throw,
@@ -15,7 +15,7 @@ var operators = (function(exports){
       Reference     = SYMBOLS.Reference,
       Completion    = SYMBOLS.Completion,
       Uninitialized = SYMBOLS.Uninitialized,
-      BuiltinSymbol  = require('./constants').BRANDS.BuiltinSymbol;
+      BuiltinSymbol  = require('../engine/constants').BRANDS.BuiltinSymbol;
 
   var BOOLEAN   = 'boolean',
       FUNCTION  = 'function',
@@ -47,7 +47,7 @@ var operators = (function(exports){
         if (type === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
           return base[v.name];
         }
-        base = exports.ToObject(base);
+        base = ToObject(base);
       }
 
       if (base.Get) {
@@ -89,7 +89,7 @@ var operators = (function(exports){
     }
 
     if (typeof base !== OBJECT) {
-      base = exports.ToObject(base);
+      base = ToObject(base);
     }
 
     if (base.Get) {
@@ -120,6 +120,40 @@ var operators = (function(exports){
   exports.GetThisValue = GetThisValue;
 
 
+  function $Boolean(o){
+    $Boolean = require('../engine/runtime').builtins.$Boolean;
+    return new $Boolean(o);
+  }
+
+  function $Number(o){
+    $Number = require('../engine/runtime').builtins.$Number;
+    return new $Number(o);
+  }
+
+  function $String(o){
+    $String = require('../engine/runtime').builtins.$String;
+    return new $String(o);
+  }
+
+  function ToObject(argument){
+    switch (typeof argument) {
+      case 'boolean':
+        return new $Boolean(argument);
+      case 'number':
+        return new $Number(argument);
+      case 'string':
+        return new $String(argument);
+      case 'undefined':
+        return ThrowException('undefined_to_object', []);
+      case 'object':
+        if (argument === null) {
+          return ThrowException('null_to_object', []);
+        }
+        return argument;
+    }
+  }
+
+  exports.ToObject = ToObject;
 
   // ## ToPrimitive
 

@@ -95,16 +95,19 @@ builder.addFiles([
   '../lib/Feeder.js',
   '../lib/PropertyList.js',
   '../lib/buffers.js',
-], function(name, source){
-  return 'exports.'+source.slice(4);
-});
 
-builder.addFiles([
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',
-  '../engine/operators.js',
-  '../engine/environments.js',
+
+  '../object-model/collections.js',
+  '../object-model/operators.js',
+  '../object-model/environments.js',
+  '../object-model/operations.js',
+  '../object-model/descriptors.js',
+  '../object-model/$Object.js',
+  '../object-model/$Proxy.js',
+
   '../engine/thunk.js',
   '../engine/runtime.js',
   '../engine/debug.js',
@@ -179,5 +182,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-//builder.writeFile('../continuum');
-builder.writeFile('../continuum', true);
+builder.writeFile('../continuum');
+//builder.writeFile('../continuum', true);

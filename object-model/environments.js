@@ -11,8 +11,8 @@ var environments = (function(exports, undefined){
       each     = require('../lib/iteration').each,
       tag      = require('../lib/utility').tag;
 
-  var ThrowException = require('./errors').ThrowException,
-      Uninitialized = require('./constants').SYMBOLS.Uninitialized;
+  var ThrowException = require('../engine/errors').ThrowException,
+      Uninitialized = require('../engine/constants').SYMBOLS.Uninitialized;
 
   var normal = { Configurable: true,
                  Enumerable: true,
@@ -40,30 +40,6 @@ var environments = (function(exports, undefined){
     });
 
     define(EnvironmentRecord.prototype, [
-      function save(serializer){
-        if (serializer.has(this.id)) {
-          return this.id;
-        }
-
-        var serialized = serializer.set(this.id, {
-          type: this.type
-        });
-
-        if (this.outer) {
-          serializer.add(this.outer);
-          serialized.outer = this.outer.id;
-        }
-
-        if (this.symbols) {
-          serialized.symbols = {};
-          each(this.symbols, function(symbol, name){
-            serializer.add(symbol);
-            serialized.symbols[name] = symbol.id;
-          });
-        }
-
-        return serialized;
-      },
       function EnumerateBindings(){},
       function HasBinding(name){},
       function GetBindingValue(name, strict){},
@@ -132,30 +108,6 @@ var environments = (function(exports, undefined){
             this.bindings[k].destroy();
           }
         }
-      },
-      function save(serializer){
-        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serialized.bindings = {};
-        each(this.bindings, function(binding, name){
-          if (isObject(binding) && 'id' in binding) {
-            serializer.add(binding);
-            serialized.bindings[name] = binding.id;
-          } else {
-            serialized.bindings[name] = serializer.serialize(binding);
-          }
-        });
-        var deletables = ownKeys(this.deletables);
-        if (deletables.length) {
-          serialized.deletables = deletables;
-        }
-        var consts = ownKeys(this.consts);
-        if (deletables.length) {
-          serialized.consts = consts;
-        }
-        return serialized;
       },
       function EnumerateBindings(){
         return ownKeys(this.bindings);
@@ -236,15 +188,6 @@ var environments = (function(exports, undefined){
         this.destroy = null;
         this.bindings.destroy && this.bindings.destroy();
       },
-      function save(serializer){
-        var serialized = EnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serializer.add(this.bindings);
-        serialized.bindings = this.bindings.id;
-        return serialized;
-      },
       function EnumerateBindings(){
         return this.bindings.Enumerate(false, false);
       },
@@ -302,24 +245,6 @@ var environments = (function(exports, undefined){
       thisValue: undefined,
       type: 'FunctionEnv'
     }, [
-      function save(serializer){
-        var serialized = DeclarativeEnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        if (isObject(this.thisValue)) {
-          serializer.add(this.thisValue);
-          serialized.thisValue = this.thisValue.id;
-        }
-        if (this.HomeObject) {
-          serializer.add(this.HomeObject);
-          serialized.HomeObject =this.HomeObject.id;
-        }
-        if (this.MethodName) {
-          serialized.MethodName = serializer.serialize(this.MethodName);
-        }
-        return serialized;
-      },
       function HasThisBinding(){
         return true;
       },
@@ -359,16 +284,6 @@ var environments = (function(exports, undefined){
       outer: null,
       type: 'GlobalEnv'
     }, [
-      function save(serializer){
-        serializer || (serializer = new Serializer);
-        var serialized = ObjectEnvironmentRecord.prototype.save.call(this, serializer);
-        if (typeof serialized === 'number') {
-          return serialized;
-        }
-        serializer.add(this.bindings.Realm.natives);
-        serialized.natives = this.bindings.Realm.natives.id;
-        return serialized;
-      },
       function GetThisBinding(){
         return this.bindings;
       },

@@ -7,7 +7,7 @@ var thunk = (function(exports){
       inherit = objects.inherit,
       Hash    = objects.Hash;
 
-  var operators    = require('./operators'),
+  var operators    = require('../object-model/operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
       ToObject     = operators.ToObject,
       UnaryOp      = operators.UnaryOp,
@@ -193,6 +193,7 @@ var thunk = (function(exports){
         }
       }
 
+      console.log(error);
       completion = error;
       return false;
     }
