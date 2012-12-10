@@ -4,7 +4,8 @@ var $Proxy = (function(module){
       operators = require('./operators'),
       descriptors = require('./descriptors'),
       operations = require('./operations'),
-      $Object = require('./$Object');
+      $Object = require('./$Object'),
+      $Array = require('./$Array');
 
   var inherit = objects.inherit,
       is = objects.is,
@@ -26,17 +27,11 @@ var $Proxy = (function(module){
     return true;
   }
 
-  function $Array(o){
-    $Array = require('../runtime').builtins.$Array;
-    return new $Array(o);
-  }
 
   function GetMethod(handler, trap){
     var result = handler.Get(trap);
 
-    if (result && result.Abrupt) {
-      return result;
-    }
+    if (result && result.Abrupt) return result;
 
     if (result !== undefined && !IsCallable(result)) {
       return ThrowException('proxy_non_callable_trap');

@@ -186,7 +186,7 @@ var functions = (function(exports){
       }
 
       if (!hasOwn(f, 'name')) {
-        var match = toSource(f).match(/^\n?function\s?(\w*)?_?\(/);
+        var match = toSource(f).match(/^\n?function\s?([\w\$]*)?_?\(/);
         if (match) {
           hidden.value = match[1];
           defineProperty(f, 'name', hidden);

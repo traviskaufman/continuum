@@ -158,36 +158,18 @@ var operators = (function(exports){
   // ## ToPrimitive
 
   function ToPrimitive(argument, hint){
-    if (typeof argument === OBJECT) {
-      if (argument === null) {
-        return argument;
-      } else if (argument.Completion) {
-        if (argument.Abrupt) {
-          return argument;
-        }
-        return ToPrimitive(argument.value, hint);
-      }
+    if (argument && typeof argument === OBJECT && !argument.Abrupt) {
       return ToPrimitive(argument.DefaultValue(hint), hint);
-    } else {
-      return argument;
     }
+    return argument;
   }
   exports.ToPrimitive = ToPrimitive;
 
   // ## ToBoolean
 
   function ToBoolean(argument){
-    if (!argument) {
-      return false;
-    } else if (typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      } else {
-        return !!argument.value;
-      }
-    } else {
-      return !!argument;
-    }
+    if (argument && argument.Completion) return argument;
+    return !!argument;
   }
   exports.ToBoolean = ToBoolean;
 
@@ -195,16 +177,10 @@ var operators = (function(exports){
 
   function ToNumber(argument){
     if (argument !== null && typeof argument === OBJECT) {
-      if (argument.Completion) {
-        if (argument.Abrupt) {
-          return argument;
-        }
-        return ToNumber(argument.value);
-      }
+      if (argument.Abrupt) return argument;
       return ToNumber(ToPrimitive(argument, 'Number'));
-    } else {
-      return +argument;
     }
+    return +argument;
   }
   exports.ToNumber = ToNumber;
 
@@ -213,12 +189,7 @@ var operators = (function(exports){
   function ToInteger(argument){
     argument = ToNumber(argument);
 
-    if (argument && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      argument = argument.value;
-    }
+    if (argument && argument.Abrupt) return argument;
 
     if (argument !== argument) {
       return 0;
@@ -236,12 +207,7 @@ var operators = (function(exports){
 
   function ToUint32(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToUint32(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return argument >>> 0;
   }
   exports.ToUint32 = ToUint32;
@@ -250,12 +216,7 @@ var operators = (function(exports){
 
   function ToInt32(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToInt32(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return argument >> 0;
   }
   exports.ToInt32 = ToInt32;
@@ -264,12 +225,7 @@ var operators = (function(exports){
 
   function ToUint16(argument){
     argument = ToNumber(argument);
-    if (argument && typeof argument === OBJECT && argument.Completion) {
-      if (argument.Abrupt) {
-        return argument;
-      }
-      return ToUint16(argument.value);
-    }
+    if (argument && argument.Abrupt) return argument;
     return (argument >>> 0) % (1 << 16);
   }
   exports.ToUint16 = ToUint16;
@@ -298,11 +254,8 @@ var operators = (function(exports){
       case OBJECT:
         if (argument === null) {
           return 'null';
-        } else if (argument.Completion) {
-          if (argument.Abrupt) {
-            return argument;
-          }
-          return ToString(argument.value);
+        } else if (argument.Abrupt) {
+          return argument;
         }
         return ToString(ToPrimitive(argument, 'String'));
     }
@@ -319,26 +272,19 @@ var operators = (function(exports){
   }(function(pre, change){
     return function(ref) {
       var val = ToNumber(GetValue(ref));
-      if (val && val.Abrupt) {
-        return val;
-      }
+      if (val && val.Abrupt) return val;
 
       var newVal = val + change,
           result = PutValue(ref, newVal);
 
-      if (result && result.Abrupt) {
-        return result;
-      }
+      if (result && result.Abrupt) return result;
       return pre ? newVal : val;
     };
   });
 
   function VOID(ref){
     var val = GetValue(ref);
-    if (val && val.Abrupt) {
-      return val;
-    }
-    return undefined;
+    if (val && val.Abrupt) return val;
   }
   exports.VOID = VOID;
 
@@ -354,13 +300,7 @@ var operators = (function(exports){
           return OBJECT;
         }
 
-        if (val.Completion) {
-          if (val.Abrupt) {
-            return val;
-          } else {
-            return TYPEOF(val.value);
-          }
-        }
+        if (val.Abrupt) return val;
 
         if (val.Reference) {
           if (val.base === undefined) {
@@ -371,9 +311,8 @@ var operators = (function(exports){
 
         if ('Call' in val) {
           return FUNCTION;
-        } else {
-          return OBJECT;
         }
+        return OBJECT;
       }
   }
   exports.TYPEOF = TYPEOF;
@@ -394,16 +333,9 @@ var operators = (function(exports){
       if (!ref || typeof ref !== OBJECT) {
         return finalize(ref);
       }
+
       var val = convert(GetValue(ref));
-
-      if (val && val.Completion) {
-        if (val.Abrupt) {
-          return val;
-        } else {
-          val = val.value;
-        }
-      }
-
+      if (val && val.Abrupt) return val;
       return finalize(val);
     }
   });
@@ -418,21 +350,9 @@ var operators = (function(exports){
   }(function(finalize){
     return function(lval, rval) {
       lval = ToNumber(lval);
-      if (lval && lval.Completion) {
-        if (lval.Abrupt) {
-          return lval;
-        } else {
-          lval = lval.value;
-        }
-      }
+      if (lval && lval.Abrupt) return lval;
       rval = ToNumber(rval);
-      if (rval && rval.Completion) {
-        if (rval.Abrupt) {
-          return rval;
-        } else {
-          rval = rval.value;
-        }
-      }
+      if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval);
     };
   });
@@ -440,22 +360,10 @@ var operators = (function(exports){
   function convertAdd(a, b, type, converter){
     if (typeof a !== type) {
       a = converter(a);
-      if (a && a.Completion) {
-        if (a.Abrupt) {
-          return a;
-        } else {
-          a = a.value;
-        }
-      }
+      if (a && a.Abrupt) return a;
     } else if (typeof b !== type) {
       b = converter(b);
-      if (b && b.Completion) {
-        if (b.Abrupt) {
-          return b;
-        } else {
-          b = b.value;
-        }
-      }
+      if (b && b.Abrupt) return b;
     }
     return a + b;
   }
@@ -464,22 +372,10 @@ var operators = (function(exports){
 
   function ADD(lval, rval) {
     lval = ToPrimitive(lval);
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
-    }
+    if (lval && lval.Abrupt) return lval;
 
     rval = ToPrimitive(rval);
-    if (rval && rval.Completion) {
-      if (rval && rval.Abrupt) {
-        return rval;
-      } else {
-        rval = rval.value;
-      }
-    }
+    if (rval && rval.Abrupt) return rval;
 
     if (typeof lval === STRING || typeof rval === STRING) {
       var type = STRING,
@@ -510,21 +406,9 @@ var operators = (function(exports){
   }(function(finalize){
     return function(lval, rval) {
       lval = ToInt32(lval);
-      if (lval && lval.Completion) {
-        if (lval.Abrupt) {
-          return lval;
-        } else {
-          lval = lval.value;
-        }
-      }
+      if (lval && lval.Abrupt) return lval;
       rval = ToUint32(rval);
-      if (rval && rval.Completion) {
-        if (rval.Abrupt) {
-          return rval;
-        } else {
-          rval = rval.value;
-        }
-      }
+      if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval & 0x1F);
     };
   });
@@ -541,22 +425,10 @@ var operators = (function(exports){
     }
 
     lval = ToPrimitive(lval, 'Number');
-    if (lval && lval.Completion) {
-      if (lval.Abrupt) {
-        return lval;
-      } else {
-        lval = lval.value;
-      }
-    }
+    if (lval && lval.Abrupt) return lval;
 
     rval = ToPrimitive(rval, 'Number');
-    if (rval && rval.Completion) {
-      if (rval.Abrupt) {
-        return rval;
-      } else {
-        rval = rval.value;
-      }
-    }
+    if (rval && rval.Abrupt) return rval;
 
     var ltype = typeof lval,
         rtype = typeof rval;
@@ -564,22 +436,10 @@ var operators = (function(exports){
     if (ltype === STRING || rtype === STRING) {
       if (ltype !== STRING) {
         lval = ToString(lval);
-        if (lval && lval.Completion) {
-          if (lval.Abrupt) {
-            return lval;
-          } else {
-            lval = lval.value;
-          }
-        }
+        if (lval && lval.Abrupt) return lval;
       } else if (rtype !== STRING) {
         rval = ToString(rval);
-        if (rval && rval.Completion) {
-          if (rval.Abrupt) {
-            return rval;
-          } else {
-            rval = rval.value;
-          }
-        }
+        if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === STRING && typeof rval === STRING) {
         return lval < rval;
@@ -587,23 +447,11 @@ var operators = (function(exports){
     } else {
       if (ltype !== NUMBER) {
         lval = ToNumber(lval);
-        if (lval && lval.Completion) {
-          if (lval.Abrupt) {
-            return lval;
-          } else {
-            lval = lval.value;
-          }
-        }
+        if (lval && lval.Abrupt) return lval;
       }
       if (rtype !== NUMBER) {
         rval = ToNumber(rval);
-        if (rval && rval.Completion) {
-          if (rval.Abrupt) {
-            return rval;
-          } else {
-            rval = rval.value;
-          }
-        }
+        if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === NUMBER && typeof rval === NUMBER) {
         return lval < rval;
@@ -626,13 +474,7 @@ var operators = (function(exports){
       }
 
       var result = COMPARE(rval, lval, left);
-      if (result && result.Completion) {
-        if (result.Abrupt) {
-          return result;
-        } else {
-          result = result.value;
-        }
-      }
+      if (result && result.Abrupt) return result;
 
       if (result === undefined) {
         return false;
@@ -664,9 +506,8 @@ var operators = (function(exports){
     if (base === undefined) {
       if (ref.strict) {
         return ThrowException('strict_delete_property', [ref.name, base]);
-      } else {
-        return true;
       }
+      return true;
     }
 
 
@@ -690,9 +531,7 @@ var operators = (function(exports){
     }
 
     lval = ToPropertyName(lval);
-    if (lval && lval.Abrupt) {
-      return lval;
-    }
+    if (lval && lval.Abrupt) return lval;
 
     return rval.HasProperty(lval);
   }
@@ -702,20 +541,8 @@ var operators = (function(exports){
 
 
   function STRICT_EQUAL(x, y) {
-    if (x && x.Completion) {
-      if (x.Abrupt) {
-        return x;
-      } else {
-        x = x.value;
-      }
-    }
-    if (y && y.Completion) {
-      if (y.Abrupt) {
-        return y;
-      } else {
-        y = y.value;
-      }
-    }
+    if (x && x.Abrupt) return x;
+    if (y && y.Abrupt) return y;
     return x === y;
   }
   exports.STRICT_EQUAL = STRICT_EQUAL;
