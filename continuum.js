@@ -8448,6 +8448,37 @@ exports.buffers = (function(global, exports){
 })(this, typeof module !== 'undefined' ? exports : {});
 
 
+exports.natives = (function(module){
+  var HashMap = require('../lib/HashMap'),
+      inherit = require('../lib/objects').inherit,
+      isObject = require('../lib/objects').isObject,
+      each = require('../lib/iteration').each,
+      fname = require('../lib/functions').fname;
+
+  function BulkMap(){
+    HashMap.apply(this, arguments);
+  }
+
+  inherit(BulkMap, HashMap, [
+    function add(name, value){
+      if (typeof name === 'string') {
+        this.set(name, value);
+      } else if (typeof name === 'function') {
+        this.set(fname(name), name);
+      } else if (isObject(name)) {
+        each(name, function(value, name){
+          this.set(name, value);
+        }, this);
+      }
+      return this.size;
+    }
+  ]);
+
+
+  return module.exports = new BulkMap;
+})(typeof module !== 'undefined' ? module : {});
+
+
 exports.constants = (function(exports){
   "use strict";
   var objects = require('./lib/objects');
@@ -12396,12 +12427,12 @@ exports.environments = (function(exports, undefined){
 
 exports.operations = (function(exports){
   var environments = require('./environments'),
-      operators = require('./operators'),
-      objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration'),
-      errors    = require('../errors'),
-      constants = require('../constants'),
-      MapData   = require('./collections').MapData;
+      operators    = require('./operators'),
+      objects      = require('../lib/objects'),
+      iteration    = require('../lib/iteration'),
+      errors       = require('../errors'),
+      constants    = require('../constants'),
+      MapData      = require('./collections').MapData;
 
   var is               = objects.is,
       create           = objects.create,
@@ -12428,7 +12459,7 @@ exports.operations = (function(exports){
   }
 
   function $Array(o){
-    $Array = require('../engine/runtime').builtins.$Array;
+    $Array = require('./$Array');
     return new $Array(o);
   }
 
@@ -15923,6 +15954,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Object      = require('./object-model/$Object'),
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
+      natives      = require('./object-model/natives'),
       Emitter      = require('./lib/Emitter'),
       buffers      = require('./lib/buffers'),
       PropertyList = require('./lib/PropertyList'),
@@ -15946,9 +15978,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       fname         = functions.fname,
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
+      iterate       = iteration.iterate,
       each          = iteration.each,
       map           = iteration.map,
       numbers       = utility.numbers,
+      uid           = utility.uid,
       nextTick      = utility.nextTick,
       tag           = utility.tag,
       unique        = utility.unique,
@@ -16048,6 +16082,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   errors.createError = function(name, type, message){
     return new $Error(name, type, message);
   };
+
 
 
 
@@ -16242,6 +16277,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
+      proto.define(intrinsics.toStringTag, brand);
     }
 
     MakeConstructor(ctor, false, proto);
@@ -16425,10 +16461,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var instance = typeof prototype === 'object' ? new $Object(prototype) : new $Object;
         if (this.BuiltinConstructor) {
           instance.BuiltinBrand = prototype.BuiltinBrand;
-        } else if (this.Class) {
-          instance.Brand = prototype.Brand;
         }
-        instance.ConstructorName = this.get('name');
 
         var result = this.Call(instance, args, true);
         if (result && result.Abrupt) return result;
@@ -16544,7 +16577,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         NEWBORN   = 'newborn';
 
     function setFunction(obj, name, func){
-      obj.set(name, new $NativeFunction({
+      obj.set(name, new $InternalFunction({
         name: name,
         length: func.length,
         call: func
@@ -17117,6 +17150,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return $MappedArguments;
   })();
 
+
   var $Module = (function(){
     function ModuleGetter(ref){
       var getter = this.Get = {
@@ -17444,6 +17478,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return $TypedArray;
   })();
 
+
   var $NativeFunction = (function(){
     function $NativeFunction(options){
       if (typeof options === 'function') {
@@ -17587,6 +17622,84 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     ]);
 
     return $InternalFunction;
+  })();
+
+  var $WrappedObject = (function(){
+    var keys = [],
+        values = [];
+
+    function wrap(id, o, proto){
+      if (isObject(o)) {
+        if (hasOwn(o, id)) {
+          return o[id];
+        }
+        var wrapper = new $WrappedObject(id, o, proto);
+        try {
+          define(o, id, wrapper);
+        } catch (e) {
+          var index = keys.indexOf(o);
+          if (~index) return values[index];
+          keys.push(o);
+          values.push(wrapper);
+        }
+        return wrapper;
+      }
+      return o;
+    }
+
+    natives.add(function wrapperClass(Ctor){
+      var symbols = Ctor.Scope.symbols,
+          proto = Ctor.get('prototype');
+
+      var get = new $InternalFunction({
+        name: symbols.get,
+        call: function(obj, args){
+          var wrapped = obj.wrapped,
+              prop = args[0],
+              result = wrap(obj.wrapid, wrapped[prop], proto);
+
+          if (result && result.wrapped && !result.initialized) {
+            Ctor.Call(result, [obj, prop], true);
+            result.initialized = true;
+          }
+          return result;
+        }
+      });
+
+      var set = new $InternalFunction({
+        name: symbols.set,
+        call: function(obj, args){
+          var wrapped = obj.wrapped,
+              prop = args[0],
+              value = args[1];
+
+          if (value && value.wrapped) {
+            value = value.wrapped;
+          }
+
+          wrapped[prop] = value;
+        }
+      });
+
+      proto.define(symbols.get, get);
+      proto.define(symbols.set, set);
+      var init = wrap(uid(), GLOBAL, proto);
+      Ctor.Call(init, [], true);
+      init.initialized = true;
+      return init;
+    });
+
+    function $WrappedObject(id, object, prototype){
+      this.Prototype = typeof prototype === 'object' ? prototype : wrap(id, getPrototypeOf(object));
+      this.Realm = realm;
+      this.properties = new PropertyList;
+      this.storage = new Hash;
+      this.wrapped = object;
+      this.wrapid = id;
+      tag(this);
+    }
+
+    inherit($WrappedObject, $Object);
   })();
 
   var ExecutionContext = (function(){
@@ -18086,7 +18199,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     var Hooked = create(null);
 
-    var natives = (function(){
+    (function(){
       var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
 
       function wrapFunction(f){
@@ -18105,7 +18218,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       var timers = {};
       var nativeCode = ['function ', '() { [native code] }'];
 
-      return {
+      natives.add({
         _GetPrimitiveValue: function(obj, args){
           return obj.PrimitiveValue;
         },
@@ -18780,7 +18893,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             },
         baseURL: module ? function(){ return module.parent.parent.dirname }
                         : function(){ return location.origin + location.pathname }
-      };
+      });
     })();
 
 
@@ -19047,15 +19160,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'quiet');
       hide(this, 'mutationScope');
 
-      for (var k in natives) {
-        var name = k[0] === '_' ? k.slice(1) : k;
+      iterate(natives, function(item){
+        var key = item[0],
+            value = item[1],
+            name = key[0] === '_' ? key.slice(1) : key;
+
         intrinsics[name] = new $NativeFunction({
-          unwrapped: k[0] === '_',
+          unwrapped: key[0] === '_',
           name: name,
-          length: natives[k].length,
-          call: natives[k]
+          length: value.length,
+          call: value
         });
-      }
+      });
 
       function init(){
         initialize(self, function(){
@@ -20988,11 +21104,11 @@ exports.builtins["@globals"] = "$__global.@@define(@toStringTag, 'global');\n\n\
 
 exports.builtins["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
 
-exports.builtins["@json"] = "let ReplacerFunction,\n    PropertyList,\n    stack,\n    indent,\n    gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  var stepback = indent,\n      partial = [],\n      brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if (value.@@GetBuiltinBrand() === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || value.@@Enumerate(false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  if (!partial.length) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + brackets[1];\n  } else if (!gap) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + partial.join(',') + brackets[1];\n  } else {\n    var final = '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback;\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + final + brackets[1];\n  }\n}\n\ninternalFunction(J);\n\nfunction Str(key, holder){\n  var value = holder[key];\n  if ($__Type(value) === 'Object') {\n    var toJSON = value.toJSON;\n    if (typeof toJSON === 'function') {\n      value = toJSON.@@Call(value, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    value = ReplacerFunction.@@Call(holder, [key, value]);\n  }\n\n  if ($__Type(value) === 'Object') {\n    var brand = value.@@GetBuiltinBrand();\n    if (brand === 'Number') {\n      value = $__ToNumber(value);\n    } else if (brand === 'String') {\n      value = $__ToString(value);\n    } else if (brand === 'Boolean') {\n      value = value.@@PrimitiveValue;\n    }\n  }\n\n\n  if (value === null) {\n    return 'null';\n  } else if (value === true) {\n    return 'true';\n  } else if (value === false) {\n    return 'false';\n  }\n\n  var type = typeof value;\n  if (type === 'string') {\n    return $__Quote(value);\n  } else if (type === 'number') {\n    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;\n  } else if (type === 'object') {\n    return J(value);\n  }\n\n}\n\ninternalFunction(Str);\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if (replacer.@@GetBuiltinBrand() === 'Array') {\n      let props = new Set;\n\n      for (let value of replacer) {\n        var item,\n            type = $__Type(value);\n\n        if (type === 'String') {\n          item = value;\n        } else if (type === 'Number') {\n          item = value + '';\n        } else if (type === 'Object') {\n          let brand = value.@@GetBuiltinBrand();\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(value);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = space.@@PrimitiveValue;\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\nexport function parse(source, reviver){\n  return $__JSONParse(source, reviver);\n}\n\n\n\nexport let JSON = {};\nJSON.@@SetBuiltinBrand('BuiltinJSON');\nJSON.@@extend({ stringify, parse });\n";
+exports.builtins["@json"] = "let ReplacerFunction,\n    PropertyList,\n    stack,\n    indent,\n    gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  var stepback = indent,\n      partial = [],\n      brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if (value.@@GetBuiltinBrand() === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || value.@@Enumerate(false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  if (!partial.length) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + brackets[1];\n  } else if (!gap) {\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + partial.join(',') + brackets[1];\n  } else {\n    var final = '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback;\n    stack.delete(value);\n    indent = stepback;\n    return brackets[0] + final + brackets[1];\n  }\n}\n\ninternalFunction(J);\n\nfunction Str(key, holder){\n  var value = holder[key];\n  if ($__Type(value) === 'Object') {\n    var toJSON = value.toJSON;\n    if (typeof toJSON === 'function') {\n      value = toJSON.@@Call(value, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    value = ReplacerFunction.@@Call(holder, [key, value]);\n  }\n\n  if ($__Type(value) === 'Object') {\n    var brand = value.@@GetBuiltinBrand();\n    if (brand === 'Number') {\n      value = $__ToNumber(value);\n    } else if (brand === 'String') {\n      value = $__ToString(value);\n    } else if (brand === 'Boolean') {\n      value = value.@@PrimitiveValue;\n    }\n  }\n\n\n  if (value === null) {\n    return 'null';\n  } else if (value === true) {\n    return 'true';\n  } else if (value === false) {\n    return 'false';\n  }\n\n  var type = typeof value;\n  if (type === 'string') {\n    return $__Quote(value);\n  } else if (type === 'number') {\n    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;\n  } else if (type === 'object') {\n    return J(value);\n  }\n\n}\n\ninternalFunction(Str);\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if (replacer.@@GetBuiltinBrand() === 'Array') {\n      let props = new Set;\n\n      for (let value of replacer) {\n        var item,\n            type = $__Type(value);\n\n        if (type === 'String') {\n          item = value;\n        } else if (type === 'Number') {\n          item = value + '';\n        } else if (type === 'Object') {\n          let brand = value.@@GetBuiltinBrand();\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(value);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = space.@@PrimitiveValue;\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\nexport function parse(source, reviver){\n  return $__JSONParse(source, reviver);\n}\n\n\n\nexport let JSON = {};\nJSON.@@SetBuiltinBrand('BuiltinJSON');\nJSON.@@extend({ stringify, parse });\nJSON.@@define(@toStringTag, 'JSON');\n";
 
 exports.builtins["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    } else {\n      return item[1];\n    }\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map;\n    if ($__IsConstructCall()) {\n      map = this;\n    } else {\n      if (this == null || this === MapPrototype) {\n        map = $__ObjectCreate(MapPrototype) ;\n      } else {\n        map = $__ToObject(this);\n      }\n    }\n\n    if (map.@@hasInternal('MapData')) {\n      throw $__Exception('double_initialization', ['Map'])\n    }\n\n    $__MapInitialization(map, iterable);\n    return map;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n\n  get size(){\n    return this === MapPrototype ? 0 : $__MapSize(this);\n  }\n\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n\n\n";
 
-exports.builtins["@math"] = "export const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== -Infinity\n      && value !== Infinity\n      && value !== 0;\n}\n\ninternalFunction(isFiniteNonZero);\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\ninternalFunction(factorial);\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nmax.@@set('length', 2);\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = $__ToNumber(values[i]);\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nmin.@@set('length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\nMath.@@SetBuiltinBrand('BuiltinMath');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    Math.@@update(k, 6);\n  } else {\n    Math.@@update(k, 0);\n  }\n}\n\n";
+exports.builtins["@math"] = "export const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== -Infinity\n      && value !== Infinity\n      && value !== 0;\n}\n\ninternalFunction(isFiniteNonZero);\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  } else {\n    return ($__exp(x) + $__exp(-x)) / 2;\n  }\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nfunction factorial(x){\n  var i = 2,\n      o = 1;\n\n  if (i <= x) {\n    do {\n      o *= i;\n    } while (++i <= x)\n  }\n  return o;\n}\n\ninternalFunction(factorial);\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nmax.@@set('length', 2);\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = $__ToNumber(values[i]);\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nmin.@@set('length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\nMath.@@SetBuiltinBrand('BuiltinMath');\nMath.@@define(@toStringTag, 'Math');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    Math.@@update(k, 6);\n  } else {\n    Math.@@update(k, 0);\n  }\n}\n\n";
 
 exports.builtins["@number"] = "export const\n  EPSILON           = 2.220446049250313e-16,\n  MAX_INTEGER       = 9007199254740992,\n  MAX_VALUE         = 1.7976931348623157e+308,\n  MIN_VALUE         = 5e-324,\n  NaN               = NaN,\n  NEGATIVE_INFINITY = -Infinity,\n  POSITIVE_INFINITY = Infinity;\n\n\nexport class Number {\n  constructor(value){\n    value = arguments.length ? $__ToNumber(value) : 0;\n    return $__IsConstructCall() ? $__NumberCreate(value) : value;\n  }\n\n  toString(radix){\n    radix = $__ToInteger(radix || 10);\n    if (typeof this === 'number') {\n      return $__NumberToString(this, radix);\n    } else if (this.@@GetBuiltinBrand() === 'Number') {\n      return $__NumberToString(this.@@getInternal('PrimitiveValue'), radix);\n    }\n    throw $__Exception('not_generic', ['Number.prototype.toString']);\n  }\n\n  valueOf(){\n    if (typeof this === 'number') {\n      return this;\n    }\n    if (this.@@GetBuiltinBrand() === 'Number') {\n      return this.@@getInternal('PrimitiveValue');\n    } else {\n      throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n    }\n  }\n\n  clz() {\n    var x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n}\n\nbuiltinClass(Number);\n\n\nexport function isNaN(number){\n  return number !== number;\n}\n\nexport function isFinite(number){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\nNumber.@@extend({ isNaN, isFinite, isInteger, toInteger,\n                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,\n                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });\n\n";
 
