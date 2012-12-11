@@ -271,6 +271,7 @@ export const Math = {
 };
 
 Math.@@SetBuiltinBrand('BuiltinMath');
+Math.@@define(@toStringTag, 'Math');
 
 for (let k in Math) {
   if (typeof Math[k] === 'function') {

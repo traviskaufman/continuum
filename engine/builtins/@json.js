@@ -163,3 +163,4 @@ export function parse(source, reviver){
 export let JSON = {};
 JSON.@@SetBuiltinBrand('BuiltinJSON');
 JSON.@@extend({ stringify, parse });
+JSON.@@define(@toStringTag, 'JSON');
