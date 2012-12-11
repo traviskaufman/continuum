@@ -1,0 +1,2310 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    <style>
+
+.ASTNodeList
+{}
+
+.ASTNode
+{}
+    .CatchClause
+    {}
+    .ClassBody
+    {}
+    .ClassBody:before
+    { content: '{ ' }
+    .ClassBody:after
+    { content: ' }' }
+    .ComprehensionBlock
+    {}
+    .ExportSpecifier
+    {}
+    .ExportSpecifierSet
+    {}
+    .Glob
+    {}
+    .ImportSpecifier
+    {}
+    .MethodDefinition
+    {}
+    .Path
+    {}
+    .Program
+    {}
+    .Property
+    {}
+    .SwitchCase
+    {}
+    .SymbolDeclarator
+    {}
+    .TemplateElement
+    {}
+    .VariableDeclarator
+    {}
+
+
+  .Expression
+  {}
+    .ArrayExpression
+    {}
+    .ArrowFunctionExpression
+    {}
+    .AssignmentExpression
+    {}
+    .AtSymbol
+    {}
+    .BinaryExpression
+    {}
+    .CallExpression
+    {}
+    .ConditionalExpression
+    {}
+    .ClassExpression
+    {}
+    .ClassExpression:before
+    { content: 'class ' }
+    .ComprehensionExpression
+    {}
+    .FunctionExpression
+    {}
+    .Identifier
+    {}
+    .Literal
+    {}
+    .LogicalExpression
+    {}
+    .MemberExpression
+    {}
+    .NewExpression
+    {}
+    .ObjectExpression
+    {}
+    .SequenceExpression
+    {}
+    .SpreadElement
+    {}
+    .TaggedTemplateExpression
+    {}
+    .TemplateLiteral
+    {}
+    .ThisExpression
+    {}
+    .UnaryExpression
+    {}
+    .UpdateExpression
+    {}
+    .YieldExpression
+    {}
+
+
+  .Pattern
+  {}
+    .ArrayPattern
+    {}
+    .ObjectPattern
+    {}
+
+  .Statement
+  { display: block; }
+    .BlockStatement
+    {}
+    .BlockStatement:before
+    { content: '{ ' }
+    .BlockStatement:after
+    { content: ' }' }
+    .BreakStatement
+    {}
+    .ContinueStatement
+    {}
+    .DoWhileStatement
+    {}
+    .DebuggerStatement
+    {}
+    .EmptyStatement
+    {}
+    .ExportDeclaration
+    {}
+    .ExpressionStatement
+    {}
+    .ForStatement
+    {}
+    .ForInStatement
+    {}
+    .ForOfStatement
+    {}
+    .IfStatement
+    {}
+    .LabeledStatement
+    {}
+    .ReturnStatement
+    {}
+    .SwitchStatement
+    {}
+    .ThrowStatement
+    {}
+    .TryStatement
+    {}
+    .WhileStatement
+    {}
+    .WithStatement
+    {}
+
+  [field=params]:before
+  { content: '(' }
+  [field=params]:after
+  { content: ')' }
+  .Declaration
+  {}
+    .ClassDeclaration:before
+    { content: 'class ' }
+    .FunctionDeclaration
+    {}
+    .ImportDeclaration
+    {}
+    .ModuleDeclaration
+    {}
+    .SymbolDeclaration
+    {}
+    .VariableDeclaration
+    {}
+
+    </style>
+  </head>
+  <body>
+<script>
+var create = (function(){
+  var hidden = { configurable: true,
+                 enumerable: false,
+                 writable: true };
+
+  function createElement(tag){
+    return document.createElement(tag);
+  }
+
+  function define(o, p, v){
+    switch (typeof p) {
+      case 'function':
+        v = p;
+        p = v.name;
+      case 'string':
+        hidden.value = v;
+        Object.defineProperty(o, p, hidden);
+        break;
+      case 'object':
+        if (p instanceof Array) {
+          for (var i=0; i < p.length; i++) {
+            var f = p[i];
+            if (typeof f === 'function') {
+              var name = f.name;
+            } else if (typeof f === 'string' && typeof p[i+1] !== 'function' || !p[i+1].name) {
+              var name = f;
+              f = p[i+1];
+            }
+            if (name) {
+              hidden.value = f;
+              Object.defineProperty(o, name, hidden);
+            }
+          }
+        } else if (p) {
+          var keys = Object.keys(p)
+
+          for (var i=0; i < keys.length; i++) {
+            var desc = Object.getOwnPropertyDescriptor(p, keys[i]);
+            if (desc) {
+              desc.enumerable = 'get' in desc;
+              Object.defineProperty(o, keys[i], desc);
+            }
+          }
+        }
+    }
+
+    hidden.value = undefined;
+    return o;
+  }
+
+  function isObject(o){
+    return typeof o === 'object' ? o !== null : typeof o === 'function';
+  }
+
+  function inherit(Ctor, Super, properties, methods){
+    define(Ctor, 'inherits', Super);
+    Ctor.prototype = Object.create(Super.prototype);
+    define(Ctor.prototype, 'constructor', Ctor);
+    properties && define(Ctor.prototype, properties);
+    methods    && define(Ctor.prototype, methods);
+    return Ctor;
+  }
+
+  function astToDOM(value){
+    if (value instanceof ASTNode) {
+      return value.el;
+    } else if (isObject(value)) {
+      if (value.type in types) {
+        return new types[value.type](value).el;
+      } else if (value instanceof Array) {
+        var el = createElement('span');
+        for (var i=0; i < value.length; i++) {
+          var node = astToDOM(value[i]);
+          value[i] = node.ast;
+          el.appendChild(node);
+        }
+        el.ast = value;
+        return el;
+      }
+    } else {
+      var el = createElement('span');
+      el.className = typeof value;
+      el.textContent = el.ast = value;
+      return el;
+    }
+  }
+
+  function replace(field, element, existing, replacement){
+    if (replacement === undefined) return;
+    if (existing) {
+      var el = astToDOM(replacement);
+      el.setAttribute('field', field);
+      element.insertBefore(el, existing);
+      element.removeChild(existing);
+      existing.ast = null;
+    } else {
+      var el = astToDOM(replacement);
+      el.setAttribute('field', field);
+      element.appendChild(el);
+    }
+  }
+
+
+  function enumeration(Ctor, field, options){
+    var opts = Object.create(null);
+    options.forEach(function(opt, i){
+      opts[opt] = i;
+    });
+    Ctor[field] = function(value){
+      if (value in opts) {
+        return value;
+      }
+      return options[0];
+    };
+  }
+
+
+  var typeofs = {
+    string: String,
+    boolean: Boolean,
+    number: Number,
+  };
+
+function SourcePosition(node) {
+  (this.el = createElement('span')).className = 'SourcePosition';
+  this.el.ast = this;
+  this.line = node.line;
+  this.column = node.column;
+}
+
+define(SourcePosition, 'fields', ['line', 'column']);
+
+define(SourcePosition.prototype, {
+  type: 'SourcePosition',
+  fields: {},
+  set line(content) {
+    replace('line', this.el, this.el.children[0], Number(content));
+  },
+  set column(content) {
+    replace('column', this.el, this.el.children[0], Number(content));
+  }
+});
+
+function SourceLocation(node) {
+  (this.el = createElement('span')).className = 'SourceLocation';
+  this.el.ast = this;
+  this.start = node.start;
+  this.end = node.end;
+}
+
+define(SourceLocation, 'fields', ['start', 'end']);
+
+define(SourceLocation.prototype, {
+  type: 'SourceLocation',
+  fields: { start: SourcePosition, end: SourcePosition },
+  get start() {
+    return this.el.children[0].ast;
+  },
+  set start(node) {
+    replace('start', this.el, this.el.children[0], node);
+  },
+  get end() {
+    return this.el.children[1].ast;
+  },
+  set end(node) {
+    replace('end', this.el, this.el.children[1], node);
+  }
+});
+
+function SourceRange(node) {
+  (this.el = createElement('span')).className = 'SourceRange';
+  this.el.ast = this;
+  this[0] = node[0];
+  this[1] = node[1];
+}
+
+define(SourceRange, 'fields', ['0', '1']);
+
+define(SourceRange.prototype, {
+  type: 'SourceRange',
+  fields: {},
+  set 0(content) {
+    replace('0', this.el, this.el.children[0], Number(content));
+  },
+  set 1(content) {
+    replace('1', this.el, this.el.children[0], Number(content));
+  }
+});
+
+function ASTNode(node) {
+  (this.el = createElement('span')).className = 'ASTNode';
+  this.el.ast = this;
+  this.loc = node.loc;
+  this.range = node.range;
+}
+
+define(ASTNode, 'fields', ['loc', 'range']);
+
+define(ASTNode.prototype, {
+  type: 'ASTNode',
+  fields: { loc: SourceLocation, range: SourceRange },
+  get loc() {
+    return this.el.children[0].ast;
+  },
+  set loc(node) {
+    replace('loc', this.el, this.el.children[0], node);
+  },
+  get range() {
+    return this.el.children[1].ast;
+  },
+  set range(node) {
+    replace('range', this.el, this.el.children[1], node);
+  }
+});
+
+function ASTNodeList(node) {
+  (this.el = createElement('span')).className = 'ASTNodeList';
+  this.el.ast = this;
+  return index(this, nodes, 'nodes', ASTNode);
+}
+
+define(ASTNodeList, 'fields', ['nodes']);
+
+define(ASTNodeList.prototype, {
+  type: 'ASTNodeList',
+  fields: { nodes: ASTNode },
+  get nodes() {
+    return this.el.children[0].ast;
+  },
+  set nodes(node) {
+    replace('nodes', this.el, this.el.children[0], node);
+  }
+});
+
+function Expression(node) {
+  (this.el = createElement('span')).className = 'Expression ASTNode';
+  this.el.ast = this;
+}
+
+define(Expression, 'fields', []);
+
+inherit(Expression, ASTNode, { type: 'Expression', fields: {} });
+
+function Pattern(node) {
+  (this.el = createElement('span')).className = 'Pattern ASTNode';
+  this.el.ast = this;
+}
+
+define(Pattern, 'fields', []);
+
+inherit(Pattern, ASTNode, { type: 'Pattern', fields: {} });
+
+function Statement(node) {
+  (this.el = createElement('span')).className = 'Statement ASTNode';
+  this.el.ast = this;
+}
+
+define(Statement, 'fields', []);
+
+inherit(Statement, ASTNode, { type: 'Statement', fields: {} });
+
+function Declaration(node) {
+  (this.el = createElement('span')).className = 'Declaration Statement ASTNode';
+  this.el.ast = this;
+}
+
+define(Declaration, 'fields', []);
+
+inherit(Declaration, Statement, { type: 'Declaration', fields: {} });
+
+function ArrayExpression(node) {
+  (this.el = createElement('span')).className = 'ArrayExpression Expression ASTNode';
+  this.el.ast = this;
+  this.elements = node.elements;
+}
+
+define(ArrayExpression, 'fields', ['elements']);
+
+inherit(ArrayExpression, Expression, {
+  type: 'ArrayExpression',
+  fields: { elements: [Expression, SpreadElement] },
+  get elements() {
+    return this.el.children[0].ast;
+  },
+  set elements(nodelist) {
+    replace('elements', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function ArrayPattern(node) {
+  (this.el = createElement('span')).className = 'ArrayPattern Pattern ASTNode';
+  this.el.ast = this;
+  this.elements = node.elements;
+}
+
+define(ArrayPattern, 'fields', ['elements']);
+
+inherit(ArrayPattern, Pattern, {
+  type: 'ArrayPattern',
+  fields: { elements: [Identifier, Pattern] },
+  get elements() {
+    return this.el.children[0].ast;
+  },
+  set elements(nodelist) {
+    replace('elements', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function ArrowFunctionExpression(node) {
+  (this.el = createElement('span')).className = 'ArrowFunctionExpression Expression ASTNode';
+  this.el.ast = this;
+  this.params = node.params;
+  this.body = node.body;
+  this.defaults = node.defaults;
+  this.rest = node.rest;
+  this.generator = node.generator;
+}
+
+define(ArrowFunctionExpression, 'fields', ['params', 'body', 'defaults', 'rest', 'generator']);
+
+enumeration(ArrowFunctionExpression, 'generator', [false, true]);
+
+inherit(ArrowFunctionExpression, Expression, {
+  type: 'ArrowFunctionExpression',
+  fields: {
+    params: [Identifier, Pattern],
+    body: [Expression, BlockStatement],
+    defaults: Expression,
+    rest: [Identifier, Pattern]
+  },
+  get params() {
+    return this.el.children[0].ast;
+  },
+  set params(nodelist) {
+    replace('params', this.el, this.el.children[0], nodelist);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  },
+  get defaults() {
+    return this.el.children[2].ast;
+  },
+  set defaults(nodelist) {
+    replace('defaults', this.el, this.el.children[2], nodelist);
+  },
+  get rest() {
+    return this.el.children[3].ast;
+  },
+  set rest(node) {
+    replace('rest', this.el, this.el.children[3], node);
+  },
+  get generator() {
+    return this.el.getAttribute('generator');
+  },
+  set generator(setting) {
+    this.el.setAttribute('generator', ArrowFunctionExpression.generator('setting'));
+  }
+});
+
+function AssignmentExpression(node) {
+  (this.el = createElement('span')).className = 'AssignmentExpression Expression ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.operator = node.operator;
+}
+
+define(AssignmentExpression, 'fields', ['left', 'right', 'operator']);
+
+enumeration(AssignmentExpression, 'operator', ['=', '*=', '/=', '%=', '+=', '-=', '<<=', '>>=', '>>>=', '&=', '^=', '|=']);
+
+inherit(AssignmentExpression, Expression, {
+  type: 'AssignmentExpression',
+  fields: { left: Expression, right: Expression },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get operator() {
+    return this.el.getAttribute('operator');
+  },
+  set operator(setting) {
+    this.el.setAttribute('operator', AssignmentExpression.operator('setting'));
+  }
+});
+
+function AtSymbol(node) {
+  (this.el = createElement('span')).className = 'AtSymbol Expression ASTNode';
+  this.el.ast = this;
+  this.name = node.name;
+  this.internal = node.internal;
+}
+
+define(AtSymbol, 'fields', ['name', 'internal']);
+
+enumeration(AtSymbol, 'internal', [false, true]);
+
+inherit(AtSymbol, Expression, {
+  type: 'AtSymbol',
+  fields: {},
+  set name(content) {
+    replace('name', this.el, this.el.children[0], String(content));
+  },
+  get internal() {
+    return this.el.getAttribute('internal');
+  },
+  set internal(setting) {
+    this.el.setAttribute('internal', AtSymbol.internal('setting'));
+  }
+});
+
+function BlockStatement(node) {
+  (this.el = createElement('span')).className = 'BlockStatement Statement ASTNode';
+  this.el.ast = this;
+  this.body = node.body;
+}
+
+define(BlockStatement, 'fields', ['body']);
+
+inherit(BlockStatement, Statement, {
+  type: 'BlockStatement',
+  fields: { body: Statement },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(nodelist) {
+    replace('body', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function BinaryExpression(node) {
+  (this.el = createElement('span')).className = 'BinaryExpression Expression ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.operator = node.operator;
+}
+
+define(BinaryExpression, 'fields', ['left', 'right', 'operator']);
+
+enumeration(BinaryExpression, 'operator', ['+', '-', '/', '*', '%', '^', '&', '|', '>>', '<<', '>>>', '===',
+                                           '==', '>', '<', '!==', '!=', '>=', '<=', 'in', 'delete', 'instanceof']);
+
+inherit(BinaryExpression, Expression, {
+  type: 'BinaryExpression',
+  fields: { left: Expression, right: Expression },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get operator() {
+    return this.el.getAttribute('operator');
+  },
+  set operator(setting) {
+    this.el.setAttribute('operator', BinaryExpression.operator('setting'));
+  }
+});
+
+function BreakStatement(node) {
+  (this.el = createElement('span')).className = 'BreakStatement Statement ASTNode';
+  this.el.ast = this;
+  this.label = node.label;
+}
+
+define(BreakStatement, 'fields', ['label']);
+
+inherit(BreakStatement, Statement, {
+  type: 'BreakStatement',
+  fields: {},
+  set label(content) {
+    replace('label', this.el, this.el.children[0], String(content));
+  }
+});
+
+function CallExpression(node) {
+  (this.el = createElement('span')).className = 'CallExpression Expression ASTNode';
+  this.el.ast = this;
+  this.callee = node.callee;
+  this.args = node.args;
+}
+
+define(CallExpression, 'fields', ['callee', 'args']);
+
+inherit(CallExpression, Expression, {
+  type: 'CallExpression',
+  fields: { callee: Expression, args: [Expression, SpreadElement] },
+  get callee() {
+    return this.el.children[0].ast;
+  },
+  set callee(node) {
+    replace('callee', this.el, this.el.children[0], node);
+  },
+  get args() {
+    return this.el.children[1].ast;
+  },
+  set args(nodelist) {
+    replace('args', this.el, this.el.children[1], nodelist);
+  }
+});
+
+function CatchClause(node) {
+  (this.el = createElement('span')).className = 'CatchClause ASTNode';
+  this.el.ast = this;
+  this.param = node.param;
+  this.body = node.body;
+}
+
+define(CatchClause, 'fields', ['param', 'body']);
+
+inherit(CatchClause, ASTNode, {
+  type: 'CatchClause',
+  fields: { param: Identifier, body: BlockStatement },
+  get param() {
+    return this.el.children[0].ast;
+  },
+  set param(node) {
+    replace('param', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  }
+});
+
+function ConditionalExpression(node) {
+  (this.el = createElement('span')).className = 'ConditionalExpression Expression ASTNode';
+  this.el.ast = this;
+  this.test = node.test;
+  this.consequent = node.consequent;
+  this.alternate = node.alternate;
+}
+
+define(ConditionalExpression, 'fields', ['test', 'consequent', 'alternate']);
+
+inherit(ConditionalExpression, Expression, {
+  type: 'ConditionalExpression',
+  fields: { test: Expression, consequent: Expression, alternate: Expression },
+  get test() {
+    return this.el.children[0].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[0], node);
+  },
+  get consequent() {
+    return this.el.children[1].ast;
+  },
+  set consequent(node) {
+    replace('consequent', this.el, this.el.children[1], node);
+  },
+  get alternate() {
+    return this.el.children[2].ast;
+  },
+  set alternate(node) {
+    replace('alternate', this.el, this.el.children[2], node);
+  }
+});
+
+function ClassBody(node) {
+  (this.el = createElement('span')).className = 'ClassBody ASTNode';
+  this.el.ast = this;
+  this.body = node.body;
+}
+
+define(ClassBody, 'fields', ['body']);
+
+inherit(ClassBody, ASTNode, {
+  type: 'ClassBody',
+  fields: { body: [MethodDefinition, SymbolDeclaration] },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(nodelist) {
+    replace('body', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function ClassDeclaration(node) {
+  (this.el = createElement('span')).className = 'ClassDeclaration Declaration Statement ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.body = node.body;
+  this.superClass = node.superClass;
+}
+
+define(ClassDeclaration, 'fields', ['id', 'body', 'superClass']);
+
+inherit(ClassDeclaration, Declaration, {
+  type: 'ClassDeclaration',
+  fields: { id: Identifier, body: ClassBody, superClass: Expression },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  },
+  get superClass() {
+    return this.el.children[2].ast;
+  },
+  set superClass(node) {
+    replace('superClass', this.el, this.el.children[2], node);
+  }
+});
+
+function ClassExpression(node) {
+  (this.el = createElement('span')).className = 'ClassExpression Expression ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.body = node.body;
+  this.superClass = node.superClass;
+}
+
+define(ClassExpression, 'fields', ['id', 'body', 'superClass']);
+
+inherit(ClassExpression, Expression, {
+  type: 'ClassExpression',
+  fields: { id: Identifier, body: ClassBody, superClass: Expression },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  },
+  get superClass() {
+    return this.el.children[2].ast;
+  },
+  set superClass(node) {
+    replace('superClass', this.el, this.el.children[2], node);
+  }
+});
+
+function ContinueStatement(node) {
+  (this.el = createElement('span')).className = 'ContinueStatement Statement ASTNode';
+  this.el.ast = this;
+  this.label = node.label;
+}
+
+define(ContinueStatement, 'fields', ['label']);
+
+inherit(ContinueStatement, Statement, {
+  type: 'ContinueStatement',
+  fields: {},
+  set label(content) {
+    replace('label', this.el, this.el.children[0], String(content));
+  }
+});
+
+function ComprehensionBlock(node) {
+  (this.el = createElement('span')).className = 'ComprehensionBlock ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.body = node.body;
+}
+
+define(ComprehensionBlock, 'fields', ['left', 'right', 'body']);
+
+inherit(ComprehensionBlock, ASTNode, {
+  type: 'ComprehensionBlock',
+  fields: { left: Expression, right: Expression, body: Statement },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  }
+});
+
+function ComprehensionExpression(node) {
+  (this.el = createElement('span')).className = 'ComprehensionExpression Expression ASTNode';
+  this.el.ast = this;
+  this.filter = node.filter;
+  this.blocks = node.blocks;
+  this.body = node.body;
+}
+
+define(ComprehensionExpression, 'fields', ['filter', 'blocks', 'body']);
+
+inherit(ComprehensionExpression, Expression, {
+  type: 'ComprehensionExpression',
+  fields: { filter: Expression, blocks: ComprehensionBlock, body: Statement },
+  get filter() {
+    return this.el.children[0].ast;
+  },
+  set filter(node) {
+    replace('filter', this.el, this.el.children[0], node);
+  },
+  get blocks() {
+    return this.el.children[1].ast;
+  },
+  set blocks(nodelist) {
+    replace('blocks', this.el, this.el.children[1], nodelist);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  }
+});
+
+function DoWhileStatement(node) {
+  (this.el = createElement('span')).className = 'DoWhileStatement Statement ASTNode';
+  this.el.ast = this;
+  this.body = node.body;
+  this.test = node.test;
+}
+
+define(DoWhileStatement, 'fields', ['body', 'test']);
+
+inherit(DoWhileStatement, Statement, {
+  type: 'DoWhileStatement',
+  fields: { body: Statement, test: Expression },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[0], node);
+  },
+  get test() {
+    return this.el.children[1].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[1], node);
+  }
+});
+
+function DebuggerStatement(node) {
+  (this.el = createElement('span')).className = 'DebuggerStatement Statement ASTNode';
+  this.el.ast = this;
+}
+
+define(DebuggerStatement, 'fields', []);
+
+inherit(DebuggerStatement, Statement, { type: 'DebuggerStatement', fields: {} });
+
+function EmptyStatement(node) {
+  (this.el = createElement('span')).className = 'EmptyStatement Statement ASTNode';
+  this.el.ast = this;
+}
+
+define(EmptyStatement, 'fields', []);
+
+inherit(EmptyStatement, Statement, { type: 'EmptyStatement', fields: {} });
+
+function ExportDeclaration(node) {
+  (this.el = createElement('span')).className = 'ExportDeclaration Statement ASTNode';
+  this.el.ast = this;
+  this.specifiers = node.specifiers;
+  this.declaration = node.declaration;
+}
+
+define(ExportDeclaration, 'fields', ['specifiers', 'declaration']);
+
+inherit(ExportDeclaration, Statement, {
+  type: 'ExportDeclaration',
+  fields: { specifiers: [ExportSpecifier, ExportSpecifierSet, Glob], declaration: Declaration },
+  get specifiers() {
+    return this.el.children[0].ast;
+  },
+  set specifiers(nodelist) {
+    replace('specifiers', this.el, this.el.children[0], nodelist);
+  },
+  get declaration() {
+    return this.el.children[1].ast;
+  },
+  set declaration(node) {
+    replace('declaration', this.el, this.el.children[1], node);
+  }
+});
+
+function ExportSpecifier(node) {
+  (this.el = createElement('span')).className = 'ExportSpecifier ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.from = node.from;
+}
+
+define(ExportSpecifier, 'fields', ['id', 'from']);
+
+inherit(ExportSpecifier, ASTNode, {
+  type: 'ExportSpecifier',
+  fields: { id: Identifier, from: [Identifier, Path] },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get from() {
+    return this.el.children[1].ast;
+  },
+  set from(node) {
+    replace('from', this.el, this.el.children[1], node);
+  }
+});
+
+function ExportSpecifierSet(node) {
+  (this.el = createElement('span')).className = 'ExportSpecifierSet ASTNode';
+  this.el.ast = this;
+  this.specifiers = node.specifiers;
+}
+
+define(ExportSpecifierSet, 'fields', ['specifiers']);
+
+inherit(ExportSpecifierSet, ASTNode, {
+  type: 'ExportSpecifierSet',
+  fields: { specifiers: ExportSpecifier },
+  get specifiers() {
+    return this.el.children[0].ast;
+  },
+  set specifiers(node) {
+    replace('specifiers', this.el, this.el.children[0], node);
+  }
+});
+
+function ExpressionStatement(node) {
+  (this.el = createElement('span')).className = 'ExpressionStatement Statement ASTNode';
+  this.el.ast = this;
+  this.expression = node.expression;
+}
+
+define(ExpressionStatement, 'fields', ['expression']);
+
+inherit(ExpressionStatement, Statement, {
+  type: 'ExpressionStatement',
+  fields: { expression: Expression },
+  get expression() {
+    return this.el.children[0].ast;
+  },
+  set expression(node) {
+    replace('expression', this.el, this.el.children[0], node);
+  }
+});
+
+function ForStatement(node) {
+  (this.el = createElement('span')).className = 'ForStatement Statement ASTNode';
+  this.el.ast = this;
+  this.init = node.init;
+  this.test = node.test;
+  this.update = node.update;
+  this.body = node.body;
+}
+
+define(ForStatement, 'fields', ['init', 'test', 'update', 'body']);
+
+inherit(ForStatement, Statement, {
+  type: 'ForStatement',
+  fields: { init: [Expression, VariableDeclaration], test: Expression, update: Expression, body: Statement },
+  get init() {
+    return this.el.children[0].ast;
+  },
+  set init(node) {
+    replace('init', this.el, this.el.children[0], node);
+  },
+  get test() {
+    return this.el.children[1].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[1], node);
+  },
+  get update() {
+    return this.el.children[2].ast;
+  },
+  set update(node) {
+    replace('update', this.el, this.el.children[2], node);
+  },
+  get body() {
+    return this.el.children[3].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[3], node);
+  }
+});
+
+function ForInStatement(node) {
+  (this.el = createElement('span')).className = 'ForInStatement Statement ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.body = node.body;
+}
+
+define(ForInStatement, 'fields', ['left', 'right', 'body']);
+
+inherit(ForInStatement, Statement, {
+  type: 'ForInStatement',
+  fields: { left: [Expression, VariableDeclaration], right: Expression, body: Statement },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  }
+});
+
+function ForOfStatement(node) {
+  (this.el = createElement('span')).className = 'ForOfStatement Statement ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.body = node.body;
+}
+
+define(ForOfStatement, 'fields', ['left', 'right', 'body']);
+
+inherit(ForOfStatement, Statement, {
+  type: 'ForOfStatement',
+  fields: { left: [Expression, VariableDeclaration], right: Expression, body: Statement },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  }
+});
+
+function FunctionDeclaration(node) {
+  (this.el = createElement('span')).className = 'FunctionDeclaration Declaration Statement ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.params = node.params;
+  this.body = node.body;
+  this.defaults = node.defaults;
+  this.rest = node.rest;
+  this.generator = node.generator;
+}
+
+define(FunctionDeclaration, 'fields', ['id', 'params', 'body', 'defaults', 'rest', 'generator']);
+
+enumeration(FunctionDeclaration, 'generator', [false, true]);
+
+inherit(FunctionDeclaration, Declaration, {
+  type: 'FunctionDeclaration',
+  fields: {
+    id: Identifier,
+    params: [Identifier, Pattern],
+    body: BlockStatement,
+    defaults: Expression,
+    rest: [Identifier, Pattern]
+  },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get params() {
+    return this.el.children[1].ast;
+  },
+  set params(nodelist) {
+    replace('params', this.el, this.el.children[1], nodelist);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  },
+  get defaults() {
+    return this.el.children[3].ast;
+  },
+  set defaults(nodelist) {
+    replace('defaults', this.el, this.el.children[3], nodelist);
+  },
+  get rest() {
+    return this.el.children[4].ast;
+  },
+  set rest(node) {
+    replace('rest', this.el, this.el.children[4], node);
+  },
+  get generator() {
+    return this.el.getAttribute('generator');
+  },
+  set generator(setting) {
+    this.el.setAttribute('generator', FunctionDeclaration.generator('setting'));
+  }
+});
+
+function FunctionExpression(node) {
+  (this.el = createElement('span')).className = 'FunctionExpression Expression ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.params = node.params;
+  this.body = node.body;
+  this.defaults = node.defaults;
+  this.rest = node.rest;
+  this.generator = node.generator;
+}
+
+define(FunctionExpression, 'fields', ['id', 'params', 'body', 'defaults', 'rest', 'generator']);
+
+enumeration(FunctionExpression, 'generator', [false, true]);
+
+inherit(FunctionExpression, Expression, {
+  type: 'FunctionExpression',
+  fields: {
+    id: Identifier,
+    params: [Identifier, Pattern],
+    body: BlockStatement,
+    defaults: Expression,
+    rest: [Identifier, Pattern]
+  },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get params() {
+    return this.el.children[1].ast;
+  },
+  set params(nodelist) {
+    replace('params', this.el, this.el.children[1], nodelist);
+  },
+  get body() {
+    return this.el.children[2].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[2], node);
+  },
+  get defaults() {
+    return this.el.children[3].ast;
+  },
+  set defaults(nodelist) {
+    replace('defaults', this.el, this.el.children[3], nodelist);
+  },
+  get rest() {
+    return this.el.children[4].ast;
+  },
+  set rest(node) {
+    replace('rest', this.el, this.el.children[4], node);
+  },
+  get generator() {
+    return this.el.getAttribute('generator');
+  },
+  set generator(setting) {
+    this.el.setAttribute('generator', FunctionExpression.generator('setting'));
+  }
+});
+
+function Glob(node) {
+  (this.el = createElement('span')).className = 'Glob ASTNode';
+  this.el.ast = this;
+}
+
+define(Glob, 'fields', []);
+
+inherit(Glob, ASTNode, { type: 'Glob', fields: {} });
+
+function Identifier(node) {
+  (this.el = createElement('span')).className = 'Identifier Expression ASTNode';
+  this.el.ast = this;
+  this.name = node.name;
+}
+
+define(Identifier, 'fields', ['name']);
+
+inherit(Identifier, Expression, {
+  type: 'Identifier',
+  fields: {},
+  set name(content) {
+    replace('name', this.el, this.el.children[0], String(content));
+  }
+});
+
+function IfStatement(node) {
+  (this.el = createElement('span')).className = 'IfStatement Statement ASTNode';
+  this.el.ast = this;
+  this.test = node.test;
+  this.consequent = node.consequent;
+  this.alternate = node.alternate;
+}
+
+define(IfStatement, 'fields', ['test', 'consequent', 'alternate']);
+
+inherit(IfStatement, Statement, {
+  type: 'IfStatement',
+  fields: { test: Expression, consequent: [Expression, Statement], alternate: [Expression, Statement] },
+  get test() {
+    return this.el.children[0].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[0], node);
+  },
+  get consequent() {
+    return this.el.children[1].ast;
+  },
+  set consequent(node) {
+    replace('consequent', this.el, this.el.children[1], node);
+  },
+  get alternate() {
+    return this.el.children[2].ast;
+  },
+  set alternate(node) {
+    replace('alternate', this.el, this.el.children[2], node);
+  }
+});
+
+function ImportDeclaration(node) {
+  (this.el = createElement('span')).className = 'ImportDeclaration Statement ASTNode';
+  this.el.ast = this;
+  this.specifiers = node.specifiers;
+  this.from = node.from;
+}
+
+define(ImportDeclaration, 'fields', ['specifiers', 'from']);
+
+inherit(ImportDeclaration, Statement, {
+  type: 'ImportDeclaration',
+  fields: { specifiers: [ImportSpecifier, Glob], from: [Identifier, Literal, Path] },
+  get specifiers() {
+    return this.el.children[0].ast;
+  },
+  set specifiers(nodelist) {
+    replace('specifiers', this.el, this.el.children[0], nodelist);
+  },
+  get from() {
+    return this.el.children[1].ast;
+  },
+  set from(node) {
+    replace('from', this.el, this.el.children[1], node);
+  }
+});
+
+function ImportSpecifier(node) {
+  (this.el = createElement('span')).className = 'ImportSpecifier ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.from = node.from;
+}
+
+define(ImportSpecifier, 'fields', ['id', 'from']);
+
+inherit(ImportSpecifier, ASTNode, {
+  type: 'ImportSpecifier',
+  fields: { id: Identifier, from: [Identifier, Path] },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get from() {
+    return this.el.children[1].ast;
+  },
+  set from(node) {
+    replace('from', this.el, this.el.children[1], node);
+  }
+});
+
+function Literal(node) {
+  (this.el = createElement('span')).className = 'Literal Expression ASTNode';
+  this.el.ast = this;
+  this.value = node.value;
+}
+
+define(Literal, 'fields', ['value']);
+
+inherit(Literal, Expression, {
+  type: 'Literal',
+  fields: {},
+  set value(content) {
+    replace('value', this.el, this.el.children[0], String(content));
+  }
+});
+
+function LabeledStatement(node) {
+  (this.el = createElement('span')).className = 'LabeledStatement Statement ASTNode';
+  this.el.ast = this;
+  this.label = node.label;
+  this.body = node.body;
+}
+
+define(LabeledStatement, 'fields', ['label', 'body']);
+
+inherit(LabeledStatement, Statement, {
+  type: 'LabeledStatement',
+  fields: { body: Statement },
+  set label(content) {
+    replace('label', this.el, this.el.children[0], String(content));
+  },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[0], node);
+  }
+});
+
+function LogicalExpression(node) {
+  (this.el = createElement('span')).className = 'LogicalExpression Expression ASTNode';
+  this.el.ast = this;
+  this.left = node.left;
+  this.right = node.right;
+  this.operator = node.operator;
+}
+
+define(LogicalExpression, 'fields', ['left', 'right', 'operator']);
+
+enumeration(LogicalExpression, 'operator', ['||', '&&']);
+
+inherit(LogicalExpression, Expression, {
+  type: 'LogicalExpression',
+  fields: { left: Expression, right: Expression },
+  get left() {
+    return this.el.children[0].ast;
+  },
+  set left(node) {
+    replace('left', this.el, this.el.children[0], node);
+  },
+  get right() {
+    return this.el.children[1].ast;
+  },
+  set right(node) {
+    replace('right', this.el, this.el.children[1], node);
+  },
+  get operator() {
+    return this.el.getAttribute('operator');
+  },
+  set operator(setting) {
+    this.el.setAttribute('operator', LogicalExpression.operator('setting'));
+  }
+});
+
+function MemberExpression(node) {
+  (this.el = createElement('span')).className = 'MemberExpression Expression ASTNode';
+  this.el.ast = this;
+  this.object = node.object;
+  this.property = node.property;
+  this.computed = node.computed;
+}
+
+define(MemberExpression, 'fields', ['object', 'property', 'computed']);
+
+enumeration(MemberExpression, 'computed', [false, true]);
+
+inherit(MemberExpression, Expression, {
+  type: 'MemberExpression',
+  fields: { object: Expression, property: Expression },
+  get object() {
+    return this.el.children[0].ast;
+  },
+  set object(node) {
+    replace('object', this.el, this.el.children[0], node);
+  },
+  get property() {
+    return this.el.children[1].ast;
+  },
+  set property(node) {
+    replace('property', this.el, this.el.children[1], node);
+  },
+  get computed() {
+    return this.el.getAttribute('computed');
+  },
+  set computed(setting) {
+    this.el.setAttribute('computed', MemberExpression.computed('setting'));
+  }
+});
+
+function MethodDefinition(node) {
+  (this.el = createElement('span')).className = 'MethodDefinition ASTNode';
+  this.el.ast = this;
+  this.key = node.key;
+  this.value = node.value;
+  this.kind = node.kind;
+}
+
+define(MethodDefinition, 'fields', ['key', 'value', 'kind']);
+
+enumeration(MethodDefinition, 'kind', ['', 'get', 'set']);
+
+inherit(MethodDefinition, ASTNode, {
+  type: 'MethodDefinition',
+  fields: { key: [AtSymbol, Identifier], value: FunctionExpression },
+  get key() {
+    return this.el.children[0].ast;
+  },
+  set key(node) {
+    replace('key', this.el, this.el.children[0], node);
+  },
+  get value() {
+    return this.el.children[1].ast;
+  },
+  set value(node) {
+    replace('value', this.el, this.el.children[1], node);
+  },
+  get kind() {
+    return this.el.getAttribute('kind');
+  },
+  set kind(setting) {
+    this.el.setAttribute('kind', MethodDefinition.kind('setting'));
+  }
+});
+
+function ModuleDeclaration(node) {
+  (this.el = createElement('span')).className = 'ModuleDeclaration Declaration Statement ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.body = node.body;
+  this.from = node.from;
+}
+
+define(ModuleDeclaration, 'fields', ['id', 'body', 'from']);
+
+inherit(ModuleDeclaration, Declaration, {
+  type: 'ModuleDeclaration',
+  fields: { id: Identifier, body: BlockStatement, from: [Identifier, Literal, Path] },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  },
+  get from() {
+    return this.el.children[2].ast;
+  },
+  set from(node) {
+    replace('from', this.el, this.el.children[2], node);
+  }
+});
+
+function NewExpression(node) {
+  (this.el = createElement('span')).className = 'NewExpression Expression ASTNode';
+  this.el.ast = this;
+  this.callee = node.callee;
+  this.args = node.args;
+}
+
+define(NewExpression, 'fields', ['callee', 'args']);
+
+inherit(NewExpression, Expression, {
+  type: 'NewExpression',
+  fields: { callee: Expression, args: [Expression, SpreadElement] },
+  get callee() {
+    return this.el.children[0].ast;
+  },
+  set callee(node) {
+    replace('callee', this.el, this.el.children[0], node);
+  },
+  get args() {
+    return this.el.children[1].ast;
+  },
+  set args(nodelist) {
+    replace('args', this.el, this.el.children[1], nodelist);
+  }
+});
+
+function ObjectExpression(node) {
+  (this.el = createElement('span')).className = 'ObjectExpression Expression ASTNode';
+  this.el.ast = this;
+  this.properties = node.properties;
+}
+
+define(ObjectExpression, 'fields', ['properties']);
+
+inherit(ObjectExpression, Expression, {
+  type: 'ObjectExpression',
+  fields: { properties: Property },
+  get properties() {
+    return this.el.children[0].ast;
+  },
+  set properties(nodelist) {
+    replace('properties', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function ObjectPattern(node) {
+  (this.el = createElement('span')).className = 'ObjectPattern Pattern ASTNode';
+  this.el.ast = this;
+  this.properties = node.properties;
+}
+
+define(ObjectPattern, 'fields', ['properties']);
+
+inherit(ObjectPattern, Pattern, {
+  type: 'ObjectPattern',
+  fields: { properties: Property },
+  get properties() {
+    return this.el.children[0].ast;
+  },
+  set properties(nodelist) {
+    replace('properties', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function Path(node) {
+  (this.el = createElement('span')).className = 'Path ASTNode';
+  this.el.ast = this;
+  this.body = node.body;
+}
+
+define(Path, 'fields', ['body']);
+
+inherit(Path, ASTNode, {
+  type: 'Path',
+  fields: { body: Identifier },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(nodelist) {
+    replace('body', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function Program(node) {
+  (this.el = createElement('span')).className = 'Program ASTNode';
+  this.el.ast = this;
+  this.body = node.body;
+}
+
+define(Program, 'fields', ['body']);
+
+inherit(Program, ASTNode, {
+  type: 'Program',
+  fields: { body: Statement },
+  get body() {
+    return this.el.children[0].ast;
+  },
+  set body(nodelist) {
+    replace('body', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function Property(node) {
+  (this.el = createElement('span')).className = 'Property ASTNode';
+  this.el.ast = this;
+  this.key = node.key;
+  this.value = node.value;
+  this.kind = node.kind;
+  this.method = node.method;
+  this.shorthand = node.shorthand;
+}
+
+define(Property, 'fields', ['key', 'value', 'kind', 'method', 'shorthand']);
+
+enumeration(Property, 'kind', ['get', 'set', 'init']);
+
+enumeration(Property, 'method', [false, true]);
+
+enumeration(Property, 'shorthand', [false, true]);
+
+inherit(Property, ASTNode, {
+  type: 'Property',
+  fields: { key: [AtSymbol, Identifier, Literal], value: Expression },
+  get key() {
+    return this.el.children[0].ast;
+  },
+  set key(node) {
+    replace('key', this.el, this.el.children[0], node);
+  },
+  get value() {
+    return this.el.children[1].ast;
+  },
+  set value(node) {
+    replace('value', this.el, this.el.children[1], node);
+  },
+  get kind() {
+    return this.el.getAttribute('kind');
+  },
+  set kind(setting) {
+    this.el.setAttribute('kind', Property.kind('setting'));
+  },
+  get method() {
+    return this.el.getAttribute('method');
+  },
+  set method(setting) {
+    this.el.setAttribute('method', Property.method('setting'));
+  },
+  get shorthand() {
+    return this.el.getAttribute('shorthand');
+  },
+  set shorthand(setting) {
+    this.el.setAttribute('shorthand', Property.shorthand('setting'));
+  }
+});
+
+function ReturnStatement(node) {
+  (this.el = createElement('span')).className = 'ReturnStatement Statement ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+}
+
+define(ReturnStatement, 'fields', ['arg']);
+
+inherit(ReturnStatement, Statement, {
+  type: 'ReturnStatement',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  }
+});
+
+function SequenceExpression(node) {
+  (this.el = createElement('span')).className = 'SequenceExpression Expression ASTNode';
+  this.el.ast = this;
+  this.expressions = node.expressions;
+}
+
+define(SequenceExpression, 'fields', ['expressions']);
+
+inherit(SequenceExpression, Expression, {
+  type: 'SequenceExpression',
+  fields: { expressions: Expression },
+  get expressions() {
+    return this.el.children[0].ast;
+  },
+  set expressions(nodelist) {
+    replace('expressions', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function SpreadElement(node) {
+  (this.el = createElement('span')).className = 'SpreadElement ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+}
+
+define(SpreadElement, 'fields', ['arg']);
+
+inherit(SpreadElement, ASTNode, {
+  type: 'SpreadElement',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  }
+});
+
+function SwitchStatement(node) {
+  (this.el = createElement('span')).className = 'SwitchStatement Statement ASTNode';
+  this.el.ast = this;
+  this.descriminant = node.descriminant;
+  this.cases = node.cases;
+}
+
+define(SwitchStatement, 'fields', ['descriminant', 'cases']);
+
+inherit(SwitchStatement, Statement, {
+  type: 'SwitchStatement',
+  fields: { descriminant: Expression, cases: SwitchCase },
+  get descriminant() {
+    return this.el.children[0].ast;
+  },
+  set descriminant(node) {
+    replace('descriminant', this.el, this.el.children[0], node);
+  },
+  get cases() {
+    return this.el.children[1].ast;
+  },
+  set cases(nodelist) {
+    replace('cases', this.el, this.el.children[1], nodelist);
+  }
+});
+
+function SwitchCase(node) {
+  (this.el = createElement('span')).className = 'SwitchCase ASTNode';
+  this.el.ast = this;
+  this.test = node.test;
+  this.consequent = node.consequent;
+}
+
+define(SwitchCase, 'fields', ['test', 'consequent']);
+
+inherit(SwitchCase, ASTNode, {
+  type: 'SwitchCase',
+  fields: { test: Expression, consequent: Statement },
+  get test() {
+    return this.el.children[0].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[0], node);
+  },
+  get consequent() {
+    return this.el.children[1].ast;
+  },
+  set consequent(nodelist) {
+    replace('consequent', this.el, this.el.children[1], nodelist);
+  }
+});
+
+function SymbolDeclaration(node) {
+  (this.el = createElement('span')).className = 'SymbolDeclaration Declaration Statement ASTNode';
+  this.el.ast = this;
+  this.kind = node.kind;
+  this.declarations = node.declarations;
+}
+
+define(SymbolDeclaration, 'fields', ['kind', 'declarations']);
+
+enumeration(SymbolDeclaration, 'kind', ['symbol', 'private']);
+
+inherit(SymbolDeclaration, Declaration, {
+  type: 'SymbolDeclaration',
+  fields: { declarations: SymbolDeclarator },
+  get kind() {
+    return this.el.getAttribute('kind');
+  },
+  set kind(setting) {
+    this.el.setAttribute('kind', SymbolDeclaration.kind('setting'));
+  },
+  get declarations() {
+    return this.el.children[0].ast;
+  },
+  set declarations(nodelist) {
+    replace('declarations', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function SymbolDeclarator(node) {
+  (this.el = createElement('span')).className = 'SymbolDeclarator ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.init = node.init;
+}
+
+define(SymbolDeclarator, 'fields', ['id', 'init']);
+
+inherit(SymbolDeclarator, ASTNode, {
+  type: 'SymbolDeclarator',
+  fields: { id: AtSymbol, init: Expression },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get init() {
+    return this.el.children[1].ast;
+  },
+  set init(node) {
+    replace('init', this.el, this.el.children[1], node);
+  }
+});
+
+function TaggedTemplateExpression(node) {
+  (this.el = createElement('span')).className = 'TaggedTemplateExpression Expression ASTNode';
+  this.el.ast = this;
+  this.tag = node.tag;
+  this.template = node.template;
+}
+
+define(TaggedTemplateExpression, 'fields', ['tag', 'template']);
+
+inherit(TaggedTemplateExpression, Expression, {
+  type: 'TaggedTemplateExpression',
+  fields: { tag: Identifier, template: TemplateLiteral },
+  get tag() {
+    return this.el.children[0].ast;
+  },
+  set tag(node) {
+    replace('tag', this.el, this.el.children[0], node);
+  },
+  get template() {
+    return this.el.children[1].ast;
+  },
+  set template(node) {
+    replace('template', this.el, this.el.children[1], node);
+  }
+});
+
+function TemplateElement(node) {
+  (this.el = createElement('span')).className = 'TemplateElement ASTNode';
+  this.el.ast = this;
+  this.value = node.value;
+  this.tail = node.tail;
+}
+
+define(TemplateElement, 'fields', ['value', 'tail']);
+
+enumeration(TemplateElement, 'tail', [false, true]);
+
+inherit(TemplateElement, ASTNode, {
+  type: 'TemplateElement',
+  fields: {},
+  set value(content) {
+    replace('value', this.el, this.el.children[0], Object(content));
+  },
+  get tail() {
+    return this.el.getAttribute('tail');
+  },
+  set tail(setting) {
+    this.el.setAttribute('tail', TemplateElement.tail('setting'));
+  }
+});
+
+function TemplateLiteral(node) {
+  (this.el = createElement('span')).className = 'TemplateLiteral Expression ASTNode';
+  this.el.ast = this;
+  this.elements = node.elements;
+  this.expressions = node.expressions;
+}
+
+define(TemplateLiteral, 'fields', ['elements', 'expressions']);
+
+inherit(TemplateLiteral, Expression, {
+  type: 'TemplateLiteral',
+  fields: { elements: TemplateElement, expressions: Expression },
+  get elements() {
+    return this.el.children[0].ast;
+  },
+  set elements(nodelist) {
+    replace('elements', this.el, this.el.children[0], nodelist);
+  },
+  get expressions() {
+    return this.el.children[1].ast;
+  },
+  set expressions(nodelist) {
+    replace('expressions', this.el, this.el.children[1], nodelist);
+  }
+});
+
+function ThisExpression(node) {
+  (this.el = createElement('span')).className = 'ThisExpression Expression ASTNode';
+  this.el.ast = this;
+}
+
+define(ThisExpression, 'fields', []);
+
+inherit(ThisExpression, Expression, { type: 'ThisExpression', fields: {} });
+
+function ThrowStatement(node) {
+  (this.el = createElement('span')).className = 'ThrowStatement Statement ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+}
+
+define(ThrowStatement, 'fields', ['arg']);
+
+inherit(ThrowStatement, Statement, {
+  type: 'ThrowStatement',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  }
+});
+
+function TryStatement(node) {
+  (this.el = createElement('span')).className = 'TryStatement Statement ASTNode';
+  this.el.ast = this;
+  this.block = node.block;
+  this.handlers = node.handlers;
+  this.finalizer = node.finalizer;
+}
+
+define(TryStatement, 'fields', ['block', 'handlers', 'finalizer']);
+
+inherit(TryStatement, Statement, {
+  type: 'TryStatement',
+  fields: { block: BlockStatement, handlers: CatchClause, finalizer: BlockStatement },
+  get block() {
+    return this.el.children[0].ast;
+  },
+  set block(node) {
+    replace('block', this.el, this.el.children[0], node);
+  },
+  get handlers() {
+    return this.el.children[1].ast;
+  },
+  set handlers(nodelist) {
+    replace('handlers', this.el, this.el.children[1], nodelist);
+  },
+  get finalizer() {
+    return this.el.children[2].ast;
+  },
+  set finalizer(node) {
+    replace('finalizer', this.el, this.el.children[2], node);
+  }
+});
+
+function UnaryExpression(node) {
+  (this.el = createElement('span')).className = 'UnaryExpression Expression ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+  this.operator = node.operator;
+}
+
+define(UnaryExpression, 'fields', ['arg', 'operator']);
+
+enumeration(UnaryExpression, 'operator', ['!', '~', '+', '-', 'void', 'typeof']);
+
+inherit(UnaryExpression, Expression, {
+  type: 'UnaryExpression',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  },
+  get operator() {
+    return this.el.getAttribute('operator');
+  },
+  set operator(setting) {
+    this.el.setAttribute('operator', UnaryExpression.operator('setting'));
+  }
+});
+
+function UpdateExpression(node) {
+  (this.el = createElement('span')).className = 'UpdateExpression Expression ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+  this.operator = node.operator;
+  this.prefix = node.prefix;
+}
+
+define(UpdateExpression, 'fields', ['arg', 'operator', 'prefix']);
+
+enumeration(UpdateExpression, 'operator', ['--', '++']);
+
+enumeration(UpdateExpression, 'prefix', [false, true]);
+
+inherit(UpdateExpression, Expression, {
+  type: 'UpdateExpression',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  },
+  get operator() {
+    return this.el.getAttribute('operator');
+  },
+  set operator(setting) {
+    this.el.setAttribute('operator', UpdateExpression.operator('setting'));
+  },
+  get prefix() {
+    return this.el.getAttribute('prefix');
+  },
+  set prefix(setting) {
+    this.el.setAttribute('prefix', UpdateExpression.prefix('setting'));
+  }
+});
+
+function VariableDeclaration(node) {
+  (this.el = createElement('span')).className = 'VariableDeclaration Declaration Statement ASTNode';
+  this.el.ast = this;
+  this.kind = node.kind;
+  this.declarations = node.declarations;
+}
+
+define(VariableDeclaration, 'fields', ['kind', 'declarations']);
+
+enumeration(VariableDeclaration, 'kind', ['var', 'const', 'let']);
+
+inherit(VariableDeclaration, Declaration, {
+  type: 'VariableDeclaration',
+  fields: { declarations: VariableDeclarator },
+  get kind() {
+    return this.el.getAttribute('kind');
+  },
+  set kind(setting) {
+    this.el.setAttribute('kind', VariableDeclaration.kind('setting'));
+  },
+  get declarations() {
+    return this.el.children[0].ast;
+  },
+  set declarations(nodelist) {
+    replace('declarations', this.el, this.el.children[0], nodelist);
+  }
+});
+
+function VariableDeclarator(node) {
+  (this.el = createElement('span')).className = 'VariableDeclarator ASTNode';
+  this.el.ast = this;
+  this.id = node.id;
+  this.init = node.init;
+}
+
+define(VariableDeclarator, 'fields', ['id', 'init']);
+
+inherit(VariableDeclarator, ASTNode, {
+  type: 'VariableDeclarator',
+  fields: { id: [Identifier, Pattern], init: Expression },
+  get id() {
+    return this.el.children[0].ast;
+  },
+  set id(node) {
+    replace('id', this.el, this.el.children[0], node);
+  },
+  get init() {
+    return this.el.children[1].ast;
+  },
+  set init(node) {
+    replace('init', this.el, this.el.children[1], node);
+  }
+});
+
+function WhileStatement(node) {
+  (this.el = createElement('span')).className = 'WhileStatement Statement ASTNode';
+  this.el.ast = this;
+  this.test = node.test;
+  this.body = node.body;
+}
+
+define(WhileStatement, 'fields', ['test', 'body']);
+
+inherit(WhileStatement, Statement, {
+  type: 'WhileStatement',
+  fields: { test: Expression, body: Statement },
+  get test() {
+    return this.el.children[0].ast;
+  },
+  set test(node) {
+    replace('test', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  }
+});
+
+function WithStatement(node) {
+  (this.el = createElement('span')).className = 'WithStatement Statement ASTNode';
+  this.el.ast = this;
+  this.object = node.object;
+  this.body = node.body;
+}
+
+define(WithStatement, 'fields', ['object', 'body']);
+
+inherit(WithStatement, Statement, {
+  type: 'WithStatement',
+  fields: { object: Expression, body: Statement },
+  get object() {
+    return this.el.children[0].ast;
+  },
+  set object(node) {
+    replace('object', this.el, this.el.children[0], node);
+  },
+  get body() {
+    return this.el.children[1].ast;
+  },
+  set body(node) {
+    replace('body', this.el, this.el.children[1], node);
+  }
+});
+
+function YieldExpression(node) {
+  (this.el = createElement('span')).className = 'YieldExpression Expression ASTNode';
+  this.el.ast = this;
+  this.arg = node.arg;
+}
+
+define(YieldExpression, 'fields', ['arg']);
+
+inherit(YieldExpression, Expression, {
+  type: 'YieldExpression',
+  fields: { arg: Expression },
+  get arg() {
+    return this.el.children[0].ast;
+  },
+  set arg(node) {
+    replace('arg', this.el, this.el.children[0], node);
+  }
+});
+
+
+  function create(ast){
+    var Type = types[ast.type];
+    if (Type) return new Type(ast);
+  }
+
+  var types = create.types = {
+    SourcePosition: SourcePosition,
+    SourceLocation: SourceLocation,
+    SourceRange: SourceRange,
+    ASTNode: ASTNode,
+    ASTNodeList: ASTNodeList,
+    Expression: Expression,
+    Pattern: Pattern,
+    Statement: Statement,
+    Declaration: Declaration,
+    ArrayExpression: ArrayExpression,
+    ArrayPattern: ArrayPattern,
+    ArrowFunctionExpression: ArrowFunctionExpression,
+    AssignmentExpression: AssignmentExpression,
+    AtSymbol: AtSymbol,
+    BlockStatement: BlockStatement,
+    BinaryExpression: BinaryExpression,
+    BreakStatement: BreakStatement,
+    CallExpression: CallExpression,
+    CatchClause: CatchClause,
+    ConditionalExpression: ConditionalExpression,
+    ClassBody: ClassBody,
+    ClassDeclaration: ClassDeclaration,
+    ClassExpression: ClassExpression,
+    ContinueStatement: ContinueStatement,
+    ComprehensionBlock: ComprehensionBlock,
+    ComprehensionExpression: ComprehensionExpression,
+    DoWhileStatement: DoWhileStatement,
+    DebuggerStatement: DebuggerStatement,
+    EmptyStatement: EmptyStatement,
+    ExportDeclaration: ExportDeclaration,
+    ExportSpecifier: ExportSpecifier,
+    ExportSpecifierSet: ExportSpecifierSet,
+    ExpressionStatement: ExpressionStatement,
+    ForStatement: ForStatement,
+    ForInStatement: ForInStatement,
+    ForOfStatement: ForOfStatement,
+    FunctionDeclaration: FunctionDeclaration,
+    FunctionExpression: FunctionExpression,
+    Glob: Glob,
+    Identifier: Identifier,
+    IfStatement: IfStatement,
+    ImportDeclaration: ImportDeclaration,
+    ImportSpecifier: ImportSpecifier,
+    Literal: Literal,
+    LabeledStatement: LabeledStatement,
+    LogicalExpression: LogicalExpression,
+    MemberExpression: MemberExpression,
+    MethodDefinition: MethodDefinition,
+    ModuleDeclaration: ModuleDeclaration,
+    NewExpression: NewExpression,
+    ObjectExpression: ObjectExpression,
+    ObjectPattern: ObjectPattern,
+    Path: Path,
+    Program: Program,
+    Property: Property,
+    ReturnStatement: ReturnStatement,
+    SequenceExpression: SequenceExpression,
+    SpreadElement: SpreadElement,
+    SwitchStatement: SwitchStatement,
+    SwitchCase: SwitchCase,
+    SymbolDeclaration: SymbolDeclaration,
+    SymbolDeclarator: SymbolDeclarator,
+    TaggedTemplateExpression: TaggedTemplateExpression,
+    TemplateElement: TemplateElement,
+    TemplateLiteral: TemplateLiteral,
+    ThisExpression: ThisExpression,
+    ThrowStatement: ThrowStatement,
+    TryStatement: TryStatement,
+    UnaryExpression: UnaryExpression,
+    UpdateExpression: UpdateExpression,
+    VariableDeclaration: VariableDeclaration,
+    VariableDeclarator: VariableDeclarator,
+    WhileStatement: WhileStatement,
+    WithStatement: WithStatement,
+    YieldExpression: YieldExpression
+  };
+
+
+
+  return create;
+})();
+</script>
+</body>
+</html>

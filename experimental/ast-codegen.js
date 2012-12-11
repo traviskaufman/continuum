@@ -10,16 +10,45 @@ var continuum = require('continuum'),
 
 
 var types = {
-  ASTNode: { fields: { type: { types: [ 'string' ] } } },
-  ASTNodeList: { fields: { nodes: { indexed: true, types: [ 'ASTNode' ] } } },
-  Expression: { kind: 'ASTNode' }, Pattern: { kind: 'ASTNode' },
+  SourcePosition: {
+    fields: {
+      line: { content: ['Number'] },
+      column: { content: ['Number'] }
+    }
+  },
+  SourceLocation: {
+    fields: {
+      start: { types: [ 'SourcePosition' ] },
+      end: { types: [ 'SourcePosition' ] }
+    }
+  },
+  SourceRange: {
+    fields: {
+      0: { content: [ 'Number' ] },
+      1: { content: [ 'Number' ] }
+    }
+  },
+  ASTNode: {
+    fields: {
+      loc: { optional: true, types: [ 'SourceLocation' ] },
+      range: { optional: true, types: [ 'SourceRange' ] }
+    }
+  },
+  ASTNodeList: {
+    fields: {
+      nodes: { indexed: true, types: [ 'ASTNode' ] }
+    }
+  },
+  Expression: { kind: 'ASTNode' },
+  Pattern: { kind: 'ASTNode' },
   Statement: { kind: 'ASTNode' },
   Declaration: { kind: 'Statement' },
   ArrayExpression: {
     kind: 'Expression',
     fields: {
       elements: {
-        list: true, holes: true,
+        list: true,
+        holes: true,
         types: [ 'Expression', 'SpreadElement' ]
       }
     }
@@ -27,7 +56,11 @@ var types = {
   ArrayPattern: {
     kind: 'Pattern',
     fields: {
-      elements: { list: true, holes: true, types: [ 'Identifier', 'Pattern' ] }
+      elements: {
+        list: true,
+        holes: true,
+        types: [ 'Identifier', 'Pattern' ]
+      }
     }
   },
   ArrowFunctionExpression: {
@@ -37,7 +70,7 @@ var types = {
       body: { types: [ 'Expression', 'BlockStatement' ] },
       defaults: { list: true, types: [ 'Expression' ] },
       rest: { optional: true, types: [ 'Identifier', 'Pattern' ] },
-      generator: { types: [ 'boolean' ] }
+      generator: { values: [ false, true ] }
     }
   },
   AssignmentExpression: {
@@ -46,7 +79,6 @@ var types = {
       left: { types: [ 'Expression' ] },
       right: { types: [ 'Expression' ] },
       operator: {
-        types: [ 'enum' ],
         values: [ '=', '*=', '/=', '%=', '+=', '-=', '<<=', '>>=', '>>>=', '&=', '^=', '|=' ]
       }
     }
@@ -54,8 +86,8 @@ var types = {
   AtSymbol: {
     kind: 'Expression',
     fields: {
-      name: { types: [ 'string' ] },
-      internal: { types: [ 'boolean' ] }
+      name: { content: [ 'String' ] },
+      internal: { values: [ false, true ] }
     }
   },
   BlockStatement: {
@@ -68,17 +100,14 @@ var types = {
       left: { types: [ 'Expression' ] },
       right: { types: [ 'Expression' ] },
       operator: {
-        types: [ 'enum' ],
-        values: [
-          '+', '-', '/', '*', '%', '^', '&', '|', '>>', '<<', '>>>', '===', '==', '>', '<', '!==',
-          '!=', '>=', '<=', 'in', 'delete', 'instanceof'
-        ]
+        values: [ '+', '-', '/', '*', '%', '^', '&', '|', '>>', '<<', '>>>', '===',
+                  '==', '>', '<', '!==', '!=', '>=', '<=', 'in', 'delete', 'instanceof' ]
       }
     }
   },
   BreakStatement: {
     kind: 'Statement',
-    fields: { label: { optional: true, types: [ 'string' ] } }
+    fields: { label: { optional: true, content: [ 'String' ] } }
   },
   CallExpression: {
     kind: 'Expression',
@@ -126,7 +155,9 @@ var types = {
   },
   ContinueStatement: {
     kind: 'Statement',
-    fields: { label: { optional: true, types: [ 'string' ] } }
+    fields: {
+      label: { optional: true, content: [ 'String' ] }
+    }
   },
   ComprehensionBlock: {
     kind: 'ASTNode',
@@ -211,7 +242,7 @@ var types = {
       body: { types: [ 'BlockStatement' ] },
       defaults: { list: true, types: [ 'Expression' ] },
       rest: { optional: true, types: [ 'Identifier', 'Pattern' ] },
-      generator: { types: [ 'boolean' ] }
+      generator: { values: [ false, true ] }
     }
   },
   FunctionExpression: {
@@ -222,11 +253,18 @@ var types = {
       body: { types: [ 'BlockStatement' ] },
       defaults: { list: true, types: [ 'Expression' ] },
       rest: { optional: true, types: [ 'Identifier', 'Pattern' ] },
-      generator: { types: [ 'boolean' ] }
+      generator: { values: [ false, true ]  }
     }
   },
-  Glob: { kind: 'ASTNode' },
-  Identifier: { kind: 'Expression', fields: { name: { types: [ 'string' ] } } },
+  Glob: {
+    kind: 'ASTNode'
+  },
+  Identifier: {
+    kind: 'Expression',
+    fields: {
+      name: { content: [ 'String' ] }
+    }
+  },
   IfStatement: {
     kind: 'Statement',
     fields: {
@@ -253,15 +291,14 @@ var types = {
     kind: 'Expression',
     fields: {
       value: {
-        optional: true,
-        types: [ 'string', 'boolean', 'number', 'undefined' ]
+        content: [ 'String', 'Boolean', 'Number' ]
       }
     }
   },
   LabeledStatement: {
     kind: 'Statement',
     fields: {
-      label: { types: [ 'string' ] },
+      label: { content: [ 'String' ] },
       body: { types: [ 'Statement' ] }
     }
   },
@@ -270,7 +307,7 @@ var types = {
     fields: {
       left: { types: [ 'Expression' ] },
       right: { types: [ 'Expression' ] },
-      operator: { types: [ 'enum' ], values: [ '||', '&&' ] }
+      operator: { values: [ '||', '&&' ] }
     }
   },
   MemberExpression: {
@@ -278,7 +315,7 @@ var types = {
     fields: {
       object: { types: [ 'Expression' ] },
       property: { types: [ 'Expression' ] },
-      computed: { types: [ 'boolean' ] }
+      computed: { values: [ false, true ] }
     }
   },
   MethodDefinition: {
@@ -286,7 +323,7 @@ var types = {
     fields: {
       key: { types: [ 'AtSymbol', 'Identifier' ] },
       value: { types: [ 'FunctionExpression' ] },
-      kind: { types: [ 'enum' ], values: [ 'get', 'set', '' ] }
+      kind: { values: [ '', 'get', 'set' ] }
     }
   },
   ModuleDeclaration: {
@@ -325,9 +362,9 @@ var types = {
     fields: {
       key: { types: [ 'AtSymbol', 'Identifier', 'Literal' ] },
       value: { types: [ 'Expression' ] },
-      kind: { types: [ 'enum' ], values: [ 'get', 'set', 'init' ] },
-      method: { types: [ 'boolean' ] },
-      shorthand: { types: [ 'boolean' ] }
+      kind: { values: [ 'get', 'set', 'init' ] },
+      method: { values: [ false, true ] },
+      shorthand: { values: [ false, true ] }
     }
   },
   ReturnStatement: {
@@ -338,7 +375,10 @@ var types = {
     kind: 'Expression',
     fields: { expressions: { list: true, types: [ 'Expression' ] } }
   },
-  SpreadElement: { kind: 'ASTNode', fields: { arg: { types: [ 'Expression' ] } } },
+  SpreadElement: {
+    kind: 'ASTNode',
+    fields: { arg: { types: [ 'Expression' ] } }
+  },
   SwitchStatement: {
     kind: 'Statement',
     fields: {
@@ -356,8 +396,8 @@ var types = {
   SymbolDeclaration: {
     kind: 'Declaration',
     fields: {
-      declarations: { list: true, types: [ 'SymbolDeclarator' ] },
-      kind: { types: [ 'enum' ], values: [ 'symbol', 'private' ] }
+      kind: { values: [ 'symbol', 'private' ] },
+      declarations: { list: true, types: [ 'SymbolDeclarator' ] }
     }
   },
   SymbolDeclarator: {
@@ -376,7 +416,10 @@ var types = {
   },
   TemplateElement: {
     kind: 'ASTNode',
-    fields: { value: { types: [ 'object' ] }, tail: { types: [ 'boolean' ] } }
+    fields: {
+      value: { content: [ 'Object' ] },
+      tail: { values: [ false, true ] }
+    }
   },
   TemplateLiteral: {
     kind: 'Expression',
@@ -403,7 +446,6 @@ var types = {
     fields: {
       arg: { types: [ 'Expression' ] },
       operator: {
-        types: [ 'enum' ],
         values: [ '!', '~', '+', '-', 'void', 'typeof' ]
       }
     }
@@ -412,15 +454,15 @@ var types = {
     kind: 'Expression',
     fields: {
       arg: { types: [ 'Expression' ] },
-      operator: { types: [ 'enum' ], values: [ '--', '++' ] },
-      prefix: { types: [ 'boolean' ] }
+      operator: { values: [ '--', '++' ] },
+      prefix: { values: [ false, true ] }
     }
   },
   VariableDeclaration: {
     kind: 'Declaration',
     fields: {
-      declarations: { list: true, types: [ 'VariableDeclarator' ] },
-      kind: { types: [ 'enum' ], values: [ 'var', 'const', 'let' ] }
+      kind: { values: [ 'var', 'const', 'let' ] },
+      declarations: { list: true, types: [ 'VariableDeclarator' ] }
     }
   },
   VariableDeclarator: {
@@ -451,91 +493,244 @@ var types = {
 };
 
 
-function METHOD(name, type, body, args, rest){
-  if (type === 'get') {
-    args = [];
-  } else if (type === 'set') {
-    args = args ? args : ['val'];
-  } else if (!args) {
-    args = [];
-  }
-  if (!body) {
-    body = [];
-  } else if (!(body instanceof Array)) {
-    body = [body];
-  }
-  return _('#method', name, _('#functionexpr', name, args, body, rest), type);
-}
 
 
-
-function GETTER(name){
-  return METHOD(name, 'get', _('#return', _('#this').get(_('#at', name))));
-}
-
-function SETTER(name, param){
-  param = _(param || 'val');
-  return METHOD(name, 'set', _('#this').set(_('#at', name), param), [param]);
-}
-
-
-function CLASS(name, inherits, args, methods){
-  var ctor = METHOD('constructor', '', map(args, function(arg){
-    return _('#this').set(arg, _('#call', _(arg)));
-  }), args);
-  methods = methods || [];
-  methods.push(ctor);
-  return _('#class', name, _('#classbody', methods), inherits);
-}
-
-
-
-var out = _('#module', 'AST', []);
-each(types, function(def, name){
-  var args = [];
-  var methods = [];
-  var rest;
-  var decl = _('#symbol', 'private');
-
-  var ctorBody = map(def.fields, function(details, name){
-    details.name = name;
-    decl.declare(name);
-    if (details.indexed) {
-      rest = name;
-      return _('#return', _('#call', 'index', [
-        _('#this'),
-        _(name),
-        _('#at', name),
-        _('#array', details.types.map(_))
-      ]));
-    } else {
-      args.push(name);
-      return _('#this').set(name, _(name));
+function classes(){
+  function METHOD(name, type, body, args, rest){
+    if (type === 'get') {
+      args = [];
+    } else if (type === 'set') {
+      args = args ? args : ['val'];
+    } else if (!args) {
+      args = [];
     }
-  });
-
-  var ctor = METHOD('constructor', '', ctorBody, args, rest);
-
-  if (decl.declarations.length) {
-    methods.push(decl);
+    if (!body) {
+      body = [];
+    } else if (!(body instanceof Array)) {
+      body = [body];
+    }
+    return _('#method', name, _('#functionexpr', name, args, body, rest), type);
   }
 
-  if (args.length || rest) {
+
+  function GETTER(name){
+    return METHOD(name, 'get', _('#return', _('#this').get(_('#at', name))));
+  }
+
+  function SETTER(name, param){
+    param = _(param || 'val');
+    return METHOD(name, 'set', _('#this').set(_('#at', name), param), [param]);
+  }
+
+
+  function CLASS(name, inherits, args, methods){
+    var ctor = METHOD('constructor', '', map(args, function(arg){
+      return _('#this').set(arg, _('#call', _(arg)));
+    }), args);
+    methods = methods || [];
     methods.push(ctor);
+    return _('#class', name, _('#classbody', methods), inherits);
   }
 
-  each(args, function(arg){
-    var field = def.fields[arg];
-    methods.push(GETTER(arg));
-    if (/[A-Z]/.test(field.types[0][0])) {
-      methods.push(SETTER(arg, field.list ? 'nodelist' : 'node'));
-    } else {
-      methods.push(SETTER(arg));
+  var out = _('#module', 'AST', []);
+  each(types, function(def, name){
+    var args = [];
+    var methods = [];
+    var rest;
+    var decl = _('#symbol', 'private');
+
+    var ctorBody = map(def.fields, function(details, name){
+      details.name = name;
+      decl.declare(name);
+      if (details.indexed) {
+        rest = name;
+        return _('#return', _('#call', 'index', [
+          _('#this'),
+          _(name),
+          _('#at', name),
+          _('#array', details.types.map(_))
+        ]));
+      } else {
+        args.push(name);
+        return _('#this').set(name, _(name));
+      }
+    });
+
+    var ctor = METHOD('constructor', '', ctorBody, args, rest);
+
+    if (decl.declarations.length) {
+      methods.push(decl);
     }
+
+    if (args.length || rest) {
+      methods.push(ctor);
+    }
+
+    each(args, function(arg){
+      var field = def.fields[arg];
+      methods.push(GETTER(arg));
+      if (/[A-Z]/.test(field.types[0][0])) {
+        methods.push(SETTER(arg, field.list ? 'nodelist' : 'node'));
+      } else {
+        methods.push(SETTER(arg));
+      }
+    });
+
+
+    out.append(_('#export', _('#class', name, _('#classbody', methods), def.kind)));
   });
+  console.log(out.toSource());
+}
+
+var replace = _('replace'),
+    thisDotEl = _('#this').get('el'),
+    thisDotElDotFirstChild = thisDotEl.get('firstChild'),
+    thisDotElDotLastChild = thisDotEl.get('lastChild'),
+    thisDotElDotChildren = thisDotEl.get('children'),
+    loc = _('#this').set('location', _('location'));
 
 
-  out.append(_('#export', _('#class', name, _('#classbody', methods), def.kind)));
-});
-console.log(out.toSource());
+function funcs(){
+  function PROPERTY(name, type, body, args){
+    if (type === 'get') {
+      args = [];
+    } else if (type === 'set') {
+      args = args ? args : ['val'];
+    } else if (!args) {
+      args = [];
+    }
+    if (!body) {
+      body = [];
+    } else if (!(body instanceof Array)) {
+      body = [body];
+    }
+    return _('#property', type, name, _('#functionexpr', name, args, body));
+  }
 
+
+
+  function GETTER(details, index){
+    var get = thisDotElDotChildren.get(index);
+    return PROPERTY(details.name, 'get', _('#return', get.get('ast')));
+  }
+
+
+  function SETTER(details, param, index, callback){
+    param = _(param || 'val');
+    var set = _('#call', replace, [
+      details.name,
+      thisDotEl,
+      thisDotElDotChildren.get(index),
+      callback ? _('#call', callback, [param]) : param
+    ]);
+    return PROPERTY(details.name, 'set', set, [param]);
+  }
+
+  function CONTENT(details, param, index, callback){
+    param = _(param || 'val');
+    var set = _('#call', replace, [
+      details.name,
+      thisDotEl,
+      thisDotElDotChildren.get(index),
+      callback ? _('#call', callback, [param]) : param
+    ]);
+    return PROPERTY(details.name, 'set', set, [param]);
+  }
+
+  function SETATTR(details, param, callback){
+    var set = _('#call', thisDotEl.get('setAttribute'), [details.name, _('#call', callback, [param])]);
+    return PROPERTY(details.name, 'set', set, [param]);
+  }
+
+  function GETATTR(details){
+    var get = _('#call', thisDotEl.get('getAttribute'), [details.name]);
+    return PROPERTY(details.name, 'get', _('#return', get), []);
+  }
+
+  function LITERAL(value){
+    return _('#literal', value);
+  }
+
+  var out = [];
+  var hash = _('#object');
+
+  each(types, function(def, name){
+    var args = [];
+    var methodsNames = [];
+    var methods = [_('#property', 'init', 'type', name)];
+
+    var ctorBody = map(def.fields, function(details, name){
+      details.name = name;
+      args.push(+name === +name ? '$'+name : name);
+      methodsNames.push(name);
+      if (details.indexed) {
+        return _('#return', _('#call', 'index', [_('#this'), _(name), name,
+          details.types.length === 1 ? _(details.types[0]) : _('#array', details.types.map(_))
+        ]));
+      } else {
+        return _('#this').set(name, _('node').get(name));
+      }
+    }) || [];
+
+    var propTypes = _('#object');
+    methods.push(_('#property', 'init', 'fields', propTypes));
+    var enumerations = [];
+
+    var i = 0;
+    each(methodsNames, function(arg){
+      var field = def.fields[arg];
+      if ('values' in field) {
+        var options = _('#array', field.values.map(LITERAL));
+        enumerations.push(_('#call', _('enumeration'), [_(name), field.name, options]));
+        methods.push(GETATTR(field));
+        return methods.push(SETATTR(field, 'setting', _(name).get(field.name)));
+      } else if ('content' in field && field.content !== undefined) {
+        return methods.push(SETTER(field, 'content', i, _(field.content[0])));
+      }
+
+      var fieldTypes = field.types;
+
+      methods.push(GETTER(field, i));
+      propTypes.set(field.name, fieldTypes.length === 1 ? _(fieldTypes[0]) : _('#array', fieldTypes));
+      if (/[A-Z]/.test(field.types[0][0])) {
+        methods.push(SETTER(field, field.list ? 'nodelist' : 'node', i));
+      } else {
+        methods.push(SETTER(field, 'node', i));
+      }
+      i++;
+    });
+    if (ctorBody) {
+      var create = _('#this').set('el', _('#call', _('createElement'), ['span']));
+      ctorBody.unshift(_('#this').get('el').set('ast', _('#this')));
+      var inheritance = [name],
+          kind = def;
+
+      while (kind && kind.kind) {
+        inheritance.push(kind.kind);
+        kind = types[kind.kind];
+      }
+      ctorBody.unshift(_('#member', create, 'className').set(LITERAL(inheritance.join(' '))));
+    }
+    var ctor = _('#functiondecl', name, ['node'], ctorBody);
+
+
+    out.push(ctor);
+    out.push(_('#call', _('define'), [_(name), 'fields', _('#array', methodsNames.map(LITERAL))]));
+    if (enumerations.length) out.push.apply(out, enumerations);
+    if (def.kind) {
+      out.push(_('#call', _('inherit'), [_(name), _(def.kind), _('#object', methods)]));
+    } else {
+      out.push(_('#call', _('define'), [_(name).get('prototype'), _('#object', methods)]));
+    }
+    hash.set(name, _(name));
+  });
+  out.push(_('#var').declare('types', hash));
+  console.log(_('#program', out).toSource());
+}
+
+
+funcs();
+
+// console.log(Object.keys(types).map(function(type){
+//   return '.'+type + '\n{}\n\n';
+// }).join(''));
