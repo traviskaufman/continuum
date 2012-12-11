@@ -2162,17 +2162,28 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var Script = (function(){
-    var parseOptions = {
-      loc    : true,
-      range  : true,
-      raw    : true,
-      tokens : false,
-      comment: true
+    function ParseOptions(o){
+      if (o) {
+        for (var k in o) {
+          if (k in this) {
+            this[k] = o[k];
+          }
+        }
+      }
     }
+
+    ParseOptions.prototype = {
+      loc     : true,
+      range   : true,
+      raw     : true,
+      comment : true,
+      tokens  : false,
+      tolerant: false
+    };
 
     function parse(src, origin, type, options){
       try {
-        return esprima.parse(src, options || parseOptions);
+        return esprima.parse(src, options ? new ParseOptions(options) : ParseOptions.prototype);
       } catch (e) {
         if (!realm || !intrinsics) return e;
         var err = new $Error('SyntaxError', undefined, e.message);
