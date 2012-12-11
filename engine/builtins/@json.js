@@ -1,17 +1,14 @@
-let ReplacerFunction,
-    PropertyList,
-    stack,
-    indent,
-    gap;
+let ReplacerFunction, PropertyList, stack, indent, gap;
 
 function J(value){
   if (stack.has(value)) {
     throw $__Exception('circular_structure', []);
   }
 
-  var stepback = indent,
-      partial = [],
-      brackets;
+  const stepback = indent,
+        partial = [];
+
+  var brackets;
 
   indent += gap;
   stack.add(value);
@@ -37,20 +34,17 @@ function J(value){
     }
   }
 
+  var final;
   if (!partial.length) {
-    stack.delete(value);
-    indent = stepback;
-    return brackets[0] + brackets[1];
+    final = brackets[0] + brackets[1];
   } else if (!gap) {
-    stack.delete(value);
-    indent = stepback;
-    return brackets[0] + partial.join(',') + brackets[1];
+    final = brackets[0] + partial.join(',') + brackets[1];
   } else {
-    var final = '\n' + indent + partial.join(',\n' + indent) + '\n' + stepback;
-    stack.delete(value);
-    indent = stepback;
-    return brackets[0] + final + brackets[1];
+    final = brackets[0] + '\n' + indent + partial.join(',\n' + indent) + '\n' + stepback + brackets[1];
   }
+  stack.delete(value);
+  indent = stepback;
+  return final;
 }
 
 internalFunction(J);
@@ -161,6 +155,6 @@ export function parse(source, reviver){
 
 
 export let JSON = {};
-JSON.@@SetBuiltinBrand('BuiltinJSON');
 JSON.@@extend({ stringify, parse });
+JSON.@@SetBuiltinBrand('BuiltinJSON');
 JSON.@@define(@toStringTag, 'JSON');
