@@ -10,28 +10,13 @@ function ensureWeakMap(o, p, name){
 
 export class WeakMap {
   constructor(iterable){
-    var weakmap;
-    if ($__IsConstructCall()) {
-      weakmap = this;
-    } else {
-      if (this === undefined || this === WeakMapPrototype) {
-        weakmap = $__ObjectCreate(WeakMapPrototype) ;
-      } else {
-        weakmap = $__ToObject(this);
-      }
-    }
-
-    if (weakmap.@@hasInternal('WeakMapData')) {
-      throw $__Exception('double_initialization', ['WeakMap']);
-    }
-
-    $__WeakMapInitialization(weakmap, iterable);
-    return weakmap;
+    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;
+    return weakmapCreate(map, iterable);
   }
 
-  set(key, value){
-    ensureWeakMap(this, key, 'set');
-    return $__WeakMapSet(this, key, value);
+  delete(key){
+    ensureWeakMap(this, key, 'delete');
+    return $__WeakMapDelete(this, key);
   }
 
   get(key){
@@ -44,12 +29,53 @@ export class WeakMap {
     return $__WeakMapHas(this, key);
   }
 
-  delete(key){
-    ensureWeakMap(this, key, 'delete');
-    return $__WeakMapDelete(this, key);
+  set(key, value){
+    ensureWeakMap(this, key, 'set');
+    return $__WeakMapSet(this, key, value);
   }
 }
 
 builtinClass(WeakMap);
 
 var WeakMapPrototype = WeakMap.prototype;
+
+
+
+
+function weakmapCreate(target, iterable){
+  target = $__ToObject(target);
+
+  if (target.@@hasInternal('WeakMapData')) {
+    throw $__Exception('double_initialization', ['WeakMap']);
+  }
+
+  $__WeakMapInitialization(target, iterable);
+  return target;
+}
+
+function weakmapDelete(weakmap, key){
+  ensureWeakMap(weakmap, key, '@weakmap.delete');
+  return $__WeakMapDelete(weakmap, key);
+}
+
+function weakmapGet(weakmap, key){
+  ensureWeakMap(weakmap, key, '@weakmap.get');
+  return $__WeakMapGet(weakmap, key);
+}
+
+function weakmapHas(weakmap, key){
+  ensureWeakMap(weakmap, key, '@weakmap.has');
+  return $__WeakMapHas(weakmap, key);
+}
+
+function weakmapSet(weakmap, key, value){
+  ensureWeakMap(weakmap, key, '@weakmap.set');
+  return $__WeakMapSet(weakmap, key, value);
+}
+
+export let
+  create  = weakmapCreate,
+//delete  = weakmapDelete, TODO: fix exporting reserved names
+  get     = weakmapGet,
+  has     = weakmapHas,
+  set     = weakmapSet;

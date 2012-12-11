@@ -42,9 +42,8 @@ class MapIterator extends Iterator {
       return item;
     } else if (kind === 'key') {
       return item[0];
-    } else {
-      return item[1];
     }
+    return item[1];
   }
 }
 
@@ -53,23 +52,15 @@ builtinClass(MapIterator);
 
 export class Map {
   constructor(iterable){
-    var map;
-    if ($__IsConstructCall()) {
-      map = this;
-    } else {
-      if (this == null || this === MapPrototype) {
-        map = $__ObjectCreate(MapPrototype) ;
-      } else {
-        map = $__ToObject(this);
-      }
-    }
+    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;
+    return mapCreate(map, iterable);
+  }
 
-    if (map.@@hasInternal('MapData')) {
-      throw $__Exception('double_initialization', ['Map'])
+  get size(){
+    if (this && this.@@hasInternal('MapData')) {
+      return $__MapSize(this);
     }
-
-    $__MapInitialization(map, iterable);
-    return map;
+    return 0;
   }
 
   clear(){
@@ -77,9 +68,9 @@ export class Map {
     return $__MapClear(this, key);
   }
 
-  set(key, value){
-    ensureMap(this, 'set');
-    return $__MapSet(this, key, value);
+  delete(key){
+    ensureMap(this, 'delete');
+    return $__MapDelete(this, key);
   }
 
   get(key){
@@ -92,11 +83,6 @@ export class Map {
     return $__MapHas(this, key);
   }
 
-  delete(key){
-    ensureMap(this, 'delete');
-    return $__MapDelete(this, key);
-  }
-
   items(){
     ensureMap(this, 'items');
     return new MapIterator('key+value');
@@ -107,13 +93,14 @@ export class Map {
     return new MapIterator('key');
   }
 
+  set(key, value){
+    ensureMap(this, 'set');
+    return $__MapSet(this, key, value);
+  }
+
   values(){
     ensureMap(this, 'values');
     return new MapIterator('value');
-  }
-
-  get size(){
-    return this === MapPrototype ? 0 : $__MapSize(this);
   }
 
   @iterator(){
@@ -126,3 +113,58 @@ builtinClass(Map);
 const MapPrototype = Map.prototype;
 
 
+function mapClear(map){
+  ensureMap(map, '@map.clear');
+  return $__MapClear(map);
+}
+
+function mapCreate(target, iterable){
+  target = $__ToObject(target);
+
+  if (target.@@hasInternal('MapData')) {
+    throw $__Exception('double_initialization', ['Map']);
+  }
+
+  $__MapInitialization(target, iterable);
+  return target;
+}
+
+function mapDelete(map, key){
+  ensureMap(map, '@map.delete');
+  return $__MapDelete(map, key);
+}
+
+function mapGet(map, key){
+  ensureMap(map, '@map.get');
+  return $__MapGet(map, key);
+}
+
+function mapHas(map, key){
+  ensureMap(map, '@map.has');
+  return $__MapHas(map, key);
+}
+
+function mapSet(map, key, value){
+  ensureMap(map, '@map.set');
+  return $__MapSet(map, key, value);
+}
+
+function mapSize(map){
+  ensureMap(map, '@map.size');
+  return $__MapSize(map);
+}
+
+function mapIterate(map, kind){
+  ensureMap(map, '@map.iterate');
+  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));
+}
+
+export let
+  clear   = mapClear,
+  create  = mapCreate,
+  //delete  = mapDelete, TODO: fix exporting reserved names
+  get     = mapGet,
+  has     = mapHas,
+  iterate = mapIterate,
+  set     = mapSet,
+  size    = mapSize;

@@ -2,7 +2,6 @@ import Map from '@map';
 import Iterator from '@iter';
 
 
-
 function ensureSet(o, name){
   var type = typeof o;
   if (type === 'object' ? o === null : type !== 'function') {
@@ -16,6 +15,8 @@ function ensureSet(o, name){
 }
 
 internalFunction(ensureSet);
+
+
 
 class SetIterator extends Iterator {
   private @data, // Set
@@ -53,47 +54,31 @@ builtinClass(SetIterator);
 
 export class Set {
   constructor(iterable){
-    var set;
-    if ($__IsConstructCall()) {
-      set = this;
-    } else {
-      if (this == null || this === SetPrototype) {
-        set = $__ObjectCreate(SetPrototype);
-      } else {
-        set = $__ToObject(this);
-      }
-    }
-    if (set.@@hasInternal('SetData')) {
-      throw $__Exception('double_initialization', ['Set']);
-    }
+    var set = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : this;
+    return setCreate(set, iterable);
+  }
 
-    var data = new Map;
-    set.@@setInternal('SetData', data);
-
-    if (iterable !== undefined) {
-      iterable = $__ToObject(iterable);
-      for (var [key, value] of iterable) {
-        $__MapSet(data, value, value);
-      }
+  get size(){
+    if (this && this.@@hasInternal('SetData')) {
+      return $__MapSize(this.@@getInternal('SetData'));
     }
-
-    return set;
+    return 0;
   }
 
   clear(){
     return $__MapClear(ensureSet(this, 'clear'));
   }
 
-  add(key){
-    return $__MapSet(ensureSet(this, 'add'), key, key);
+  add(value){
+    return $__MapSet(ensureSet(this, 'add'), value, value);
   }
 
-  has(key){
-    return $__MapHas(ensureSet(this, 'has'), key);
+  has(value){
+    return $__MapHas(ensureSet(this, 'has'), value);
   }
 
-  delete(key){
-    return $__MapDelete(ensureSet(this, 'delete'), key);
+  delete(value){
+    return $__MapDelete(ensureSet(this, 'delete'), value);
   }
 
   items(){
@@ -108,13 +93,6 @@ export class Set {
     return new SetIterator(this, 'value');
   }
 
-  get size(){
-    if (this.@@hasInternal('SetData')) {
-      return $__MapSize(ensureSet(this, 'size'));
-    }
-    return 0;
-  }
-
   @iterator(){
     return new SetIterator(this, 'value');
   }
@@ -123,3 +101,57 @@ export class Set {
 builtinClass(Set);
 const SetPrototype = Set.prototype;
 
+
+
+function setAdd(set, value){
+  return $__MapSet(ensureSet(set, '@set.add'), value, value);
+}
+
+function setClear(set){
+  return $__MapClear(ensureSet(set, '@set.clear'));
+}
+
+function setCreate(target, iterable){
+  target = $__ToObject(target);
+
+  if (target.@@hasInternal('SetData')) {
+    throw $__Exception('double_initialization', ['Set']);
+  }
+
+  const data = new Map;
+  target.@@setInternal('SetData', data);
+
+  if (iterable !== undefined) {
+    iterable = $__ToObject(iterable);
+    for (var [key, value] of iterable) {
+      $__MapSet(data, value, value);
+    }
+  }
+
+  return target;
+}
+
+function setDelete(set, value){
+  return $__MapDelete(ensureSet(set, '@set.delete'), value);
+}
+
+function setHas(set, value){
+  return $__MapHas(ensureSet(set, '@set.has'), value);
+}
+
+function setSize(set){
+  return $__MapSize(ensureMap(set, '@set.size'));
+}
+
+function setIterate(set, kind){
+  return new SetIterator(set, 'value');
+}
+
+export let
+  add     = setAdd,
+  clear   = setClear,
+  create  = setCreate,
+  //delete  = setDelete, //uhg
+  has     = setHas,
+  iterate = setIterate,
+  size    = setSize;
