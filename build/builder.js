@@ -66,7 +66,16 @@ Builder.prototype.combine = function combine(){
 Builder.prototype.writeFile = function writeFile(name, minified){
   var src = this.combine();
   write(name+'.js', src);
-  write(name+'.min.js', minified ? minify(src) : src);
+  if (minified) {
+    try {
+      src = minify(src);
+    } catch (e) {
+      console.warn('You tried to make the minified version but likely are missing the'+
+                   ' super duper custom things needed to make it, skipping minification');
+    }
+  }
+
+  write(name+'.min.js', src);
 }
 
 
