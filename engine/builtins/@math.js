@@ -82,9 +82,8 @@ export function cosh(x) {
   x = abs(x);
   if (x > 21) {
     return $__exp(x) / 2;
-  } else {
-    return ($__exp(x) + $__exp(-x)) / 2;
   }
+  return ($__exp(x) + $__exp(-x)) / 2;
 }
 
 export function exp(x){
@@ -98,8 +97,8 @@ function factorial(x){
 
   if (i <= x) {
     do {
-      o *= i;
-    } while (++i <= x)
+      o *= i++;
+    } while (i <= x)
   }
   return o;
 }
@@ -276,9 +275,9 @@ Math.@@define(@toStringTag, 'Math');
 for (let k in Math) {
   if (typeof Math[k] === 'function') {
     builtinFunction(Math[k]);
-    Math.@@update(k, 6);
+    Math.@@update(k, HIDDEN);
   } else {
-    Math.@@update(k, 0);
+    Math.@@update(k, FROZEN);
   }
 }
 
