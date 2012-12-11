@@ -184,5 +184,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-builder.writeFile('../continuum');
-//builder.writeFile('../continuum', true);
+//builder.writeFile('../continuum');
+builder.writeFile('../continuum', true);
