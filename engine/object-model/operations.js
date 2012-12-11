@@ -1,11 +1,11 @@
 var operations = (function(exports){
   var environments = require('./environments'),
-      operators = require('./operators'),
-      objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration'),
-      errors    = require('../errors'),
-      constants = require('../constants'),
-      MapData   = require('./collections').MapData;
+      operators    = require('./operators'),
+      objects      = require('../lib/objects'),
+      iteration    = require('../lib/iteration'),
+      errors       = require('../errors'),
+      constants    = require('../constants'),
+      MapData      = require('./collections').MapData;
 
   var is               = objects.is,
       create           = objects.create,
@@ -32,7 +32,7 @@ var operations = (function(exports){
   }
 
   function $Array(o){
-    $Array = require('../engine/runtime').builtins.$Array;
+    $Array = require('./$Array');
     return new $Array(o);
   }
 

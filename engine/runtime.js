@@ -16,6 +16,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object      = require('./object-model/$Object'),
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
+      natives      = require('./object-model/natives'),
       Emitter      = require('./lib/Emitter'),
       buffers      = require('./lib/buffers'),
       PropertyList = require('./lib/PropertyList'),
@@ -39,9 +40,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       fname         = functions.fname,
       toArray       = functions.toArray,
       applyNew      = functions.applyNew,
+      iterate       = iteration.iterate,
       each          = iteration.each,
       map           = iteration.map,
       numbers       = utility.numbers,
+      uid           = utility.uid,
       nextTick      = utility.nextTick,
       tag           = utility.tag,
       unique        = utility.unique,
@@ -141,6 +144,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   errors.createError = function(name, type, message){
     return new $Error(name, type, message);
   };
+
 
 
 
@@ -335,6 +339,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
+      proto.define(intrinsics.toStringTag, brand);
     }
 
     MakeConstructor(ctor, false, proto);
@@ -518,10 +523,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var instance = typeof prototype === 'object' ? new $Object(prototype) : new $Object;
         if (this.BuiltinConstructor) {
           instance.BuiltinBrand = prototype.BuiltinBrand;
-        } else if (this.Class) {
-          instance.Brand = prototype.Brand;
         }
-        instance.ConstructorName = this.get('name');
 
         var result = this.Call(instance, args, true);
         if (result && result.Abrupt) return result;
@@ -637,7 +639,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         NEWBORN   = 'newborn';
 
     function setFunction(obj, name, func){
-      obj.set(name, new $NativeFunction({
+      obj.set(name, new $InternalFunction({
         name: name,
         length: func.length,
         call: func
@@ -1210,6 +1212,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $MappedArguments;
   })();
 
+
   var $Module = (function(){
     function ModuleGetter(ref){
       var getter = this.Get = {
@@ -1537,6 +1540,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $TypedArray;
   })();
 
+
   var $NativeFunction = (function(){
     function $NativeFunction(options){
       if (typeof options === 'function') {
@@ -1680,6 +1684,84 @@ var runtime = (function(GLOBAL, exports, undefined){
     ]);
 
     return $InternalFunction;
+  })();
+
+  var $WrappedObject = (function(){
+    var keys = [],
+        values = [];
+
+    function wrap(id, o, proto){
+      if (isObject(o)) {
+        if (hasOwn(o, id)) {
+          return o[id];
+        }
+        var wrapper = new $WrappedObject(id, o, proto);
+        try {
+          define(o, id, wrapper);
+        } catch (e) {
+          var index = keys.indexOf(o);
+          if (~index) return values[index];
+          keys.push(o);
+          values.push(wrapper);
+        }
+        return wrapper;
+      }
+      return o;
+    }
+
+    natives.add(function wrapperClass(Ctor){
+      var symbols = Ctor.Scope.symbols,
+          proto = Ctor.get('prototype');
+
+      var get = new $InternalFunction({
+        name: symbols.get,
+        call: function(obj, args){
+          var wrapped = obj.wrapped,
+              prop = args[0],
+              result = wrap(obj.wrapid, wrapped[prop], proto);
+
+          if (result && result.wrapped && !result.initialized) {
+            Ctor.Call(result, [obj, prop], true);
+            result.initialized = true;
+          }
+          return result;
+        }
+      });
+
+      var set = new $InternalFunction({
+        name: symbols.set,
+        call: function(obj, args){
+          var wrapped = obj.wrapped,
+              prop = args[0],
+              value = args[1];
+
+          if (value && value.wrapped) {
+            value = value.wrapped;
+          }
+
+          wrapped[prop] = value;
+        }
+      });
+
+      proto.define(symbols.get, get);
+      proto.define(symbols.set, set);
+      var init = wrap(uid(), GLOBAL, proto);
+      Ctor.Call(init, [], true);
+      init.initialized = true;
+      return init;
+    });
+
+    function $WrappedObject(id, object, prototype){
+      this.Prototype = typeof prototype === 'object' ? prototype : wrap(id, getPrototypeOf(object));
+      this.Realm = realm;
+      this.properties = new PropertyList;
+      this.storage = new Hash;
+      this.wrapped = object;
+      this.wrapid = id;
+      tag(this);
+    }
+
+    inherit($WrappedObject, $Object);
   })();
 
   var ExecutionContext = (function(){
@@ -2179,7 +2261,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     var Hooked = create(null);
 
-    var natives = (function(){
+    (function(){
       var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
 
       function wrapFunction(f){
@@ -2198,7 +2280,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       var timers = {};
       var nativeCode = ['function ', '() { [native code] }'];
 
-      return {
+      natives.add({
         _GetPrimitiveValue: function(obj, args){
           return obj.PrimitiveValue;
         },
@@ -2873,7 +2955,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             },
         baseURL: module ? function(){ return module.parent.parent.dirname }
                         : function(){ return location.origin + location.pathname }
-      };
+      });
     })();
 
 
@@ -3140,15 +3222,18 @@ var runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'quiet');
       hide(this, 'mutationScope');
 
-      for (var k in natives) {
-        var name = k[0] === '_' ? k.slice(1) : k;
+      iterate(natives, function(item){
+        var key = item[0],
+            value = item[1],
+            name = key[0] === '_' ? key.slice(1) : key;
+
         intrinsics[name] = new $NativeFunction({
-          unwrapped: k[0] === '_',
+          unwrapped: key[0] === '_',
           name: name,
-          length: natives[k].length,
-          call: natives[k]
+          length: value.length,
+          call: value
         });
-      }
+      });
 
       function init(){
         initialize(self, function(){

@@ -96,6 +96,7 @@ builder.addFiles([
   '../engine/lib/PropertyList.js',
   '../engine/lib/buffers.js',
 
+  '../engine/object-model/natives.js',
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',
@@ -106,6 +107,7 @@ builder.addFiles([
   '../engine/object-model/operations.js',
   '../engine/object-model/descriptors.js',
   '../engine/object-model/$Object.js',
+  '../engine/object-model/$Array.js',
   '../engine/object-model/$Proxy.js',
 
   '../engine/thunk.js',
@@ -182,5 +184,5 @@ function minify(src){
   return generate(mangle(post.reduce(passer, optimize(parse(src, a), passes, b)), b), c);
 }
 
-//builder.writeFile('../continuum');
-builder.writeFile('../continuum', true);
+builder.writeFile('../continuum');
+//builder.writeFile('../continuum', true);
