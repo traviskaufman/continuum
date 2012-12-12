@@ -139,8 +139,7 @@ var $Array = (function(module){
     function DefineOwnProperty(key, desc, strict){
       var oldLenDesc = this.GetOwnProperty('length'),
           oldLen = oldLenDesc.Value,
-          reject = strict ? function(e, a){ return ThrowException(e, a) }
-                          : function(e, a){ return false };
+          reject = strict ? ThrowException : function(e, a){ return false };
 
 
       if (key === 'length') {
