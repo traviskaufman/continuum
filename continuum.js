@@ -8448,37 +8448,6 @@ exports.buffers = (function(global, exports){
 })(this, typeof module !== 'undefined' ? exports : {});
 
 
-exports.natives = (function(module){
-  var HashMap = require('../lib/HashMap'),
-      inherit = require('../lib/objects').inherit,
-      isObject = require('../lib/objects').isObject,
-      each = require('../lib/iteration').each,
-      fname = require('../lib/functions').fname;
-
-  function BulkMap(){
-    HashMap.apply(this, arguments);
-  }
-
-  inherit(BulkMap, HashMap, [
-    function add(name, value){
-      if (typeof name === 'string') {
-        this.set(name, value);
-      } else if (typeof name === 'function') {
-        this.set(fname(name), name);
-      } else if (isObject(name)) {
-        each(name, function(value, name){
-          this.set(name, value);
-        }, this);
-      }
-      return this.size;
-    }
-  ]);
-
-
-  return module.exports = new BulkMap;
-})(typeof module !== 'undefined' ? module : {});
-
-
 exports.constants = (function(exports){
   "use strict";
   var objects = require('./lib/objects');
@@ -13025,16 +12994,6 @@ exports.descriptors = (function(exports){
   StringIndex.prototype = new DataDescriptor(undefined, E__);
 
 
-  function ArrayBufferIndex(value){
-    this.Value = value;
-  }
-
-  exports.ArrayBufferIndex = ArrayBufferIndex;
-
-  ArrayBufferIndex.prototype = new DataDescriptor(undefined, E_W);
-
-
-
   function Value(value){
     this.Value = value;
   }
@@ -13119,7 +13078,7 @@ exports.descriptors = (function(exports){
 
 
   function IsGenericDescriptor(desc) {
-    return desc === undefined ? false : !(('Get' in desc || 'Set' in desc) || ('Value' in desc || 'Writable' in desc));
+    return desc === undefined ? false : !('Get' in desc || 'Set' in desc || 'Value' in desc || 'Writable' in desc);
   }
 
   exports.isGenericDescriptor = IsGenericDescriptor;
@@ -13943,8 +13902,7 @@ exports.$Array = (function(module){
     function DefineOwnProperty(key, desc, strict){
       var oldLenDesc = this.GetOwnProperty('length'),
           oldLen = oldLenDesc.Value,
-          reject = strict ? function(e, a){ return ThrowException(e, a) }
-                          : function(e, a){ return false };
+          reject = strict ? ThrowException : function(e, a){ return false };
 
 
       if (key === 'length') {
@@ -14170,7 +14128,6 @@ exports.$Proxy = (function(module){
 
   function GetMethod(handler, trap){
     var result = handler.Get(trap);
-
     if (result && result.Abrupt) return result;
 
     if (result !== undefined && !IsCallable(result)) {
@@ -14181,13 +14138,13 @@ exports.$Proxy = (function(module){
 
   function TrapDefineOwnProperty(proxy, key, descObj, strict){
     var handler = proxy.ProxyHandler,
-        target = proxy.ProxyTarget,
-        trap = GetMethod(handler, 'defineProperty'),
-        normalizedDesc = ToPropertyDescriptor(descObj);
+        target = proxy.ProxyTarget;
 
-    if (trap && trap.Abrupt) {
-      return trap;
-    }
+    var trap = GetMethod(handler, 'defineProperty');
+    if (trap && trap.Abrupt) return trap;
+
+    var normalizedDesc = ToPropertyDescriptor(descObj);
+
 
     if (trap === undefined) {
       return target.DefineOwnProperty(key, normalizedDesc, strict);
@@ -14218,36 +14175,29 @@ exports.$Proxy = (function(module){
 
   function TrapGetOwnProperty(proxy, key){
     var handler = proxy.ProxyHandler,
-        target = proxy.ProxyTarget,
-        trap = GetMethod(handler, 'getOwnPropertyDescriptor');
+        target = proxy.ProxyTarget;
 
-    if (trap && trap.Abrupt) {
-      return trap;
-    }
+    var trap = GetMethod(handler, 'getOwnPropertyDescriptor');
+    if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
       return target.GetOwnProperty(key);
     } else {
       var trapResult = trap.Call(handler, [target, key]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var desc = NormalizeAndCompletePropertyDescriptor(trapResult),
-          targetDesc = target.GetOwnProperty(key);
-      if (targetDesc && targetDesc.Abrupt) {
-        return targetDesc;
-      }
+      var desc = NormalizeAndCompletePropertyDescriptor(trapResult);
 
-      if (desc === undefined) {
-        if (targetDesc !== undefined) {
-          if (!targetDesc.Configurable) {
-            return ThrowException('proxy_configurability_inconsistent');
-          } else if (!target.IsExtensible()) {
-            return ThrowException('proxy_extensibility_inconsistent');
-          }
-          return;
+      var targetDesc = target.GetOwnProperty(key);
+      if (targetDesc && targetDesc.Abrupt) return targetDesc;
+
+      if (desc === undefined && targetDesc !== undefined) {
+        if (!targetDesc.Configurable) {
+          return ThrowException('proxy_configurability_inconsistent');
+        } else if (!target.IsExtensible()) {
+          return ThrowException('proxy_extensibility_inconsistent');
         }
+        return;
       }
 
       var extensible = target.IsExtensible();
@@ -14255,11 +14205,10 @@ exports.$Proxy = (function(module){
         return ThrowException('proxy_extensibility_inconsistent');
       } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(desc))) {
         return ThrowException('proxy_incompatible_descriptor');
-      } else if (!ToBoolean(desc.Get('configurable'))) {
-        if (targetDesc === undefined || targetDesc.Configurable) {
-          return ThrowException('proxy_configurability_inconsistent')
-        }
+      } else if (!ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
+        return ThrowException('proxy_configurability_inconsistent')
       }
+
       return desc;
     }
   }
@@ -14288,23 +14237,16 @@ exports.$Proxy = (function(module){
   }, [
     function GetInheritance(){
       var trap = GetMethod(this.ProxyHandler, 'getPrototypeOf');
-
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.GetInheritance();
       } else {
         var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget]);
-        if (trapResult && trapResult.Abrupt) {
-          return trapResult;
-        }
+        if (trapResult && trapResult.Abrupt) return trapResult;
 
         var targetProto = this.ProxyTarget.GetInheritance();
-        if (targetProto && targetProto.Abrupt) {
-          return targetProto;
-        }
+        if (targetProto && targetProto.Abrupt) return targetProto;
 
         if (trapResult !== targetProto) {
           return ThrowException('proxy_inconsistent', 'getPrototypeOf');
@@ -14315,23 +14257,17 @@ exports.$Proxy = (function(module){
     },
     function IsExtensible(){
       var trap = GetMethod(this.ProxyHandler, 'isExtensible');
-
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.IsExtensible();
       }
-      var proxyIsExtensible = ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
 
-      var targetIsExtensible  = this.ProxyTarget.IsExtensible();
-      if (targetIsExtensible && targetIsExtensible.Abrupt) {
-        return targetIsExtensible;
-      }
+      var proxyIsExtensible = ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
+      if (trapResult && trapResult.Abrupt) return trapResult;
+
+      var targetIsExtensible = this.ProxyTarget.IsExtensible();
+      if (targetIsExtensible && targetIsExtensible.Abrupt) return targetIsExtensible;
 
       if (proxyIsExtensible !== targetIsExtensible) {
         return ThrowException('proxy_extensibility_inconsistent');
@@ -14340,23 +14276,17 @@ exports.$Proxy = (function(module){
     },
     function GetP(receiver, key){
       var trap = GetMethod(this.ProxyHandler, 'get');
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.GetP(receiver, key);
       }
 
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key, receiver]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
       var desc = this.ProxyTarget.GetOwnProperty(key);
-      if (desc && desc.Abrupt) {
-        return desc;
-      }
+      if (desc && desc.Abrupt) return desc;
 
       if (desc !== undefined) {
         if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
@@ -14374,10 +14304,7 @@ exports.$Proxy = (function(module){
     },
     function SetP(receiver, key, value){
       var trap = GetMethod(this.ProxyHandler, 'set');
-
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.SetP(receiver, key, value);
@@ -14392,9 +14319,7 @@ exports.$Proxy = (function(module){
 
       if (success) {
         var desc = this.ProxyTarget.GetOwnProperty(key);
-        if (desc && desc.Abrupt) {
-          return desc;
-        }
+        if (desc && desc.Abrupt) return desc;
 
         if (desc !== undefined) {
           if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
@@ -14416,33 +14341,26 @@ exports.$Proxy = (function(module){
     },
     function DefineOwnProperty(key, desc, strict){
       var descObj = FromGenericPropertyDescriptor(desc);
-      if (descObj && descObj.Abrupt) {
-        return descObj;
-      }
+      if (descObj && descObj.Abrupt) return descObj;
 
       return TrapDefineOwnProperty(this, key, descObj, strict);
     },
     function HasOwnProperty(key){
       var trap = GetMethod(this.ProxyHandler, 'hasOwn');
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
+
       if (trap === undefined) {
         return this.ProxyTarget.HasOwnProperty(key);
       }
 
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
       var success = ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
-        if (targetDesc && targetDesc.Abrupt) {
-          return targetDesc;
-        }
+        if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
           return ThrowException('proxy_inconsistent', 'hasOwn');
@@ -14454,25 +14372,20 @@ exports.$Proxy = (function(module){
     },
     function HasProperty(key){
       var trap = GetMethod(this.ProxyHandler, 'has');
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
+
       if (trap === undefined) {
         return this.ProxyTarget.HasProperty(key);
       }
 
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
       var success = ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
-        if (targetDesc && targetDesc.Abrupt) {
-          return targetDesc;
-        }
+        if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
           return ThrowException('proxy_inconsistent', 'has');
@@ -14484,24 +14397,19 @@ exports.$Proxy = (function(module){
     },
     function Delete(key, strict){
       var trap = GetMethod(this.ProxyHandler, 'deleteProperty');
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
+
       if (trap === undefined) {
         return this.ProxyTarget.Delete(key, strict);
       }
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
       var success = ToBoolean(trapResult);
 
       if (success === true) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
-        if (targetDesc && targetDesc.Abrupt) {
-          return targetDesc;
-        }
+        if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
           return ThrowException('proxy_inconsistent', 'delete');
@@ -14511,9 +14419,8 @@ exports.$Proxy = (function(module){
         return true;
       } else if (strict) {
         return ThrowException('strict_delete_failure');
-      } else {
-        return false;
       }
+      return false;
     },
     function Enumerate(includePrototype, onlyEnumerable){
       if (onlyEnumerable) {
@@ -14524,36 +14431,28 @@ exports.$Proxy = (function(module){
       }
 
       var trap = GetMethod(this.ProxyHandler, type);
-      if (trap && trap.Abrupt) {
-        return trap;
-      }
+      if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable);
       }
 
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget]);
-      if (trapResult && trapResult.Abrupt) {
-        return trapResult;
-      }
+      if (trapResult && trapResult.Abrupt) return trapResult;
 
       if (typeof trapResult !== 'object' || trapResult === null) {
         return ThrowException('proxy_non_object_result', type);
       }
 
       var len = ToUint32(trapResult.Get('length'));
-      if (len && len.Abrupt) {
-        return len;
-      }
+      if (len && len.Abrupt) return len;
 
       var array = [],
           seen = new Hash;
 
       for (var i = 0; i < len; i++) {
         var element = ToString(trapResult.Get(''+i));
-        if (element && element.Abrupt) {
-          return element;
-        }
+        if (element && element.Abrupt) return element;
 
         if (element in seen) {
           return ThrowException('proxy_duplicate', type);
@@ -14568,18 +14467,14 @@ exports.$Proxy = (function(module){
       }
 
       var props = this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable);
-      if (props && props.Abrupt) {
-        return props;
-      }
+      if (props && props.Abrupt) return props;
 
       var len = props.length;
 
       for (var i=0; i < len; i++) {
         if (!(props[i] in seen)) {
           var targetDesc = this.ProxyTarget.GetOwnProperty(props[i]);
-          if (targetDesc && targetDesc.Abrupt) {
-            return targetDesc;
-          }
+          if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
           if (targetDesc && !targetDesc.Configurable) {
             return ThrowException('proxy_inconsistent', type);
@@ -14597,9 +14492,7 @@ exports.$Proxy = (function(module){
 
   function ProxyCall(thisValue, args){
     var trap = GetMethod(this.ProxyHandler, 'apply');
-    if (trap && trap.Abrupt) {
-      return trap;
-    }
+    if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
       return this.ProxyTarget.Call(thisValue, args);
@@ -14610,9 +14503,7 @@ exports.$Proxy = (function(module){
 
   function ProxyConstruct(args){
     var trap = GetMethod(this.ProxyHandler, 'construct');
-    if (trap && trap.Abrupt) {
-      return trap;
-    }
+    if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
       return this.ProxyTarget.Construct(args);
@@ -14622,6 +14513,922 @@ exports.$Proxy = (function(module){
   }
 
   return module.exports = $Proxy;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.$TypedArray = (function(module){
+  var objects        = require('../lib/objects'),
+      buffers        = require('../lib/buffers'),
+      $Array         = require('./$Array'),
+      $Object        = require('./$Object'),
+      ThrowException = require('../errors').ThrowException,
+      DataDescriptor = require('./descriptors').DataDescriptor;
+
+  var BRANDS      = require('../constants').BRANDS,
+      inherit     = objects.inherit,
+      define      = objects.define,
+      Hash        = objects.Hash,
+      DataView    = buffers.DataView,
+      ArrayBuffer = buffers.ArrayBuffer;
+
+  var types     = new Hash,
+      DefineOwn = $Object.prototype.DefineOwnProperty,
+      GetOwn    = $Object.prototype.GetOwnProperty;
+
+
+
+  function hasIndex(key, max){
+    var index = key >>> 0;
+    return index < max && index == key;
+  }
+
+
+  function ArrayBufferIndex(value){
+    this.Value = value;
+  }
+
+  ArrayBufferIndex.prototype = new DataDescriptor(undefined, 5);
+
+
+  function Type(options){
+    this.name  = options.name
+    this.size  = options.size;
+    this.cast  = options.cast;
+    this.set   = options.set;
+    this.get   = options.get;
+    this.brand = BRANDS['Builtin'+this.name+'Array'];
+    types[this.name+'Array'] = this;
+  }
+
+  var Int8 = new Type({
+    name: 'Int8',
+    size: 1,
+    cast: function(x){
+      return (x &= 0xff) & 0x80 ? x - 0x100 : x & 0x7f;
+    },
+    set: DataView.prototype.setInt8,
+    get: DataView.prototype.getInt8
+  });
+
+  var Int16 = new Type({
+    name: 'Int16',
+    size: 2,
+    cast: function(x){
+      return (x &= 0xffff) & 0x8000 ? x - 0x10000 : x & 0x7fff;
+    },
+    set: DataView.prototype.setInt16,
+    get: DataView.prototype.getInt16
+  });
+
+  var Int32 = new Type({
+    name: 'Int32',
+    size: 4,
+    cast: function(x){
+      return x >> 0;
+    },
+    set: DataView.prototype.setInt32,
+    get: DataView.prototype.getInt32
+  });
+
+  var Uint8 = new Type({
+    name: 'Uint8',
+    size: 1,
+    cast: function(x){
+      return x & 0xff;
+    },
+    set: DataView.prototype.setUint8,
+    get: DataView.prototype.getUint8
+  });
+
+  var Uint16 = new Type({
+    name: 'Uint16',
+    size: 2,
+    cast: function(x){
+      return x & 0xffff;
+    },
+    set: DataView.prototype.setUint16,
+    get: DataView.prototype.getUint16
+  });
+
+  var Uint32 = new Type({
+    name: 'Uint32',
+    size: 4,
+    cast: function(x){
+      return x >>> 0;
+    },
+    set: DataView.prototype.setUint32,
+    get: DataView.prototype.getUint32
+  });
+
+  var Float32 = new Type({
+    name: 'Float32',
+    size: 4,
+    cast: function(x){
+      return +x || 0;
+    },
+    set: DataView.prototype.setFloat32,
+    get: DataView.prototype.getFloat32
+  });
+
+  var Float64 = new Type({
+    name: 'Float64',
+    size: 8,
+    cast: function(x){
+      return +x || 0;
+    },
+    set: DataView.prototype.setFloat64,
+    get: DataView.prototype.getFloat64
+  });
+
+  function $TypedArray(type, buffer, byteLength, byteOffset){
+    $Object.call(this, require('../runtime').intrinsics[type+'Proto']);
+    this.Buffer = buffer;
+    this.ByteOffset = byteOffset;
+    this.ByteLength = byteLength;
+    this.Type = types[type];
+    this.BuiltinBrand = this.Type.brand;
+    this.Length = byteLength / this.Type.size;
+    this.define('buffer', buffer, 0);
+    this.define('byteLength', byteLength, 0);
+    this.define('byteOffset', byteOffset, 0);
+    this.define('length', this.Length, 0);
+    this.init();
+  }
+
+  inherit($TypedArray, $Object, (function(){
+    if (typeof Uint8Array !== 'undefined') {
+      Uint8.Array   = Uint8Array;
+      Uint16.Array  = Uint16Array;
+      Uint32.Array  = Uint32Array;
+      Int8.Array    = Int8Array;
+      Int16.Array   = Int16Array;
+      Int32.Array   = Int32Array;
+      Float32.Array = Float32Array;
+      Float64.Array = Float64Array;
+
+      return [
+        function init(){
+          this.data = new this.Type.Array(this.Buffer.NativeBuffer, this.ByteOffset, this.Length);
+        },
+        function each(callback){
+          for (var i=0; i < this.Length; i++) {
+            callback([i+'', this.data[i], 5]);
+          }
+          this.properties.each(callback, this);
+        },
+        function get(key){
+          if (hasIndex(key, this.Length)) {
+            return this.data[+key];
+          } else {
+            return this.properties.get(key);
+          }
+        },
+        function describe(key){
+          if (hasIndex(key, this.Length)) {
+            return [key, this.data[+key], 5];
+          } else {
+            return this.properties.describe(key);
+          }
+        },
+        function set(key, value){
+          if (hasIndex(key, this.Length)) {
+            this.data[+key] = value;
+          } else {
+            return this.properties.set(key, value);
+          }
+        },
+        (function(){ // IE6-8 leaks function expression names to surrounding scope
+          return function define(key, value, attr){
+            if (hasIndex(key, this.Length)) {
+              this.data[+key] = value;
+            } else {
+              return this.properties.define(key, value, attr);
+            }
+          };
+        })()
+      ];
+    }
+    return [
+      function init(){
+        this.data = new DataView(this.Buffer.NativeBuffer, this.ByteOffset, this.ByteLength);
+        this.data.get = this.Type.get;
+        this.data.set = this.Type.set;
+        this.bytesPer = this.Type.size;
+      },
+      function each(callback){
+        for (var i=0; i < this.Length; i++) {
+          callback([i+'', this.data.get(i * this.bytesPer, true), 5]);
+        }
+        this.properties.each(callback, this);
+      },
+      function get(key){
+        if (hasIndex(key, this.Length)) {
+          return this.data.get(key * this.bytesPer, true);
+        } else {
+          return this.properties.get(key);
+        }
+      },
+      function describe(key){
+        if (hasIndex(key, this.Length)) {
+          return [key, this.data.get(key * this.bytesPer, true), 5];
+        } else {
+          return this.properties.describe(key);
+        }
+      },
+      function set(key, value){
+        if (hasIndex(key, this.Length)) {
+          this.data.set(key * this.bytesPer, value, true);
+        } else {
+          return this.properties.set(key, value);
+        }
+      },
+      (function(){ // IE6-8 leaks function expression names to surrounding scope
+        return function define(key, value, attr){
+          if (hasIndex(key, this.Length)) {
+            this.data.set(key * this.bytesPer, value, true);
+          } else {
+            return this.properties.define(key, value, attr);
+          }
+        };
+      })()
+    ];
+  })());
+
+  define($TypedArray.prototype, [
+    function has(key){
+      return hasIndex(key, this.Length) || this.properties.has(key);
+    },
+    function GetOwnProperty(key){
+      if (hasIndex(key, this.Length)) {
+        return new ArrayBufferIndex(this.get(key));
+      }
+
+      return GetOwn.call(this, key);
+    },
+    function DefineOwnProperty(key, desc, strict){
+      if (hasIndex(key, this.Length)) {
+        if ('Value' in desc) {
+          this.set(key, desc.Value);
+          return true;
+        }
+        return false;
+      }
+
+      return DefineOwn.call(this, key, desc, strict);
+    }
+  ]);
+
+  var realm, intrinsics;
+
+  define($TypedArray, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
+
+  return module.exports = $TypedArray;
+})(typeof module !== 'undefined' ? module : {});
+
+
+exports.natives = (function(module){
+  var objects     = require('./lib/objects'),
+      Stack       = require('./lib/Stack'),
+      buffers     = require('./lib/buffers'),
+      errors      = require('./errors'),
+      $Array      = require('./object-model/$Array'),
+      $Object     = require('./object-model/$Object'),
+      $TypedArray = require('./object-model/$TypedArray'),
+      operators   = require('./object-model/operators'),
+      operations  = require('./object-model/operations'),
+      descriptors = require('./object-model/descriptors'),
+      collections = require('./object-model/collections'),
+      BRANDS      = require('./constants').BRANDS;
+
+  var inherit                 = objects.inherit,
+      define                  = objects.define,
+      isObject                = objects.isObject,
+      create                  = objects.create,
+      Hash                    = objects.Hash,
+      ThrowException          = errors.ThrowException,
+      MakeException           = errors.MakeException,
+      DataView                = buffers.DataView,
+      ArrayBuffer             = buffers.ArrayBuffer,
+      toPropertyDescriptor    = descriptors.toPropertyDescriptor,
+      fromPropertyDescriptor  = descriptors.fromPropertyDescriptor,
+      isCallable              = operations.isCallable,
+      toInternalArray         = operations.toInternalArray,
+      deliverAllChangeRecords = operations.deliverAllChangeRecords;
+
+  var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+      Hooked = new Hash,
+      timers = {},
+      nativeCode = ['function ', '() { [native code] }'];
+
+
+  var natives = (function(){
+    var HashMap  = require('./lib/HashMap'),
+        inherit  = require('./lib/objects').inherit,
+        isObject = require('./lib/objects').isObject,
+        each     = require('./lib/iteration').each,
+        fname    = require('./lib/functions').fname;
+
+    function BulkMap(){
+      HashMap.apply(this, arguments);
+    }
+
+    inherit(BulkMap, HashMap, [
+      function add(name, value){
+        if (typeof name === 'string') {
+          this.set(name, value);
+        } else if (typeof name === 'function') {
+          this.set(fname(name), name);
+        } else if (isObject(name)) {
+          each(name, function(value, name){
+            this.set(name, value);
+          }, this);
+        }
+        return this.size;
+      }
+    ]);
+
+    return new BulkMap;
+  })();
+
+
+
+  function $InternalFunction(o){
+    $InternalFunction = require('./runtime').builtins.$InternalFunction;
+    return new $InternalFunction(o);
+  }
+
+  function deliverChangeRecordsAndReportErrors(){
+    var observerResults = deliverAllChangeRecords();
+    if (observerResults && observerResults instanceof Array) {
+      each(observerResults, function(error){
+        require('./runtime').emit('throw', error);
+      });
+    }
+  }
+
+  function fromJSON(object){
+    if (object instanceof Array) {
+      return new $Array(object);
+    } else if (typeof object === 'function') {
+      return new $InternalFunction(object);
+    } else if (object === null || typeof object !== 'object') {
+      return object;
+    } else {
+      var out = new $Object;
+      each(object, function(val, key){
+        out.set(key, fromJSON(val));
+      });
+      return out;
+    }
+  }
+
+  natives.add({
+    ToObject: operators.ToObject,
+    ToString: operators.ToString,
+    ToNumber: operators.ToNumber,
+    ToBoolean: operators.ToBoolean,
+    ToPropertyName: operators.ToPropertyName,
+    ToInteger: operators.ToInteger,
+    ToInt32: operators.ToInt32,
+    ToUint32: operators.ToUint32,
+    ToUint16: operators.ToUint16,
+    CheckObjectCoercible: operations.checkObjectCoercible,
+    GetNotifier: operations.getNotifier,
+    EnqueueChangeRecord: operations.enqueueChangeRecord,
+    DeliverChangeRecords: operations.deliverChangeRecords,
+    parseInt: parseInt,
+    parseFloat: parseFloat,
+    decodeURI: decodeURI,
+    decodeURIComponent: decodeURIComponent,
+    encodeURI: encodeURI,
+    encodeURIComponent: encodeURIComponent,
+    escape: escape,
+    unescape: unescape,
+    acos: Math.acos,
+    asin: Math.asin,
+    atan: Math.atan,
+    atan2: Math.atan2,
+    cos: Math.acos,
+    exp: Math.exp,
+    log: Math.log,
+    pow: Math.pow,
+    random: Math.random,
+    sin: Math.sin,
+    sqrt: Math.sqrt,
+    tan: Math.tan,
+    _Call: function(obj, args){
+      return obj.Call(args[0], toInternalArray(args[1]));
+    },
+    _Construct: function(obj, args){
+      return obj.Construct(toInternalArray(args[0]));
+    },
+    _GetPrimitiveValue: function(obj, args){
+      return obj.PrimitiveValue;
+    },
+    _SetPrimitiveValue: function(obj, args){
+      obj.PrimitiveValue = args[0];
+    },
+    _GetBuiltinBrand: function(obj, args){
+      if (obj.BuiltinBrand) {
+        return obj.BuiltinBrand.name;
+      }
+    },
+    _SetBuiltinBrand: function(obj, args){
+      var brand = BRANDS[args[0]];
+      if (brand) {
+        obj.BuiltinBrand = brand;
+        return obj.BuiltinBrand.name;
+      }
+      return ThrowException('unknown_builtin_brand')
+    },
+    _HasProperty: function(obj, args){
+      return obj.HasProperty(args[0]);
+    },
+    _IsExtensible: function(obj){
+      return obj.IsExtensible();
+    },
+    _PreventExtensions: function(obj){
+      return obj.PreventExtensions();
+    },
+    _GetPrototype: function(obj){
+      do {
+        obj = obj.GetInheritance();
+      } while (obj && obj.HiddenPrototype)
+      return obj;
+    },
+    _SetPrototype: function(obj, args){
+      var proto = obj.Prototype;
+      if (proto && proto.HiddenPrototype) {
+        obj = proto;
+      }
+      return obj.SetInheritance(args[0]);
+    },
+    _TypedArrayCreate: function(obj, args){
+      return new $TypedArray(args[0], args[1], args[2], args[3]);
+    },
+    _NativeBufferCreate: function(obj, args){
+      return new ArrayBuffer(args[0]);
+    },
+    NativeDataViewCreate: function(buffer){
+      return new DataView(buffer.NativeBuffer);
+    },
+    NativeBufferSlice: function(buffer, begin, end){
+      return buffer.slice(begin, end);
+    },
+    _DataViewSet: function(obj, args){
+      var offset = args[1] >>> 0;
+
+      if (offset >= obj.ByteLength) {
+        return ThrowException('buffer_out_of_bounds')
+      }
+
+      return obj.View['set'+args[0]](offset, args[2], !!args[3]);
+    },
+    _DataViewGet: function(obj, args){
+      var offset = args[1] >>> 0;
+
+      if (offset >= obj.ByteLength) {
+        return ThrowException('buffer_out_of_bounds')
+      }
+
+      return obj.View['get'+args[0]](offset, !!args[2]);
+    },
+    _DefineOwnProperty: function(obj, args){
+      return obj.DefineOwnProperty(args[0], toPropertyDescriptor(args[1]), false);
+    },
+    _Enumerate: function(obj, args){
+      return new $Array(obj.Enumerate(args[0], args[1]));
+    },
+    _GetProperty: function(obj, args){
+      return fromPropertyDescriptor(obj.GetProperty(args[0]));
+    },
+    _GetOwnProperty: function(obj, args){
+      return fromPropertyDescriptor(obj.GetOwnProperty(args[0]));
+    },
+    _HasOwnProperty: function(obj, args){
+      return obj.HasOwnProperty(args[0]);
+    },
+    _SetP: function(obj, args){
+      return obj.SetP(args[2], args[0], args[1]);
+    },
+    _GetP: function(obj, args){
+      return obj.GetP(args[1], args[0]);
+    },
+    _Put: function(obj, args){
+      return obj.Put(args[0]);
+    },
+    _has: function(obj, args){
+      return obj.has(args[0]);
+    },
+    _delete: function(obj, args){
+      return obj.remove(args[0]);
+    },
+    _set: function(obj, args){
+      return obj.set(args[0], args[1]);
+    },
+    _get: function(obj, args){
+      return obj.get(args[0]);
+    },
+    _define: function(obj, args){
+      obj.define(args[0], args[1], args.length === 3 ? args[2] : 6);
+    },
+    _query: function(obj, args){
+      return obj.query(args[0]);
+    },
+    _update: function(obj, args){
+      return obj.update(args[0], args[1]);
+    },
+    _each: function(obj, args){
+      var callback = args[0];
+      obj.each(function(prop){
+        callback.Call(obj, prop);
+      });
+    },
+    _setInternal: function(obj, args){
+      obj[args[0]] = args[1];
+    },
+    _getInternal: function(obj, args){
+      return obj[args[0]];
+    },
+    _hasInternal: function(obj, args){
+      return args[0] in obj;
+    },
+    _GetIntrinsic: function(obj, args){
+      return require('./runtime').intrinsics[args[0]];
+    },
+    _SetIntrinsic: function(obj, args){
+      require('./runtime').intrinsics[args[0]] = args[1];
+    },
+    _IsConstructor: function(obj, args){
+      return !!(args[0] && args[0].Construct);
+    },
+    _Type: function(obj, args){
+      if (args[0] === null) {
+        return 'Null';
+      }
+      switch (typeof args[0]) {
+        case 'undefined': return 'Undefined';
+        case 'function':
+        case 'object':    return 'Object';
+        case 'string':    return 'String';
+        case 'number':    return 'Number';
+        case 'boolean':   return 'Boolean';
+      }
+    },
+    Exception: function(type, args){
+      return MakeException(type, toInternalArray(args));
+    },
+    _now: Date.now || function(){ return +new Date },
+    _SetDefaultLoader: function(obj, args){
+      require('./runtime').realm.loader = args[0];
+    },
+    _promoteClass: function(obj, args){
+      var ctor = args[0],
+          prototype = ctor.Get('prototype');
+
+      function $Reflected(){
+        $Object.call(this, prototype);
+      }
+
+      $Reflected.prototype = define(create(prototype), {
+        Prototype: prototype,
+        properties: undefined,
+        storage: undefined,
+        id: undefined,
+        __introspected: undefined
+      });
+
+      ctor.Construct = function Construct(args){
+        var instance = new $Reflected;
+        var result = this.Call(instance, args, true);
+        return result !== null && typeof result === 'object' ? result : instance;
+      };
+
+      return ctor;
+    },
+    _getHook: function(obj, args){
+      var hook = args[0][args[1]];
+      if (hook && hook.hooked === Hooked) {
+        return hook.callback;
+      }
+    },
+    _hasHook: function(obj, args){
+      var hook = args[0][args[1]];
+      return !!hook && hook.hooked === Hooked;
+    },
+    _setHook: function(obj, args){
+      var target = args[0],
+          type = args[1],
+          callback = args[2],
+          original = target[type];
+
+      if (type === 'describe') {
+        var forward = new $InternalFunction(function(_, args){
+          return new $Array(original.call(args[0], args[1]));
+        });
+
+        target.describe = function(key){
+          var result = callback.Call(this, [key]);
+          if (result instanceof $Array) {
+            return [result.get(0), result.get(1), result.get(2)];
+          }
+        };
+      } else if (type === 'each') {
+        var stack = new Stack;
+
+        var forward = new $InternalFunction(function(_, args){
+          return original.call(args[0], stack.top);
+        });
+
+        var proxy = [new $InternalFunction(function(obj, args){
+          var result = args[0];
+          if (result instanceof $Array) {
+            stack.top([result.get(0), result.get(1), result.get(2)]);
+          }
+        })];
+
+        target.each = function(callback){
+          stack.push(callback);
+          args[2].Call(this, proxy);
+          stack.pop();
+        };
+      } else if (type === 'define') {
+        var forward = new $InternalFunction(function(_, args){
+          return original.call(args[0], args[1], args[2], args[3]);
+        });
+
+        target.define = function(key, value, attr){
+          return callback.Call(this, [key, value, attr]);
+        };
+      } else if (type === 'get' || type === 'has' || type === 'remove' || type === 'query') {
+        var forward = new $InternalFunction(function(_, args){
+          return original.call(args[0], args[1]);
+        });
+
+        target[type] = function(key){
+          return callback.Call(this, [key]);
+        };
+      } else if (type === 'set' || type === 'update') {
+        var forward = new $InternalFunction(function(_, args){
+          return original.call(args[0], args[1], args[2]);
+        });
+
+        target[type] = function(key, value){
+          return callback.Call(this, [key, value]);
+        };
+      }
+
+      target[type].hooked = Hooked;
+      target[type].callback = callback;
+      return forward;
+    },
+    _removeHook: function(obj, args){
+      var target = args[0],
+          type = args[1],
+          hook = target[type];
+
+      if (hook && hook.hooked === Hooked) {
+        delete target[type];
+        return true;
+      }
+      return false;
+    },
+
+    _FunctionToString: function(obj, args){
+      if (obj.Proxy) {
+        obj = obj.ProxyTarget;
+      }
+      var code = obj.code;
+      if (obj.BuiltinFunction || !code) {
+        var name = obj.get('name');
+        if (name && typeof name !== 'string' && name.BuiltinBrand === BRANDS.BuiltinSymbol) {
+          name = '@' + name.Name;
+        }
+        return nativeCode[0] + name + nativeCode[1];
+      } else {
+        return code.source.slice(code.range[0], code.range[1]);
+      }
+    },
+    _NumberToString: function(obj, args){
+      return args[0].toString(args[1]);
+    },
+    _RegExpToString: function(obj, args){
+      return ''+obj.PrimitiveValue;
+    },
+    _RegExpExec: function(obj, args){
+      var result = obj.PrimitiveValue.exec(args[0]);
+      if (result) {
+        var array = new $Array(result);
+        array.set('index', result.index);
+        array.set('input', args[0]);
+        return array;
+      }
+      return result;
+    },
+    _RegExpTest: function(obj, args){
+      return obj.PrimitiveValue.test(args[0]);
+    },
+    _CallBuiltin: function(obj, args){
+      var object = args[0],
+          prop = args[1],
+          arglist = args[2];
+
+      if (arglist) {
+        return object[prop].apply(object, toInternalArray(arglist));
+      }
+      return object[prop]();
+    },
+    _CodeUnit: function(obj, args){
+      return args[0].charCodeAt(0);
+    },
+    StringReplace: function(str, search, replace){
+      if (typeof search !== 'string') {
+        search = search.PrimitiveValue;
+      }
+      return str.replace(search, replace);
+    },
+    StringSplit: function(str, separator, limit){
+      if (typeof separator !== 'string') {
+        separator = separator.PrimitiveValue;
+      }
+      return new $Array(str.split(separator, limit));
+    },
+    StringSearch: function(str, regexp){
+      return str.search(regexp);
+    },
+    StringSlice: function(str, start, end){
+      return end === undefined ? str.slice(start) : str.slice(start, end);
+    },
+    FromCharCode: String.fromCharCode,
+    StringTrim: String.prototype.trim
+      ? function(str){ return str.trim() }
+      : (function(trimmer){
+        return function(str){
+          return str.replace(trimmer, '');
+        };
+      })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
+
+    SetTimer: function(f, time, repeating){
+      if (typeof f === 'string') {
+        f = natives.get('FunctionCreate')(f);
+      }
+      var id = Math.random() * 1000000 << 10;
+      timers[id] = setTimeout(function trigger(){
+        if (timers[id]) {
+          f.Call(require('./runtime').global, []);
+          deliverChangeRecordsAndReportErrors();
+          if (repeating) {
+            timers[id] = setTimeout(trigger, time);
+          } else {
+            timers[id] = f = null;
+          }
+        } else {
+          f = null;
+        }
+      }, time);
+      return id;
+    },
+    ClearTimer: function(id){
+      if (timers[id]) {
+        timers[id] = null;
+      }
+    },
+    JSONParse: function parse(source, reviver){
+      function walk(holder, key){
+        var value = holder.get(key);
+        if (value && typeof value === 'object') {
+          value.each(function(prop){
+            if (prop[2] & 1) {
+              v = walk(prop[1], prop[0]);
+              if (v !== undefined) {
+                prop[1] = v;
+              } else {
+                value.remove(prop[0]);
+              }
+            }
+          });
+        }
+        return reviver.Call(holder, [key, value]);
+      }
+
+      source = ToString(source);
+      cx.lastIndex = 0;
+
+      if (cx.test(source)) {
+        source = source.replace(cx, function(a){
+          return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        });
+      }
+
+      var test = source.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                       .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                       .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
+
+      if (/^[\],:{}\s]*$/.test(test)) {
+        var json = require('./runtime').realm.evaluate('('+source+')'),
+            wrapper = new $Object;
+        wrapper.set('', json);
+        return isCallable(reviver) ? walk(wrapper, '') : json;
+      }
+
+      return ThrowException('invalid_json', source);
+    },
+    _MapSigil: function(){
+      return collections.MapData.sigil;
+    },
+    _MapSize: function(obj, args){
+      return args[0].MapData ? args[0].MapData.size : 0;
+    },
+    _MapClear: function(obj, args){
+      return args[0].MapData.clear();
+    },
+    _MapGet: function(obj, args){
+      return args[0].MapData.get(args[1]);
+    },
+    _MapSet: function(obj, args){
+      return args[0].MapData.set(args[1], args[2]);
+    },
+    _MapDelete: function(obj, args){
+      return args[0].MapData.remove(args[1]);
+    },
+    _MapHas: function(obj, args){
+      return args[0].MapData.has(args[1]);
+    },
+    _MapNext: function(obj, args){
+      var result = args[0].MapData.after(args[1]);
+      return result instanceof Array ? new $Array(result) : result;
+    },
+    _WeakMapGet: function(obj, args){
+      return args[0].WeakMapData.get(args[1]);
+    },
+    _WeakMapSet: function(obj, args){
+      return args[0].WeakMapData.set(args[1], args[2]);
+    },
+    _WeakMapDelete: function(obj, args){
+      return args[0].WeakMapData.remove(args[1]);
+    },
+    _WeakMapHas: function(obj, args){
+      return args[0].WeakMapData.has(args[1]);
+    },
+    _Signal: function(obj, args){
+      var realm = require('./runtime').realm;
+      realm.emit.apply(realm, args);
+    },
+    AddObserver: function(data, callback){
+      data.set(callback, callback);
+    },
+    RemoveObserver: function(data, callback){
+      data.remove(callback);
+    },
+    readFile: function(path, callback){
+      require('fs').readFile(path, 'utf8', function(err, file){
+        callback.Call(undefined, [file]);
+      });
+    },
+    resolve: require('path')
+      ?  require('path').resolve
+      : function(base, to){
+          to = to.split('/');
+          base = base.split('/');
+          base.length--;
+
+          for (var i=0; i < to.length; i++) {
+            if (to[i] === '..') {
+              base.length--;
+            } else if (to[i] !== '.') {
+              base[base.length] = to[i];
+            }
+          }
+
+          return base.join('/');
+        },
+    baseURL: module ? function(){ return module.parent.parent.dirname }
+                    : function(){ return location.origin + location.pathname }
+  });
+
+  void function(){
+    var escapable = /[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
+
+    function escaper(a) {
+      var c = meta[a];
+      return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+    }
+
+    natives.add({
+      Quote: function(string){
+        escapable.lastIndex = 0;
+        return '"'+string.replace(escapable, escaper)+'"';
+      }
+    });
+  }();
+
+  return module.exports = natives;
 })(typeof module !== 'undefined' ? module : {});
 
 
@@ -15954,85 +16761,50 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Object      = require('./object-model/$Object'),
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
-      natives      = require('./object-model/natives'),
+      $TypedArray  = require('./object-model/$TypedArray'),
+      natives      = require('./natives'),
       Emitter      = require('./lib/Emitter'),
-      buffers      = require('./lib/buffers'),
       PropertyList = require('./lib/PropertyList'),
       Thunk        = require('./thunk').Thunk,
       Stack        = require('./lib/Stack');
 
-  var Hash          = objects.Hash,
-      DataView      = buffers.DataView,
-      ArrayBuffer   = buffers.ArrayBuffer,
-      create        = objects.create,
-      hasOwn        = objects.hasOwn,
-      isObject      = objects.isObject,
-      enumerate     = objects.enumerate,
-      ownKeys       = objects.keys,
-      assign        = objects.assign,
-      define        = objects.define,
-      copy          = objects.copy,
-      inherit       = objects.inherit,
-      ownProperties = objects.properties,
-      hide          = objects.hide,
-      fname         = functions.fname,
-      toArray       = functions.toArray,
-      applyNew      = functions.applyNew,
-      iterate       = iteration.iterate,
-      each          = iteration.each,
-      map           = iteration.map,
-      numbers       = utility.numbers,
-      uid           = utility.uid,
-      nextTick      = utility.nextTick,
-      tag           = utility.tag,
-      unique        = utility.unique,
-      MapData       = collections.MapData,
-      WeakMapData   = collections.WeakMapData;
+  var Hash        = objects.Hash,
+      create      = objects.create,
+      hasOwn      = objects.hasOwn,
+      isObject    = objects.isObject,
+      assign      = objects.assign,
+      define      = objects.define,
+      inherit     = objects.inherit,
+      hide        = objects.hide,
+      fname       = functions.fname,
+      applyNew    = functions.applyNew,
+      iterate     = iteration.iterate,
+      each        = iteration.each,
+      map         = iteration.map,
+      numbers     = utility.numbers,
+      uid         = utility.uid,
+      nextTick    = utility.nextTick,
+      tag         = utility.tag,
+      unique      = utility.unique,
+      MapData     = collections.MapData,
+      WeakMapData = collections.WeakMapData;
 
   var ThrowException   = errors.ThrowException,
       MakeException    = errors.MakeException,
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
-  var GetValue         = operators.GetValue,
-      PutValue         = operators.PutValue,
-      GetThisValue     = operators.GetThisValue,
-      ToObject         = operators.ToObject,
-      ToPrimitive      = operators.ToPrimitive,
-      ToBoolean        = operators.ToBoolean,
-      ToNumber         = operators.ToNumber,
-      ToInteger        = operators.ToInteger,
-      ToUint32         = operators.ToUint32,
-      ToInt32          = operators.ToInt32,
-      ToUint16         = operators.ToUint16,
-      ToString         = operators.ToString,
-      UnaryOp          = operators.UnaryOp,
-      BinaryOp         = operators.BinaryOp,
-      ToPropertyName   = operators.ToPropertyName,
-      EQUAL            = operators.EQUAL,
-      STRICT_EQUAL     = operators.STRICT_EQUAL;
+  var GetValue = operators.GetValue,
+      ToObject = operators.ToObject;
 
   var Reference               = operations.Reference,
-      CheckObjectCoercible    = operations.checkObjectCoercible,
-      IsArrayIndex            = operations.isArrayIndex,
-      GetSymbol               = operations.getSymbol,
-      Element                 = operations.element,
-      SuperReference          = operations.superReference,
-      GetThisEnvironment      = operations.getThisEnvironment,
-      ThisResolution          = operations.thisResolution,
-      IdentifierResolution    = operations.identifierResolution,
       IsCallable              = operations.isCallable,
-      IsConstructor           = operations.isConstructor,
       Invoke                  = operations.invoke,
-      SpreadDestructuring     = operations.spreadDestructuring,
-      GetTemplateCallSite     = operations.getTemplateCallSite,
       EnqueueChangeRecord     = operations.enqueueChangeRecord,
       DeliverAllChangeRecords = operations.deliverAllChangeRecords,
-      IsStopIteration         = operations.isStopIteration,
-      ToInternalArray         = operations.toInternalArray;
+      IsStopIteration         = operations.isStopIteration;
 
   var StringIndex            = descriptors.StringIndex,
-      ArrayBufferIndex       = descriptors.ArrayBufferIndex,
       Value                  = descriptors.Value,
       Accessor               = descriptors.Accessor,
       ArgAccessor            = descriptors.ArgAccessor,
@@ -17226,258 +17998,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
 
-  var $TypedArray = (function(){
-
-    var types = create(null);
-
-    function Type(options){
-      this.name = options.name
-      this.size = options.size;
-      this.cast = options.cast;
-      this.set = options.set;
-      this.get = options.get;
-      this.brand = BRANDS['Builtin'+this.name+'Array'];
-      types[this.name+'Array'] = this;
-    }
-
-    var Int8 = new Type({
-      name: 'Int8',
-      size: 1,
-      cast: function(x){
-        return (x &= 0xff) & 0x80 ? x - 0x100 : x & 0x7f;
-      },
-      set: DataView.prototype.setInt8,
-      get: DataView.prototype.getInt8
-    });
-
-    var Int16 = new Type({
-      name: 'Int16',
-      size: 2,
-      cast: function(x){
-        return (x &= 0xffff) & 0x8000 ? x - 0x10000 : x & 0x7fff;
-      },
-      set: DataView.prototype.setInt16,
-      get: DataView.prototype.getInt16
-    });
-
-    var Int32 = new Type({
-      name: 'Int32',
-      size: 4,
-      cast: function(x){
-        return x >> 0;
-      },
-      set: DataView.prototype.setInt32,
-      get: DataView.prototype.getInt32
-    });
-
-    var Uint8 = new Type({
-      name: 'Uint8',
-      size: 1,
-      cast: function(x){
-        return x & 0xff;
-      },
-      set: DataView.prototype.setUint8,
-      get: DataView.prototype.getUint8
-    });
-
-    var Uint16 = new Type({
-      name: 'Uint16',
-      size: 2,
-      cast: function(x){
-        return x & 0xffff;
-      },
-      set: DataView.prototype.setUint16,
-      get: DataView.prototype.getUint16
-    });
-
-    var Uint32 = new Type({
-      name: 'Uint32',
-      size: 4,
-      cast: function(x){
-        return x >>> 0;
-      },
-      set: DataView.prototype.setUint32,
-      get: DataView.prototype.getUint32
-    });
-
-    var Float32 = new Type({
-      name: 'Float32',
-      size: 4,
-      cast: function(x){
-        return +x || 0;
-      },
-      set: DataView.prototype.setFloat32,
-      get: DataView.prototype.getFloat32
-    });
-
-    var Float64 = new Type({
-      name: 'Float64',
-      size: 8,
-      cast: function(x){
-        return +x || 0;
-      },
-      set: DataView.prototype.setFloat64,
-      get: DataView.prototype.getFloat64
-    });
-
-    function hasIndex(key, max){
-      var index = +key;
-      return index < max && (index >>> 0) === index;
-    }
-
-
-    function $TypedArray(type, buffer, byteLength, byteOffset){
-      $Object.call(this, intrinsics[type+'Proto']);
-      this.Buffer = buffer;
-      this.ByteOffset = byteOffset;
-      this.ByteLength = byteLength;
-      this.Type = types[type];
-      this.BuiltinBrand = this.Type.brand;
-      this.Length = byteLength / this.Type.size;
-      this.define('buffer', buffer, ___);
-      this.define('byteLength', byteLength, ___);
-      this.define('byteOffset', byteOffset, ___);
-      this.define('length', this.Length, ___);
-      this.init();
-    }
-
-    inherit($TypedArray, $Object);
-
-    if (typeof Uint8Array !== 'undefined') {
-      void function(){
-        Uint8.Array = Uint8Array;
-        Uint16.Array = Uint16Array;
-        Uint32.Array = Uint32Array;
-        Int8.Array = Int8Array;
-        Int16.Array = Int16Array;
-        Int32.Array = Int32Array;
-        Float32.Array = Float32Array;
-        Float64.Array = Float64Array;
-
-        define($TypedArray.prototype, [
-          function init(){
-            this.data = new this.Type.Array(this.Buffer.NativeBuffer, this.ByteOffset, this.Length);
-          },
-          function each(callback){
-            for (var i=0; i < this.Length; i++) {
-              callback.call(this, [i+'', this.data[i], 5]);
-            }
-            this.properties.each(callback, this);
-          },
-          function get(key){
-            if (hasIndex(key, this.Length)) {
-              return this.data[+key];
-            } else {
-              return this.properties.get(key);
-            }
-          },
-          function describe(key){
-            if (hasIndex(key, this.Length)) {
-              return [key, this.data[+key], 5];
-            } else {
-              return this.properties.describe(key);
-            }
-          },
-          function set(key, value){
-            if (hasIndex(key, this.Length)) {
-              this.data[+key] = value;
-            } else {
-              return this.properties.set(key, value);
-            }
-          },
-          (function(){ // IE6-8 leaks function expression names to surrounding scope
-            return function define(key, value, attr){
-              if (hasIndex(key, this.Length)) {
-                this.data[+key] = value;
-              } else {
-                return this.properties.define(key, value, attr);
-              }
-            };
-          })()
-        ]);
-      }();
-    } else {
-      void function(){
-        define($TypedArray.prototype, [
-          function init(){
-            this.data = new DataView(this.Buffer.NativeBuffer, this.ByteOffset, this.ByteLength);
-            this.data.get = this.Type.get;
-            this.data.set = this.Type.set;
-            this.bytesPer = this.Type.size;
-          },
-          function each(callback){
-            for (var i=0; i < this.Length; i++) {
-              callback.call(this, [i+'', this.data.get(i * this.bytesPer, true), 5]);
-            }
-            this.properties.each(callback, this);
-          },
-          function get(key){
-            if (hasIndex(key, this.Length)) {
-              return this.data.get(key * this.bytesPer, true);
-            } else {
-              return this.properties.get(key);
-            }
-          },
-          function describe(key){
-            if (hasIndex(key, this.Length)) {
-              return [key, this.data.get(key * this.bytesPer, true), 5];
-            } else {
-              return this.properties.describe(key);
-            }
-          },
-          function set(key, value){
-            if (hasIndex(key, this.Length)) {
-              this.data.set(key * this.bytesPer, value, true);
-            } else {
-              return this.properties.set(key, value);
-            }
-          },
-          (function(){ // IE6-8 leaks function expression names to surrounding scope
-            return function define(key, value, attr){
-              if (hasIndex(key, this.Length)) {
-                this.data.set(key * this.bytesPer, value, true);
-              } else {
-                return this.properties.define(key, value, attr);
-              }
-            };
-          })()
-        ]);
-      }();
-    }
-
-
-    define($TypedArray.prototype, [
-      function has(key){
-        if (hasIndex(key, this.Length)) {
-          return true;
-        }
-
-        return this.properties.has(key);
-      },
-      function GetOwnProperty(key){
-        if (hasIndex(key, this.Length)) {
-          return new ArrayBufferIndex(this.get(key));
-        }
-
-        return $Object.prototype.GetOwnProperty.call(this, key);
-      },
-      function DefineOwnProperty(key, desc, strict){
-        if (hasIndex(key, this.Length)) {
-          if ('Value' in desc) {
-            this.set(key, desc.Value);
-            return true;
-          }
-          return false;
-        }
-
-        return DefineOwn.call(this, key, desc, strict);
-      }
-    ]);
-
-
-    return $TypedArray;
-  })();
-
 
   var $NativeFunction = (function(){
     function $NativeFunction(options){
@@ -17703,6 +18223,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
   var ExecutionContext = (function(){
+    var GetSymbol               = operations.getSymbol,
+        Element                 = operations.element,
+        SuperReference          = operations.superReference,
+        GetThisEnvironment      = operations.getThisEnvironment,
+        ThisResolution          = operations.thisResolution,
+        IsCallable              = operations.isCallable,
+        Invoke                  = operations.invoke,
+        SpreadDestructuring     = operations.spreadDestructuring,
+        GetTemplateCallSite     = operations.getTemplateCallSite,
+        DeliverAllChangeRecords = operations.deliverAllChangeRecords;
+
+
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
       this.caller = caller;
       this.Realm = realm;
@@ -18081,23 +18613,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return Intrinsics;
   })();
 
-  function FromJSON(object){
-    if (object instanceof Array) {
-      return new $Array(object);
-    } else if (typeof object === 'function') {
-      return new $NativeFunction(object);
-    } else if (object === null || typeof object !== 'object') {
-      return object;
-    } else {
-      var out = new $Object;
-      each(object, function(val, key){
-        out.set(key, FromJSON(val));
-      });
-      return out;
-    }
-  }
-
-
 
   var Script = (function(){
     function ParseOptions(o){
@@ -18207,706 +18722,152 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
   var Realm = (function(){
-
-    var Hooked = create(null);
-
-    (function(){
-      var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
-
-      function wrapFunction(f){
-        if (f._wrapper) {
-          return f._wrapper;
-        }
-        return f._wrapper = function(){
-          var receiver = this;
-          if (isObject(receiver) && !(receiver instanceof $Object)) {
-            receiver = undefined
-          }
-          return f.Call(receiver, arguments);
-        };
+    function wrapFunction(f){
+      if (f._wrapper) {
+        return f._wrapper;
       }
+      return f._wrapper = function(){
+        var receiver = this;
+        if (isObject(receiver) && !(receiver instanceof $Object)) {
+          receiver = undefined
+        }
+        return f.Call(receiver, arguments);
+      };
+    }
 
-      var timers = {};
-      var nativeCode = ['function ', '() { [native code] }'];
-
-      natives.add({
-        _GetPrimitiveValue: function(obj, args){
-          return obj.PrimitiveValue;
-        },
-        _SetPrimitiveValue: function(obj, args){
-          obj.PrimitiveValue = args[0];
-        },
-        _GetBuiltinBrand: function(obj, args){
-          if (obj.BuiltinBrand) {
-            return obj.BuiltinBrand.name;
+    natives.add({
+      _IsConstructCall: function(){
+        return context.isConstruct;
+      },
+      _eval: (function(){
+        function builtinEval(obj, args, direct){
+          var code = args[0];
+          if (typeof code !== 'string') {
+            return code;
           }
-        },
-        _SetBuiltinBrand: function(obj, args){
-          var brand = BRANDS[args[0]];
-          if (brand) {
-            obj.BuiltinBrand = brand;
-          } else {
-            var err = new $Error('ReferenceError', undefined, 'Unknown BuiltinBrand "'+args[0]+'"');
-            return new AbruptCompletion('throw', err);
-          }
-          return obj.BuiltinBrand.name;
-        },
-        _Call: function(obj, args){
-          return obj.Call(args[0], ToInternalArray(args[1]));
-        },
-        _Construct: function(obj, args){
-          return obj.Construct(ToInternalArray(args[0]));
-        },
-        _HasProperty: function(obj, args){
-          return obj.HasProperty(args[0]);
-        },
-        _IsExtensible: function(obj){
-          return obj.IsExtensible();
-        },
-        _PreventExtensions: function(obj){
-          return obj.PreventExtensions();
-        },
-        _GetPrototype: function(obj){
-          do {
-            obj = obj.GetInheritance();
-          } while (obj && obj.HiddenPrototype)
-          return obj;
-        },
-        _SetPrototype: function(obj, args){
-          var proto = obj.Prototype;
-          if (proto && proto.HiddenPrototype) {
-            obj = proto;
-          }
-          return obj.SetInheritance(args[0]);
-        },
-        _DefineOwnProperty: function(obj, args){
-          return obj.DefineOwnProperty(args[0], ToPropertyDescriptor(args[1]), false);
-        },
-        _Enumerate: function(obj, args){
-          return new $Array(obj.Enumerate(args[0], args[1]));
-        },
-        _GetProperty: function(obj, args){
-          return FromPropertyDescriptor(obj.GetProperty(args[0]));
-        },
-        _GetOwnProperty: function(obj, args){
-          return FromPropertyDescriptor(obj.GetOwnProperty(args[0]));
-        },
-        _HasOwnProperty: function(obj, args){
-          return obj.HasOwnProperty(args[0]);
-        },
-        _SetP: function(obj, args){
-          return obj.SetP(args[2], args[0], args[1]);
-        },
-        _GetP: function(obj, args){
-          return obj.GetP(args[1], args[0]);
-        },
-        _Put: function(obj, args){
-          return obj.Put(args[0]);
-        },
-        _has: function(obj, args){
-          return obj.has(args[0]);
-        },
-        _delete: function(obj, args){
-          return obj.remove(args[0]);
-        },
-        _set: function(obj, args){
-          return obj.set(args[0], args[1]);
-        },
-        _get: function(obj, args){
-          return obj.get(args[0]);
-        },
-        _define: function(obj, args){
-          obj.define(args[0], args[1], args.length === 3 ? args[2] : _CW);
-        },
-        _query: function(obj, args){
-          return obj.query(args[0]);
-        },
-        _update: function(obj, args){
-          return obj.update(args[0], args[1]);
-        },
-        _each: function(obj, args){
-          var callback = args[0];
-          obj.each(function(prop){
-            callback.Call(obj, prop);
-          });
-        },
-        _setInternal: function(obj, args){
-          obj[args[0]] = args[1];
-        },
-        _getInternal: function(obj, args){
-          return obj[args[0]];
-        },
-        _hasInternal: function(obj, args){
-          return args[0] in obj;
-        },
-        _GetIntrinsic: function(obj, args){
-          return intrinsics[args[0]];
-        },
-        _SetIntrinsic: function(obj, args){
-          intrinsics[args[0]] = args[1];
-        },
-        CheckObjectCoercible: operations.checkObjectCoercible,
-        ToObject: operators.ToObject,
-        ToString: operators.ToString,
-        ToNumber: operators.ToNumber,
-        ToBoolean: operators.ToBoolean,
-        ToPropertyName: operators.ToPropertyName,
-        ToInteger: operators.ToInteger,
-        ToInt32: operators.ToInt32,
-        ToUint32: operators.ToUint32,
-        ToUint16: operators.ToUint16,
-        ToModule: function(obj){
-          if (obj.BuiltinBrand === BRANDS.BuiltinModule) {
-            return obj;
-          }
-          return new $Module(obj, obj.Enumerate(false, false));
-        },
-        IsObject: function(object){
-          return object instanceof $Object;
-        },
-        IsConstructor: function(obj){
-          return !!(obj && obj.Construct);
-        },
-        IsConstructCall: function(){
-          return context.isConstruct;
-        },
-        GetNotifier: operations.getNotifier,
-        EnqueueChangeRecord: operations.enqueueChangeRecord,
-        DeliverChangeRecords: operations.deliverChangeRecords,
-        Type: function(o){
-          if (o === null) {
-            return 'Null';
-          } else {
-            switch (typeof o) {
-              case 'undefined': return 'Undefined';
-              case 'function':
-              case 'object':    return 'Object';
-              case 'string':    return 'String';
-              case 'number':    return 'Number';
-              case 'boolean':   return 'Boolean';
-            }
-          }
-        },
-        Exception: function(type, args){
-          return MakeException(type, ToInternalArray(args));
-        },
-        _Signal: function(obj, args){
-          realm.emit.apply(realm, args);
-        },
-        _now: Date.now || function(){ return +new Date },
-
-
-        Fetch: function(name, callback){
-          var result = require('./builtins')[name];
-          if (!result) {
-            result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
-          }
-          callback.Call(undefined, [result]);
-        },
-
-        EvaluateModule: function(source, name, callback, errback){
-          if (!callback && !errback) {
-            var result, thrown;
-
-            realm.evaluateModule(this, source, name,
-              function(module){ result = module },
-              function(error){ result = error; thrown = true; }
-            );
-
-            return thrown ? new AbruptCompletion('throw', result) : result;
-          } else {
-            realm.evaluateModule(this, source, name, wrapFunction(callback), wrapFunction(errback));
-          }
-        },
-        SetDefaultLoader: function(loader){
-          realm.loader = loader;
-        },
-        _promoteClass: function(obj, args){
-          var ctor = args[0],
-              prototype = ctor.Get('prototype');
-
-          function $Reflected(){
-            $Object.call(this, prototype);
-          }
-
-          $Reflected.prototype = define(create(prototype), {
-            Prototype: prototype,
-            properties: undefined,
-            storage: undefined,
-            id: undefined,
-            __introspected: undefined
-          });
-
-          ctor.Construct = function Construct(args){
-            var instance = new $Reflected;
-            var result = this.Call(instance, args, true);
-            return result !== null && typeof result === 'object' ? result : instance;
-          };
-
-          return ctor;
-        },
-        _getHook: function(obj, args){
-          var hook = args[0][args[1]];
-          if (hook && hook.hooked === Hooked) {
-            return hook.callback;
-          }
-        },
-        _hasHook: function(obj, args){
-          var hook = args[0][args[1]];
-          return !!hook && hook.hooked === Hooked;
-        },
-        _setHook: function(obj, args){
-          var target = args[0],
-              type = args[1],
-              callback = args[2],
-              original = target[type];
-
-          if (type === 'describe') {
-            var forward = new $InternalFunction(function(_, args){
-              return new $Array(original.call(args[0], args[1]));
-            });
-
-            target.describe = function(key){
-              var result = callback.Call(this, [key]);
-              if (result instanceof $Array) {
-                return [result.get(0), result.get(1), result.get(2)];
-              }
-            };
-          } else if (type === 'each') {
-            var stack = new Stack;
-
-            var forward = new $InternalFunction(function(_, args){
-              return original.call(args[0], stack.top);
-            });
-
-            var proxy = [new $InternalFunction(function(obj, args){
-              var result = args[0];
-              if (result instanceof $Array) {
-                stack.top([result.get(0), result.get(1), result.get(2)]);
-              }
-            })];
-
-            target.each = function(callback){
-              stack.push(callback);
-              args[2].Call(this, proxy);
-              stack.pop();
-            };
-          } else if (type === 'define') {
-            var forward = new $InternalFunction(function(_, args){
-              return original.call(args[0], args[1], args[2], args[3]);
-            });
-
-            target.define = function(key, value, attr){
-              return callback.Call(this, [key, value, attr]);
-            };
-          } else if (type === 'get' || type === 'has' || type === 'remove' || type === 'query') {
-            var forward = new $InternalFunction(function(_, args){
-              return original.call(args[0], args[1]);
-            });
-
-            target[type] = function(key){
-              return callback.Call(this, [key]);
-            };
-          } else if (type === 'set' || type === 'update') {
-            var forward = new $InternalFunction(function(_, args){
-              return original.call(args[0], args[1], args[2]);
-            });
-
-            target[type] = function(key, value){
-              return callback.Call(this, [key, value]);
-            };
-          }
-
-          target[type].hooked = Hooked;
-          target[type].callback = callback;
-          return forward;
-        },
-        _removeHook: function(obj, args){
-          var target = args[0],
-              type = args[1],
-              hook = target[type];
-
-          if (hook && hook.hooked === Hooked) {
-            delete target[type];
-            return true;
-          }
-          return false;
-        },
-        _eval: (function(){
-          function builtinEval(obj, args, direct){
-            var code = args[0];
-            if (typeof code !== 'string') {
-              return code;
-            }
-
-            var script = new Script({
-              scope: 'eval',
-              natives: false,
-              strict: context.strict,
-              source: code
-            });
-
-            if (script.error) {
-              return script.error;
-            }
-
-            if (direct) {
-              return script.thunk.run(context);
-            }
-
-            ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
-            var result = script.thunk.run(context);
-            ExecutionContext.pop();
-            return result;
-          }
-          builtinEval.isBuiltinEval = true;
-          return builtinEval;
-        })(),
-        _FunctionCreate: function(obj, args){
-          var body = args.pop();
 
           var script = new Script({
-            scope: 'global',
+            scope: 'eval',
             natives: false,
-            source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
+            strict: context.strict,
+            source: code
           });
 
           if (script.error) {
             return script.error;
           }
 
+          if (direct) {
+            return script.thunk.run(context);
+          }
+
           ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
-          var func = script.thunk.run(context);
+          var result = script.thunk.run(context);
           ExecutionContext.pop();
-          return func;
-        },
-        _BoundFunctionCreate: function(obj, args){
-          return new $BoundFunction(args[0], args[1], ToInternalArray(args[2]));
-        },
-        _BooleanCreate: function(obj, args){
-          return new $Boolean(args[0]);
-        },
-        _DateCreate: function(obj, args){
-          return new $Date(applyNew(Date, args));
-        },
-        _NumberCreate: function(obj, args){
-          return new $Number(args[0]);
-        },
-        _ObjectCreate: function(obj, args){
-          return new $Object(args[0] === null ? intrinsics.Genesis : args[0]);
-        },
-        _RegExpCreate: function(obj, args){
-          var pattern = args[0],
-              flags = args[1];
-
-          if (typeof pattern === 'object') {
-            pattern = pattern.PrimitiveValue;
-          }
-          try {
-            var result = new RegExp(pattern, flags);
-          } catch (e) {
-            return ThrowException('invalid_regexp', [pattern+'']);
-          }
-          return new $RegExp(result);
-        },
-        _ProxyCreate: function(obj, args){
-          return new $Proxy(args[0], args[1]);
-        },
-        _SymbolCreate: function(obj, args){
-          return new $Symbol(args[0], args[1]);
-        },
-        _StringCreate: function(obj, args){
-          return new $String(args[0]);
-        },
-        _TypedArrayCreate: function(obj, args){
-          return new $TypedArray(args[0], args[1], args[2], args[3]);
-        },
-        _NativeBufferCreate: function(obj, args){
-          return new ArrayBuffer(args[0]);
-        },
-        NativeDataViewCreate: function(buffer){
-          return new DataView(buffer.NativeBuffer);
-        },
-        NativeBufferSlice: function(buffer, begin, end){
-          return buffer.slice(begin, end);
-        },
-        _DataViewSet: function(obj, args){
-          var offset = args[1] >>> 0;
-
-          if (offset >= obj.ByteLength) {
-            return ThrowException('buffer_out_of_bounds')
-          }
-
-          return obj.View['set'+args[0]](offset, args[2], !!args[3]);
-        },
-        _DataViewGet: function(obj, args){
-          var offset = args[1] >>> 0;
-
-          if (offset >= obj.ByteLength) {
-            return ThrowException('buffer_out_of_bounds')
-          }
-
-          return obj.View['get'+args[0]](offset, !!args[2]);
-        },
-
-        _FunctionToString: function(obj, args){
-          if (obj.Proxy) {
-            obj = obj.ProxyTarget;
-          }
-          var code = obj.code;
-          if (obj.BuiltinFunction || !code) {
-            var name = obj.get('name');
-            if (name && typeof name !== 'string' && name instanceof $Symbol) {
-              name = '@' + name.Name;
-            }
-            return nativeCode[0] + name + nativeCode[1];
-          } else {
-            return code.source.slice(code.range[0], code.range[1]);
-          }
-        },
-        _NumberToString: function(obj, args){
-          return args[0].toString(args[1]);
-        },
-        _RegExpToString: function(obj, args){
-          return ''+obj.PrimitiveValue;
-        },
-        _RegExpExec: function(obj, args){
-          var result = obj.PrimitiveValue.exec(args[0]);
-          if (result) {
-            var array = new $Array(result);
-            array.set('index', result.index);
-            array.set('input', args[0]);
-            return array;
-          }
           return result;
-        },
-        _RegExpTest: function(obj, args){
-          return obj.PrimitiveValue.test(args[0]);
-        },
-        _CallBuiltin: function(obj, args){
-          if (args[2]) {
-            return args[0][args[1]].apply(args[0], ToInternalArray(args[2]));
-          } else {
-            return args[0][args[1]]();
-          }
-        },
+        }
+        builtinEval.isBuiltinEval = true;
+        return builtinEval;
+      })(),
+      _FunctionCreate: function(obj, args){
+        var body = args.pop();
 
-        CodeUnit: function(v){
-          return v.charCodeAt(0);
-        },
-        StringReplace: function(str, search, replace){
-          if (typeof search !== 'string') {
-            search = search.PrimitiveValue;
-          }
-          return str.replace(search, replace);
-        },
-        StringSplit: function(str, separator, limit){
-          if (typeof separator !== 'string') {
-            separator = separator.PrimitiveValue;
-          }
-          return new $Array(str.split(separator, limit));
-        },
+        var script = new Script({
+          scope: 'global',
+          natives: false,
+          source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
+        });
 
-        StringSearch: function(str, regexp){
-          return str.search(regexp);
-        },
-        StringSlice: function(str, start, end){
-          return end === undefined ? str.slice(start) : str.slice(start, end);
-        },
-        FromCharCode: String.fromCharCode,
-        StringTrim: String.prototype.trim
-          ? function(str){ return str.trim() }
-          : (function(trimmer){
-            return function(str){
-              return str.replace(trimmer, '');
-            };
-          })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
+        if (script.error) {
+          return script.error;
+        }
 
-        parseInt: parseInt,
-        parseFloat: parseFloat,
-        decodeURI: decodeURI,
-        decodeURIComponent: decodeURIComponent,
-        encodeURI: encodeURI,
-        encodeURIComponent: encodeURIComponent,
-        escape: escape,
-        unescape: unescape,
-        SetTimer: function(f, time, repeating){
-          if (typeof f === 'string') {
-            f = natives.FunctionCreate(f);
-          }
-          var id = Math.random() * 1000000 << 10;
-          timers[id] = setTimeout(function trigger(){
-            if (timers[id]) {
-              f.Call(global, []);
-              deliverChangeRecordsAndReportErrors();
-              if (repeating) {
-                timers[id] = setTimeout(trigger, time);
-              } else {
-                timers[id] = f = null;
-              }
-            } else {
-              f = null;
-            }
-          }, time);
-          return id;
-        },
-        ClearTimer: function(id){
-          if (timers[id]) {
-            timers[id] = null;
-          }
-        },
-        Quote: (function(){
-          var escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-              meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
+        ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
+        var func = script.thunk.run(context);
+        ExecutionContext.pop();
+        return func;
+      },
+      _BoundFunctionCreate: function(obj, args){
+        return new $BoundFunction(args[0], args[1], toInternalArray(args[2]));
+      },
+      _BooleanCreate: function(obj, args){
+        return new $Boolean(args[0]);
+      },
+      _DateCreate: function(obj, args){
+        return new $Date(applyNew(Date, args));
+      },
+      _NumberCreate: function(obj, args){
+        return new $Number(args[0]);
+      },
+      _ObjectCreate: function(obj, args){
+        return new $Object(args[0] === null ? intrinsics.Genesis : args[0]);
+      },
+      _ProxyCreate: function(obj, args){
+        return new $Proxy(args[0], args[1]);
+      },
+      _SymbolCreate: function(obj, args){
+        return new $Symbol(args[0], args[1]);
+      },
+      _StringCreate: function(obj, args){
+        return new $String(args[0]);
+      },
+      _RegExpCreate: function(obj, args){
+        var pattern = args[0],
+            flags = args[1];
 
-          function escaper(a) {
-            var c = meta[a];
-            return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-          }
+        if (typeof pattern === 'object') {
+          pattern = pattern.PrimitiveValue;
+        }
+        try {
+          var result = new RegExp(pattern, flags);
+        } catch (e) {
+          return ThrowException('invalid_regexp', [pattern+'']);
+        }
+        return new $RegExp(result);
+      },
+      parse: function(src, loc, range, raw, tokens, comment, source){
+        var ast = Script.parse(src, source, 'script', {
+          loc    : !!loc,
+          range  : !!range,
+          raw    : !!raw,
+          tokens : !!tokens,
+          comment: !!comment
+        });
+        if (ast.Abrupt) {
+          return ast;
+        }
+        return fromJSON(ast);
+      },
+      _MapInitialization: CollectionInitializer(MapData, 'Map'),
+      _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
+      EvaluateModule: function(source, name, callback, errback){
+        if (!callback && !errback) {
+          var result, thrown;
 
-          return function(string){
-            escapable.lastIndex = 0;
-            return '"'+string.replace(escapable, escaper)+'"';
-          };
-        })(),
-        JSONParse: function parse(source, reviver){
-          function walk(holder, key){
-            var value = holder.get(key);
-            if (value && typeof value === 'object') {
-              value.each(function(prop){
-                if (prop[2] & E) {
-                  v = walk(prop[1], prop[0]);
-                  if (v !== undefined) {
-                    prop[1] = v;
-                  } else {
-                    value.remove(prop[0]);
-                  }
-                }
-              });
-            }
-            return reviver.Call(holder, [key, value]);
-          }
+          realm.evaluateModule(this, source, name,
+            function(module){ result = module },
+            function(error){ result = error; thrown = true; }
+          );
 
-          source = ToString(source);
-          cx.lastIndex = 0;
-
-          if (cx.test(source)) {
-            source = source.replace(cx, function(a){
-              return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-            });
-          }
-
-          var test = source.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
-                           .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
-                           .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
-
-          if (/^[\],:{}\s]*$/.test(test)) {
-            var json = realm.evaluate('('+source+')');
-            var wrapper = new $Object;
-            wrapper.set('', json);
-            return IsCallable(reviver) ? walk(wrapper, '') : json;
-          }
-
-          return ThrowException('invalid_json', source);
-        },
-        acos: Math.acos,
-        asin: Math.asin,
-        atan: Math.atan,
-        atan2: Math.atan2,
-        cos: Math.acos,
-        exp: Math.exp,
-        log: Math.log,
-        pow: Math.pow,
-        random: Math.random,
-        sin: Math.sin,
-        sqrt: Math.sqrt,
-        tan: Math.tan,
-        _MapInitialization: CollectionInitializer(MapData, 'Map'),
-        _MapSigil: function(){
-          return MapData.sigil;
-        },
-        _MapSize: function(obj, args){
-          return args[0].MapData ? args[0].MapData.size : 0;
-        },
-        _MapClear: function(obj, args){
-          return args[0].MapData.clear();
-        },
-        _MapGet: function(obj, args){
-          return args[0].MapData.get(args[1]);
-        },
-        _MapSet: function(obj, args){
-          return args[0].MapData.set(args[1], args[2]);
-        },
-        _MapDelete: function(obj, args){
-          return args[0].MapData.remove(args[1]);
-        },
-        _MapHas: function(obj, args){
-          return args[0].MapData.has(args[1]);
-        },
-        _MapNext: function(obj, args){
-          var result = args[0].MapData.after(args[1]);
-          return result instanceof Array ? new $Array(result) : result;
-        },
-
-        _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-        _WeakMapGet: function(obj, args){
-          return args[0].WeakMapData.get(args[1]);
-        },
-        _WeakMapSet: function(obj, args){
-          return args[0].WeakMapData.set(args[1], args[2]);
-        },
-        _WeakMapDelete: function(obj, args){
-          return args[0].WeakMapData.remove(args[1]);
-        },
-        _WeakMapHas: function(obj, args){
-          return args[0].WeakMapData.has(args[1]);
-        },
-        parse: function(src, loc, range, raw, tokens, comment, source){
-          var ast = Script.parse(src, source, 'script', {
-            loc    : !!loc,
-            range  : !!range,
-            raw    : !!raw,
-            tokens : !!tokens,
-            comment: !!comment
-          });
-          if (ast.Abrupt) {
-            return ast;
-          }
-          return FromJSON(ast);
-        },
-        AddObserver: function(data, callback){
-          data.set(callback, callback);
-        },
-        RemoveObserver: function(data, callback){
-          data.remove(callback);
-        },
-        readFile: function(path, callback){
-          require('fs').readFile(path, 'utf8', function(err, file){
-            callback.Call(undefined, [file]);
-          });
-        },
-        resolve: module
-          ? require('path').resolve
-          : function(base, to){
-              to = to.split('/');
-              base = base.split('/');
-              base.length--;
-
-              for (var i=0; i < to.length; i++) {
-                if (to[i] === '..') {
-                  base.length--;
-                } else if (to[i] !== '.') {
-                  base[base.length] = to[i];
-                }
-              }
-
-              return base.join('/');
-            },
-        baseURL: module ? function(){ return module.parent.parent.dirname }
-                        : function(){ return location.origin + location.pathname }
-      });
-    })();
-
+          return thrown ? new AbruptCompletion('throw', result) : result;
+        } else {
+          realm.evaluateModule(this, source, name, wrapFunction(callback), wrapFunction(errback));
+        }
+      },
+      _ToModule: function(obj, args){
+        if (args[0].BuiltinBrand === BRANDS.BuiltinModule) {
+          return args[0];
+        }
+        return new $Module(args[0], args[0].Enumerate(false, false));
+      },
+      Fetch: function(name, callback){
+        var result = require('./builtins')[name];
+        if (!result) {
+          result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
+        }
+        callback.Call(undefined, [result]);
+      },
+    });
 
     function deliverChangeRecordsAndReportErrors(){
       var observerResults = DeliverAllChangeRecords();
@@ -18921,13 +18882,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     function initialize(realm, Ω, ƒ){
       if (realm.initialized) Ω();
-      realm.state = 'initializing';
-      realm.initialized = true;
-      realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
       var fakeLoader = { global: realm.global, baseURL: '' },
           builtins = require('./builtins'),
           init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
 
+      realm.state = 'initializing';
+      realm.initialized = true;
+      realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
       resolveModule(fakeLoader, init, '@system', Ω, ƒ);
     }
 
@@ -18971,7 +18932,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return result;
       }
     }
-
 
     function mutationContext(realm, toggle){
       if (toggle === undefined) {
@@ -19288,9 +19248,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         realm.emit('deactivate');
       }
       realmStack.push(realm);
-      realm = target;
-      global = operators.global = target.global;
-      intrinsics = target.intrinsics;
+      exports.realm = realm = target;
+      exports.global = global = operators.global = target.global;
+      exports.intrinsics = intrinsics = target.intrinsics;
       target.active = true;
       target.emit('activate');
       $Object.changeRealm(target);
