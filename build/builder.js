@@ -105,7 +105,6 @@ builder.addFiles([
   '../engine/lib/PropertyList.js',
   '../engine/lib/buffers.js',
 
-  '../engine/object-model/natives.js',
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',
@@ -118,7 +117,9 @@ builder.addFiles([
   '../engine/object-model/$Object.js',
   '../engine/object-model/$Array.js',
   '../engine/object-model/$Proxy.js',
+  '../engine/object-model/$TypedArray.js',
 
+  '../engine/natives.js',
   '../engine/thunk.js',
   '../engine/runtime.js',
   '../engine/debug.js',

@@ -119,16 +119,6 @@ var descriptors = (function(exports){
   StringIndex.prototype = new DataDescriptor(undefined, E__);
 
 
-  function ArrayBufferIndex(value){
-    this.Value = value;
-  }
-
-  exports.ArrayBufferIndex = ArrayBufferIndex;
-
-  ArrayBufferIndex.prototype = new DataDescriptor(undefined, E_W);
-
-
-
   function Value(value){
     this.Value = value;
   }
@@ -213,7 +203,7 @@ var descriptors = (function(exports){
 
 
   function IsGenericDescriptor(desc) {
-    return desc === undefined ? false : !(('Get' in desc || 'Set' in desc) || ('Value' in desc || 'Writable' in desc));
+    return desc === undefined ? false : !('Get' in desc || 'Set' in desc || 'Value' in desc || 'Writable' in desc);
   }
 
   exports.isGenericDescriptor = IsGenericDescriptor;
