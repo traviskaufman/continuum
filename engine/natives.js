@@ -1,10 +1,11 @@
 var natives = (function(module){
+  "use strict";
   var objects     = require('./lib/objects'),
       Stack       = require('./lib/Stack'),
       buffers     = require('./lib/buffers'),
       errors      = require('./errors'),
       $Array      = require('./object-model/$Array'),
-      $Object     = require('./object-model/$Object'),
+      $Object     = require('./object-model/$Object').$Object,
       $TypedArray = require('./object-model/$TypedArray'),
       operators   = require('./object-model/operators'),
       operations  = require('./object-model/operations'),
@@ -12,20 +13,20 @@ var natives = (function(module){
       collections = require('./object-model/collections'),
       BRANDS      = require('./constants').BRANDS;
 
-  var inherit                 = objects.inherit,
-      define                  = objects.define,
-      isObject                = objects.isObject,
-      create                  = objects.create,
-      Hash                    = objects.Hash,
-      ThrowException          = errors.ThrowException,
-      MakeException           = errors.MakeException,
-      DataView                = buffers.DataView,
-      ArrayBuffer             = buffers.ArrayBuffer,
-      toPropertyDescriptor    = descriptors.toPropertyDescriptor,
-      fromPropertyDescriptor  = descriptors.fromPropertyDescriptor,
-      isCallable              = operations.isCallable,
-      toInternalArray         = operations.toInternalArray,
-      deliverAllChangeRecords = operations.deliverAllChangeRecords;
+  var inherit                   = objects.inherit,
+      define                    = objects.define,
+      isObject                  = objects.isObject,
+      create                    = objects.create,
+      Hash                      = objects.Hash,
+      $$ThrowException          = errors.$$ThrowException,
+      $$MakeException           = errors.$$MakeException,
+      DataView                  = buffers.DataView,
+      ArrayBuffer               = buffers.ArrayBuffer,
+      $$ToPropertyDescriptor    = descriptors.$$ToPropertyDescriptor,
+      $$FromPropertyDescriptor  = descriptors.$$FromPropertyDescriptor,
+      $$IsCallable              = operations.$$IsCallable,
+      $$CreateListFromArray     = operations.$$CreateListFromArray,
+      $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords;
 
   var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
       Hooked = new Hash,
@@ -70,7 +71,7 @@ var natives = (function(module){
   }
 
   function deliverChangeRecordsAndReportErrors(){
-    var observerResults = deliverAllChangeRecords();
+    var observerResults = $$DeliverAllChangeRecords();
     if (observerResults && observerResults instanceof Array) {
       each(observerResults, function(error){
         require('./runtime').emit('throw', error);
@@ -95,19 +96,19 @@ var natives = (function(module){
   }
 
   natives.add({
-    ToObject: operators.ToObject,
-    ToString: operators.ToString,
-    ToNumber: operators.ToNumber,
-    ToBoolean: operators.ToBoolean,
-    ToPropertyName: operators.ToPropertyName,
-    ToInteger: operators.ToInteger,
-    ToInt32: operators.ToInt32,
-    ToUint32: operators.ToUint32,
-    ToUint16: operators.ToUint16,
-    CheckObjectCoercible: operations.checkObjectCoercible,
-    GetNotifier: operations.getNotifier,
-    EnqueueChangeRecord: operations.enqueueChangeRecord,
-    DeliverChangeRecords: operations.deliverChangeRecords,
+    ToObject: operators.$$ToObject,
+    ToString: operators.$$ToString,
+    ToNumber: operators.$$ToNumber,
+    ToBoolean: operators.$$ToBoolean,
+    ToPropertyKey: operators.$$ToPropertyKey,
+    ToInteger: operators.$$ToInteger,
+    ToInt32: operators.$$ToInt32,
+    ToUint32: operators.$$ToUint32,
+    ToUint16: operators.$$ToUint16,
+    CheckObjectCoercible: operations.$$CheckObjectCoercible,
+    GetNotifier: operations.$$GetNotifier,
+    EnqueueChangeRecord: operations.$$EnqueueChangeRecord,
+    DeliverChangeRecords: operations.$$DeliverChangeRecords,
     parseInt: parseInt,
     parseFloat: parseFloat,
     decodeURI: decodeURI,
@@ -129,10 +130,10 @@ var natives = (function(module){
     sqrt: Math.sqrt,
     tan: Math.tan,
     _Call: function(obj, args){
-      return obj.Call(args[0], toInternalArray(args[1]));
+      return obj.Call(args[0], $$CreateListFromArray(args[1]));
     },
     _Construct: function(obj, args){
-      return obj.Construct(toInternalArray(args[0]));
+      return obj.Construct($$CreateListFromArray(args[0]));
     },
     _GetPrimitiveValue: function(obj, args){
       return obj.PrimitiveValue;
@@ -151,7 +152,7 @@ var natives = (function(module){
         obj.BuiltinBrand = brand;
         return obj.BuiltinBrand.name;
       }
-      return ThrowException('unknown_builtin_brand')
+      return $$ThrowException('unknown_builtin_brand')
     },
     _HasProperty: function(obj, args){
       return obj.HasProperty(args[0]);
@@ -191,7 +192,7 @@ var natives = (function(module){
       var offset = args[1] >>> 0;
 
       if (offset >= obj.ByteLength) {
-        return ThrowException('buffer_out_of_bounds')
+        return $$ThrowException('buffer_out_of_bounds')
       }
 
       return obj.View['set'+args[0]](offset, args[2], !!args[3]);
@@ -200,22 +201,22 @@ var natives = (function(module){
       var offset = args[1] >>> 0;
 
       if (offset >= obj.ByteLength) {
-        return ThrowException('buffer_out_of_bounds')
+        return $$ThrowException('buffer_out_of_bounds')
       }
 
       return obj.View['get'+args[0]](offset, !!args[2]);
     },
     _DefineOwnProperty: function(obj, args){
-      return obj.DefineOwnProperty(args[0], toPropertyDescriptor(args[1]), false);
+      return obj.DefineOwnProperty(args[0], $$ToPropertyDescriptor(args[1]), false);
     },
     _Enumerate: function(obj, args){
       return new $Array(obj.Enumerate(args[0], args[1]));
     },
     _GetProperty: function(obj, args){
-      return fromPropertyDescriptor(obj.GetProperty(args[0]));
+      return $$FromPropertyDescriptor(obj.GetProperty(args[0]));
     },
     _GetOwnProperty: function(obj, args){
-      return fromPropertyDescriptor(obj.GetOwnProperty(args[0]));
+      return $$FromPropertyDescriptor(obj.GetOwnProperty(args[0]));
     },
     _HasOwnProperty: function(obj, args){
       return obj.HasOwnProperty(args[0]);
@@ -288,7 +289,7 @@ var natives = (function(module){
       }
     },
     Exception: function(type, args){
-      return MakeException(type, toInternalArray(args));
+      return $$MakeException(type, $$CreateListFromArray(args));
     },
     _now: Date.now || function(){ return +new Date },
     _SetDefaultLoader: function(obj, args){
@@ -406,7 +407,7 @@ var natives = (function(module){
       return false;
     },
 
-    _FunctionToString: function(obj, args){
+    _Function$$ToString: function(obj, args){
       if (obj.Proxy) {
         obj = obj.ProxyTarget;
       }
@@ -421,10 +422,10 @@ var natives = (function(module){
         return code.source.slice(code.range[0], code.range[1]);
       }
     },
-    _NumberToString: function(obj, args){
+    _Number$$ToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _RegExpToString: function(obj, args){
+    _RegExp$$ToString: function(obj, args){
       return ''+obj.PrimitiveValue;
     },
     _RegExpExec: function(obj, args){
@@ -446,7 +447,7 @@ var natives = (function(module){
           arglist = args[2];
 
       if (arglist) {
-        return object[prop].apply(object, toInternalArray(arglist));
+        return object[prop].apply(object, $$CreateListFromArray(arglist));
       }
       return object[prop]();
     },
@@ -523,7 +524,7 @@ var natives = (function(module){
         return reviver.Call(holder, [key, value]);
       }
 
-      source = ToString(source);
+      source = $$ToString(source);
       cx.lastIndex = 0;
 
       if (cx.test(source)) {
@@ -540,10 +541,10 @@ var natives = (function(module){
         var json = require('./runtime').realm.evaluate('('+source+')'),
             wrapper = new $Object;
         wrapper.set('', json);
-        return isCallable(reviver) ? walk(wrapper, '') : json;
+        return $$IsCallable(reviver) ? walk(wrapper, '') : json;
       }
 
-      return ThrowException('invalid_json', source);
+      return $$ThrowException('invalid_json', source);
     },
     _MapSigil: function(){
       return collections.MapData.sigil;

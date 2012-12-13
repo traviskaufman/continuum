@@ -1,9 +1,10 @@
 var $TypedArray = (function(module){
+  "use strict";
   var objects        = require('../lib/objects'),
       buffers        = require('../lib/buffers'),
       $Array         = require('./$Array'),
-      $Object        = require('./$Object'),
-      ThrowException = require('../errors').ThrowException,
+      $Object        = require('./$Object').$Object,
+      $$ThrowException = require('../errors').$$ThrowException,
       DataDescriptor = require('./descriptors').DataDescriptor;
 
   var BRANDS      = require('../constants').BRANDS,

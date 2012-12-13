@@ -13,7 +13,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       environments = require('./object-model/environments'),
       operations   = require('./object-model/operations'),
       descriptors  = require('./object-model/descriptors'),
-      $Object      = require('./object-model/$Object'),
+      $Object      = require('./object-model/$Object').$Object,
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
       $TypedArray  = require('./object-model/$TypedArray'),
@@ -22,6 +22,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       PropertyList = require('./lib/PropertyList'),
       Thunk        = require('./thunk').Thunk,
       Stack        = require('./lib/Stack');
+
 
   var Hash        = objects.Hash,
       create      = objects.create,
@@ -44,28 +45,29 @@ var runtime = (function(GLOBAL, exports, undefined){
       MapData     = collections.MapData,
       WeakMapData = collections.WeakMapData;
 
-  var ThrowException   = errors.ThrowException,
-      MakeException    = errors.MakeException,
+  var $$ThrowException = errors.$$ThrowException,
+      $$MakeException  = errors.$$MakeException,
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
-  var GetValue = operators.GetValue,
-      ToObject = operators.ToObject;
+  var $$GetValue = operators.$$GetValue,
+      $$ToObject = operators.$$ToObject;
 
-  var Reference               = operations.Reference,
-      IsCallable              = operations.isCallable,
-      Invoke                  = operations.invoke,
-      EnqueueChangeRecord     = operations.enqueueChangeRecord,
-      DeliverAllChangeRecords = operations.deliverAllChangeRecords,
-      IsStopIteration         = operations.isStopIteration;
+  var Reference                 = operations.Reference,
+      $$IsCallable              = operations.$$IsCallable,
+      $$Invoke                  = operations.$$Invoke,
+      $$EnqueueChangeRecord     = operations.$$EnqueueChangeRecord,
+      $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
+      $$CreateListFromArray     = operations.$$CreateListFromArray,
+      $$IsStopIteration         = operations.$$IsStopIteration;
 
-  var StringIndex            = descriptors.StringIndex,
-      Value                  = descriptors.Value,
-      Accessor               = descriptors.Accessor,
-      ArgAccessor            = descriptors.ArgAccessor,
-      IsAccessorDescriptor   = descriptors.isAccessorDescriptor,
-      FromPropertyDescriptor = descriptors.fromPropertyDescriptor,
-      ToPropertyDescriptor   = descriptors.toPropertyDescriptor;
+  var StringIndex              = descriptors.StringIndex,
+      Value                    = descriptors.Value,
+      Accessor                 = descriptors.Accessor,
+      ArgAccessor              = descriptors.ArgAccessor,
+      $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
+      $$FromPropertyDescriptor = descriptors.$$FromPropertyDescriptor,
+      $$ToPropertyDescriptor   = descriptors.$$ToPropertyDescriptor;
 
   var DeclarativeEnv = environments.DeclarativeEnvironmentRecord,
       ObjectEnv      = environments.ObjectEnvironmentRecord,
@@ -111,8 +113,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   };
 
 
-
-
   function noop(){}
 
   // ###############################
@@ -122,7 +122,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############################
 
 
-  function MakeConstructor(func, writable, prototype){
+  function $$MakeConstructor(func, writable, prototype){
     var install = prototype === undefined;
     if (install) {
       prototype = new $Object;
@@ -141,7 +141,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
-  var PropertyDefinitionEvaluation = (function(){
+  var $$PropertyDefinitionEvaluation = (function(){
     function makeDefiner(constructs, field, desc){
       return function(obj, key, code) {
 
@@ -151,7 +151,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             $F = code.flags.generator ? $GeneratorFunction : $Function,
             func = new $F('method', key, code.params, code, lex, code.flags.strict, undefined, home, sup);
 
-        constructs && MakeConstructor(func);
+        constructs && $$MakeConstructor(func);
         desc[field] = func;
         var result = obj.DefineOwnProperty(key, desc, false);
         desc[field] = undefined;
@@ -179,7 +179,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Configurable: true
     });
 
-    return function PropertyDefinitionEvaluation(kind, obj, key, code){
+    return function $$PropertyDefinitionEvaluation(kind, obj, key, code){
       if (kind === 'get') {
         return DefineGetter(obj, key, code);
       } else if (kind === 'set') {
@@ -201,7 +201,7 @@ var runtime = (function(GLOBAL, exports, undefined){
                     Enumerable: true,
                     Configurable: false };
 
-  function TopLevelDeclarationInstantiation(code){
+  function $$TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
         configurable = code.scopeType === 'eval',
         decls = code.lexDecls;
@@ -217,12 +217,12 @@ var runtime = (function(GLOBAL, exports, undefined){
           var existing = global.GetOwnProperty(name);
           if (!existing) {
             global.DefineOwnProperty(name, desc, true);
-          } else if (IsAccessorDescriptor(existing) || !existing.Writable && !existing.Enumerable) {
-            return ThrowException('global invalid define');
+          } else if ($$IsAccessorDescriptor(existing) || !existing.Writable && !existing.Enumerable) {
+            return $$ThrowException('global invalid define');
           }
         }
 
-        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.flags.strict);
+        env.SetMutableBinding(name, $$InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.flags.strict);
       }
     }
 
@@ -251,9 +251,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return context.getSymbol(v[1]);
   }
-  // ## ClassDefinitionEvaluation
+  // ## $$ClassDefinitionEvaluation
 
-  function ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
+  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
@@ -264,7 +264,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         superproto = null;
         superctor = intrinsics.FunctionProto;
       } else if (typeof superclass !== 'object') {
-        return ThrowException('non_object_superclass');
+        return $$ThrowException('non_object_superclass');
       } else if (!('Construct' in superclass)) {
         superproto = superclass;
         superctor = intrinsics.FunctionProto;
@@ -273,7 +273,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (superproto && superproto.Abrupt) return superproto;
 
         if (typeof superproto !== 'object') {
-          return ThrowException('non_object_superproto');
+          return $$ThrowException('non_object_superproto');
         }
         superctor = superclass;
       }
@@ -299,7 +299,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       constructorCode = intrinsics.EmptyClass.code;
     }
 
-    var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
+    var ctor = $$PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
     if (ctor && ctor.Abrupt) return ctor;
 
     if (name) {
@@ -307,7 +307,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       proto.define(intrinsics.toStringTag, brand);
     }
 
-    MakeConstructor(ctor, false, proto);
+    $$MakeConstructor(ctor, false, proto);
     ctor.Class = true;
     ctor.SetInheritance(superctor);
     ctor.set('name', brand);
@@ -316,20 +316,20 @@ var runtime = (function(GLOBAL, exports, undefined){
     proto.IsClassProto = true;
 
     each(methods, function(method){
-      PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
+      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
     });
 
     return ctor;
   }
 
-  // ## InstantiateFunctionDeclaration
+  // ## $$InstantiateFunctionDeclaration
 
-  function InstantiateFunctionDeclaration(decl, env){
+  function $$InstantiateFunctionDeclaration(decl, env){
     var code = decl.code,
         $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
-    MakeConstructor(func);
+    $$MakeConstructor(func);
     return func;
   }
 
@@ -348,22 +348,22 @@ var runtime = (function(GLOBAL, exports, undefined){
         return object;
       }
 
-      iterable = ToObject(iterable);
+      iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iterator = Invoke(intrinsics.iterator, iterable);
+      var iterator = $$Invoke(intrinsics.iterator, iterable);
       if (iterator && iterator.Abrupt) return iterator;
 
       var adder = object.Get('set');
       if (adder && adder.Abrupt) return adder;
 
-      if (!IsCallable(adder)) {
-        return ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
+      if (!$$IsCallable(adder)) {
+        return $$ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
       }
 
       var next;
-      while (next = ToObject(Invoke('next', iterator))) {
-        if (IsStopIteration(next)) {
+      while (next = $$ToObject($$Invoke('next', iterator))) {
+        if ($$IsStopIteration(next)) {
           return object;
         }
 
@@ -447,7 +447,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (receiver == null) {
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
-              receiver = ToObject(receiver);
+              receiver = $$ToObject(receiver);
               if (receiver.Abrupt) return receiver;
             }
           }
@@ -480,7 +480,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function Construct(args){
         if (this.ThisMode === 'lexical') {
-          return ThrowException('construct_arrow_function');
+          return $$ThrowException('construct_arrow_function');
         }
         var prototype = this.Get('prototype');
         if (prototype && prototype.Abrupt) return prototype;
@@ -503,7 +503,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (prototype.Abrupt) return prototype;
 
         if (typeof prototype !== 'object') {
-          return ThrowException('instanceof_nonobject_proto');
+          return $$ThrowException('instanceof_nonobject_proto');
         }
 
         while (arg) {
@@ -523,7 +523,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
       $Object.call(this, intrinsics.FunctionProto);
-      this.TargetFunction = target;
+      this.BoundTargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
@@ -538,19 +538,19 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$BoundFunction'
     }, [
       function Call(_, newArgs){
-        return this.TargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
+        return this.BoundTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.TargetFunction.Construct) {
-          return ThrowException('not_constructor', this.TargetFunction.name);
+        if (!this.BoundTargetFunction.Construct) {
+          return $$ThrowException('not_constructor', this.BoundTargetFunction.name);
         }
-        return this.TargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        return this.BoundTargetFunction.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.TargetFunction.HasInstance) {
-          return ThrowException('instanceof_function_expected', this.TargetFunction.name);
+        if (!this.BoundTargetFunction.HasInstance) {
+          return $$ThrowException('instanceof_function_expected', this.BoundTargetFunction.name);
         }
-        return This.TargetFunction.HasInstance(arg);
+        return this.BoundTargetFunction.HasInstance(arg);
       }
     ]);
 
@@ -574,7 +574,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (receiver == null) {
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
-              receiver = ToObject(receiver);
+              receiver = $$ToObject(receiver);
               if (receiver.Abrupt) return receiver;
             }
           }
@@ -637,13 +637,13 @@ var runtime = (function(GLOBAL, exports, undefined){
     }, [
       function Send(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'send');
+          return $$ThrowException('generator_executing', 'send');
         } else if (this.State === CLOSED) {
-          return ThrowException('generator_closed', 'send');
+          return $$ThrowException('generator_closed', 'send');
         }
         if (this.State === NEWBORN) {
           if (value !== undefined) {
-            return ThrowException('generator_send_newborn');
+            return $$ThrowException('generator_send_newborn');
           }
           this.ExecutionContext.currentGenerator = this;
           this.State = EXECUTING;
@@ -652,13 +652,13 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        return Resume(this.ExecutionContext, Normal, value);
+        return $$Resume(this.ExecutionContext, Normal, value);
       },
       function Throw(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'throw');
+          return $$ThrowException('generator_executing', 'throw');
         } else if (this.State === CLOSED) {
-          return ThrowException('generator_closed', 'throw');
+          return $$ThrowException('generator_closed', 'throw');
         }
         if (this.State === NEWBORN) {
           this.State = CLOSED;
@@ -667,11 +667,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        return Resume(this.ExecutionContext, Throw, value);
+        return $$Resume(this.ExecutionContext, Throw, value);
       },
       function Close(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'close');
+          return $$ThrowException('generator_executing', 'close');
         } else if (this.State === CLOSED) {
           return;
         }
@@ -683,14 +683,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        var result = Resume(this.ExecutionContext, Return, value);
+        var result = $$Resume(this.ExecutionContext, Return, value);
         this.State = CLOSED;
         return result;
       }
     ]);
 
 
-    function Resume(ctx, completionType, value){
+    function $$Resume(ctx, completionType, value){
       ExecutionContext.push(ctx);
       if (completionType !== Normal) {
         value = new AbruptCompletion(completionType, value);
@@ -983,7 +983,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new $Object.$Enumerator([]);
+    var iterator = new (require('$Object').$Enumerator)([]);
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
@@ -1126,8 +1126,8 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
-          if (key === 'caller' && IsCallable(val) && val.strict) {
-            return ThrowException('strict_poison_pill');
+          if (key === 'caller' && $$IsCallable(val) && val.strict) {
+            return $$ThrowException('strict_poison_pill');
           }
           return val;
         }
@@ -1144,11 +1144,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function DefineOwnProperty(key, desc, strict){
         if (!DefineOwn.call(this, key, desc, false) && strict) {
-          return ThrowException('strict_lhs_assignment');
+          return $$ThrowException('strict_lhs_assignment');
         }
 
         if (this.isMapped && this.ParameterMap.has(key)) {
-          if (IsAccessorDescriptor(desc)) {
+          if ($$IsAccessorDescriptor(desc)) {
             this.ParameterMap.Delete(key, false);
           } else {
             if ('Value' in desc) {
@@ -1182,7 +1182,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     function ModuleGetter(ref){
       var getter = this.Get = {
         Call: function(){
-          var value = GetValue(ref);
+          var value = $$GetValue(ref);
           ref = null;
           getter.Call = function(){ return value };
           return value;
@@ -1478,16 +1478,13 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
   var ExecutionContext = (function(){
-    var GetSymbol               = operations.getSymbol,
-        Element                 = operations.element,
-        SuperReference          = operations.superReference,
-        GetThisEnvironment      = operations.getThisEnvironment,
-        ThisResolution          = operations.thisResolution,
-        IsCallable              = operations.isCallable,
-        Invoke                  = operations.invoke,
-        SpreadDestructuring     = operations.spreadDestructuring,
-        GetTemplateCallSite     = operations.getTemplateCallSite,
-        DeliverAllChangeRecords = operations.deliverAllChangeRecords;
+    var $$GetSymbol           = operations.$$GetSymbol,
+        $$Element             = operations.$$Element,
+        $$SuperReference      = operations.$$SuperReference,
+        $$GetThisEnvironment  = operations.$$GetThisEnvironment,
+        $$ThisResolution      = operations.$$ThisResolution,
+        $$SpreadDestructuring = operations.$$SpreadDestructuring,
+        $$GetTemplateCallSite = operations.$$GetTemplateCallSite;
 
 
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
@@ -1527,11 +1524,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       isGlobal: false,
       strict: false,
       isEval: false,
-      constructFunction: operations.evaluateConstruct,
-      callFunction: operations.evaluateCall,
-      spreadArguments: operations.spreadArguments,
-      spreadArray: operations.spreadInitialization,
-      defineMethod: PropertyDefinitionEvaluation
+      constructFunction: operations.$$EvaluateConstruct,
+      callFunction     : operations.$$EvaluateCall,
+      spreadArguments  : operations.$$SpreadArguments,
+      spreadArray      : operations.$$SpreadInitialization,
+      defineMethod     : $$PropertyDefinitionEvaluation
     });
 
     define(ExecutionContext.prototype, [
@@ -1541,12 +1538,23 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
+      function calleeName(){
+        if (this.callee) {
+          return this.callee.Get('name');
+        }
+        return null;
+      },
+      function callerName(){
+        if (this.caller) {
+          return this.caller.calleeName();
+        }
+        return null;
+      },
       function createBinding(name, immutable){
         if (immutable) {
           return this.LexicalEnvironment.CreateImmutableBinding(name);
-        } else {
-          return this.LexicalEnvironment.CreateMutableBinding(name, false);
         }
+        return this.LexicalEnvironment.CreateMutableBinding(name, false);
       },
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
@@ -1589,7 +1597,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function createClass(def, superclass){
         this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
-        var ctor = ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
+        var ctor = $$ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
         return ctor;
       },
@@ -1605,7 +1613,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var func = new $F(code.lexicalType, name, code.params, code, env, code.flags.strict);
 
         if (code.lexicalType !== 'arrow') {
-          MakeConstructor(func);
+          $$MakeConstructor(func);
           isExpression && name && env.InitializeBinding(name, func);
         }
 
@@ -1628,7 +1636,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return new $RegExp(regex);
       },
       function getPropertyReference(name, obj){
-        return Element(this, name, obj);
+        return $$Element(this, name, obj);
       },
       function getReference(name){
         var origin = this.LexicalEnvironment || this.VariableEnvironment;
@@ -1648,22 +1656,22 @@ var runtime = (function(GLOBAL, exports, undefined){
         return new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
-        return SuperReference(this, name);
+        return $$SuperReference(this, name);
       },
       function getThisEnvironment(){
-        return GetThisEnvironment(this);
+        return $$GetThisEnvironment(this);
       },
       function getThis(){
-        return ThisResolution(this);
+        return $$ThisResolution(this);
       },
       function destructureSpread(target, index){
-        return SpreadDestructuring(this, target, index);
+        return $$SpreadDestructuring(this, target, index);
       },
       function getTemplateCallSite(template){
-        return GetTemplateCallSite(this, template);
+        return $$GetTemplateCallSite(this, template);
       },
       function getSymbol(name){
-        return GetSymbol(this, name) || ThrowException('undefined_symbol', name);
+        return $$GetSymbol(this, name) || $$ThrowException('undefined_symbol', name);
       },
       function createSymbol(name, isPublic){
         return new $Symbol(name, isPublic);
@@ -1673,6 +1681,16 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     ]);
 
+
+    natives.add({
+      _callerName: function(){
+        return context.callerName();
+      },
+      _IsConstructCall: function(){
+        return context.isConstruct;
+      }
+    });
+
     return ExecutionContext;
   })();
 
@@ -1681,13 +1699,13 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function notify(changeRecord){
     if (!('ChangeObservers' in this)) {
-      return ThrowException('called_on_incompatible_object', ['Notifier.prototype.notify']);
+      return $$ThrowException('called_on_incompatible_object', ['Notifier.prototype.notify']);
     }
 
-    changeRecord = ToObject(changeRecord);
+    changeRecord = $$ToObject(changeRecord);
     var type = changeRecord.Get('type');
     if (typeof type !== 'string') {
-      return  ThrowException('changerecord_type', [typeof type]);
+      return  $$ThrowException('changerecord_type', [typeof type]);
     }
 
     var changeObservers = this.ChangeObservers;
@@ -1702,7 +1720,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       newRecord.PreventExtensions();
-      EnqueueChangeRecord(newRecord, changeObservers);
+      $$EnqueueChangeRecord(newRecord, changeObservers);
     }
   }
 
@@ -1759,10 +1777,10 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
-    function CreateThrowTypeError(realm){
+    function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
-      thrower.call = function(){ return ThrowException('strict_poison_pill') };
+      thrower.call = function(){ return $$ThrowException('strict_poison_pill') };
       thrower.define('length', 0, ___);
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
@@ -1822,7 +1840,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       intrinsics.ArrayProto.length = ['length', 0, __W];
       intrinsics.ErrorProto.define('name', 'Error', _CW);
       intrinsics.ErrorProto.define('message', '', _CW);
-      intrinsics.ThrowTypeError = CreateThrowTypeError(realm);
+      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
       intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
@@ -1991,9 +2009,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     natives.add({
-      _IsConstructCall: function(){
-        return context.isConstruct;
-      },
       _eval: (function(){
         function builtinEval(obj, args, direct){
           var code = args[0];
@@ -2043,7 +2058,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return func;
       },
       _BoundFunctionCreate: function(obj, args){
-        return new $BoundFunction(args[0], args[1], toInternalArray(args[2]));
+        return new $BoundFunction(args[0], args[1], $$CreateListFromArray(args[2]));
       },
       _BooleanCreate: function(obj, args){
         return new $Boolean(args[0]);
@@ -2076,7 +2091,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         try {
           var result = new RegExp(pattern, flags);
         } catch (e) {
-          return ThrowException('invalid_regexp', [pattern+'']);
+          return $$ThrowException('invalid_regexp', [pattern+'']);
         }
         return new $RegExp(result);
       },
@@ -2125,7 +2140,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     function deliverChangeRecordsAndReportErrors(){
-      var observerResults = DeliverAllChangeRecords();
+      var observerResults = $$DeliverAllChangeRecords();
       if (observerResults && observerResults instanceof Array) {
         each(observerResults, function(error){
           realm.emit('throw', error);
@@ -2155,7 +2170,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var realm = scope.Realm;
       }
       ExecutionContext.push(new ExecutionContext(null, scope, realm, bytecode));
-      var status = TopLevelDeclarationInstantiation(bytecode);
+      var status = $$TopLevelDeclarationInstantiation(bytecode);
       if (status && status.Abrupt) {
         realm.emit(status.type, status);
         return status;
@@ -2291,7 +2306,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       ExecutionContext.push(ctx);
-      var status = TopLevelDeclarationInstantiation(script.bytecode);
+      var status = $$TopLevelDeclarationInstantiation(script.bytecode);
       context === ctx && ExecutionContext.pop();
 
       if (status && status.Abrupt) {

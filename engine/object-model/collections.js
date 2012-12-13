@@ -1,4 +1,5 @@
 var collections = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects');
 
   var Hash = objects.Hash,

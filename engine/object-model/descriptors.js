@@ -1,4 +1,5 @@
 var descriptors = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects'),
       iteration = require('../lib/iteration'),
       errors    = require('../errors'),
@@ -11,7 +12,7 @@ var descriptors = (function(exports){
       inherit = objects.inherit,
       each = iteration.each,
       tag = utility.tag,
-      ThrowException = errors.ThrowException;
+      $$ThrowException = errors.$$ThrowException;
 
   var E = 0x1,
       C = 0x2,
@@ -41,7 +42,7 @@ var descriptors = (function(exports){
 
 
   function $Object(proto){
-    $Object = require('./$Object');
+    $Object = require('./$Object').$Object;
     return new $Object(proto);
   }
 
@@ -170,14 +171,14 @@ var descriptors = (function(exports){
 
 
 
-  function IsDescriptor(desc) {
+  function $$IsDescriptor(desc) {
     return desc ? desc.isDescriptor === true : false;
   }
 
-  exports.isDescriptor = IsDescriptor;
+  exports.$$IsDescriptor = $$IsDescriptor;
 
 
-  function IsEmptyDescriptor(desc) {
+  function $$IsEmptyDescriptor(desc) {
     return !('Get' in desc
           || 'Set' in desc
           || 'Value' in desc
@@ -186,30 +187,30 @@ var descriptors = (function(exports){
           || 'Configurable' in desc);
   }
 
-  exports.isEmptyDescriptor = IsEmptyDescriptor;
+  exports.$$IsEmptyDescriptor = $$IsEmptyDescriptor;
 
 
-  function IsAccessorDescriptor(desc) {
+  function $$IsAccessorDescriptor(desc) {
     return desc === undefined ? false : 'Get' in desc || 'Set' in desc;
   }
 
-  exports.isAccessorDescriptor = IsAccessorDescriptor;
+  exports.$$IsAccessorDescriptor = $$IsAccessorDescriptor;
 
-  function IsDataDescriptor(desc) {
+  function $$IsDataDescriptor(desc) {
     return desc === undefined ? false : 'Value' in desc || 'Writable' in desc;
   }
 
-  exports.isDataDescriptor = IsDataDescriptor;
+  exports.$$IsDataDescriptor = $$IsDataDescriptor;
 
 
-  function IsGenericDescriptor(desc) {
+  function $$IsGenericDescriptor(desc) {
     return desc === undefined ? false : !('Get' in desc || 'Set' in desc || 'Value' in desc || 'Writable' in desc);
   }
 
-  exports.isGenericDescriptor = IsGenericDescriptor;
+  exports.$$IsGenericDescriptor = $$IsGenericDescriptor;
 
 
-  function IsEquivalentDescriptor(a, b) {
+  function $$IsEquivalentDescriptor(a, b) {
     return a.isDataDescriptor === b.isDataDescriptor
         && a.Get === b.Get
         && a.Set === b.Set
@@ -219,11 +220,11 @@ var descriptors = (function(exports){
         && is(a.Value, b.Value);
   }
 
-  exports.isEquivalentDescriptor = IsEquivalentDescriptor;
+  exports.$$IsEquivalentDescriptor = $$IsEquivalentDescriptor;
 
 
 
-  function FromPropertyDescriptor(desc){
+  function $$FromPropertyDescriptor(desc){
     if (desc) {
       var obj = new $Object;
       obj.set('enumerable', desc.Enumerable);
@@ -239,12 +240,12 @@ var descriptors = (function(exports){
     }
   }
 
-  exports.fromPropertyDescriptor = FromPropertyDescriptor;
+  exports.$$FromPropertyDescriptor = $$FromPropertyDescriptor;
 
 
-  function ToPropertyDescriptor(obj) {
+  function $$ToPropertyDescriptor(obj) {
     if (typeof obj !== 'object') {
-      return ThrowException('property_desc_object', [typeof obj]);
+      return $$ThrowException('property_desc_object', [typeof obj]);
     }
 
     var fields = create(null);
@@ -258,16 +259,16 @@ var descriptors = (function(exports){
     }
 
     if (fields.get ? !fields.get.Call : fields.get !== undefined) {
-      return ThrowException('getter_must_be_callable', [typeof fields.get]);
+      return $$ThrowException('getter_must_be_callable', [typeof fields.get]);
     }
 
     if (fields.set ? !fields.set.Call : fields.set !== undefined) {
-      return ThrowException('setter_must_be_callable', [typeof fields.set]);
+      return $$ThrowException('setter_must_be_callable', [typeof fields.set]);
     }
 
     if ('get' in fields || 'set' in fields) {
       if ('value' in fields || 'writable' in fields) {
-        return ThrowException('value_and_accessor', [fields]);
+        return $$ThrowException('value_and_accessor', [fields]);
       }
       var desc = new EmptyDataDescriptor;
       if ('get' in fields) desc.Get = fields.get;
@@ -284,9 +285,9 @@ var descriptors = (function(exports){
     return desc;
   }
 
-  exports.toPropertyDescriptor = ToPropertyDescriptor;
+  exports.$$ToPropertyDescriptor = $$ToPropertyDescriptor;
 
-  function FromGenericPropertyDescriptor(desc){
+  function $$FromGenericPropertyDescriptor(desc){
     if (desc === undefined) return;
     var obj = new $Object;
     for (var i=0, v; i < 6; i++) {
@@ -297,10 +298,10 @@ var descriptors = (function(exports){
     return obj;
   }
 
-  exports.fromGenericPropertyDescriptor = FromGenericPropertyDescriptor;
+  exports.$$FromGenericPropertyDescriptor = $$FromGenericPropertyDescriptor;
 
 
-  function ToCompletePropertyDescriptor(obj) {
+  function $$ToCompletePropertyDescriptor(obj){
     var desc = ToPropertyDescriptor(obj);
     if (desc && desc.Abrupt) return desc;
 
@@ -320,10 +321,10 @@ var descriptors = (function(exports){
     return desc;
   }
 
-  exports.toCompletePropertyDescriptor = ToCompletePropertyDescriptor;
+  exports.$$ToCompletePropertyDescriptor = $$ToCompletePropertyDescriptor;
 
 
-  function CopyAttributes(from, to){
+  function $$CopyAttributes(from, to){
     var props = from.Enumerate(true, false);
     for (var i=0; i < props.length; i++) {
       var field = props[i];
@@ -333,7 +334,7 @@ var descriptors = (function(exports){
     }
   }
 
-  exports.copyAttributes = CopyAttributes;
+  exports.$$CopyAttributes = $$CopyAttributes;
 
 
   return exports;

@@ -1,85 +1,75 @@
 var $Proxy = (function(module){
-  var objects = require('../lib/objects'),
-      errors = require('../errors'),
-      operators = require('./operators'),
+  "use strict";
+  var objects     = require('../lib/objects'),
+      errors      = require('../errors'),
+      operators   = require('./operators'),
       descriptors = require('./descriptors'),
-      operations = require('./operations'),
-      $Object = require('./$Object'),
-      $Array = require('./$Array');
+      operations  = require('./operations'),
+      $Object     = require('./$Object').$Object,
+      $Array      = require('./$Array');
 
   var inherit = objects.inherit,
-      is = objects.is,
-      define = objects.define,
-      ToPropertyDescriptor = descriptors.toPropertyDescriptor,
-      FromGenericPropertyDescriptor = descriptors.fromGenericPropertyDescriptor,
-      NormalizeAndCompletePropertyDescriptor = descriptors.normalizeAndCompletePropertyDescriptor
-      CopyAttributes = descriptors.copyAttributes,
-      IsDataDescriptor = descriptors.isDataDescriptor,
-      IsAccessorDescriptor = descriptors.isAccessorDescriptor,
-      ThrowException = errors.ThrowException,
-      ToBoolean = operators.ToBoolean,
-      ToString = operators.ToString,
-      ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable,
-      ToInternalArray = operations.toInternalArray;
-
-  function IsCompatibleDescriptor(){
-    return true;
-  }
+      is      = objects.is,
+      define  = objects.define,
+      $$ToPropertyDescriptor                   = descriptors.$$ToPropertyDescriptor,
+      $$FromGenericPropertyDescriptor          = descriptors.$$FromGenericPropertyDescriptor,
+      $$NormalizeAndCompletePropertyDescriptor = descriptors.$$NormalizeAndCompletePropertyDescriptor,
+      $$CopyAttributes                         = descriptors.$$CopyAttributes,
+      $$IsDataDescriptor                       = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor                   = descriptors.$$IsAccessorDescriptor,
+      $$ThrowException                         = errors.$$ThrowException,
+      $$ToBoolean                              = operators.$$ToBoolean,
+      $$ToString                               = operators.$$ToString,
+      $$ToUint32                               = operators.$$ToUint32,
+      $$IsCallable                             = operations.$$IsCallable,
+      $$GetMethod                              = operations.$$GetMethod,
+      $$CreateListFromArray                    = operations.$$CreateListFromArray,
+      $$IsCompatibleDescriptor                 = operations.$$IsCompatibleDescriptor;
 
 
-  function GetMethod(handler, trap){
-    var result = handler.Get(trap);
-    if (result && result.Abrupt) return result;
 
-    if (result !== undefined && !IsCallable(result)) {
-      return ThrowException('proxy_non_callable_trap');
-    }
-    return result;
-  }
-
-  function TrapDefineOwnProperty(proxy, key, descObj, strict){
+  function $$TrapDefineOwnProperty(proxy, key, descObj, strict){
     var handler = proxy.ProxyHandler,
         target = proxy.ProxyTarget;
 
-    var trap = GetMethod(handler, 'defineProperty');
+    var trap = $$GetMethod(handler, 'defineProperty');
     if (trap && trap.Abrupt) return trap;
 
-    var normalizedDesc = ToPropertyDescriptor(descObj);
+    var normalizedDesc = $$ToPropertyDescriptor(descObj);
 
 
     if (trap === undefined) {
       return target.DefineOwnProperty(key, normalizedDesc, strict);
     } else {
-      var normalizedDescObj = FromGenericPropertyDescriptor(normalizedDesc);
-      CopyAttributes(descObj, normalizedDescObj);
+      var normalizedDescObj = $$FromGenericPropertyDescriptor(normalizedDesc);
+      $$CopyAttributes(descObj, normalizedDescObj);
 
       var trapResult = trap.Call(handler, [target, key, normalizedDescObj]),
-          success = ToBoolean(trapResult),
+          success = $$ToBoolean(trapResult),
           targetDesc = target.GetOwnProperty(key),
           extensible = target.IsExtensible();
 
       if (!extensible && targetDesc === undefined) {
-        return ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(normalizedDesc))) {
-        return ThrowException('proxy_incompatible_descriptor');
+        return $$ThrowException('proxy_extensibility_inconsistent');
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(normalizedDesc))) {
+        return $$ThrowException('proxy_incompatible_descriptor');
       } else if (!normalizedDesc.Configurable) {
         if (targetDesc === undefined || targetDesc.Configurable) {
-          return ThrowException('proxy_configurability_inconsistent')
+          return $$ThrowException('proxy_configurability_inconsistent')
         }
       } else if (strict) {
-        return ThrowException('strict_property_redefinition');
+        return $$ThrowException('strict_property_redefinition');
       }
       return false;
     }
   }
 
 
-  function TrapGetOwnProperty(proxy, key){
+  function $$TrapGetOwnProperty(proxy, key){
     var handler = proxy.ProxyHandler,
         target = proxy.ProxyTarget;
 
-    var trap = GetMethod(handler, 'getOwnPropertyDescriptor');
+    var trap = $$GetMethod(handler, 'getOwnPropertyDescriptor');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
@@ -88,27 +78,27 @@ var $Proxy = (function(module){
       var trapResult = trap.Call(handler, [target, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var desc = NormalizeAndCompletePropertyDescriptor(trapResult);
+      var desc = $$NormalizeAndCompletePropertyDescriptor(trapResult);
 
       var targetDesc = target.GetOwnProperty(key);
       if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
       if (desc === undefined && targetDesc !== undefined) {
         if (!targetDesc.Configurable) {
-          return ThrowException('proxy_configurability_inconsistent');
+          return $$ThrowException('proxy_configurability_inconsistent');
         } else if (!target.IsExtensible()) {
-          return ThrowException('proxy_extensibility_inconsistent');
+          return $$ThrowException('proxy_extensibility_inconsistent');
         }
         return;
       }
 
       var extensible = target.IsExtensible();
       if (!extensible && targetDesc === undefined) {
-        return ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(desc))) {
-        return ThrowException('proxy_incompatible_descriptor');
-      } else if (!ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
-        return ThrowException('proxy_configurability_inconsistent')
+        return $$ThrowException('proxy_extensibility_inconsistent');
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(desc))) {
+        return $$ThrowException('proxy_incompatible_descriptor');
+      } else if (!$$ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
+        return $$ThrowException('proxy_configurability_inconsistent')
       }
 
       return desc;
@@ -138,7 +128,7 @@ var $Proxy = (function(module){
     Proxy: true
   }, [
     function GetInheritance(){
-      var trap = GetMethod(this.ProxyHandler, 'getPrototypeOf');
+      var trap = $$GetMethod(this.ProxyHandler, 'getPrototypeOf');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -151,33 +141,33 @@ var $Proxy = (function(module){
         if (targetProto && targetProto.Abrupt) return targetProto;
 
         if (trapResult !== targetProto) {
-          return ThrowException('proxy_inconsistent', 'getPrototypeOf');
+          return $$ThrowException('proxy_inconsistent', 'getPrototypeOf');
         } else {
           return targetProto;
         }
       }
     },
     function IsExtensible(){
-      var trap = GetMethod(this.ProxyHandler, 'isExtensible');
+      var trap = $$GetMethod(this.ProxyHandler, 'isExtensible');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.IsExtensible();
       }
 
-      var proxyIsExtensible = ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
+      var proxyIsExtensible = $$ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
       if (trapResult && trapResult.Abrupt) return trapResult;
 
       var targetIsExtensible = this.ProxyTarget.IsExtensible();
       if (targetIsExtensible && targetIsExtensible.Abrupt) return targetIsExtensible;
 
       if (proxyIsExtensible !== targetIsExtensible) {
-        return ThrowException('proxy_extensibility_inconsistent');
+        return $$ThrowException('proxy_extensibility_inconsistent');
       }
       return targetIsExtensible;
     },
     function GetP(receiver, key){
-      var trap = GetMethod(this.ProxyHandler, 'get');
+      var trap = $$GetMethod(this.ProxyHandler, 'get');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -191,13 +181,13 @@ var $Proxy = (function(module){
       if (desc && desc.Abrupt) return desc;
 
       if (desc !== undefined) {
-        if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
+        if ($$IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
           if (!is(trapResult, desc.Value)) {
-            return ThrowException('proxy_inconsistent', 'get');
+            return $$ThrowException('proxy_inconsistent', 'get');
           }
-        } else if (IsAccessorDescriptor(desc) && desc.Configurable === false && desc.Get === undefined) {
+        } else if ($$IsAccessorDescriptor(desc) && desc.Configurable === false && desc.Get === undefined) {
           if (trapResult !== undefined) {
-            return ThrowException('proxy_inconsistent', 'get');
+            return $$ThrowException('proxy_inconsistent', 'get');
           }
         }
       }
@@ -205,7 +195,7 @@ var $Proxy = (function(module){
       return trapResult;
     },
     function SetP(receiver, key, value){
-      var trap = GetMethod(this.ProxyHandler, 'set');
+      var trap = $$GetMethod(this.ProxyHandler, 'set');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -217,21 +207,21 @@ var $Proxy = (function(module){
         return trapResult;
       }
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success) {
         var desc = this.ProxyTarget.GetOwnProperty(key);
         if (desc && desc.Abrupt) return desc;
 
         if (desc !== undefined) {
-          if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
+          if ($$IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
             if (!is(value, desc.Value)) {
-              return ThrowException('proxy_inconsistent', 'set');
+              return $$ThrowException('proxy_inconsistent', 'set');
             }
           }
-        } else if (IsAccessorDescriptor(desc) && desc.Configurable === false) {
+        } else if ($$IsAccessorDescriptor(desc) && desc.Configurable === false) {
           if (desc.Set !== undefined) {
-            return ThrowException('proxy_inconsistent', 'set');
+            return $$ThrowException('proxy_inconsistent', 'set');
           }
         }
       }
@@ -239,16 +229,16 @@ var $Proxy = (function(module){
       return success;
     },
     function GetOwnProperty(key){
-      return TrapGetOwnProperty(this, key);
+      return $$TrapGetOwnProperty(this, key);
     },
     function DefineOwnProperty(key, desc, strict){
-      var descObj = FromGenericPropertyDescriptor(desc);
+      var descObj = $$FromGenericPropertyDescriptor(desc);
       if (descObj && descObj.Abrupt) return descObj;
 
-      return TrapDefineOwnProperty(this, key, descObj, strict);
+      return $$TrapDefineOwnProperty(this, key, descObj, strict);
     },
     function HasOwnProperty(key){
-      var trap = GetMethod(this.ProxyHandler, 'hasOwn');
+      var trap = $$GetMethod(this.ProxyHandler, 'hasOwn');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -258,22 +248,22 @@ var $Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'hasOwn');
+          return $$ThrowException('proxy_inconsistent', 'hasOwn');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'hasOwn');
+          return $$ThrowException('proxy_non_extensible', 'hasOwn');
         }
       }
       return success;
     },
     function HasProperty(key){
-      var trap = GetMethod(this.ProxyHandler, 'has');
+      var trap = $$GetMethod(this.ProxyHandler, 'has');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -283,22 +273,22 @@ var $Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'has');
+          return $$ThrowException('proxy_inconsistent', 'has');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'has');
+          return $$ThrowException('proxy_non_extensible', 'has');
         }
       }
       return success;
     },
     function Delete(key, strict){
-      var trap = GetMethod(this.ProxyHandler, 'deleteProperty');
+      var trap = $$GetMethod(this.ProxyHandler, 'deleteProperty');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -307,20 +297,20 @@ var $Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === true) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'delete');
+          return $$ThrowException('proxy_inconsistent', 'delete');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'delete');
+          return $$ThrowException('proxy_non_extensible', 'delete');
         }
         return true;
       } else if (strict) {
-        return ThrowException('strict_delete_failure');
+        return $$ThrowException('strict_delete_failure');
       }
       return false;
     },
@@ -332,7 +322,7 @@ var $Proxy = (function(module){
             recurse = includePrototype;
       }
 
-      var trap = GetMethod(this.ProxyHandler, type);
+      var trap = $$GetMethod(this.ProxyHandler, type);
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -343,26 +333,26 @@ var $Proxy = (function(module){
       if (trapResult && trapResult.Abrupt) return trapResult;
 
       if (typeof trapResult !== 'object' || trapResult === null) {
-        return ThrowException('proxy_non_object_result', type);
+        return $$ThrowException('proxy_non_object_result', type);
       }
 
-      var len = ToUint32(trapResult.Get('length'));
+      var len = $$ToUint32(trapResult.Get('length'));
       if (len && len.Abrupt) return len;
 
       var array = [],
           seen = new Hash;
 
       for (var i = 0; i < len; i++) {
-        var element = ToString(trapResult.Get(''+i));
+        var element = $$ToString(trapResult.Get(''+i));
         if (element && element.Abrupt) return element;
 
         if (element in seen) {
-          return ThrowException('proxy_duplicate', type);
+          return $$ThrowException('proxy_duplicate', type);
         }
         seen[element] = true;
 
         if (!includePrototype && !this.ProxyTarget.IsExtensible() && !this.ProxyTarget.HasOwnProperty(element)) {
-          return ThrowException('proxy_non_extensible', type);
+          return $$ThrowException('proxy_non_extensible', type);
         }
 
         array[i] = element;
@@ -379,11 +369,11 @@ var $Proxy = (function(module){
           if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
           if (targetDesc && !targetDesc.Configurable) {
-            return ThrowException('proxy_inconsistent', type);
+            return $$ThrowException('proxy_inconsistent', type);
           }
 
           if (targetDesc && !this.ProxyTarget.IsExtensible()) {
-            return ThrowException('proxy_non_extensible', type);
+            return $$ThrowException('proxy_non_extensible', type);
           }
         }
       }
@@ -393,7 +383,7 @@ var $Proxy = (function(module){
   ]);
 
   function ProxyCall(thisValue, args){
-    var trap = GetMethod(this.ProxyHandler, 'apply');
+    var trap = $$GetMethod(this.ProxyHandler, 'apply');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
@@ -404,7 +394,7 @@ var $Proxy = (function(module){
   }
 
   function ProxyConstruct(args){
-    var trap = GetMethod(this.ProxyHandler, 'construct');
+    var trap = $$GetMethod(this.ProxyHandler, 'construct');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {

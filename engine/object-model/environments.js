@@ -11,7 +11,7 @@ var environments = (function(exports, undefined){
       each     = require('../lib/iteration').each,
       tag      = require('../lib/utility').tag;
 
-  var ThrowException = require('../errors').ThrowException,
+  var $$ThrowException = require('../errors').$$ThrowException,
       Uninitialized = require('../constants').SYMBOLS.Uninitialized;
 
   var normal = { Configurable: true,
@@ -67,7 +67,7 @@ var environments = (function(exports, undefined){
           this.symbols = new Hash;
         }
         if (name in this.symbols) {
-          return ThrowException('symbol_redefine', name);
+          return $$ThrowException('symbol_redefine', name);
         }
         this.symbols[name] = symbol;
       },
@@ -75,7 +75,7 @@ var environments = (function(exports, undefined){
         if (this.symbols && name in this.symbols) {
           return this.symbols[name];
         } else{
-          return ThrowException('symbol_not_defined', name);
+          return $$ThrowException('symbol_not_defined', name);
         }
       }
     ]);
@@ -127,11 +127,11 @@ var environments = (function(exports, undefined){
         if (name in this.bindings) {
           var value = this.bindings[name];
           if (value === Uninitialized)
-            return ThrowException('uninitialized_const', name);
+            return $$ThrowException('uninitialized_const', name);
           else
             return value;
         } else if (strict) {
-          return ThrowException('not_defined', name);
+          return $$ThrowException('not_defined', name);
         } else {
           return false;
         }
@@ -139,9 +139,9 @@ var environments = (function(exports, undefined){
       function SetMutableBinding(name, value, strict){
         if (name in this.consts) {
           if (this.bindings[name] === Uninitialized)
-            return ThrowException('uninitialized_const', name);
+            return $$ThrowException('uninitialized_const', name);
           else if (strict)
-            return ThrowException('const_assign', name);
+            return $$ThrowException('const_assign', name);
         } else {
           this.bindings[name] = value;
         }
@@ -207,7 +207,7 @@ var environments = (function(exports, undefined){
         if (this.bindings.HasProperty(name)) {
           return this.bindings.Get(name);
         } else if (strict) {
-          return ThrowException('not_defined', name);
+          return $$ThrowException('not_defined', name);
         }
       },
       function SetMutableBinding(name, value, strict){

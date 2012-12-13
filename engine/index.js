@@ -15,7 +15,7 @@ var index = (function(exports){
       Realm           = runtime.Realm,
       Script          = runtime.Script,
       Renderer        = debug.Renderer,
-      ThrowException  = errors.ThrowException,
+      $$ThrowException  = errors.$$ThrowException,
       $NativeFunction = runtime.$NativeFunction,
       builtins        = runtime.builtins;
 
@@ -103,19 +103,19 @@ var index = (function(exports){
           return this.query(key) !== undefined;
         },
         function each(callback){
-          return ThrowException('missing_fundamental_handler', 'each');
+          return $$ThrowException('missing_fundamental_handler', 'each');
         },
         function get(key){
-          return ThrowException('missing_fundamental_handler', 'get');
+          return $$ThrowException('missing_fundamental_handler', 'get');
         },
         function set(key, value){
-          return ThrowException('missing_fundamental_handler', 'set');
+          return $$ThrowException('missing_fundamental_handler', 'set');
         },
         function query(key){
-          return ThrowException('missing_fundamental_handler', 'query');
+          return $$ThrowException('missing_fundamental_handler', 'query');
         },
         function update(key, attr){
-          return ThrowException('missing_fundamental_handler', 'update');
+          return $$ThrowException('missing_fundamental_handler', 'update');
         }
       ]);
 

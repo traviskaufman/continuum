@@ -1,4 +1,4 @@
-var $Object = (function(module){
+var $Object = (function(exports){
   var objects      = require('../lib/objects'),
       errors       = require('../errors'),
       constants    = require('../constants'),
@@ -9,29 +9,30 @@ var $Object = (function(module){
       utility      = require('../lib/utility');
 
   var inherit = objects.inherit,
-      define = objects.define,
-      create = objects.create,
-      hide = objects.hide,
-      Hash = objects.Hash,
-      tag = utility.tag,
+      define  = objects.define,
+      create  = objects.create,
+      hide    = objects.hide,
+      is      = objects.is,
+      Hash    = objects.Hash,
+      tag     = utility.tag,
       AccessorDescriptor = descriptors.AccessorDescriptor,
-      DataDescriptor = descriptors.DataDescriptor,
-      Accessor = descriptors.Accessor,
-      Value = descriptors.Value,
-      IsDataDescriptor = descriptors.isDataDescriptor,
-      IsAccessorDescriptor = descriptors.isAccessorDescriptor,
-      IsEmptyDescriptor = descriptors.isEmptyDescriptor,
-      IsEquivalentDescriptor = descriptors.isEquivalentDescriptor,
-      IsGenericDescriptor = descriptors.isGenericDescriptor,
-      ThrowException = errors.ThrowException,
-      ToBoolean = operators.ToBoolean,
-      ToString = operators.ToString,
-      ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable,
-      Invoke = operations.invoke,
-      ThrowStopIteration = operations.throwStopIteration,
-      CreateChangeRecord = operations.createChangeRecord,
-      EnqueueChangeRecord = operations.enqueueChangeRecord;
+      DataDescriptor     = descriptors.DataDescriptor,
+      Accessor           = descriptors.Accessor,
+      Value              = descriptors.Value,
+      $$IsDataDescriptor          = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor      = descriptors.$$IsAccessorDescriptor,
+      $$IsEmptyDescriptor         = descriptors.$$IsEmptyDescriptor,
+      $$IsEquivalentDescriptor    = descriptors.$$IsEquivalentDescriptor,
+      $$IsGenericDescriptor       = descriptors.$$IsGenericDescriptor,
+      $$ThrowException            = errors.$$ThrowException,
+      $$ToBoolean                 = operators.$$ToBoolean,
+      $$ToString                  = operators.$$ToString,
+      $$ToUint32                  = operators.$$ToUint32,
+      $$IsCallable                = operations.$$IsCallable,
+      $$Invoke                    = operations.$$Invoke,
+      $$ThrowStopIteration        = operations.$$ThrowStopIteration,
+      $$CreateChangeRecord        = operations.$$CreateChangeRecord,
+      $$EnqueueChangeRecord       = operations.$$EnqueueChangeRecord;
 
   var E = 0x1,
       C = 0x2,
@@ -49,6 +50,215 @@ var $Object = (function(module){
       E_A = 9,
       _CA = 10,
       ECA = 11;
+
+
+
+  var normalDescriptor = { Value: undefined,
+                           Writable: true,
+                           Enumerable: true,
+                           Configurable: true,
+                           isDescriptor: true,
+                           isDataDescriptor: true,
+                           isAccessorDescriptor: false };
+
+  function $$CreateOwnDataProperty(object, key, value){
+    var extensible = object.IsExtensible();
+    if (!extensible || extensible.Abrupt) return extensible;
+    normalDescriptor.Value = value;
+    return object.DefineOwnProperty(key, normalDescriptor);
+  }
+
+  exports.$$CreateOwnDataProperty = $$CreateOwnDataProperty;
+
+
+  function $$OrdinaryGetOwnProperty(object, key){
+    if (key === '__proto__') {
+      var val = object.GetP(object, '__proto__');
+      return typeof val === 'object' ? new DataDescriptor(val, _CW) : undefined;
+    }
+
+    var prop = object.describe(key);
+    if (prop) {
+      if (prop[2] & A) {
+        var Descriptor = AccessorDescriptor,
+            val = prop[1];
+      } else {
+        var val = prop[3] ? prop[3].Get.Call(object, []) : prop[1],
+            Descriptor = DataDescriptor;
+      }
+      return new Descriptor(val, prop[2]);
+    }
+  }
+
+  exports.$$OrdinaryGetOwnProperty = $$OrdinaryGetOwnProperty;
+
+
+  function $$DefinePropertyOrThrow(object, key, desc){
+    var success = object.DefineOwnProperty(key, value, desc);
+    if (!success) {
+      return $$ThrowException('redefine_disallowed', [key]);
+    }
+    return success;
+  }
+
+  exports.$$DefinePropertyOrThrow = $$DefinePropertyOrThrow;
+
+
+  function $$DeletePropertyOrThrow(object, key){
+    var success = object.DeleteProperty(key, value);
+    if (!success) {
+      return $$ThrowException('strict_delete_property', [key]);
+    }
+    return success;
+  }
+
+  exports.$$DeletePropertyOrThrow = $$DeletePropertyOrThrow;
+
+
+  function $$HasProperty(object, key){
+    if (object === null) return false;
+
+    var obj = object;
+    do {
+      if (typeof obj !== 'object')  {
+        return $$ThrowException('invalid_in_operator_use', [key, typeof obj]);
+      }
+      var has = obj.HasOwnProperty(key);
+      if (has) return has;
+      obj = obj.GetInheritance();
+      if (obj && obj.Abrupt) return obj;
+    } while (obj)
+    return false;
+  }
+
+  exports.$$HasProperty = $$HasProperty;
+
+
+  function $$GetMethod(object, key){
+    var func = object.GetP(key, object);
+    if (func !== undefined && !$$IsCallable(func)) {
+      return $$ThrowException('called_non_callable', [key]);
+    }
+    return func;
+  }
+
+  exports.$$GetMethod = $$GetMethod;
+
+
+  function $$OrdinaryDefineOwnProperty(object, key, desc){
+    var current = $$OrdinaryGetOwnProperty(object, key),
+        extensible = object.IsExtensible();
+    return $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current);
+  }
+
+  exports.$$OrdinaryDefineOwnProperty = $$OrdinaryDefineOwnProperty;
+
+
+  function $$IsCompatableDescriptor(extensible, desc, current){
+    return $$ValidateAndApplyPropertyDescriptor(undefined, undefined, extensible, desc, current);
+  }
+
+  exports.$$IsCompatableDescriptor = $$IsCompatableDescriptor;
+
+
+  function $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current){
+    var changeType = 'reconfigured';
+
+    // New property
+    if (current === undefined) {
+      if (extensible && object !== undefined) {
+        if ($$IsGenericDescriptor(desc) || $$IsDataDescriptor(desc)) {
+          object.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+        } else {
+          object.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | 8);
+        }
+
+        if (object.Notifier) {
+          var changeObservers = object.Notifier.ChangeObservers;
+          if (changeObservers.size) {
+            var record = $$CreateChangeRecord('new', object, key);
+            $$EnqueueChangeRecord(record, changeObservers);
+          }
+        }
+      }
+      return extensible === true;
+    }
+
+    // Empty descriptor
+    if (!('Get' in desc || 'Set' in desc || 'Value' in desc)) {
+      if (!('Writable' in desc || 'Enumerable' in desc || 'Configurable' in desc)) {
+        return true;
+      }
+    }
+
+    //Equal descriptor
+    if (desc.Writable === current.Writable && desc.Enumerable === current.Enumerable && desc.Configurable === current.Configurable) {
+      if (desc.Get === current.Get && desc.Set === current.Set && is(desc.Value, current.Value)) {
+        return true;
+      }
+    }
+
+    if (!current.Configurable) {
+      if (desc.Configurable || 'Enumerable' in desc && desc.Enumerable !== current.Enumerable) {
+        return false;
+      } else {
+        var currentIsData = $$IsDataDescriptor(current),
+            descIsData = $$IsDataDescriptor(desc);
+
+        if (currentIsData !== descIsData) {
+          return false;
+        } else if (currentIsData && descIsData) {
+          if (!current.Writable && 'Value' in desc && !is(desc.Value, current.Value)) {
+            return false;
+          }
+        } else if ('Set' in desc && desc.Set !== current.Set) {
+          return false;
+        } else if ('Get' in desc && desc.Get !== current.Get) {
+          return false;
+        }
+      }
+    }
+
+    if (object === undefined) {
+      return true;
+    }
+
+    'Configurable' in desc || (desc.Configurable = current.Configurable);
+    'Enumerable' in desc || (desc.Enumerable = current.Enumerable);
+
+    if ($$IsAccessorDescriptor(desc)) {
+      object.update(key, desc.Enumerable | (desc.Configurable << 1) | 8);
+      if ($$IsDataDescriptor(current)) {
+        object.set(key, new Accessor(desc.Get, desc.Set));
+      } else {
+        'Set' in desc && (prop[1].Set = desc.Set);
+        'Get' in desc && (prop[1].Get = desc.Get);
+        ('Set' in desc || 'Get' in desc) && object.set(key, prop[1])
+      }
+    } else {
+      if ($$IsAccessorDescriptor(current)) {
+        current.Writable = true;
+      }
+      'Writable' in desc || (desc.Writable = current.Writable);
+      object.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+      if ('Value' in desc) {
+        object.set(key, desc.Value);
+        changeType = 'updated';
+      }
+    }
+
+    if (object.Notifier) {
+      var changeObservers = object.Notifier.ChangeObservers;
+      if (changeObservers.size) {
+        var record = $$CreateChangeRecord(changeType, object, key, current);
+        $$EnqueueChangeRecord(record, changeObservers);
+      }
+    }
+
+    return true;
+  }
+
+  exports.$$ValidateAndApplyPropertyDescriptor = $$ValidateAndApplyPropertyDescriptor;
 
 
 
@@ -85,11 +295,17 @@ var $Object = (function(module){
     if (proto && proto.HiddenPrototype) {
       this.properties.setProperty(['__proto__', null, 6, Proto]);
     }
-
-    hide(this, 'storage');
-    hide(this, 'Prototype');
-    hide(this, 'Realm');
   }
+
+  exports.$Object = $Object;
+
+
+  define($Object, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
 
   define($Object.prototype, {
     Extensible: true,
@@ -157,7 +373,7 @@ var $Object = (function(module){
         var proto = value;
         while (proto) {
           if (proto === this) {
-            return ThrowException('cyclic_proto');
+            return $$ThrowException('cyclic_proto');
           }
           proto = proto.GetInheritance();
         }
@@ -165,8 +381,8 @@ var $Object = (function(module){
         if (this.Notifier) {
           var changeObservers = this.Notifier.ChangeObservers;
           if (changeObservers.size) {
-            var record = CreateChangeRecord('prototype', this, null, new Value(this.GetInheritance()));
-            EnqueueChangeRecord(record, changeObservers);
+            var record = $$CreateChangeRecord('prototype', this, null, new Value(this.GetInheritance()));
+            $$EnqueueChangeRecord(record, changeObservers);
           }
         }
         this.Prototype = value;
@@ -186,22 +402,7 @@ var $Object = (function(module){
       return this.Extensible === v;
     },
     function GetOwnProperty(key){
-      if (key === '__proto__') {
-        var val = this.GetP(this, '__proto__');
-        return typeof val === 'object' ? new DataDescriptor(val, _CW) : undefined;
-      }
-
-      var prop = this.describe(key);
-      if (prop) {
-        if (prop[2] & A) {
-          var Descriptor = AccessorDescriptor,
-              val = prop[1];
-        } else {
-          var val = prop[3] ? prop[3].Get.Call(this, []) : prop[1],
-              Descriptor = DataDescriptor;
-        }
-        return new Descriptor(val, prop[2]);
-      }
+      return $$OrdinaryGetOwnProperty(this, key);
     },
     function GetProperty(key){
       var desc = this.GetOwnProperty(key);
@@ -219,167 +420,66 @@ var $Object = (function(module){
     },
     function Put(key, value, strict){
       if (!this.SetP(this, key, value) && strict) {
-        return ThrowException('strict_cannot_assign', [key]);
+        return $$ThrowException('strict_cannot_assign', [key]);
       }
     },
     function GetP(receiver, key){
       var prop = this.describe(key);
       if (!prop) {
-        var proto = this.GetInheritance();
-        if (proto) {
-          return proto.GetP(receiver, key);
-        }
-      } else if (prop[3]) {
-        var getter = prop[3].Get;
-        return getter.Call(receiver, []);
-      } else if (prop[2] & A) {
-        var getter = prop[1].Get;
-        if (IsCallable(getter)) {
-          return getter.Call(receiver, []);
+        var parent = this.GetInheritance();
+        if (parent && parent.Abrupt) return parent;
+
+        if (parent) {
+          return parent.GetP(receiver, key);
         }
       } else {
+        if (prop[3]) {
+          var getter = prop[3].Get;
+        } else if (prop[2] & A) {
+          var getter = prop[1].Get;
+        }
+
+        if (getter && $$IsCallable(getter)) {
+          return getter.Call(receiver, []);
+        }
         return prop[1];
       }
     },
     function SetP(receiver, key, value) {
       var prop = this.describe(key);
-      if (prop) {
+      if (!prop) {
+        var parent = this.GetInheritance();
+        if (parent && parent.Abrupt) return parent;
+
+        if (parent) {
+          return parent.SetP(receiver, key, value);
+        } else if (typeof receiver === 'object') {
+          return $$CreateOwnDataProperty(receiver, key, value);
+        }
+      } else {
         if (prop[3]) {
           var setter = prop[3].Set;
-          setter.Call(receiver, [value]);
-          return true;
         } else if (prop[2] & A) {
           var setter = prop[1].Set;
-          if (IsCallable(setter)) {
-            setter.Call(receiver, [value]);
-            return true;
-          } else {
-            return false;
-          }
+        }
+
+        if (setter && $$IsCallable(setter)) {
+          var setterResult = setter.Call(receiver, [value]);
+          if (setterResult && setterResult.Abrupt) return setterResult;
+
+          return true;
         } else if (prop[2] & W) {
           if (this === receiver) {
-            return this.DefineOwnProperty(key, new Value(value), false);
-          } else if (!receiver.IsExtensible()) {
-            return false;
-          } else {
-            return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
+            return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
+          } else if (typeof receiver === 'object') {
+            return $$CreateOwnDataProperty(receiver, key, value);
           }
-        } else {
-          return false;
-        }
-      } else {
-        var proto = this.GetInheritance();
-        if (!proto) {
-          if (!receiver.IsExtensible()) {
-            return false;
-          } else {
-            return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
-          }
-        } else {
-          return proto.SetP(receiver, key, value);
         }
       }
+      return false;
     },
-    function DefineOwnProperty(key, desc, strict){
-      var reject = strict
-          ? function(e, a){ return ThrowException(e, a) }
-          : function(e, a){ return false };
-
-      var current = this.GetOwnProperty(key),
-          changeType = 'reconfigured';
-
-      if (current === undefined) {
-        if (!this.IsExtensible()) {
-          return reject('define_disallowed', []);
-        } else {
-          if (IsGenericDescriptor(desc) || IsDataDescriptor(desc)) {
-            this.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
-          } else {
-            this.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | A);
-          }
-
-          if (this.Notifier) {
-            var changeObservers = this.Notifier.ChangeObservers;
-            if (changeObservers.size) {
-              var record = CreateChangeRecord('new', this, key);
-              EnqueueChangeRecord(record, changeObservers);
-            }
-          }
-          return true;
-        }
-      } else {
-        var rejected = false;
-        if (IsEmptyDescriptor(desc) || IsEquivalentDescriptor(desc, current)) {
-          return true;
-        }
-
-        if (!current.Configurable) {
-          if (desc.Configurable || desc.Enumerable === !current.Enumerable) {
-            return reject('redefine_disallowed', []);
-          } else {
-            var currentIsData = IsDataDescriptor(current),
-                descIsData = IsDataDescriptor(desc);
-
-            if (currentIsData !== descIsData) {
-              return reject('redefine_disallowed', []);
-            } else if (currentIsData && descIsData) {
-              if (!current.Writable && 'Value' in desc && desc.Value !== current.Value) {
-                return reject('redefine_disallowed', []);
-              }
-            } else if ('Set' in desc && desc.Set !== current.Set) {
-              return reject('redefine_disallowed', []);
-            } else if ('Get' in desc && desc.Get !== current.Get) {
-              return reject('redefine_disallowed', []);
-            }
-          }
-        }
-
-        'Configurable' in desc || (desc.Configurable = current.Configurable);
-        'Enumerable' in desc || (desc.Enumerable = current.Enumerable);
-
-        var prop = this.describe(key);
-
-        if (IsAccessorDescriptor(desc)) {
-          this.update(key, desc.Enumerable | (desc.Configurable << 1) | A);
-          if (IsDataDescriptor(current)) {
-            this.set(key, new Accessor(desc.Get, desc.Set));
-          } else {
-            var accessor = prop[1],
-                setter = 'Set' in desc,
-                getter = 'Get' in desc;
-
-            if (setter) {
-              accessor.Set = desc.Set;
-            }
-            if (getter) {
-              accessor.Get = desc.Get;
-            }
-            if (setter || getter) {
-              this.set(key, accessor)
-            }
-          }
-        } else {
-          if (IsAccessorDescriptor(current)) {
-            current.Writable = true;
-          }
-          'Writable' in desc || (desc.Writable = current.Writable);
-          this.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
-          if ('Value' in desc) {
-            this.set(key, desc.Value);
-            changeType = 'updated';
-          }
-        }
-
-        if (this.Notifier) {
-          var changeObservers = this.Notifier.ChangeObservers;
-          if (changeObservers.size) {
-            var record = CreateChangeRecord(changeType, this, key, current);
-            EnqueueChangeRecord(record, changeObservers);
-          }
-        }
-
-        return true;
-      }
+    function DefineOwnProperty(key, desc){
+      return $$OrdinaryDefineOwnProperty(this, key, desc);
     },
     function HasOwnProperty(key){
       return this.has(key);
@@ -403,20 +503,20 @@ var $Object = (function(module){
         if (this.Notifier) {
           var changeObservers = this.Notifier.ChangeObservers;
           if (changeObservers.size) {
-            var record = CreateChangeRecord('deleted', this, key, this.GetOwnProperty(key));
-            EnqueueChangeRecord(record, changeObservers);
+            var record = $$CreateChangeRecord('deleted', this, key, this.GetOwnProperty(key));
+            $$EnqueueChangeRecord(record, changeObservers);
           }
         }
         this.remove(key);
         return true;
       } else if (strict) {
-        return ThrowException('strict_delete', []);
+        return $$ThrowException('strict_delete', []);
       } else {
         return false;
       }
     },
     function Iterate(){
-      return Invoke(intrinsics.iterator, this, []);
+      return $$Invoke(intrinsics.iterator, this, []);
     },
     function enumerator(){
       return new $Enumerator(this.Enumerate(true, true));
@@ -466,7 +566,7 @@ var $Object = (function(module){
         var method = this.Get(order[i]);
         if (method && method.Abrupt) return method;
 
-        if (IsCallable(method)) {
+        if ($$IsCallable(method)) {
           var value = method.Call(this, []);
           if (value && value.Abrupt) return value;
           if (value === null || typeof value !== 'object') {
@@ -475,7 +575,7 @@ var $Object = (function(module){
         }
       }
 
-      return ThrowException('cannot_convert_to_primitive', []);
+      return $$ThrowException('cannot_convert_to_primitive', []);
     }
     // function Keys(){},
     // function OwnPropertyKeys(){},
@@ -497,7 +597,7 @@ var $Object = (function(module){
       if (this.depleted || this.index >= this.count) {
         this.depleted = true;
         this.keys = null;
-        return ThrowStopIteration();
+        return $$ThrowStopIteration();
       } else {
         return this.keys[this.index++];
       }
@@ -506,6 +606,8 @@ var $Object = (function(module){
     function $Enumerator(keys){
       this.next = ['next', new next(keys), 7];
     }
+
+    exports.$Enumerator = $Enumerator;
 
     inherit($Enumerator, $Object, [
       function has(key){
@@ -532,13 +634,44 @@ var $Object = (function(module){
 
   var realm, intrinsics;
 
-  define($Object, [
-    $Enumerator,
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  return exports;
+})(typeof module !== 'undefined' ? exports : {});
 
-  return module.exports = $Object;
-})(typeof module !== 'undefined' ? module : {});
+/*
+  function SetP(receiver, key, value){
+    var desc = $$OrdinaryGetOwnProperty(this, key);
+    if (desc && desc.Abrupt) return desc;
+
+    if (desc === undefined) {
+      var parent = this.GetInheritance();
+      if (parent && parent.Abrupt) return parent;
+
+      if (parent) {
+        return parent.SetP(receiver, key, value);
+      } else if ($$Type(receiver) !== 'Object') {
+        return false;
+      }
+      return $$CreateOwnDataProperty(receiver, key, value);
+    }
+
+    if ($$IsDataDescriptor(desc)) {
+      if (!desc.Writable) {
+        return false;
+      } else if (this === receiver) {
+        return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
+      } else if ($$Type(receiver) !== 'Object') {
+        return false;
+      }
+      return $$CreateOwnDataProperty(receiver, key, value);
+    } else if ($$IsAccessorDescriptor(desc)) {
+      var setter = desc.Set;
+      if ($$IsCallable(setter)) {
+        var setterResult = setter.Call(receiver, [value]);
+        if (setterResult && setterResult.Abrupt) return setterResult;
+
+        return true;
+      }
+      return false;
+    }
+  }
+*/

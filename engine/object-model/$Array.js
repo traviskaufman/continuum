@@ -6,18 +6,18 @@ var $Array = (function(module){
       operators    = require('./operators'),
       operations   = require('./operations'),
       PropertyList = require('../lib/PropertyList'),
-      $Object      = require('./$Object');
+      $Object      = require('./$Object').$Object;
 
   var inherit        = objects.inherit,
       define         = objects.define,
       copy           = objects.copy,
       Hash           = objects.Hash,
       tag            = utility.tag,
-      IsArrayIndex   = operations.isArrayIndex,
-      ThrowException = errors.ThrowException,
-      ToBoolean      = operators.ToBoolean,
-      ToUint32       = operators.ToUint32,
-      ToNumber       = operators.ToNumber;
+      $$IsArrayIndex   = operations.$$IsArrayIndex,
+      $$ThrowException = errors.$$ThrowException,
+      $$ToBoolean      = operators.$$ToBoolean,
+      $$ToUint32       = operators.$$ToUint32,
+      $$ToNumber       = operators.$$ToNumber;
 
   var __W = 4,
       ECW = 7;
@@ -139,7 +139,7 @@ var $Array = (function(module){
     function DefineOwnProperty(key, desc, strict){
       var oldLenDesc = this.GetOwnProperty('length'),
           oldLen = oldLenDesc.Value,
-          reject = strict ? ThrowException : function(e, a){ return false };
+          reject = strict ? $$ThrowException : function(e, a){ return false };
 
 
       if (key === 'length') {
@@ -148,11 +148,11 @@ var $Array = (function(module){
         }
 
         var newLenDesc = copy(desc),
-            newLen = ToUint32(desc.Value);
+            newLen = $$ToUint32(desc.Value);
 
         if (newLen.Abrupt) return newLen;
 
-        var value = ToNumber(desc.Value);
+        var value = $$ToNumber(desc.Value);
         if (value.Abrupt) return value;
 
         if (newLen !== value) {
@@ -201,8 +201,8 @@ var $Array = (function(module){
         }
 
         return true;
-      }  else if (IsArrayIndex(key)) {
-        var index = ToUint32(key);
+      }  else if ($$IsArrayIndex(key)) {
+        var index = $$ToUint32(key);
         if (index.Abrupt) return index;
 
         if (index >= oldLen && oldLenDesc.Writable === false) {

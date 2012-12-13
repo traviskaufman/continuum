@@ -76,7 +76,7 @@ var errors = (function(errors, messages, exports){
 
   exports.AbruptCompletion = AbruptCompletion;
 
-  function MakeException(type, args){
+  function $$MakeException(type, args){
     if (!(args instanceof Array)) {
       args = [args];
     }
@@ -84,14 +84,14 @@ var errors = (function(errors, messages, exports){
     return exports.createError(error.name, type, error.apply(null, args));
   }
 
-  exports.MakeException = MakeException;
+  exports.$$MakeException = $$MakeException;
 
 
-  function ThrowException(type, args){
-    return new AbruptCompletion('throw', MakeException(type, args));
+  function $$ThrowException(type, args){
+    return new AbruptCompletion('throw', $$MakeException(type, args));
   }
 
-  exports.ThrowException = ThrowException;
+  exports.$$ThrowException = $$ThrowException;
 
 
   return exports;
