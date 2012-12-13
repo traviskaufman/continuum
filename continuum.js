@@ -5510,38 +5510,46 @@ exports.functions = (function(exports){
     _apply = Function.prototype.apply;
   } else {
     void function(){
-      function bind(receiver){
-        if (typeof this !== 'function') {
-          throw new TypeError("Function.prototype.bind called on non-callable");
-        }
+      var construct = (function(){
+        var ctors = new Array(6),
+            template = ['return function(F,_,$){ return new F(', ') }'];
 
-        var args = toArray(arguments),
-            params = '',
-            F = this;
+        void function(){
+          var pre = '';
 
-        for (var i=1; i < args.length; i++) {
-          if (i > 1) params += ',';
-          params += '$['+i+']';
-        }
-
-        var bound = function(){
-          if (this instanceof bound) {
-            var p = params;
-            for (var i=0; i < arguments.length; i++) {
-              p += ',_['+i+']';
+          for (var i=0; i < 6; i++) {
+            var post = '';
+            ctors[i] = new Array(6);
+            for (var j=0; j < 6; j++) {
+              ctors[i][j] = new Function(template[0]+(pre+post).slice(0, -1)+template[1])();
+              post += '$['+j+'],';
             }
-            return new Function('F,$,_', 'return new F('+p+')')(F, args, arguments);
-          } else {
-            var a = toArray(args);
-            for (var i=0; i < arguments.length; i++) {
-              a[a.length] = arguments[i];
-            }
-            return _call.apply(F, a);
+            pre += '_['+i+'],';
           }
-        };
+        }();
 
-        return bound;
-      }
+        return function construct(Ctor, boundArgs, args){
+          var boundArgsCount = boundArgs.length,
+              argsCount = args.length,
+              subset = boundArgsCount in ctors ? ctors[boundArgsCount] : (ctors[boundArgsCount] = []);
+
+          if (argsCount in subset) {
+            var constructs = subset[argsCount];
+          } else {
+            var params = '';
+            for (var i=0; i < boundArgsCount; i++) {
+              params += '_['+i+'],';
+            }
+            for (var i=0; i < argsCount; i++) {
+              params += '$['+i+'],';
+            }
+            var constructs = subset[argsCount] = new Function(template[0]+params.slice(0, -1)+template[1])();
+          }
+
+          return constructs(Ctor, boundArgs, args);
+        };
+      })();
+
 
       var iframe = document.createElement('iframe');
       iframe.style.display = 'none';
@@ -5549,8 +5557,30 @@ exports.functions = (function(exports){
       iframe.src = 'javascript:';
       _call = iframe.contentWindow.Function.prototype.call;
       _apply = _call.apply;
-      _bind = bind;
       iframe = null;
+      _bind = function bind(receiver){
+        if (typeof this !== 'function') {
+          throw new TypeError("Function.prototype.bind called on non-callable");
+        }
+
+        var boundTarget = this,
+            boundArgs = toArray(arguments);
+
+        var bound = function(){
+          if (this instanceof bound) {
+            return construct(boundTarget, boundArgs, arguments);
+          }
+
+          var args = toArray(boundArgs);
+          for (var i=0; i < arguments.length; i++) {
+            args[args.length] = arguments[i];
+          }
+
+          return _call.apply(boundTarget, args);
+        };
+
+        return bound;
+      };
     }();
   }
 
@@ -8678,7 +8708,7 @@ exports.errors = (function(errors, messages, exports){
 
   exports.AbruptCompletion = AbruptCompletion;
 
-  function MakeException(type, args){
+  function $$MakeException(type, args){
     if (!(args instanceof Array)) {
       args = [args];
     }
@@ -8686,14 +8716,14 @@ exports.errors = (function(errors, messages, exports){
     return exports.createError(error.name, type, error.apply(null, args));
   }
 
-  exports.MakeException = MakeException;
+  exports.$$MakeException = $$MakeException;
 
 
-  function ThrowException(type, args){
-    return new AbruptCompletion('throw', MakeException(type, args));
+  function $$ThrowException(type, args){
+    return new AbruptCompletion('throw', $$MakeException(type, args));
   }
 
-  exports.ThrowException = ThrowException;
+  exports.$$ThrowException = $$ThrowException;
 
 
   return exports;
@@ -11262,7 +11292,351 @@ exports.assembler = (function(exports){
 })(typeof module !== 'undefined' ? module.exports : {});
 
 
+exports.descriptors = (function(exports){
+  "use strict";
+  var objects   = require('../lib/objects'),
+      iteration = require('../lib/iteration'),
+      errors    = require('../errors'),
+      utility   = require('../lib/utility');
+
+
+  var is = objects.is,
+      create = objects.create,
+      define = objects.define,
+      inherit = objects.inherit,
+      each = iteration.each,
+      tag = utility.tag,
+      $$ThrowException = errors.$$ThrowException;
+
+  var E = 0x1,
+      C = 0x2,
+      W = 0x4,
+      A = 0x8,
+      ___ = 0,
+      E__ = 1,
+      _C_ = 2,
+      EC_ = 3,
+      __W = 4,
+      E_W = 5,
+      _CW = 6,
+      ECW = 7,
+      __A = 8,
+      E_A = 9,
+      _CA = 10,
+      ECA = 11;
+
+
+  var descFields = ['value', 'writable', 'enumerable', 'configurable', 'get', 'set'],
+      descProps = ['Value', 'Writable', 'Enumerable', 'Configurable', 'Get', 'Set'],
+      standardFields = create(null);
+
+  each(descFields, function(field){
+    standardFields[field] = true;
+  });
+
+
+  function $Object(proto){
+    $Object = require('./$Object').$Object;
+    return new $Object(proto);
+  }
+
+
+  function PropertyDescriptor(){}
+
+  PropertyDescriptor.prototype = define(create(null), {
+    constructor: PropertyDescriptor,
+    type: 'PropertyDescriptor',
+    isDescriptor: true
+  });
+
+  exports.PropertyDescriptor = PropertyDescriptor;
+
+
+  function EmptyDataDescriptor(){}
+
+  exports.EmptyDataDescriptor = EmptyDataDescriptor;
+
+  inherit(EmptyDataDescriptor, PropertyDescriptor, {
+    type: 'DataDescriptor',
+    isDataDescriptor: true,
+    isAccessorDescriptor: false
+  });
+
+
+  function EmptyAccessorDescriptor(){}
+
+  exports.EmptyAccessorDescriptor = EmptyAccessorDescriptor;
+
+  inherit(EmptyAccessorDescriptor, PropertyDescriptor, {
+    type: 'AccessorDescriptor',
+    isDataDescriptor: false,
+    isAccessorDescriptor: true
+  });
+
+
+  function DataDescriptor(value, attributes){
+    this.Value = value;
+    this.Writable = (attributes & W) > 0;
+    this.Enumerable = (attributes & E) > 0;
+    this.Configurable = (attributes & C) > 0;
+  }
+
+  exports.DataDescriptor = DataDescriptor;
+
+  inherit(DataDescriptor, EmptyDataDescriptor, {
+    Writable: undefined,
+    Value: undefined
+  });
+
+
+
+  function AccessorDescriptor(accessors, attributes){
+    this.Get = accessors.Get;
+    this.Set = accessors.Set;
+    this.Enumerable = (attributes & E) > 0;
+    this.Configurable = (attributes & C) > 0;
+  }
+
+  exports.AccessorDescriptor = AccessorDescriptor;
+
+  inherit(AccessorDescriptor, EmptyAccessorDescriptor, {
+    Get: undefined,
+    Set: undefined
+  });
+
+
+  function StringIndex(value){
+    this.Value = value;
+  }
+
+  exports.StringIndex = StringIndex;
+
+  StringIndex.prototype = new DataDescriptor(undefined, E__);
+
+
+  function Value(value){
+    this.Value = value;
+  }
+
+  exports.Value = Value;
+
+  inherit(Value, EmptyDataDescriptor);
+
+
+  function Accessor(get, set){
+    this.Get = get;
+    this.Set = set;
+    tag(this);
+  }
+
+  exports.Accessor = Accessor;
+
+  define(Accessor.prototype, {
+    Get: undefined,
+    Set: undefined
+  });
+
+
+  function BuiltinAccessor(get, set){
+    tag(this);
+    if (get) this.Get = { Call: get };
+    if (set) this.Set = { Call: set };
+  }
+
+  exports.BuiltinAccessor = BuiltinAccessor;
+
+  inherit(BuiltinAccessor, Accessor);
+
+
+  function ArgAccessor(name, env){
+    this.name = name;
+    this.env = env;
+    tag(this);
+  }
+
+  exports.ArgAccessor = ArgAccessor;
+
+  inherit(ArgAccessor, Accessor, {
+    type: 'ArgAccessor',
+    Get: { Call: function(){ return this.env.GetBindingValue(this.name) } },
+    Set: { Call: function(v){ this.env.SetMutableBinding(this.name, v) } }
+  });
+
+
+
+
+  function $$IsDescriptor(desc) {
+    return desc ? desc.isDescriptor === true : false;
+  }
+
+  exports.$$IsDescriptor = $$IsDescriptor;
+
+
+  function $$IsEmptyDescriptor(desc) {
+    return !('Get' in desc
+          || 'Set' in desc
+          || 'Value' in desc
+          || 'Writable' in desc
+          || 'Enumerable' in desc
+          || 'Configurable' in desc);
+  }
+
+  exports.$$IsEmptyDescriptor = $$IsEmptyDescriptor;
+
+
+  function $$IsAccessorDescriptor(desc) {
+    return desc === undefined ? false : 'Get' in desc || 'Set' in desc;
+  }
+
+  exports.$$IsAccessorDescriptor = $$IsAccessorDescriptor;
+
+  function $$IsDataDescriptor(desc) {
+    return desc === undefined ? false : 'Value' in desc || 'Writable' in desc;
+  }
+
+  exports.$$IsDataDescriptor = $$IsDataDescriptor;
+
+
+  function $$IsGenericDescriptor(desc) {
+    return desc === undefined ? false : !('Get' in desc || 'Set' in desc || 'Value' in desc || 'Writable' in desc);
+  }
+
+  exports.$$IsGenericDescriptor = $$IsGenericDescriptor;
+
+
+  function $$IsEquivalentDescriptor(a, b) {
+    return a.isDataDescriptor === b.isDataDescriptor
+        && a.Get === b.Get
+        && a.Set === b.Set
+        && a.Writable === b.Writable
+        && a.Enumerable === b.Enumerable
+        && a.Configurable === b.Configurable
+        && is(a.Value, b.Value);
+  }
+
+  exports.$$IsEquivalentDescriptor = $$IsEquivalentDescriptor;
+
+
+
+  function $$FromPropertyDescriptor(desc){
+    if (desc) {
+      var obj = new $Object;
+      obj.set('enumerable', desc.Enumerable);
+      obj.set('configurable', desc.Configurable);
+      if (desc.isDataDescriptor) {
+        obj.set('writable', desc.Writable);
+        obj.set('value', desc.Value);
+      } else if (desc.isAccessorDescriptor)  {
+        obj.set('get', desc.Get);
+        obj.set('set', desc.Set);
+      }
+      return obj;
+    }
+  }
+
+  exports.$$FromPropertyDescriptor = $$FromPropertyDescriptor;
+
+
+  function $$ToPropertyDescriptor(obj) {
+    if (typeof obj !== 'object') {
+      return $$ThrowException('property_desc_object', [typeof obj]);
+    }
+
+    var fields = create(null);
+
+    for (var i=0; i < 6; i++) {
+      var field = descFields[i];
+      if (obj.HasProperty(field)) {
+        var result = fields[field] = obj.Get(field);
+        if (result && result !== true && result.Abrupt) return result;
+      }
+    }
+
+    if (fields.get ? !fields.get.Call : fields.get !== undefined) {
+      return $$ThrowException('getter_must_be_callable', [typeof fields.get]);
+    }
+
+    if (fields.set ? !fields.set.Call : fields.set !== undefined) {
+      return $$ThrowException('setter_must_be_callable', [typeof fields.set]);
+    }
+
+    if ('get' in fields || 'set' in fields) {
+      if ('value' in fields || 'writable' in fields) {
+        return $$ThrowException('value_and_accessor', [fields]);
+      }
+      var desc = new EmptyDataDescriptor;
+      if ('get' in fields) desc.Get = fields.get;
+      if ('set' in fields) desc.Set = fields.set;
+    } else if ('value' in fields || 'writable' in fields) {
+      var desc = new EmptyAccessorDescriptor;
+      if ('value' in fields) desc.Value = fields.value;
+      if ('writable' in fields) desc.Writable = fields.writable;
+    } else {
+      var desc = new PropertyDescriptor;
+    }
+    if ('enumerable' in fields) desc.Enumerable = fields.enumerable;
+    if ('configurable' in fields) desc.Configurable = fields.configurable;
+    return desc;
+  }
+
+  exports.$$ToPropertyDescriptor = $$ToPropertyDescriptor;
+
+  function $$FromGenericPropertyDescriptor(desc){
+    if (desc === undefined) return;
+    var obj = new $Object;
+    for (var i=0, v; i < 6; i++) {
+      if (descProps[i] in desc) {
+        obj.set(descFields[i], desc[descProps[i]]);
+      }
+    }
+    return obj;
+  }
+
+  exports.$$FromGenericPropertyDescriptor = $$FromGenericPropertyDescriptor;
+
+
+  function $$ToCompletePropertyDescriptor(obj){
+    var desc = ToPropertyDescriptor(obj);
+    if (desc && desc.Abrupt) return desc;
+
+    if (desc.isDataDescriptor) {
+      'Value' in desc    || (desc.Value = undefined);
+      'Writable' in desc || (desc.Writable = false);
+    } else if (desc.isAccessorDescriptor) {
+      'Get' in desc || (desc.Get = undefined);
+      'Set' in desc || (desc.Set = undefined);
+    } else {
+      desc.isDataDescriptor = true;
+      desc.Value = undefined;
+      desc.Writable = false;
+    }
+    'Enumerable' in desc   || (desc.Enumerable = false);
+    'Configurable' in desc || (desc.Configurable = false);
+    return desc;
+  }
+
+  exports.$$ToCompletePropertyDescriptor = $$ToCompletePropertyDescriptor;
+
+
+  function $$CopyAttributes(from, to){
+    var props = from.Enumerate(true, false);
+    for (var i=0; i < props.length; i++) {
+      var field = props[i];
+      if (!(field in standardFields)) {
+        to.define(field, from.Get(field), ECW);
+      }
+    }
+  }
+
+  exports.$$CopyAttributes = $$CopyAttributes;
+
+
+  return exports;
+})(typeof module !== 'undefined' ? exports : {});
+
+
 exports.collections = (function(exports){
+  "use strict";
   var objects   = require('../lib/objects');
 
   var Hash = objects.Hash,
@@ -11463,7 +11837,7 @@ exports.collections = (function(exports){
 
 exports.operators = (function(exports){
   "use strict";
-  var ThrowException = require('../errors').ThrowException;
+  var $$ThrowException = require('../errors').$$ThrowException;
 
   var SYMBOLS       = require('../constants').SYMBOLS,
       Break         = SYMBOLS.Break,
@@ -11489,20 +11863,20 @@ exports.operators = (function(exports){
 
 
 
-  function HasPrimitiveBase(v){
+  function $$HasPrimitiveBase(v){
     var type = typeof v.base;
     return type === STRING || type === NUMBER || type === BOOLEAN;
   }
 
 
-  // ## GetValue
+  // ## $$GetValue
 
-  function GetValue(v){
+  function $$GetValue(v){
     if (!v || !v.Reference || v.Abrupt) return v;
     var base = v.base;
 
     if (base == null) {
-      return ThrowException('not_defined', [v.name]);
+      return $$ThrowException('not_defined', [v.name]);
     } else {
       var type = typeof base;
 
@@ -11510,12 +11884,12 @@ exports.operators = (function(exports){
         if (type === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
           return base[v.name];
         }
-        base = ToObject(base);
+        base = $$ToObject(base);
       }
 
       if (base.Get) {
         if ('thisValue' in v) {
-          return base.GetP(GetThisValue(v), v.name);
+          return base.GetP($$GetThisValue(v), v.name);
         } else {
           return base.Get(v.name);
         }
@@ -11527,17 +11901,17 @@ exports.operators = (function(exports){
     }
   }
 
-  exports.GetValue = GetValue;
+  exports.$$GetValue = $$GetValue;
 
-  // ## PutValue
+  // ## $$PutValue
 
-  function PutValue(v, w){
+  function $$PutValue(v, w){
     if (!v) {
-      return ThrowException('non_object_property_store', ['undefined', 'undefined']);
+      return $$ThrowException('non_object_property_store', ['undefined', 'undefined']);
     } else if (v.Abrupt) {
       return v;
     } else if (!v.Reference) {
-      return ThrowException('non_object_property_store', [v.name, v.base]);
+      return $$ThrowException('non_object_property_store', [v.name, v.base]);
     } else if (w && w.Abrupt) {
       return w;
     }
@@ -11546,13 +11920,13 @@ exports.operators = (function(exports){
 
     if (base === undefined) {
       if (v.strict) {
-        return ThrowException('not_defined', [v.name, base]);
+        return $$ThrowException('not_defined', [v.name, base]);
       }
       return exports.global.Put(v.name, w, false);
     }
 
     if (typeof base !== OBJECT) {
-      base = ToObject(base);
+      base = $$ToObject(base);
     }
 
     if (base.Get) {
@@ -11563,11 +11937,11 @@ exports.operators = (function(exports){
     }
     return base.SetMutableBinding(v.name, w, v.strict);
   }
-  exports.PutValue = PutValue;
+  exports.$$PutValue = $$PutValue;
 
   // ## GetThisValue
 
-  function GetThisValue(v){
+  function $$GetThisValue(v){
     if (!v || v.Abrupt || !v.Reference) {
       return v;
     }
@@ -11575,12 +11949,12 @@ exports.operators = (function(exports){
     var base = v.base;
 
     if (base === undefined) {
-      return ThrowException('non_object_property_load', [v.name, base]);
+      return $$ThrowException('non_object_property_load', [v.name, base]);
     }
 
     return 'thisValue' in v ? v.thisValue : base;
   }
-  exports.GetThisValue = GetThisValue;
+  exports.$$GetThisValue = $$GetThisValue;
 
 
   function $Boolean(o){
@@ -11598,7 +11972,7 @@ exports.operators = (function(exports){
     return new $String(o);
   }
 
-  function ToObject(argument){
+  function $$ToObject(argument){
     switch (typeof argument) {
       case 'boolean':
         return new $Boolean(argument);
@@ -11607,50 +11981,46 @@ exports.operators = (function(exports){
       case 'string':
         return new $String(argument);
       case 'undefined':
-        return ThrowException('undefined_to_object', []);
+        return $$ThrowException('undefined_to_object', []);
       case 'object':
         if (argument === null) {
-          return ThrowException('null_to_object', []);
+          return $$ThrowException('null_to_object', []);
         }
         return argument;
     }
   }
 
-  exports.ToObject = ToObject;
+  exports.$$ToObject = $$ToObject;
 
-  // ## ToPrimitive
 
-  function ToPrimitive(argument, hint){
+  function $$ToPrimitive(argument, hint){
     if (argument && typeof argument === OBJECT && !argument.Abrupt) {
-      return ToPrimitive(argument.DefaultValue(hint), hint);
+      return $$ToPrimitive(argument.DefaultValue(hint), hint);
     }
     return argument;
   }
-  exports.ToPrimitive = ToPrimitive;
+  exports.$$ToPrimitive = $$ToPrimitive;
 
-  // ## ToBoolean
 
-  function ToBoolean(argument){
+  function $$ToBoolean(argument){
     if (argument && argument.Completion) return argument;
     return !!argument;
   }
-  exports.ToBoolean = ToBoolean;
+  exports.$$ToBoolean = $$ToBoolean;
 
-  // ## ToNumber
 
-  function ToNumber(argument){
+  function $$ToNumber(argument){
     if (argument !== null && typeof argument === OBJECT) {
       if (argument.Abrupt) return argument;
-      return ToNumber(ToPrimitive(argument, 'Number'));
+      return $$ToNumber($$ToPrimitive(argument, 'Number'));
     }
     return +argument;
   }
-  exports.ToNumber = ToNumber;
+  exports.$$ToNumber = $$ToNumber;
 
-  // ## ToInteger
 
-  function ToInteger(argument){
-    argument = ToNumber(argument);
+  function $$ToInteger(argument){
+    argument = $$ToNumber(argument);
 
     if (argument && argument.Abrupt) return argument;
 
@@ -11664,51 +12034,51 @@ exports.operators = (function(exports){
 
     return argument >> 0;
   }
-  exports.ToInteger = ToInteger;
+  exports.$$ToInteger = $$ToInteger;
 
-  // ## ToUint32
+  // ## $$ToUint32
 
-  function ToUint32(argument){
-    argument = ToNumber(argument);
+  function $$ToUint32(argument){
+    argument = $$ToNumber(argument);
     if (argument && argument.Abrupt) return argument;
     return argument >>> 0;
   }
-  exports.ToUint32 = ToUint32;
+  exports.$$ToUint32 = $$ToUint32;
 
-  // ## ToInt32
+  // ## $$ToInt32
 
-  function ToInt32(argument){
-    argument = ToNumber(argument);
+  function $$ToInt32(argument){
+    argument = $$ToNumber(argument);
     if (argument && argument.Abrupt) return argument;
     return argument >> 0;
   }
-  exports.ToInt32 = ToInt32;
+  exports.$$ToInt32 = $$ToInt32;
 
-  // ## ToUint16
+  // ## $$ToUint16
 
-  function ToUint16(argument){
-    argument = ToNumber(argument);
+  function $$ToUint16(argument){
+    argument = $$ToNumber(argument);
     if (argument && argument.Abrupt) return argument;
     return (argument >>> 0) % (1 << 16);
   }
-  exports.ToUint16 = ToUint16;
+  exports.$$ToUint16 = $$ToUint16;
 
 
-  // ## ToPropertyName
+  // ## $$ToPropertyKey
 
-  function ToPropertyName(argument){
+  function $$ToPropertyKey(argument){
     if (!argument) return argument + '';
     var type = typeof argument;
     if (type === STRING || type === OBJECT && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
     }
-    return ToString(argument);
+    return $$ToString(argument);
   }
-  exports.ToPropertyName = ToPropertyName;
+  exports.$$ToPropertyKey = $$ToPropertyKey;
 
-  // ## ToString
+  // ## $$ToString
 
-  function ToString(argument){
+  function $$ToString(argument){
     switch (typeof argument) {
       case STRING: return argument;
       case UNDEFINED:
@@ -11720,10 +12090,10 @@ exports.operators = (function(exports){
         } else if (argument.Abrupt) {
           return argument;
         }
-        return ToString(ToPrimitive(argument, 'String'));
+        return $$ToString($$ToPrimitive(argument, 'String'));
     }
   }
-  exports.ToString = ToString;
+  exports.$$ToString = $$ToString;
 
 
   var PRE_INC, POST_INC, PRE_DEC, POST_DEC;
@@ -11734,11 +12104,11 @@ exports.operators = (function(exports){
     exports.POST_DEC = POST_DEC = createChanger(false, -1);
   }(function(pre, change){
     return function(ref) {
-      var val = ToNumber(GetValue(ref));
+      var val = $$ToNumber($$GetValue(ref));
       if (val && val.Abrupt) return val;
 
       var newVal = val + change,
-          result = PutValue(ref, newVal);
+          result = $$PutValue(ref, newVal);
 
       if (result && result.Abrupt) return result;
       return pre ? newVal : val;
@@ -11746,7 +12116,7 @@ exports.operators = (function(exports){
   });
 
   function VOID(ref){
-    var val = GetValue(ref);
+    var val = $$GetValue(ref);
     if (val && val.Abrupt) return val;
   }
   exports.VOID = VOID;
@@ -11769,7 +12139,7 @@ exports.operators = (function(exports){
           if (val.base === undefined) {
             return UNDEFINED;
           }
-          return TYPEOF(GetValue(val));
+          return TYPEOF($$GetValue(val));
         }
 
         if ('Call' in val) {
@@ -11782,22 +12152,22 @@ exports.operators = (function(exports){
 
 
   function POSITIVE(ref){
-    return ToNumber(GetValue(ref));
+    return $$ToNumber($$GetValue(ref));
   }
   exports.POSITIVE = POSITIVE;
 
   var NEGATIVE, BIT_NOT, NOT;
   void function(createUnaryOp){
-    exports.NEGATIVE = NEGATIVE = createUnaryOp(ToNumber, function(n){ return -n });
-    exports.BIT_NOT  = BIT_NOT  = createUnaryOp(ToInt32, function(n){ return ~n });
-    exports.NOT      = NOT      = createUnaryOp(ToBoolean, function(n){ return !n });
+    exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber, function(n){ return -n });
+    exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32, function(n){ return ~n });
+    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
   }(function(convert, finalize){
     return function(ref){
       if (!ref || typeof ref !== OBJECT) {
         return finalize(ref);
       }
 
-      var val = convert(GetValue(ref));
+      var val = convert($$GetValue(ref));
       if (val && val.Abrupt) return val;
       return finalize(val);
     }
@@ -11812,9 +12182,9 @@ exports.operators = (function(exports){
     exports.BIT_OR = BIT_OR = makeMathOp(function(l, r){ return l | r });
   }(function(finalize){
     return function(lval, rval) {
-      lval = ToNumber(lval);
+      lval = $$ToNumber(lval);
       if (lval && lval.Abrupt) return lval;
-      rval = ToNumber(rval);
+      rval = $$ToNumber(rval);
       if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval);
     };
@@ -11834,18 +12204,18 @@ exports.operators = (function(exports){
 
 
   function ADD(lval, rval) {
-    lval = ToPrimitive(lval);
+    lval = $$ToPrimitive(lval);
     if (lval && lval.Abrupt) return lval;
 
-    rval = ToPrimitive(rval);
+    rval = $$ToPrimitive(rval);
     if (rval && rval.Abrupt) return rval;
 
     if (typeof lval === STRING || typeof rval === STRING) {
       var type = STRING,
-          converter = ToString;
+          converter = $$ToString;
     } else {
       var type = NUMBER,
-          converter = ToNumber;
+          converter = $$ToNumber;
     }
 
     return convertAdd(lval, rval, type, converter);
@@ -11855,7 +12225,7 @@ exports.operators = (function(exports){
 
 
   function STRING_ADD(lval, rval){
-    return convertAdd(lval, rval, STRING, ToString);
+    return convertAdd(lval, rval, STRING, $$ToString);
   }
   exports.STRING_ADD = STRING_ADD;
 
@@ -11868,9 +12238,9 @@ exports.operators = (function(exports){
     exports.SAR = SAR = makeShifter(function(l, r){ return l >>> r });
   }(function(finalize){
     return function(lval, rval) {
-      lval = ToInt32(lval);
+      lval = $$ToInt32(lval);
       if (lval && lval.Abrupt) return lval;
-      rval = ToUint32(rval);
+      rval = $$ToUint32(rval);
       if (rval && rval.Abrupt) return rval;
       return finalize(lval, rval & 0x1F);
     };
@@ -11887,10 +12257,10 @@ exports.operators = (function(exports){
           rval = x;
     }
 
-    lval = ToPrimitive(lval, 'Number');
+    lval = $$ToPrimitive(lval, 'Number');
     if (lval && lval.Abrupt) return lval;
 
-    rval = ToPrimitive(rval, 'Number');
+    rval = $$ToPrimitive(rval, 'Number');
     if (rval && rval.Abrupt) return rval;
 
     var ltype = typeof lval,
@@ -11898,10 +12268,10 @@ exports.operators = (function(exports){
 
     if (ltype === STRING || rtype === STRING) {
       if (ltype !== STRING) {
-        lval = ToString(lval);
+        lval = $$ToString(lval);
         if (lval && lval.Abrupt) return lval;
       } else if (rtype !== STRING) {
-        rval = ToString(rval);
+        rval = $$ToString(rval);
         if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === STRING && typeof rval === STRING) {
@@ -11909,11 +12279,11 @@ exports.operators = (function(exports){
       }
     } else {
       if (ltype !== NUMBER) {
-        lval = ToNumber(lval);
+        lval = $$ToNumber(lval);
         if (lval && lval.Abrupt) return lval;
       }
       if (rtype !== NUMBER) {
-        rval = ToNumber(rval);
+        rval = $$ToNumber(rval);
         if (rval && rval.Abrupt) return rval;
       }
       if (typeof lval === NUMBER && typeof rval === NUMBER) {
@@ -11952,7 +12322,7 @@ exports.operators = (function(exports){
 
   function INSTANCE_OF(lval, rval) {
     if (rval === null || typeof rval !== OBJECT || !('HasInstance' in rval)) {
-      return ThrowException('instanceof_function_expected', lval);
+      return $$ThrowException('instanceof_function_expected', lval);
     }
 
     return rval.HasInstance(lval);
@@ -11968,7 +12338,7 @@ exports.operators = (function(exports){
     var base = ref.base;
     if (base === undefined) {
       if (ref.strict) {
-        return ThrowException('strict_delete_property', [ref.name, base]);
+        return $$ThrowException('strict_delete_property', [ref.name, base]);
       }
       return true;
     }
@@ -11976,7 +12346,7 @@ exports.operators = (function(exports){
 
     if (base.Delete) {
       if ('thisValue' in ref) {
-        return ThrowException('super_delete_property', ref.name);
+        return $$ThrowException('super_delete_property', ref.name);
       } else {
         return base.Delete(ref.name, ref.strict);
       }
@@ -11990,10 +12360,10 @@ exports.operators = (function(exports){
 
   function IN(lval, rval) {
     if (rval === null || typeof rval !== OBJECT) {
-      return ThrowException('invalid_in_operator_use', [lval, rval]);
+      return $$ThrowException('invalid_in_operator_use', [lval, rval]);
     }
 
-    lval = ToPropertyName(lval);
+    lval = $$ToPropertyKey(lval);
     if (lval && lval.Abrupt) return lval;
 
     return rval.HasProperty(lval);
@@ -12023,17 +12393,17 @@ exports.operators = (function(exports){
     } else if (x == null || y == null) {
       return x == null && y == null;
     } else if (ltype === NUMBER || rtype === STRING) {
-      return EQUAL(x, ToNumber(y));
+      return EQUAL(x, $$ToNumber(y));
     } else if (ltype === STRING || rtype === NUMBER) {
-      return EQUAL(ToNumber(x), y);
+      return EQUAL($$ToNumber(x), y);
     } else if (rtype === BOOLEAN) {
-      return EQUAL(x, ToNumber(y));
+      return EQUAL(x, $$ToNumber(y));
     } else if (ltype === BOOLEAN) {
-      return EQUAL(ToNumber(x), y);
+      return EQUAL($$ToNumber(x), y);
     } else if (rtype === OBJECT && ltype === NUMBER || ltype === STRING) {
-      return EQUAL(x, ToPrimitive(y));
+      return EQUAL(x, $$ToPrimitive(y));
     } else if (ltype === OBJECT && rtype === NUMBER || rtype === OBJECT) {
-      return EQUAL(ToPrimitive(x), y);
+      return EQUAL($$ToPrimitive(x), y);
     }
     return false;
   }
@@ -12103,7 +12473,7 @@ exports.environments = (function(exports, undefined){
       each     = require('../lib/iteration').each,
       tag      = require('../lib/utility').tag;
 
-  var ThrowException = require('../errors').ThrowException,
+  var $$ThrowException = require('../errors').$$ThrowException,
       Uninitialized = require('../constants').SYMBOLS.Uninitialized;
 
   var normal = { Configurable: true,
@@ -12159,7 +12529,7 @@ exports.environments = (function(exports, undefined){
           this.symbols = new Hash;
         }
         if (name in this.symbols) {
-          return ThrowException('symbol_redefine', name);
+          return $$ThrowException('symbol_redefine', name);
         }
         this.symbols[name] = symbol;
       },
@@ -12167,7 +12537,7 @@ exports.environments = (function(exports, undefined){
         if (this.symbols && name in this.symbols) {
           return this.symbols[name];
         } else{
-          return ThrowException('symbol_not_defined', name);
+          return $$ThrowException('symbol_not_defined', name);
         }
       }
     ]);
@@ -12219,11 +12589,11 @@ exports.environments = (function(exports, undefined){
         if (name in this.bindings) {
           var value = this.bindings[name];
           if (value === Uninitialized)
-            return ThrowException('uninitialized_const', name);
+            return $$ThrowException('uninitialized_const', name);
           else
             return value;
         } else if (strict) {
-          return ThrowException('not_defined', name);
+          return $$ThrowException('not_defined', name);
         } else {
           return false;
         }
@@ -12231,9 +12601,9 @@ exports.environments = (function(exports, undefined){
       function SetMutableBinding(name, value, strict){
         if (name in this.consts) {
           if (this.bindings[name] === Uninitialized)
-            return ThrowException('uninitialized_const', name);
+            return $$ThrowException('uninitialized_const', name);
           else if (strict)
-            return ThrowException('const_assign', name);
+            return $$ThrowException('const_assign', name);
         } else {
           this.bindings[name] = value;
         }
@@ -12299,7 +12669,7 @@ exports.environments = (function(exports, undefined){
         if (this.bindings.HasProperty(name)) {
           return this.bindings.Get(name);
         } else if (strict) {
-          return ThrowException('not_defined', name);
+          return $$ThrowException('not_defined', name);
         }
       },
       function SetMutableBinding(name, value, strict){
@@ -12395,35 +12765,57 @@ exports.environments = (function(exports, undefined){
 
 
 exports.operations = (function(exports){
+  "use strict";
   var environments = require('./environments'),
       operators    = require('./operators'),
+      descriptors  = require('./descriptors'),
       objects      = require('../lib/objects'),
       iteration    = require('../lib/iteration'),
       errors       = require('../errors'),
       constants    = require('../constants'),
       MapData      = require('./collections').MapData;
 
-  var is               = objects.is,
-      create           = objects.create,
-      define           = objects.define,
-      inherit          = objects.inherit,
-      each             = iteration.each,
-      ThrowException   = errors.ThrowException,
-      AbruptCompletion = errors.AbruptCompletion,
-      StopIeration     = constants.BRANDS.StopIteration,
-      ToPropertyName   = operators.ToPropertyName,
-      GetThisValue     = operators.GetThisValue,
-      ToUint32         = operators.ToUint32,
-      ToObject         = operators.ToObject;
+  var BRANDS = constants.BRANDS,
+      is                     = objects.is,
+      create                 = objects.create,
+      define                 = objects.define,
+      inherit                = objects.inherit,
+      each                   = iteration.each,
+      $$ThrowException       = errors.$$ThrowException,
+      AbruptCompletion       = errors.AbruptCompletion,
+      $$ToPropertyKey        = operators.$$ToPropertyKey,
+      $$GetThisValue         = operators.$$GetThisValue,
+      $$ToUint32             = operators.$$ToUint32,
+      $$ToObject             = operators.$$ToObject,
+      $$IsDataDescriptor     = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor = descriptors.$$IsAccessorDescriptor,
+      $$IsGenericDescriptor  = descriptors.$$IsGenericDescriptor,
+      $$IsEmptyDescriptor    = descriptors.$$IsEmptyDescriptor,
+      Accessor               = descriptors.Accessor,
+      DataDescriptor         = descriptors.DataDescriptor,
+      AccessorDescriptor     = descriptors.AccessorDescriptor;
+
+  var E = 0x1,
+      C = 0x2,
+      W = 0x4,
+      A = 0x8,
+      ___ = 0,
+      E__ = 1,
+      _C_ = 2,
+      EC_ = 3,
+      __W = 4,
+      E_W = 5,
+      _CW = 6,
+      ECW = 7,
+      __A = 8,
+      E_A = 9,
+      _CA = 10,
+      ECA = 11;
 
 
-  function IsDataDescriptor(o){
-    IsDataDescriptor = require('./descriptors').isDataDescriptor;
-    return IsDataDescriptor(o);
-  }
 
   function $Object(o){
-    $Object = require('./$Object');
+    $Object = require('./$Object').$Object;
     return new $Object(o);
   }
 
@@ -12454,50 +12846,50 @@ exports.operations = (function(exports){
   })();
 
 
-  function CheckObjectCoercible(argument){
+  function $$CheckObjectCoercible(argument){
     if (argument === null) {
-      return ThrowException('null_to_object');
+      return $$ThrowException('null_to_object');
     } else if (argument === undefined) {
-      return ThrowException('undefined_to_object');
+      return $$ThrowException('undefined_to_object');
     }
     return argument;
   }
 
-  exports.checkObjectCoercible = CheckObjectCoercible;
+  exports.$$CheckObjectCoercible = $$CheckObjectCoercible;
 
 
-  function IsArrayIndex(argument) {
+  function $$IsArrayIndex(argument) {
     var n = argument >>> 0;
     return ''+n === argument && n !== 0xffffffff;
   }
 
-  exports.isArrayIndex = IsArrayIndex;
+  exports.$$IsArrayIndex = $$IsArrayIndex;
 
 
-  function IsPropertyReference(v){
+  function $$IsPropertyReference(v){
     var type = typeof v.base;
     return v !== null
         && type === 'string' || type === 'number' || type === 'boolean'
         || type === 'object' && 'GetP' in v.base;
   }
 
-  exports.isPropertyReference = IsPropertyReference;
+  exports.$$IsPropertyReference = $$IsPropertyReference;
 
 
-  function GetIdentifierReference(lex, name, strict){
+  function $$GetIdentifierReference(lex, name, strict){
     if (lex == null) {
       return new Reference(undefined, name, strict);
     } else if (lex.HasBinding(name)) {
       return new Reference(lex, name, strict);
     } else {
-      return GetIdentifierReference(lex.outer, name, strict);
+      return $$GetIdentifierReference(lex.outer, name, strict);
     }
   }
 
-  exports.getIdentifierReference = GetIdentifierReference;
+  exports.$$GetIdentifierReference = $$GetIdentifierReference;
 
 
-  function GetSymbol(context, name){
+  function $$GetSymbol(context, name){
     var env = context.LexicalEnvironment;
     while (env) {
       if (env.HasSymbolBinding(name)) {
@@ -12507,38 +12899,38 @@ exports.operations = (function(exports){
     }
   }
 
-  exports.getSymbol = GetSymbol;
+  exports.$$GetSymbol = $$GetSymbol;
 
 
-  function Element(context, prop, base){
-    var result = CheckObjectCoercible(base);
+  function $$Element(context, prop, base){
+    var result = $$CheckObjectCoercible(base);
     if (result.Abrupt) return result;
 
-    var name = ToPropertyName(prop);
+    var name = $$ToPropertyKey(prop);
     if (name && name.Abrupt) return name;
     return new Reference(base, name, context.strict);
   }
 
-  exports.element = Element;
+  exports.$$Element = $$Element;
 
 
-  function SuperReference(context, prop){
-    var env = GetThisEnvironment(context);
+  function $$SuperReference(context, prop){
+    var env = $$GetThisEnvironment(context);
     if (!env.HasSuperBinding()) {
-      return ThrowException('invalid_super_binding');
+      return $$ThrowException('invalid_super_binding');
     } else if (prop === null) {
       return env;
     }
 
     var baseValue = env.GetSuperBase(),
-        status = CheckObjectCoercible(baseValue);
+        status = $$CheckObjectCoercible(baseValue);
 
     if (status.Abrupt) return status;
 
     if (prop === false) {
       var key = env.GetMethodName();
     } else {
-      var key = ToPropertyName(prop);
+      var key = $$ToPropertyKey(prop);
       if (key && key.Abrupt) return key;
     }
 
@@ -12547,10 +12939,10 @@ exports.operations = (function(exports){
     return ref;
   }
 
-  exports.superReference = SuperReference;
+  exports.$$SuperReference = $$SuperReference;
 
 
-  function GetThisEnvironment(context){
+  function $$GetThisEnvironment(context){
     var env = context.LexicalEnvironment;
     while (env) {
       if (env.HasThisBinding())
@@ -12559,61 +12951,61 @@ exports.operations = (function(exports){
     }
   }
 
-  exports.getThisEnvironment = GetThisEnvironment;
+  exports.$$GetThisEnvironment = $$GetThisEnvironment;
 
 
-  function ThisResolution(context){
-    return GetThisEnvironment(context).GetThisBinding();
+  function $$ThisResolution(context){
+    return $$GetThisEnvironment(context).GetThisBinding();
   }
 
-  exports.thisResolution = ThisResolution;
+  exports.$$ThisResolution = $$ThisResolution;
 
 
-  function IdentifierResolution(context, name) {
-    return GetIdentifierReference(context.LexicalEnvironment, name, context.strict);
+  function $$IdentifierResolution(context, name) {
+    return $$GetIdentifierReference(context.LexicalEnvironment, name, context.strict);
   }
 
-  exports.identifierResolution = IdentifierResolution;
+  exports.$$IdentifierResolution = $$IdentifierResolution;
 
 
-  function IsCallable(argument){
+  function $$IsCallable(argument){
     if (argument && argument.Abrupt) return argument;
     return argument && typeof argument === 'object' ? 'Call' in argument : false;
   }
 
-  exports.isCallable = IsCallable;
+  exports.$$IsCallable = $$IsCallable;
 
 
-  function IsConstructor(argument){
+  function $$IsConstructor(argument){
     if (argument && argument.Abrupt) return argument;
     return argument && typeof argument === 'object' ? 'Construct' in argument : false;
   }
 
-  exports.isConstructor = IsConstructor;
+  exports.$$IsConstructor = $$IsConstructor;
 
 
-  function EvaluateConstruct(func, args) {
+  function $$EvaluateConstruct(func, args) {
     if (typeof func !== 'object') {
-      return ThrowException('not_constructor', func);
+      return $$ThrowException('not_constructor', func);
     }
 
-    if (IsConstructor(func)) {
+    if ($$IsConstructor(func)) {
       return func.Construct(args);
     } else {
-      return ThrowException('not_constructor', func);
+      return $$ThrowException('not_constructor', func);
     }
   }
 
-  exports.evaluateConstruct = EvaluateConstruct;
+  exports.$$EvaluateConstruct = $$EvaluateConstruct;
 
 
-  function EvaluateCall(ref, func, args, tail){
-    if (typeof func !== 'object' || !IsCallable(func)) {
-      return ThrowException('called_non_callable', [ref && ref.name]);
+  function $$EvaluateCall(ref, func, args, tail){
+    if (typeof func !== 'object' || !$$IsCallable(func)) {
+      return $$ThrowException('called_non_callable', [ref && ref.name]);
     }
 
     if (ref instanceof Reference) {
-      var receiver = IsPropertyReference(ref) ? GetThisValue(ref) : ref.base.WithBaseObject();
+      var receiver = $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
     }
 
     // if (tail) {
@@ -12624,35 +13016,67 @@ exports.operations = (function(exports){
     return func.Call(receiver, args);
   }
 
-  exports.evaluateCall = EvaluateCall;
+  exports.$$EvaluateCall = $$EvaluateCall;
+
 
   var emptyArgs = [];
 
+  function $$Invoke(receiver, key, args){
+    var object = $$ToObject(receiver);
+    if (object && object.Abrupt) return object;
 
-  function Invoke(key, receiver, args){
-    var obj = ToObject(receiver);
-    if (obj && obj.Abrupt) return obj;
-
-    var func = obj.Get(key);
+    var func = $$GetMethod(object, key);
     if (func && func.Abrupt) return func;
 
-    if (!IsCallable(func)) {
-      return ThrowException('called_non_callable', key);
+    if (func === undefined) {
+      return $$ThrowException('property_not_function', [key, object.BuiltinBrand]);
     }
 
-    return func.Call(obj, args || emptyArgs);
+    return func.Call(receiver, args || emptyArgs);
   }
 
-  exports.invoke = Invoke;
+  exports.$$Invoke = $$Invoke;
 
 
-  function SpreadArguments(precedingArgs, spread){
+  function $$OrdinaryHasInstance(callable, object){
+    if (!$$IsCallable(callable)) {
+      return false;
+    }
+
+    if (callable.BoundTargetFunction) {
+      return callable.BoundTargetFunction.HasInstance(object);
+    }
+
+    if (typeof object !== 'object' || object === null) {
+      return false;
+    }
+
+    var prototype = callable.Get('prototype');
+    if (prototype.Abrupt) return prototype;
+
+    if (typeof prototype !== 'object') {
+      return $$ThrowException('instanceof_nonobject_proto');
+    }
+
+    while (object) {
+      object = object.GetInheritance();
+      if (prototype === object) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  exports.$$OrdinaryHasInstance = $$OrdinaryHasInstance;
+
+
+  function $$SpreadArguments(precedingArgs, spread){
     if (typeof spread !== 'object') {
-      return ThrowException('spread_non_object');
+      return $$ThrowException('spread_non_object');
     }
 
     var offset = precedingArgs.length,
-        len = ToUint32(spread.Get('length'));
+        len = $$ToUint32(spread.Get('length'));
 
     if (len && len.Abrupt) return len;
 
@@ -12663,18 +13087,18 @@ exports.operations = (function(exports){
     }
   }
 
-  exports.spreadArguments = SpreadArguments;
+  exports.$$SpreadArguments = $$SpreadArguments;
 
 
-  function SpreadInitialization(array, offset, spread){
-    if (typeof spread !== 'object') {
-      return ThrowException('spread_non_object');
-    }
+  function $$SpreadInitialization(array, offset, spread){
+    var obj = $$ToObject(spread);
+    if (obj && obj.Abrupt) return obj;
 
-    var len = ToUint32(spread.Get('length'));
+    var len = $$ToUint32(obj.Get('length'));
+    if (len && len.Abrupt) return len;
 
     for (var i = offset; i < len; i++) {
-      var value = spread.Get(i);
+      var value = obj.Get(i);
       if (value && value.Abrupt) return value;
       array.set(offset++ + '', value);
     }
@@ -12683,19 +13107,19 @@ exports.operations = (function(exports){
     return offset;
   }
 
-  exports.spreadInitialization = SpreadInitialization;
+  exports.$$SpreadInitialization = $$SpreadInitialization;
 
 
-  function SpreadDestructuring(context, target, index){
-    var array = context.createArray(0);
+  function $$SpreadDestructuring(context, target, index){
+    var array = new $Array(0);
     if (target == null) {
       return array;
     }
     if (typeof target !== 'object') {
-      return ThrowException('spread_non_object', typeof target);
+      return $$ThrowException('spread_non_object', typeof target);
     }
 
-    var len = ToUint32(target.Get('length'));
+    var len = $$ToUint32(target.Get('length'));
     if (len && len.Abrupt) return len;
 
     var count = len - index;
@@ -12709,21 +13133,21 @@ exports.operations = (function(exports){
     return array;
   }
 
-  exports.spreadDestructuring = SpreadDestructuring;
+  exports.$$SpreadDestructuring = $$SpreadDestructuring;
 
 
-  function GetTemplateCallSite(context, template){
+  function $$GetTemplateCallSite(context, template){
     if (!('id' in template)) {
-      GetTemplateCallSite.count = (GetTemplateCallSite.count || 0) + 1;
-      template.id = GetTemplateCallSite.count;
+      $$GetTemplateCallSite.count = ($$GetTemplateCallSite.count || 0) + 1;
+      template.id = $$GetTemplateCallSite.count;
     }
     if (template.id in realm.templates) {
       return context.Realm.templates[template.id];
     }
 
     var count = template.length,
-        site = context.createArray(count),
-        raw = context.createArray(count);
+        site = new $Array(count),
+        raw = new $Array(count);
 
     for (var i=0; i < count; i++) {
       site.define(i+'', template[i].cooked, E__);
@@ -12739,64 +13163,60 @@ exports.operations = (function(exports){
     return site;
   }
 
-  exports.getTemplateCallSite = GetTemplateCallSite;
+  exports.$$GetTemplateCallSite = $$GetTemplateCallSite;
 
 
-  function EnqueueChangeRecord(record, changeObservers){
+  function $$EnqueueChangeRecord(record, changeObservers){
     changeObservers.forEach(function(callback){
       var changeRecords = callback.PendingChangeRecords || (callback.PendingChangeRecords = []);
       changeRecords.push(record);
     });
   }
 
-  exports.enqueueChangeRecord = EnqueueChangeRecord;
+  exports.$$EnqueueChangeRecord = $$EnqueueChangeRecord;
 
 
-  function CreateChangeRecord(type, object, name, oldDesc){
+  function $$CreateChangeRecord(type, object, name, oldDesc){
     var changeRecord = new $Object;
     changeRecord.define('type', type, E__);
     changeRecord.define('object', object, E__);
     if (name !== null) {
       changeRecord.define('name', name, E__);
     }
-    if (IsDataDescriptor(oldDesc)) {
+    if ($$IsDataDescriptor(oldDesc)) {
       changeRecord.define('oldValue', oldDesc.Value, E__);
     }
     changeRecord.PreventExtensions();
     return changeRecord;
   }
 
-  exports.createChangeRecord = CreateChangeRecord;
+  exports.$$CreateChangeRecord = $$CreateChangeRecord;
 
 
-  function DeliverChangeRecords(callback){
+  function $$DeliverChangeRecords(callback){
     var changeRecords = callback.PendingChangeRecords;
     if (changeRecords && changeRecords.length) {
-      var array = new $Array(changeRecords);
-      changeRecords.length = 0;
-      var result = callback.Call(undefined, [array]);
-      if (result && result.Abrupt) {
-        return result;
-      }
+      var result = callback.Call(undefined, [new $Array(changeRecords)]);
+      if (result && result.Abrupt) return result;
       return true;
     }
     return false;
   }
 
-  exports.deliverChangeRecords = DeliverChangeRecords;
+  exports.$$DeliverChangeRecords = $$DeliverChangeRecords;
 
 
-  function DeliverAllChangeRecords(realm){
+  function $$DeliverAllChangeRecords(realm){
     var anyWorkDone = false,
         callbacks = intrinsics.ObserverCallbacks,
         errors = [];
 
     if (callbacks && callbacks.size) {
       callbacks.forEach(function(callback){
-        var result = DeliverChangeRecords(callback);
+        var result = $$DeliverChangeRecords(callback);
         if (result) {
           anyWorkDone = true;
-          if (result && result.Abrupt) {
+          if (result.Abrupt) {
             errors.push(result);
           }
         }
@@ -12806,10 +13226,10 @@ exports.operations = (function(exports){
     return errors.length ? errors : anyWorkDone;
   }
 
-  exports.deliverAllChangeRecords = DeliverAllChangeRecords;
+  exports.$$DeliverAllChangeRecords = $$DeliverAllChangeRecords;
 
 
-  function GetNotifier(object){
+  function $$GetNotifier(object){
     var notifier = object.Notifier;
     if (!notifier) {
       notifier = object.Notifier = new $Object(intrinsics.NotifierProto);
@@ -12819,34 +13239,34 @@ exports.operations = (function(exports){
     return notifier;
   }
 
-  exports.getNotifier = GetNotifier;
+  exports.$$GetNotifier = $$GetNotifier;
 
 
-  function ThrowStopIteration(){
+  function $$ThrowStopIteration(){
     return new AbruptCompletion('throw', intrinsics.StopIteration);
   }
 
-  exports.throwStopIteration = ThrowStopIteration;
+  exports.$$ThrowStopIteration = $$ThrowStopIteration;
 
 
-  function IsStopIteration(o){
-    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === StopIteration);
+  function $$IsStopIteration(o){
+    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === BRANDS.StopIteration);
   }
 
-  exports.isStopIteration = IsStopIteration;
+  exports.$$IsStopIteration = $$IsStopIteration;
 
 
-  function GetKey(context, value){
+  function $$GetKey(context, value){
     if (!value || typeof value === 'string') {
       return value;
     }
     return value[0] !== '@' ? value[1] : context.getSymbol(value[1]);
   }
 
-  exports.getKey = GetKey;
+  exports.$$GetKey = $$GetKey;
 
 
-  function ToInternalArray($array){
+  function $$CreateListFromArray($array){
     if ($array.array) {
       return $array.array;
     }
@@ -12859,7 +13279,15 @@ exports.operations = (function(exports){
     return array;
   }
 
-  exports.toInternalArray = ToInternalArray;
+  exports.$$CreateListFromArray = $$CreateListFromArray;
+
+
+  function $$CreateArrayFromList(elements){
+    return new $Array(elements.slice());
+  }
+
+  exports.$$CreateArrayFromList = $$CreateArrayFromList;
+
 
 
   var realm, intrinsics;
@@ -12873,349 +13301,7 @@ exports.operations = (function(exports){
 })(typeof module !== 'undefined' ? exports : {});
 
 
-exports.descriptors = (function(exports){
-  var objects   = require('../lib/objects'),
-      iteration = require('../lib/iteration'),
-      errors    = require('../errors'),
-      utility   = require('../lib/utility');
-
-
-  var is = objects.is,
-      create = objects.create,
-      define = objects.define,
-      inherit = objects.inherit,
-      each = iteration.each,
-      tag = utility.tag,
-      ThrowException = errors.ThrowException;
-
-  var E = 0x1,
-      C = 0x2,
-      W = 0x4,
-      A = 0x8,
-      ___ = 0,
-      E__ = 1,
-      _C_ = 2,
-      EC_ = 3,
-      __W = 4,
-      E_W = 5,
-      _CW = 6,
-      ECW = 7,
-      __A = 8,
-      E_A = 9,
-      _CA = 10,
-      ECA = 11;
-
-
-  var descFields = ['value', 'writable', 'enumerable', 'configurable', 'get', 'set'],
-      descProps = ['Value', 'Writable', 'Enumerable', 'Configurable', 'Get', 'Set'],
-      standardFields = create(null);
-
-  each(descFields, function(field){
-    standardFields[field] = true;
-  });
-
-
-  function $Object(proto){
-    $Object = require('./$Object');
-    return new $Object(proto);
-  }
-
-
-  function PropertyDescriptor(){}
-
-  PropertyDescriptor.prototype = define(create(null), {
-    constructor: PropertyDescriptor,
-    type: 'PropertyDescriptor',
-    isDescriptor: true
-  });
-
-  exports.PropertyDescriptor = PropertyDescriptor;
-
-
-  function EmptyDataDescriptor(){}
-
-  exports.EmptyDataDescriptor = EmptyDataDescriptor;
-
-  inherit(EmptyDataDescriptor, PropertyDescriptor, {
-    type: 'DataDescriptor',
-    isDataDescriptor: true,
-    isAccessorDescriptor: false
-  });
-
-
-  function EmptyAccessorDescriptor(){}
-
-  exports.EmptyAccessorDescriptor = EmptyAccessorDescriptor;
-
-  inherit(EmptyAccessorDescriptor, PropertyDescriptor, {
-    type: 'AccessorDescriptor',
-    isDataDescriptor: false,
-    isAccessorDescriptor: true
-  });
-
-
-  function DataDescriptor(value, attributes){
-    this.Value = value;
-    this.Writable = (attributes & W) > 0;
-    this.Enumerable = (attributes & E) > 0;
-    this.Configurable = (attributes & C) > 0;
-  }
-
-  exports.DataDescriptor = DataDescriptor;
-
-  inherit(DataDescriptor, EmptyDataDescriptor, {
-    Writable: undefined,
-    Value: undefined
-  });
-
-
-
-  function AccessorDescriptor(accessors, attributes){
-    this.Get = accessors.Get;
-    this.Set = accessors.Set;
-    this.Enumerable = (attributes & E) > 0;
-    this.Configurable = (attributes & C) > 0;
-  }
-
-  exports.AccessorDescriptor = AccessorDescriptor;
-
-  inherit(AccessorDescriptor, EmptyAccessorDescriptor, {
-    Get: undefined,
-    Set: undefined
-  });
-
-
-  function StringIndex(value){
-    this.Value = value;
-  }
-
-  exports.StringIndex = StringIndex;
-
-  StringIndex.prototype = new DataDescriptor(undefined, E__);
-
-
-  function Value(value){
-    this.Value = value;
-  }
-
-  exports.Value = Value;
-
-  inherit(Value, EmptyDataDescriptor);
-
-
-  function Accessor(get, set){
-    this.Get = get;
-    this.Set = set;
-    tag(this);
-  }
-
-  exports.Accessor = Accessor;
-
-  define(Accessor.prototype, {
-    Get: undefined,
-    Set: undefined
-  });
-
-
-  function BuiltinAccessor(get, set){
-    tag(this);
-    if (get) this.Get = { Call: get };
-    if (set) this.Set = { Call: set };
-  }
-
-  exports.BuiltinAccessor = BuiltinAccessor;
-
-  inherit(BuiltinAccessor, Accessor);
-
-
-  function ArgAccessor(name, env){
-    this.name = name;
-    this.env = env;
-    tag(this);
-  }
-
-  exports.ArgAccessor = ArgAccessor;
-
-  inherit(ArgAccessor, Accessor, {
-    type: 'ArgAccessor',
-    Get: { Call: function(){ return this.env.GetBindingValue(this.name) } },
-    Set: { Call: function(v){ this.env.SetMutableBinding(this.name, v) } }
-  });
-
-
-
-
-  function IsDescriptor(desc) {
-    return desc ? desc.isDescriptor === true : false;
-  }
-
-  exports.isDescriptor = IsDescriptor;
-
-
-  function IsEmptyDescriptor(desc) {
-    return !('Get' in desc
-          || 'Set' in desc
-          || 'Value' in desc
-          || 'Writable' in desc
-          || 'Enumerable' in desc
-          || 'Configurable' in desc);
-  }
-
-  exports.isEmptyDescriptor = IsEmptyDescriptor;
-
-
-  function IsAccessorDescriptor(desc) {
-    return desc === undefined ? false : 'Get' in desc || 'Set' in desc;
-  }
-
-  exports.isAccessorDescriptor = IsAccessorDescriptor;
-
-  function IsDataDescriptor(desc) {
-    return desc === undefined ? false : 'Value' in desc || 'Writable' in desc;
-  }
-
-  exports.isDataDescriptor = IsDataDescriptor;
-
-
-  function IsGenericDescriptor(desc) {
-    return desc === undefined ? false : !('Get' in desc || 'Set' in desc || 'Value' in desc || 'Writable' in desc);
-  }
-
-  exports.isGenericDescriptor = IsGenericDescriptor;
-
-
-  function IsEquivalentDescriptor(a, b) {
-    return a.isDataDescriptor === b.isDataDescriptor
-        && a.Get === b.Get
-        && a.Set === b.Set
-        && a.Writable === b.Writable
-        && a.Enumerable === b.Enumerable
-        && a.Configurable === b.Configurable
-        && is(a.Value, b.Value);
-  }
-
-  exports.isEquivalentDescriptor = IsEquivalentDescriptor;
-
-
-
-  function FromPropertyDescriptor(desc){
-    if (desc) {
-      var obj = new $Object;
-      obj.set('enumerable', desc.Enumerable);
-      obj.set('configurable', desc.Configurable);
-      if (desc.isDataDescriptor) {
-        obj.set('writable', desc.Writable);
-        obj.set('value', desc.Value);
-      } else if (desc.isAccessorDescriptor)  {
-        obj.set('get', desc.Get);
-        obj.set('set', desc.Set);
-      }
-      return obj;
-    }
-  }
-
-  exports.fromPropertyDescriptor = FromPropertyDescriptor;
-
-
-  function ToPropertyDescriptor(obj) {
-    if (typeof obj !== 'object') {
-      return ThrowException('property_desc_object', [typeof obj]);
-    }
-
-    var fields = create(null);
-
-    for (var i=0; i < 6; i++) {
-      var field = descFields[i];
-      if (obj.HasProperty(field)) {
-        var result = fields[field] = obj.Get(field);
-        if (result && result !== true && result.Abrupt) return result;
-      }
-    }
-
-    if (fields.get ? !fields.get.Call : fields.get !== undefined) {
-      return ThrowException('getter_must_be_callable', [typeof fields.get]);
-    }
-
-    if (fields.set ? !fields.set.Call : fields.set !== undefined) {
-      return ThrowException('setter_must_be_callable', [typeof fields.set]);
-    }
-
-    if ('get' in fields || 'set' in fields) {
-      if ('value' in fields || 'writable' in fields) {
-        return ThrowException('value_and_accessor', [fields]);
-      }
-      var desc = new EmptyDataDescriptor;
-      if ('get' in fields) desc.Get = fields.get;
-      if ('set' in fields) desc.Set = fields.set;
-    } else if ('value' in fields || 'writable' in fields) {
-      var desc = new EmptyAccessorDescriptor;
-      if ('value' in fields) desc.Value = fields.value;
-      if ('writable' in fields) desc.Writable = fields.writable;
-    } else {
-      var desc = new PropertyDescriptor;
-    }
-    if ('enumerable' in fields) desc.Enumerable = fields.enumerable;
-    if ('configurable' in fields) desc.Configurable = fields.configurable;
-    return desc;
-  }
-
-  exports.toPropertyDescriptor = ToPropertyDescriptor;
-
-  function FromGenericPropertyDescriptor(desc){
-    if (desc === undefined) return;
-    var obj = new $Object;
-    for (var i=0, v; i < 6; i++) {
-      if (descProps[i] in desc) {
-        obj.set(descFields[i], desc[descProps[i]]);
-      }
-    }
-    return obj;
-  }
-
-  exports.fromGenericPropertyDescriptor = FromGenericPropertyDescriptor;
-
-
-  function ToCompletePropertyDescriptor(obj) {
-    var desc = ToPropertyDescriptor(obj);
-    if (desc && desc.Abrupt) return desc;
-
-    if (desc.isDataDescriptor) {
-      'Value' in desc    || (desc.Value = undefined);
-      'Writable' in desc || (desc.Writable = false);
-    } else if (desc.isAccessorDescriptor) {
-      'Get' in desc || (desc.Get = undefined);
-      'Set' in desc || (desc.Set = undefined);
-    } else {
-      desc.isDataDescriptor = true;
-      desc.Value = undefined;
-      desc.Writable = false;
-    }
-    'Enumerable' in desc   || (desc.Enumerable = false);
-    'Configurable' in desc || (desc.Configurable = false);
-    return desc;
-  }
-
-  exports.toCompletePropertyDescriptor = ToCompletePropertyDescriptor;
-
-
-  function CopyAttributes(from, to){
-    var props = from.Enumerate(true, false);
-    for (var i=0; i < props.length; i++) {
-      var field = props[i];
-      if (!(field in standardFields)) {
-        to.define(field, from.Get(field), ECW);
-      }
-    }
-  }
-
-  exports.copyAttributes = CopyAttributes;
-
-
-  return exports;
-})(typeof module !== 'undefined' ? exports : {});
-
-
-exports.$Object = (function(module){
+exports.$Object = (function(exports){
   var objects      = require('../lib/objects'),
       errors       = require('../errors'),
       constants    = require('../constants'),
@@ -13226,29 +13312,30 @@ exports.$Object = (function(module){
       utility      = require('../lib/utility');
 
   var inherit = objects.inherit,
-      define = objects.define,
-      create = objects.create,
-      hide = objects.hide,
-      Hash = objects.Hash,
-      tag = utility.tag,
+      define  = objects.define,
+      create  = objects.create,
+      hide    = objects.hide,
+      is      = objects.is,
+      Hash    = objects.Hash,
+      tag     = utility.tag,
       AccessorDescriptor = descriptors.AccessorDescriptor,
-      DataDescriptor = descriptors.DataDescriptor,
-      Accessor = descriptors.Accessor,
-      Value = descriptors.Value,
-      IsDataDescriptor = descriptors.isDataDescriptor,
-      IsAccessorDescriptor = descriptors.isAccessorDescriptor,
-      IsEmptyDescriptor = descriptors.isEmptyDescriptor,
-      IsEquivalentDescriptor = descriptors.isEquivalentDescriptor,
-      IsGenericDescriptor = descriptors.isGenericDescriptor,
-      ThrowException = errors.ThrowException,
-      ToBoolean = operators.ToBoolean,
-      ToString = operators.ToString,
-      ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable,
-      Invoke = operations.invoke,
-      ThrowStopIteration = operations.throwStopIteration,
-      CreateChangeRecord = operations.createChangeRecord,
-      EnqueueChangeRecord = operations.enqueueChangeRecord;
+      DataDescriptor     = descriptors.DataDescriptor,
+      Accessor           = descriptors.Accessor,
+      Value              = descriptors.Value,
+      $$IsDataDescriptor          = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor      = descriptors.$$IsAccessorDescriptor,
+      $$IsEmptyDescriptor         = descriptors.$$IsEmptyDescriptor,
+      $$IsEquivalentDescriptor    = descriptors.$$IsEquivalentDescriptor,
+      $$IsGenericDescriptor       = descriptors.$$IsGenericDescriptor,
+      $$ThrowException            = errors.$$ThrowException,
+      $$ToBoolean                 = operators.$$ToBoolean,
+      $$ToString                  = operators.$$ToString,
+      $$ToUint32                  = operators.$$ToUint32,
+      $$IsCallable                = operations.$$IsCallable,
+      $$Invoke                    = operations.$$Invoke,
+      $$ThrowStopIteration        = operations.$$ThrowStopIteration,
+      $$CreateChangeRecord        = operations.$$CreateChangeRecord,
+      $$EnqueueChangeRecord       = operations.$$EnqueueChangeRecord;
 
   var E = 0x1,
       C = 0x2,
@@ -13266,6 +13353,215 @@ exports.$Object = (function(module){
       E_A = 9,
       _CA = 10,
       ECA = 11;
+
+
+
+  var normalDescriptor = { Value: undefined,
+                           Writable: true,
+                           Enumerable: true,
+                           Configurable: true,
+                           isDescriptor: true,
+                           isDataDescriptor: true,
+                           isAccessorDescriptor: false };
+
+  function $$CreateOwnDataProperty(object, key, value){
+    var extensible = object.IsExtensible();
+    if (!extensible || extensible.Abrupt) return extensible;
+    normalDescriptor.Value = value;
+    return object.DefineOwnProperty(key, normalDescriptor);
+  }
+
+  exports.$$CreateOwnDataProperty = $$CreateOwnDataProperty;
+
+
+  function $$OrdinaryGetOwnProperty(object, key){
+    if (key === '__proto__') {
+      var val = object.GetP(object, '__proto__');
+      return typeof val === 'object' ? new DataDescriptor(val, _CW) : undefined;
+    }
+
+    var prop = object.describe(key);
+    if (prop) {
+      if (prop[2] & A) {
+        var Descriptor = AccessorDescriptor,
+            val = prop[1];
+      } else {
+        var val = prop[3] ? prop[3].Get.Call(object, []) : prop[1],
+            Descriptor = DataDescriptor;
+      }
+      return new Descriptor(val, prop[2]);
+    }
+  }
+
+  exports.$$OrdinaryGetOwnProperty = $$OrdinaryGetOwnProperty;
+
+
+  function $$DefinePropertyOrThrow(object, key, desc){
+    var success = object.DefineOwnProperty(key, value, desc);
+    if (!success) {
+      return $$ThrowException('redefine_disallowed', [key]);
+    }
+    return success;
+  }
+
+  exports.$$DefinePropertyOrThrow = $$DefinePropertyOrThrow;
+
+
+  function $$DeletePropertyOrThrow(object, key){
+    var success = object.DeleteProperty(key, value);
+    if (!success) {
+      return $$ThrowException('strict_delete_property', [key]);
+    }
+    return success;
+  }
+
+  exports.$$DeletePropertyOrThrow = $$DeletePropertyOrThrow;
+
+
+  function $$HasProperty(object, key){
+    if (object === null) return false;
+
+    var obj = object;
+    do {
+      if (typeof obj !== 'object')  {
+        return $$ThrowException('invalid_in_operator_use', [key, typeof obj]);
+      }
+      var has = obj.HasOwnProperty(key);
+      if (has) return has;
+      obj = obj.GetInheritance();
+      if (obj && obj.Abrupt) return obj;
+    } while (obj)
+    return false;
+  }
+
+  exports.$$HasProperty = $$HasProperty;
+
+
+  function $$GetMethod(object, key){
+    var func = object.GetP(key, object);
+    if (func !== undefined && !$$IsCallable(func)) {
+      return $$ThrowException('called_non_callable', [key]);
+    }
+    return func;
+  }
+
+  exports.$$GetMethod = $$GetMethod;
+
+
+  function $$OrdinaryDefineOwnProperty(object, key, desc){
+    var current = $$OrdinaryGetOwnProperty(object, key),
+        extensible = object.IsExtensible();
+    return $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current);
+  }
+
+  exports.$$OrdinaryDefineOwnProperty = $$OrdinaryDefineOwnProperty;
+
+
+  function $$IsCompatableDescriptor(extensible, desc, current){
+    return $$ValidateAndApplyPropertyDescriptor(undefined, undefined, extensible, desc, current);
+  }
+
+  exports.$$IsCompatableDescriptor = $$IsCompatableDescriptor;
+
+
+  function $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current){
+    var changeType = 'reconfigured';
+
+    // New property
+    if (current === undefined) {
+      if (extensible && object !== undefined) {
+        if ($$IsGenericDescriptor(desc) || $$IsDataDescriptor(desc)) {
+          object.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+        } else {
+          object.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | 8);
+        }
+
+        if (object.Notifier) {
+          var changeObservers = object.Notifier.ChangeObservers;
+          if (changeObservers.size) {
+            var record = $$CreateChangeRecord('new', object, key);
+            $$EnqueueChangeRecord(record, changeObservers);
+          }
+        }
+      }
+      return extensible === true;
+    }
+
+    // Empty descriptor
+    if (!('Get' in desc || 'Set' in desc || 'Value' in desc)) {
+      if (!('Writable' in desc || 'Enumerable' in desc || 'Configurable' in desc)) {
+        return true;
+      }
+    }
+
+    //Equal descriptor
+    if (desc.Writable === current.Writable && desc.Enumerable === current.Enumerable && desc.Configurable === current.Configurable) {
+      if (desc.Get === current.Get && desc.Set === current.Set && is(desc.Value, current.Value)) {
+        return true;
+      }
+    }
+
+    if (!current.Configurable) {
+      if (desc.Configurable || 'Enumerable' in desc && desc.Enumerable !== current.Enumerable) {
+        return false;
+      } else {
+        var currentIsData = $$IsDataDescriptor(current),
+            descIsData = $$IsDataDescriptor(desc);
+
+        if (currentIsData !== descIsData) {
+          return false;
+        } else if (currentIsData && descIsData) {
+          if (!current.Writable && 'Value' in desc && !is(desc.Value, current.Value)) {
+            return false;
+          }
+        } else if ('Set' in desc && desc.Set !== current.Set) {
+          return false;
+        } else if ('Get' in desc && desc.Get !== current.Get) {
+          return false;
+        }
+      }
+    }
+
+    if (object === undefined) {
+      return true;
+    }
+
+    'Configurable' in desc || (desc.Configurable = current.Configurable);
+    'Enumerable' in desc || (desc.Enumerable = current.Enumerable);
+
+    if ($$IsAccessorDescriptor(desc)) {
+      object.update(key, desc.Enumerable | (desc.Configurable << 1) | 8);
+      if ($$IsDataDescriptor(current)) {
+        object.set(key, new Accessor(desc.Get, desc.Set));
+      } else {
+        'Set' in desc && (prop[1].Set = desc.Set);
+        'Get' in desc && (prop[1].Get = desc.Get);
+        ('Set' in desc || 'Get' in desc) && object.set(key, prop[1])
+      }
+    } else {
+      if ($$IsAccessorDescriptor(current)) {
+        current.Writable = true;
+      }
+      'Writable' in desc || (desc.Writable = current.Writable);
+      object.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
+      if ('Value' in desc) {
+        object.set(key, desc.Value);
+        changeType = 'updated';
+      }
+    }
+
+    if (object.Notifier) {
+      var changeObservers = object.Notifier.ChangeObservers;
+      if (changeObservers.size) {
+        var record = $$CreateChangeRecord(changeType, object, key, current);
+        $$EnqueueChangeRecord(record, changeObservers);
+      }
+    }
+
+    return true;
+  }
+
+  exports.$$ValidateAndApplyPropertyDescriptor = $$ValidateAndApplyPropertyDescriptor;
 
 
 
@@ -13302,11 +13598,17 @@ exports.$Object = (function(module){
     if (proto && proto.HiddenPrototype) {
       this.properties.setProperty(['__proto__', null, 6, Proto]);
     }
-
-    hide(this, 'storage');
-    hide(this, 'Prototype');
-    hide(this, 'Realm');
   }
+
+  exports.$Object = $Object;
+
+
+  define($Object, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
 
   define($Object.prototype, {
     Extensible: true,
@@ -13374,7 +13676,7 @@ exports.$Object = (function(module){
         var proto = value;
         while (proto) {
           if (proto === this) {
-            return ThrowException('cyclic_proto');
+            return $$ThrowException('cyclic_proto');
           }
           proto = proto.GetInheritance();
         }
@@ -13382,8 +13684,8 @@ exports.$Object = (function(module){
         if (this.Notifier) {
           var changeObservers = this.Notifier.ChangeObservers;
           if (changeObservers.size) {
-            var record = CreateChangeRecord('prototype', this, null, new Value(this.GetInheritance()));
-            EnqueueChangeRecord(record, changeObservers);
+            var record = $$CreateChangeRecord('prototype', this, null, new Value(this.GetInheritance()));
+            $$EnqueueChangeRecord(record, changeObservers);
           }
         }
         this.Prototype = value;
@@ -13403,22 +13705,7 @@ exports.$Object = (function(module){
       return this.Extensible === v;
     },
     function GetOwnProperty(key){
-      if (key === '__proto__') {
-        var val = this.GetP(this, '__proto__');
-        return typeof val === 'object' ? new DataDescriptor(val, _CW) : undefined;
-      }
-
-      var prop = this.describe(key);
-      if (prop) {
-        if (prop[2] & A) {
-          var Descriptor = AccessorDescriptor,
-              val = prop[1];
-        } else {
-          var val = prop[3] ? prop[3].Get.Call(this, []) : prop[1],
-              Descriptor = DataDescriptor;
-        }
-        return new Descriptor(val, prop[2]);
-      }
+      return $$OrdinaryGetOwnProperty(this, key);
     },
     function GetProperty(key){
       var desc = this.GetOwnProperty(key);
@@ -13436,167 +13723,66 @@ exports.$Object = (function(module){
     },
     function Put(key, value, strict){
       if (!this.SetP(this, key, value) && strict) {
-        return ThrowException('strict_cannot_assign', [key]);
+        return $$ThrowException('strict_cannot_assign', [key]);
       }
     },
     function GetP(receiver, key){
       var prop = this.describe(key);
       if (!prop) {
-        var proto = this.GetInheritance();
-        if (proto) {
-          return proto.GetP(receiver, key);
-        }
-      } else if (prop[3]) {
-        var getter = prop[3].Get;
-        return getter.Call(receiver, []);
-      } else if (prop[2] & A) {
-        var getter = prop[1].Get;
-        if (IsCallable(getter)) {
-          return getter.Call(receiver, []);
+        var parent = this.GetInheritance();
+        if (parent && parent.Abrupt) return parent;
+
+        if (parent) {
+          return parent.GetP(receiver, key);
         }
       } else {
+        if (prop[3]) {
+          var getter = prop[3].Get;
+        } else if (prop[2] & A) {
+          var getter = prop[1].Get;
+        }
+
+        if (getter && $$IsCallable(getter)) {
+          return getter.Call(receiver, []);
+        }
         return prop[1];
       }
     },
     function SetP(receiver, key, value) {
       var prop = this.describe(key);
-      if (prop) {
+      if (!prop) {
+        var parent = this.GetInheritance();
+        if (parent && parent.Abrupt) return parent;
+
+        if (parent) {
+          return parent.SetP(receiver, key, value);
+        } else if (typeof receiver === 'object') {
+          return $$CreateOwnDataProperty(receiver, key, value);
+        }
+      } else {
         if (prop[3]) {
           var setter = prop[3].Set;
-          setter.Call(receiver, [value]);
-          return true;
         } else if (prop[2] & A) {
           var setter = prop[1].Set;
-          if (IsCallable(setter)) {
-            setter.Call(receiver, [value]);
-            return true;
-          } else {
-            return false;
-          }
+        }
+
+        if (setter && $$IsCallable(setter)) {
+          var setterResult = setter.Call(receiver, [value]);
+          if (setterResult && setterResult.Abrupt) return setterResult;
+
+          return true;
         } else if (prop[2] & W) {
           if (this === receiver) {
-            return this.DefineOwnProperty(key, new Value(value), false);
-          } else if (!receiver.IsExtensible()) {
-            return false;
-          } else {
-            return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
+            return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
+          } else if (typeof receiver === 'object') {
+            return $$CreateOwnDataProperty(receiver, key, value);
           }
-        } else {
-          return false;
-        }
-      } else {
-        var proto = this.GetInheritance();
-        if (!proto) {
-          if (!receiver.IsExtensible()) {
-            return false;
-          } else {
-            return receiver.DefineOwnProperty(key, new DataDescriptor(value, ECW), false);
-          }
-        } else {
-          return proto.SetP(receiver, key, value);
         }
       }
+      return false;
     },
-    function DefineOwnProperty(key, desc, strict){
-      var reject = strict
-          ? function(e, a){ return ThrowException(e, a) }
-          : function(e, a){ return false };
-
-      var current = this.GetOwnProperty(key),
-          changeType = 'reconfigured';
-
-      if (current === undefined) {
-        if (!this.IsExtensible()) {
-          return reject('define_disallowed', []);
-        } else {
-          if (IsGenericDescriptor(desc) || IsDataDescriptor(desc)) {
-            this.define(key, desc.Value, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
-          } else {
-            this.define(key, new Accessor(desc.Get, desc.Set), desc.Enumerable | (desc.Configurable << 1) | A);
-          }
-
-          if (this.Notifier) {
-            var changeObservers = this.Notifier.ChangeObservers;
-            if (changeObservers.size) {
-              var record = CreateChangeRecord('new', this, key);
-              EnqueueChangeRecord(record, changeObservers);
-            }
-          }
-          return true;
-        }
-      } else {
-        var rejected = false;
-        if (IsEmptyDescriptor(desc) || IsEquivalentDescriptor(desc, current)) {
-          return true;
-        }
-
-        if (!current.Configurable) {
-          if (desc.Configurable || desc.Enumerable === !current.Enumerable) {
-            return reject('redefine_disallowed', []);
-          } else {
-            var currentIsData = IsDataDescriptor(current),
-                descIsData = IsDataDescriptor(desc);
-
-            if (currentIsData !== descIsData) {
-              return reject('redefine_disallowed', []);
-            } else if (currentIsData && descIsData) {
-              if (!current.Writable && 'Value' in desc && desc.Value !== current.Value) {
-                return reject('redefine_disallowed', []);
-              }
-            } else if ('Set' in desc && desc.Set !== current.Set) {
-              return reject('redefine_disallowed', []);
-            } else if ('Get' in desc && desc.Get !== current.Get) {
-              return reject('redefine_disallowed', []);
-            }
-          }
-        }
-
-        'Configurable' in desc || (desc.Configurable = current.Configurable);
-        'Enumerable' in desc || (desc.Enumerable = current.Enumerable);
-
-        var prop = this.describe(key);
-
-        if (IsAccessorDescriptor(desc)) {
-          this.update(key, desc.Enumerable | (desc.Configurable << 1) | A);
-          if (IsDataDescriptor(current)) {
-            this.set(key, new Accessor(desc.Get, desc.Set));
-          } else {
-            var accessor = prop[1],
-                setter = 'Set' in desc,
-                getter = 'Get' in desc;
-
-            if (setter) {
-              accessor.Set = desc.Set;
-            }
-            if (getter) {
-              accessor.Get = desc.Get;
-            }
-            if (setter || getter) {
-              this.set(key, accessor)
-            }
-          }
-        } else {
-          if (IsAccessorDescriptor(current)) {
-            current.Writable = true;
-          }
-          'Writable' in desc || (desc.Writable = current.Writable);
-          this.update(key, desc.Enumerable | (desc.Configurable << 1) | (desc.Writable << 2));
-          if ('Value' in desc) {
-            this.set(key, desc.Value);
-            changeType = 'updated';
-          }
-        }
-
-        if (this.Notifier) {
-          var changeObservers = this.Notifier.ChangeObservers;
-          if (changeObservers.size) {
-            var record = CreateChangeRecord(changeType, this, key, current);
-            EnqueueChangeRecord(record, changeObservers);
-          }
-        }
-
-        return true;
-      }
+    function DefineOwnProperty(key, desc){
+      return $$OrdinaryDefineOwnProperty(this, key, desc);
     },
     function HasOwnProperty(key){
       return this.has(key);
@@ -13620,20 +13806,20 @@ exports.$Object = (function(module){
         if (this.Notifier) {
           var changeObservers = this.Notifier.ChangeObservers;
           if (changeObservers.size) {
-            var record = CreateChangeRecord('deleted', this, key, this.GetOwnProperty(key));
-            EnqueueChangeRecord(record, changeObservers);
+            var record = $$CreateChangeRecord('deleted', this, key, this.GetOwnProperty(key));
+            $$EnqueueChangeRecord(record, changeObservers);
           }
         }
         this.remove(key);
         return true;
       } else if (strict) {
-        return ThrowException('strict_delete', []);
+        return $$ThrowException('strict_delete', []);
       } else {
         return false;
       }
     },
     function Iterate(){
-      return Invoke(intrinsics.iterator, this, []);
+      return $$Invoke(intrinsics.iterator, this, []);
     },
     function enumerator(){
       return new $Enumerator(this.Enumerate(true, true));
@@ -13683,7 +13869,7 @@ exports.$Object = (function(module){
         var method = this.Get(order[i]);
         if (method && method.Abrupt) return method;
 
-        if (IsCallable(method)) {
+        if ($$IsCallable(method)) {
           var value = method.Call(this, []);
           if (value && value.Abrupt) return value;
           if (value === null || typeof value !== 'object') {
@@ -13692,7 +13878,7 @@ exports.$Object = (function(module){
         }
       }
 
-      return ThrowException('cannot_convert_to_primitive', []);
+      return $$ThrowException('cannot_convert_to_primitive', []);
     }
     // function Keys(){},
     // function OwnPropertyKeys(){},
@@ -13714,7 +13900,7 @@ exports.$Object = (function(module){
       if (this.depleted || this.index >= this.count) {
         this.depleted = true;
         this.keys = null;
-        return ThrowStopIteration();
+        return $$ThrowStopIteration();
       } else {
         return this.keys[this.index++];
       }
@@ -13723,6 +13909,8 @@ exports.$Object = (function(module){
     function $Enumerator(keys){
       this.next = ['next', new next(keys), 7];
     }
+
+    exports.$Enumerator = $Enumerator;
 
     inherit($Enumerator, $Object, [
       function has(key){
@@ -13749,16 +13937,47 @@ exports.$Object = (function(module){
 
   var realm, intrinsics;
 
-  define($Object, [
-    $Enumerator,
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  return exports;
+})(typeof module !== 'undefined' ? exports : {});
 
-  return module.exports = $Object;
-})(typeof module !== 'undefined' ? module : {});
+/*
+  function SetP(receiver, key, value){
+    var desc = $$OrdinaryGetOwnProperty(this, key);
+    if (desc && desc.Abrupt) return desc;
+
+    if (desc === undefined) {
+      var parent = this.GetInheritance();
+      if (parent && parent.Abrupt) return parent;
+
+      if (parent) {
+        return parent.SetP(receiver, key, value);
+      } else if ($$Type(receiver) !== 'Object') {
+        return false;
+      }
+      return $$CreateOwnDataProperty(receiver, key, value);
+    }
+
+    if ($$IsDataDescriptor(desc)) {
+      if (!desc.Writable) {
+        return false;
+      } else if (this === receiver) {
+        return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
+      } else if ($$Type(receiver) !== 'Object') {
+        return false;
+      }
+      return $$CreateOwnDataProperty(receiver, key, value);
+    } else if ($$IsAccessorDescriptor(desc)) {
+      var setter = desc.Set;
+      if ($$IsCallable(setter)) {
+        var setterResult = setter.Call(receiver, [value]);
+        if (setterResult && setterResult.Abrupt) return setterResult;
+
+        return true;
+      }
+      return false;
+    }
+  }
+*/
 
 
 exports.$Array = (function(module){
@@ -13769,18 +13988,18 @@ exports.$Array = (function(module){
       operators    = require('./operators'),
       operations   = require('./operations'),
       PropertyList = require('../lib/PropertyList'),
-      $Object      = require('./$Object');
+      $Object      = require('./$Object').$Object;
 
   var inherit        = objects.inherit,
       define         = objects.define,
       copy           = objects.copy,
       Hash           = objects.Hash,
       tag            = utility.tag,
-      IsArrayIndex   = operations.isArrayIndex,
-      ThrowException = errors.ThrowException,
-      ToBoolean      = operators.ToBoolean,
-      ToUint32       = operators.ToUint32,
-      ToNumber       = operators.ToNumber;
+      $$IsArrayIndex   = operations.$$IsArrayIndex,
+      $$ThrowException = errors.$$ThrowException,
+      $$ToBoolean      = operators.$$ToBoolean,
+      $$ToUint32       = operators.$$ToUint32,
+      $$ToNumber       = operators.$$ToNumber;
 
   var __W = 4,
       ECW = 7;
@@ -13902,7 +14121,7 @@ exports.$Array = (function(module){
     function DefineOwnProperty(key, desc, strict){
       var oldLenDesc = this.GetOwnProperty('length'),
           oldLen = oldLenDesc.Value,
-          reject = strict ? ThrowException : function(e, a){ return false };
+          reject = strict ? $$ThrowException : function(e, a){ return false };
 
 
       if (key === 'length') {
@@ -13911,11 +14130,11 @@ exports.$Array = (function(module){
         }
 
         var newLenDesc = copy(desc),
-            newLen = ToUint32(desc.Value);
+            newLen = $$ToUint32(desc.Value);
 
         if (newLen.Abrupt) return newLen;
 
-        var value = ToNumber(desc.Value);
+        var value = $$ToNumber(desc.Value);
         if (value.Abrupt) return value;
 
         if (newLen !== value) {
@@ -13964,8 +14183,8 @@ exports.$Array = (function(module){
         }
 
         return true;
-      }  else if (IsArrayIndex(key)) {
-        var index = ToUint32(key);
+      }  else if ($$IsArrayIndex(key)) {
+        var index = $$ToUint32(key);
         if (index.Abrupt) return index;
 
         if (index >= oldLen && oldLenDesc.Writable === false) {
@@ -14097,87 +14316,77 @@ exports.$Array = (function(module){
 
 
 exports.$Proxy = (function(module){
-  var objects = require('../lib/objects'),
-      errors = require('../errors'),
-      operators = require('./operators'),
+  "use strict";
+  var objects     = require('../lib/objects'),
+      errors      = require('../errors'),
+      operators   = require('./operators'),
       descriptors = require('./descriptors'),
-      operations = require('./operations'),
-      $Object = require('./$Object'),
-      $Array = require('./$Array');
+      operations  = require('./operations'),
+      $Object     = require('./$Object').$Object,
+      $Array      = require('./$Array');
 
   var inherit = objects.inherit,
-      is = objects.is,
-      define = objects.define,
-      ToPropertyDescriptor = descriptors.toPropertyDescriptor,
-      FromGenericPropertyDescriptor = descriptors.fromGenericPropertyDescriptor,
-      NormalizeAndCompletePropertyDescriptor = descriptors.normalizeAndCompletePropertyDescriptor
-      CopyAttributes = descriptors.copyAttributes,
-      IsDataDescriptor = descriptors.isDataDescriptor,
-      IsAccessorDescriptor = descriptors.isAccessorDescriptor,
-      ThrowException = errors.ThrowException,
-      ToBoolean = operators.ToBoolean,
-      ToString = operators.ToString,
-      ToUint32 = operators.ToUint32,
-      IsCallable = operations.isCallable,
-      ToInternalArray = operations.toInternalArray;
-
-  function IsCompatibleDescriptor(){
-    return true;
-  }
+      is      = objects.is,
+      define  = objects.define,
+      $$ToPropertyDescriptor                   = descriptors.$$ToPropertyDescriptor,
+      $$FromGenericPropertyDescriptor          = descriptors.$$FromGenericPropertyDescriptor,
+      $$NormalizeAndCompletePropertyDescriptor = descriptors.$$NormalizeAndCompletePropertyDescriptor,
+      $$CopyAttributes                         = descriptors.$$CopyAttributes,
+      $$IsDataDescriptor                       = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor                   = descriptors.$$IsAccessorDescriptor,
+      $$ThrowException                         = errors.$$ThrowException,
+      $$ToBoolean                              = operators.$$ToBoolean,
+      $$ToString                               = operators.$$ToString,
+      $$ToUint32                               = operators.$$ToUint32,
+      $$IsCallable                             = operations.$$IsCallable,
+      $$GetMethod                              = operations.$$GetMethod,
+      $$CreateListFromArray                    = operations.$$CreateListFromArray,
+      $$IsCompatibleDescriptor                 = operations.$$IsCompatibleDescriptor;
 
 
-  function GetMethod(handler, trap){
-    var result = handler.Get(trap);
-    if (result && result.Abrupt) return result;
 
-    if (result !== undefined && !IsCallable(result)) {
-      return ThrowException('proxy_non_callable_trap');
-    }
-    return result;
-  }
-
-  function TrapDefineOwnProperty(proxy, key, descObj, strict){
+  function $$TrapDefineOwnProperty(proxy, key, descObj, strict){
     var handler = proxy.ProxyHandler,
         target = proxy.ProxyTarget;
 
-    var trap = GetMethod(handler, 'defineProperty');
+    var trap = $$GetMethod(handler, 'defineProperty');
     if (trap && trap.Abrupt) return trap;
 
-    var normalizedDesc = ToPropertyDescriptor(descObj);
+    var normalizedDesc = $$ToPropertyDescriptor(descObj);
 
 
     if (trap === undefined) {
       return target.DefineOwnProperty(key, normalizedDesc, strict);
     } else {
-      var normalizedDescObj = FromGenericPropertyDescriptor(normalizedDesc);
-      CopyAttributes(descObj, normalizedDescObj);
+      var normalizedDescObj = $$FromGenericPropertyDescriptor(normalizedDesc);
+      $$CopyAttributes(descObj, normalizedDescObj);
 
       var trapResult = trap.Call(handler, [target, key, normalizedDescObj]),
-          success = ToBoolean(trapResult),
+          success = $$ToBoolean(trapResult),
           targetDesc = target.GetOwnProperty(key),
           extensible = target.IsExtensible();
 
       if (!extensible && targetDesc === undefined) {
-        return ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(normalizedDesc))) {
-        return ThrowException('proxy_incompatible_descriptor');
+        return $$ThrowException('proxy_extensibility_inconsistent');
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(normalizedDesc))) {
+        return $$ThrowException('proxy_incompatible_descriptor');
       } else if (!normalizedDesc.Configurable) {
         if (targetDesc === undefined || targetDesc.Configurable) {
-          return ThrowException('proxy_configurability_inconsistent')
+          return $$ThrowException('proxy_configurability_inconsistent')
         }
       } else if (strict) {
-        return ThrowException('strict_property_redefinition');
+        return $$ThrowException('strict_property_redefinition');
       }
       return false;
     }
   }
 
 
-  function TrapGetOwnProperty(proxy, key){
+  function $$TrapGetOwnProperty(proxy, key){
     var handler = proxy.ProxyHandler,
         target = proxy.ProxyTarget;
 
-    var trap = GetMethod(handler, 'getOwnPropertyDescriptor');
+    var trap = $$GetMethod(handler, 'getOwnPropertyDescriptor');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
@@ -14186,27 +14395,27 @@ exports.$Proxy = (function(module){
       var trapResult = trap.Call(handler, [target, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var desc = NormalizeAndCompletePropertyDescriptor(trapResult);
+      var desc = $$NormalizeAndCompletePropertyDescriptor(trapResult);
 
       var targetDesc = target.GetOwnProperty(key);
       if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
       if (desc === undefined && targetDesc !== undefined) {
         if (!targetDesc.Configurable) {
-          return ThrowException('proxy_configurability_inconsistent');
+          return $$ThrowException('proxy_configurability_inconsistent');
         } else if (!target.IsExtensible()) {
-          return ThrowException('proxy_extensibility_inconsistent');
+          return $$ThrowException('proxy_extensibility_inconsistent');
         }
         return;
       }
 
       var extensible = target.IsExtensible();
       if (!extensible && targetDesc === undefined) {
-        return ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !IsCompatibleDescriptor(extensible, targetDesc, ToPropertyDescriptor(desc))) {
-        return ThrowException('proxy_incompatible_descriptor');
-      } else if (!ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
-        return ThrowException('proxy_configurability_inconsistent')
+        return $$ThrowException('proxy_extensibility_inconsistent');
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(desc))) {
+        return $$ThrowException('proxy_incompatible_descriptor');
+      } else if (!$$ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
+        return $$ThrowException('proxy_configurability_inconsistent')
       }
 
       return desc;
@@ -14236,7 +14445,7 @@ exports.$Proxy = (function(module){
     Proxy: true
   }, [
     function GetInheritance(){
-      var trap = GetMethod(this.ProxyHandler, 'getPrototypeOf');
+      var trap = $$GetMethod(this.ProxyHandler, 'getPrototypeOf');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14249,33 +14458,33 @@ exports.$Proxy = (function(module){
         if (targetProto && targetProto.Abrupt) return targetProto;
 
         if (trapResult !== targetProto) {
-          return ThrowException('proxy_inconsistent', 'getPrototypeOf');
+          return $$ThrowException('proxy_inconsistent', 'getPrototypeOf');
         } else {
           return targetProto;
         }
       }
     },
     function IsExtensible(){
-      var trap = GetMethod(this.ProxyHandler, 'isExtensible');
+      var trap = $$GetMethod(this.ProxyHandler, 'isExtensible');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
         return this.ProxyTarget.IsExtensible();
       }
 
-      var proxyIsExtensible = ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
+      var proxyIsExtensible = $$ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
       if (trapResult && trapResult.Abrupt) return trapResult;
 
       var targetIsExtensible = this.ProxyTarget.IsExtensible();
       if (targetIsExtensible && targetIsExtensible.Abrupt) return targetIsExtensible;
 
       if (proxyIsExtensible !== targetIsExtensible) {
-        return ThrowException('proxy_extensibility_inconsistent');
+        return $$ThrowException('proxy_extensibility_inconsistent');
       }
       return targetIsExtensible;
     },
     function GetP(receiver, key){
-      var trap = GetMethod(this.ProxyHandler, 'get');
+      var trap = $$GetMethod(this.ProxyHandler, 'get');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14289,13 +14498,13 @@ exports.$Proxy = (function(module){
       if (desc && desc.Abrupt) return desc;
 
       if (desc !== undefined) {
-        if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
+        if ($$IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
           if (!is(trapResult, desc.Value)) {
-            return ThrowException('proxy_inconsistent', 'get');
+            return $$ThrowException('proxy_inconsistent', 'get');
           }
-        } else if (IsAccessorDescriptor(desc) && desc.Configurable === false && desc.Get === undefined) {
+        } else if ($$IsAccessorDescriptor(desc) && desc.Configurable === false && desc.Get === undefined) {
           if (trapResult !== undefined) {
-            return ThrowException('proxy_inconsistent', 'get');
+            return $$ThrowException('proxy_inconsistent', 'get');
           }
         }
       }
@@ -14303,7 +14512,7 @@ exports.$Proxy = (function(module){
       return trapResult;
     },
     function SetP(receiver, key, value){
-      var trap = GetMethod(this.ProxyHandler, 'set');
+      var trap = $$GetMethod(this.ProxyHandler, 'set');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14315,21 +14524,21 @@ exports.$Proxy = (function(module){
         return trapResult;
       }
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success) {
         var desc = this.ProxyTarget.GetOwnProperty(key);
         if (desc && desc.Abrupt) return desc;
 
         if (desc !== undefined) {
-          if (IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
+          if ($$IsDataDescriptor(desc) && desc.Configurable === false && desc.Writable === false) {
             if (!is(value, desc.Value)) {
-              return ThrowException('proxy_inconsistent', 'set');
+              return $$ThrowException('proxy_inconsistent', 'set');
             }
           }
-        } else if (IsAccessorDescriptor(desc) && desc.Configurable === false) {
+        } else if ($$IsAccessorDescriptor(desc) && desc.Configurable === false) {
           if (desc.Set !== undefined) {
-            return ThrowException('proxy_inconsistent', 'set');
+            return $$ThrowException('proxy_inconsistent', 'set');
           }
         }
       }
@@ -14337,16 +14546,16 @@ exports.$Proxy = (function(module){
       return success;
     },
     function GetOwnProperty(key){
-      return TrapGetOwnProperty(this, key);
+      return $$TrapGetOwnProperty(this, key);
     },
     function DefineOwnProperty(key, desc, strict){
-      var descObj = FromGenericPropertyDescriptor(desc);
+      var descObj = $$FromGenericPropertyDescriptor(desc);
       if (descObj && descObj.Abrupt) return descObj;
 
-      return TrapDefineOwnProperty(this, key, descObj, strict);
+      return $$TrapDefineOwnProperty(this, key, descObj, strict);
     },
     function HasOwnProperty(key){
-      var trap = GetMethod(this.ProxyHandler, 'hasOwn');
+      var trap = $$GetMethod(this.ProxyHandler, 'hasOwn');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14356,22 +14565,22 @@ exports.$Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'hasOwn');
+          return $$ThrowException('proxy_inconsistent', 'hasOwn');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'hasOwn');
+          return $$ThrowException('proxy_non_extensible', 'hasOwn');
         }
       }
       return success;
     },
     function HasProperty(key){
-      var trap = GetMethod(this.ProxyHandler, 'has');
+      var trap = $$GetMethod(this.ProxyHandler, 'has');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14381,22 +14590,22 @@ exports.$Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === false) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'has');
+          return $$ThrowException('proxy_inconsistent', 'has');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'has');
+          return $$ThrowException('proxy_non_extensible', 'has');
         }
       }
       return success;
     },
     function Delete(key, strict){
-      var trap = GetMethod(this.ProxyHandler, 'deleteProperty');
+      var trap = $$GetMethod(this.ProxyHandler, 'deleteProperty');
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14405,20 +14614,20 @@ exports.$Proxy = (function(module){
       var trapResult = trap.Call(this.ProxyHandler, [this.ProxyTarget, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var success = ToBoolean(trapResult);
+      var success = $$ToBoolean(trapResult);
 
       if (success === true) {
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
         if (desc !== undefined && targetDesc.Configurable === false) {
-          return ThrowException('proxy_inconsistent', 'delete');
+          return $$ThrowException('proxy_inconsistent', 'delete');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
-          return ThrowException('proxy_non_extensible', 'delete');
+          return $$ThrowException('proxy_non_extensible', 'delete');
         }
         return true;
       } else if (strict) {
-        return ThrowException('strict_delete_failure');
+        return $$ThrowException('strict_delete_failure');
       }
       return false;
     },
@@ -14430,7 +14639,7 @@ exports.$Proxy = (function(module){
             recurse = includePrototype;
       }
 
-      var trap = GetMethod(this.ProxyHandler, type);
+      var trap = $$GetMethod(this.ProxyHandler, type);
       if (trap && trap.Abrupt) return trap;
 
       if (trap === undefined) {
@@ -14441,26 +14650,26 @@ exports.$Proxy = (function(module){
       if (trapResult && trapResult.Abrupt) return trapResult;
 
       if (typeof trapResult !== 'object' || trapResult === null) {
-        return ThrowException('proxy_non_object_result', type);
+        return $$ThrowException('proxy_non_object_result', type);
       }
 
-      var len = ToUint32(trapResult.Get('length'));
+      var len = $$ToUint32(trapResult.Get('length'));
       if (len && len.Abrupt) return len;
 
       var array = [],
           seen = new Hash;
 
       for (var i = 0; i < len; i++) {
-        var element = ToString(trapResult.Get(''+i));
+        var element = $$ToString(trapResult.Get(''+i));
         if (element && element.Abrupt) return element;
 
         if (element in seen) {
-          return ThrowException('proxy_duplicate', type);
+          return $$ThrowException('proxy_duplicate', type);
         }
         seen[element] = true;
 
         if (!includePrototype && !this.ProxyTarget.IsExtensible() && !this.ProxyTarget.HasOwnProperty(element)) {
-          return ThrowException('proxy_non_extensible', type);
+          return $$ThrowException('proxy_non_extensible', type);
         }
 
         array[i] = element;
@@ -14477,11 +14686,11 @@ exports.$Proxy = (function(module){
           if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
           if (targetDesc && !targetDesc.Configurable) {
-            return ThrowException('proxy_inconsistent', type);
+            return $$ThrowException('proxy_inconsistent', type);
           }
 
           if (targetDesc && !this.ProxyTarget.IsExtensible()) {
-            return ThrowException('proxy_non_extensible', type);
+            return $$ThrowException('proxy_non_extensible', type);
           }
         }
       }
@@ -14491,7 +14700,7 @@ exports.$Proxy = (function(module){
   ]);
 
   function ProxyCall(thisValue, args){
-    var trap = GetMethod(this.ProxyHandler, 'apply');
+    var trap = $$GetMethod(this.ProxyHandler, 'apply');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
@@ -14502,7 +14711,7 @@ exports.$Proxy = (function(module){
   }
 
   function ProxyConstruct(args){
-    var trap = GetMethod(this.ProxyHandler, 'construct');
+    var trap = $$GetMethod(this.ProxyHandler, 'construct');
     if (trap && trap.Abrupt) return trap;
 
     if (trap === undefined) {
@@ -14517,11 +14726,12 @@ exports.$Proxy = (function(module){
 
 
 exports.$TypedArray = (function(module){
+  "use strict";
   var objects        = require('../lib/objects'),
       buffers        = require('../lib/buffers'),
       $Array         = require('./$Array'),
-      $Object        = require('./$Object'),
-      ThrowException = require('../errors').ThrowException,
+      $Object        = require('./$Object').$Object,
+      $$ThrowException = require('../errors').$$ThrowException,
       DataDescriptor = require('./descriptors').DataDescriptor;
 
   var BRANDS      = require('../constants').BRANDS,
@@ -14792,12 +15002,13 @@ exports.$TypedArray = (function(module){
 
 
 exports.natives = (function(module){
+  "use strict";
   var objects     = require('./lib/objects'),
       Stack       = require('./lib/Stack'),
       buffers     = require('./lib/buffers'),
       errors      = require('./errors'),
       $Array      = require('./object-model/$Array'),
-      $Object     = require('./object-model/$Object'),
+      $Object     = require('./object-model/$Object').$Object,
       $TypedArray = require('./object-model/$TypedArray'),
       operators   = require('./object-model/operators'),
       operations  = require('./object-model/operations'),
@@ -14805,20 +15016,20 @@ exports.natives = (function(module){
       collections = require('./object-model/collections'),
       BRANDS      = require('./constants').BRANDS;
 
-  var inherit                 = objects.inherit,
-      define                  = objects.define,
-      isObject                = objects.isObject,
-      create                  = objects.create,
-      Hash                    = objects.Hash,
-      ThrowException          = errors.ThrowException,
-      MakeException           = errors.MakeException,
-      DataView                = buffers.DataView,
-      ArrayBuffer             = buffers.ArrayBuffer,
-      toPropertyDescriptor    = descriptors.toPropertyDescriptor,
-      fromPropertyDescriptor  = descriptors.fromPropertyDescriptor,
-      isCallable              = operations.isCallable,
-      toInternalArray         = operations.toInternalArray,
-      deliverAllChangeRecords = operations.deliverAllChangeRecords;
+  var inherit                   = objects.inherit,
+      define                    = objects.define,
+      isObject                  = objects.isObject,
+      create                    = objects.create,
+      Hash                      = objects.Hash,
+      $$ThrowException          = errors.$$ThrowException,
+      $$MakeException           = errors.$$MakeException,
+      DataView                  = buffers.DataView,
+      ArrayBuffer               = buffers.ArrayBuffer,
+      $$ToPropertyDescriptor    = descriptors.$$ToPropertyDescriptor,
+      $$FromPropertyDescriptor  = descriptors.$$FromPropertyDescriptor,
+      $$IsCallable              = operations.$$IsCallable,
+      $$CreateListFromArray     = operations.$$CreateListFromArray,
+      $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords;
 
   var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
       Hooked = new Hash,
@@ -14863,7 +15074,7 @@ exports.natives = (function(module){
   }
 
   function deliverChangeRecordsAndReportErrors(){
-    var observerResults = deliverAllChangeRecords();
+    var observerResults = $$DeliverAllChangeRecords();
     if (observerResults && observerResults instanceof Array) {
       each(observerResults, function(error){
         require('./runtime').emit('throw', error);
@@ -14888,19 +15099,19 @@ exports.natives = (function(module){
   }
 
   natives.add({
-    ToObject: operators.ToObject,
-    ToString: operators.ToString,
-    ToNumber: operators.ToNumber,
-    ToBoolean: operators.ToBoolean,
-    ToPropertyName: operators.ToPropertyName,
-    ToInteger: operators.ToInteger,
-    ToInt32: operators.ToInt32,
-    ToUint32: operators.ToUint32,
-    ToUint16: operators.ToUint16,
-    CheckObjectCoercible: operations.checkObjectCoercible,
-    GetNotifier: operations.getNotifier,
-    EnqueueChangeRecord: operations.enqueueChangeRecord,
-    DeliverChangeRecords: operations.deliverChangeRecords,
+    ToObject: operators.$$ToObject,
+    ToString: operators.$$ToString,
+    ToNumber: operators.$$ToNumber,
+    ToBoolean: operators.$$ToBoolean,
+    ToPropertyKey: operators.$$ToPropertyKey,
+    ToInteger: operators.$$ToInteger,
+    ToInt32: operators.$$ToInt32,
+    ToUint32: operators.$$ToUint32,
+    ToUint16: operators.$$ToUint16,
+    CheckObjectCoercible: operations.$$CheckObjectCoercible,
+    GetNotifier: operations.$$GetNotifier,
+    EnqueueChangeRecord: operations.$$EnqueueChangeRecord,
+    DeliverChangeRecords: operations.$$DeliverChangeRecords,
     parseInt: parseInt,
     parseFloat: parseFloat,
     decodeURI: decodeURI,
@@ -14922,10 +15133,10 @@ exports.natives = (function(module){
     sqrt: Math.sqrt,
     tan: Math.tan,
     _Call: function(obj, args){
-      return obj.Call(args[0], toInternalArray(args[1]));
+      return obj.Call(args[0], $$CreateListFromArray(args[1]));
     },
     _Construct: function(obj, args){
-      return obj.Construct(toInternalArray(args[0]));
+      return obj.Construct($$CreateListFromArray(args[0]));
     },
     _GetPrimitiveValue: function(obj, args){
       return obj.PrimitiveValue;
@@ -14944,7 +15155,7 @@ exports.natives = (function(module){
         obj.BuiltinBrand = brand;
         return obj.BuiltinBrand.name;
       }
-      return ThrowException('unknown_builtin_brand')
+      return $$ThrowException('unknown_builtin_brand')
     },
     _HasProperty: function(obj, args){
       return obj.HasProperty(args[0]);
@@ -14984,7 +15195,7 @@ exports.natives = (function(module){
       var offset = args[1] >>> 0;
 
       if (offset >= obj.ByteLength) {
-        return ThrowException('buffer_out_of_bounds')
+        return $$ThrowException('buffer_out_of_bounds')
       }
 
       return obj.View['set'+args[0]](offset, args[2], !!args[3]);
@@ -14993,22 +15204,22 @@ exports.natives = (function(module){
       var offset = args[1] >>> 0;
 
       if (offset >= obj.ByteLength) {
-        return ThrowException('buffer_out_of_bounds')
+        return $$ThrowException('buffer_out_of_bounds')
       }
 
       return obj.View['get'+args[0]](offset, !!args[2]);
     },
     _DefineOwnProperty: function(obj, args){
-      return obj.DefineOwnProperty(args[0], toPropertyDescriptor(args[1]), false);
+      return obj.DefineOwnProperty(args[0], $$ToPropertyDescriptor(args[1]), false);
     },
     _Enumerate: function(obj, args){
       return new $Array(obj.Enumerate(args[0], args[1]));
     },
     _GetProperty: function(obj, args){
-      return fromPropertyDescriptor(obj.GetProperty(args[0]));
+      return $$FromPropertyDescriptor(obj.GetProperty(args[0]));
     },
     _GetOwnProperty: function(obj, args){
-      return fromPropertyDescriptor(obj.GetOwnProperty(args[0]));
+      return $$FromPropertyDescriptor(obj.GetOwnProperty(args[0]));
     },
     _HasOwnProperty: function(obj, args){
       return obj.HasOwnProperty(args[0]);
@@ -15081,7 +15292,7 @@ exports.natives = (function(module){
       }
     },
     Exception: function(type, args){
-      return MakeException(type, toInternalArray(args));
+      return $$MakeException(type, $$CreateListFromArray(args));
     },
     _now: Date.now || function(){ return +new Date },
     _SetDefaultLoader: function(obj, args){
@@ -15199,7 +15410,7 @@ exports.natives = (function(module){
       return false;
     },
 
-    _FunctionToString: function(obj, args){
+    _Function$$ToString: function(obj, args){
       if (obj.Proxy) {
         obj = obj.ProxyTarget;
       }
@@ -15214,10 +15425,10 @@ exports.natives = (function(module){
         return code.source.slice(code.range[0], code.range[1]);
       }
     },
-    _NumberToString: function(obj, args){
+    _Number$$ToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _RegExpToString: function(obj, args){
+    _RegExp$$ToString: function(obj, args){
       return ''+obj.PrimitiveValue;
     },
     _RegExpExec: function(obj, args){
@@ -15239,7 +15450,7 @@ exports.natives = (function(module){
           arglist = args[2];
 
       if (arglist) {
-        return object[prop].apply(object, toInternalArray(arglist));
+        return object[prop].apply(object, $$CreateListFromArray(arglist));
       }
       return object[prop]();
     },
@@ -15316,7 +15527,7 @@ exports.natives = (function(module){
         return reviver.Call(holder, [key, value]);
       }
 
-      source = ToString(source);
+      source = $$ToString(source);
       cx.lastIndex = 0;
 
       if (cx.test(source)) {
@@ -15333,10 +15544,10 @@ exports.natives = (function(module){
         var json = require('./runtime').realm.evaluate('('+source+')'),
             wrapper = new $Object;
         wrapper.set('', json);
-        return isCallable(reviver) ? walk(wrapper, '') : json;
+        return $$IsCallable(reviver) ? walk(wrapper, '') : json;
       }
 
-      return ThrowException('invalid_json', source);
+      return $$ThrowException('invalid_json', source);
     },
     _MapSigil: function(){
       return collections.MapData.sigil;
@@ -15443,11 +15654,11 @@ exports.thunk = (function(exports){
 
   var operators    = require('./object-model/operators'),
       STRICT_EQUAL = operators.STRICT_EQUAL,
-      ToObject     = operators.ToObject,
+      ToObject     = operators.$$ToObject,
       UnaryOp      = operators.UnaryOp,
       BinaryOp     = operators.BinaryOp,
-      GetValue     = operators.GetValue,
-      PutValue     = operators.PutValue,
+      GetValue     = operators.$$GetValue,
+      PutValue     = operators.$$PutValue,
       PRE_INC      = operators.PRE_INC,
       POST_INC     = operators.POST_INC,
       PRE_DEC      = operators.PRE_DEC,
@@ -16758,7 +16969,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       environments = require('./object-model/environments'),
       operations   = require('./object-model/operations'),
       descriptors  = require('./object-model/descriptors'),
-      $Object      = require('./object-model/$Object'),
+      $Object      = require('./object-model/$Object').$Object,
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
       $TypedArray  = require('./object-model/$TypedArray'),
@@ -16767,6 +16978,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       PropertyList = require('./lib/PropertyList'),
       Thunk        = require('./thunk').Thunk,
       Stack        = require('./lib/Stack');
+
 
   var Hash        = objects.Hash,
       create      = objects.create,
@@ -16789,28 +17001,29 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       MapData     = collections.MapData,
       WeakMapData = collections.WeakMapData;
 
-  var ThrowException   = errors.ThrowException,
-      MakeException    = errors.MakeException,
+  var $$ThrowException = errors.$$ThrowException,
+      $$MakeException  = errors.$$MakeException,
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
-  var GetValue = operators.GetValue,
-      ToObject = operators.ToObject;
+  var $$GetValue = operators.$$GetValue,
+      $$ToObject = operators.$$ToObject;
 
-  var Reference               = operations.Reference,
-      IsCallable              = operations.isCallable,
-      Invoke                  = operations.invoke,
-      EnqueueChangeRecord     = operations.enqueueChangeRecord,
-      DeliverAllChangeRecords = operations.deliverAllChangeRecords,
-      IsStopIteration         = operations.isStopIteration;
+  var Reference                 = operations.Reference,
+      $$IsCallable              = operations.$$IsCallable,
+      $$Invoke                  = operations.$$Invoke,
+      $$EnqueueChangeRecord     = operations.$$EnqueueChangeRecord,
+      $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
+      $$CreateListFromArray     = operations.$$CreateListFromArray,
+      $$IsStopIteration         = operations.$$IsStopIteration;
 
-  var StringIndex            = descriptors.StringIndex,
-      Value                  = descriptors.Value,
-      Accessor               = descriptors.Accessor,
-      ArgAccessor            = descriptors.ArgAccessor,
-      IsAccessorDescriptor   = descriptors.isAccessorDescriptor,
-      FromPropertyDescriptor = descriptors.fromPropertyDescriptor,
-      ToPropertyDescriptor   = descriptors.toPropertyDescriptor;
+  var StringIndex              = descriptors.StringIndex,
+      Value                    = descriptors.Value,
+      Accessor                 = descriptors.Accessor,
+      ArgAccessor              = descriptors.ArgAccessor,
+      $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
+      $$FromPropertyDescriptor = descriptors.$$FromPropertyDescriptor,
+      $$ToPropertyDescriptor   = descriptors.$$ToPropertyDescriptor;
 
   var DeclarativeEnv = environments.DeclarativeEnvironmentRecord,
       ObjectEnv      = environments.ObjectEnvironmentRecord,
@@ -16856,8 +17069,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   };
 
 
-
-
   function noop(){}
 
   // ###############################
@@ -16867,7 +17078,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ###############################
 
 
-  function MakeConstructor(func, writable, prototype){
+  function $$MakeConstructor(func, writable, prototype){
     var install = prototype === undefined;
     if (install) {
       prototype = new $Object;
@@ -16886,7 +17097,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
 
-  var PropertyDefinitionEvaluation = (function(){
+  var $$PropertyDefinitionEvaluation = (function(){
     function makeDefiner(constructs, field, desc){
       return function(obj, key, code) {
 
@@ -16896,7 +17107,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             $F = code.flags.generator ? $GeneratorFunction : $Function,
             func = new $F('method', key, code.params, code, lex, code.flags.strict, undefined, home, sup);
 
-        constructs && MakeConstructor(func);
+        constructs && $$MakeConstructor(func);
         desc[field] = func;
         var result = obj.DefineOwnProperty(key, desc, false);
         desc[field] = undefined;
@@ -16924,7 +17135,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Configurable: true
     });
 
-    return function PropertyDefinitionEvaluation(kind, obj, key, code){
+    return function $$PropertyDefinitionEvaluation(kind, obj, key, code){
       if (kind === 'get') {
         return DefineGetter(obj, key, code);
       } else if (kind === 'set') {
@@ -16946,7 +17157,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
                     Enumerable: true,
                     Configurable: false };
 
-  function TopLevelDeclarationInstantiation(code){
+  function $$TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
         configurable = code.scopeType === 'eval',
         decls = code.lexDecls;
@@ -16962,12 +17173,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           var existing = global.GetOwnProperty(name);
           if (!existing) {
             global.DefineOwnProperty(name, desc, true);
-          } else if (IsAccessorDescriptor(existing) || !existing.Writable && !existing.Enumerable) {
-            return ThrowException('global invalid define');
+          } else if ($$IsAccessorDescriptor(existing) || !existing.Writable && !existing.Enumerable) {
+            return $$ThrowException('global invalid define');
           }
         }
 
-        env.SetMutableBinding(name, InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.flags.strict);
+        env.SetMutableBinding(name, $$InstantiateFunctionDeclaration(decl, context.LexicalEnvironment), code.flags.strict);
       }
     }
 
@@ -16996,9 +17207,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return context.getSymbol(v[1]);
   }
-  // ## ClassDefinitionEvaluation
+  // ## $$ClassDefinitionEvaluation
 
-  function ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
+  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
@@ -17009,7 +17220,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         superproto = null;
         superctor = intrinsics.FunctionProto;
       } else if (typeof superclass !== 'object') {
-        return ThrowException('non_object_superclass');
+        return $$ThrowException('non_object_superclass');
       } else if (!('Construct' in superclass)) {
         superproto = superclass;
         superctor = intrinsics.FunctionProto;
@@ -17018,7 +17229,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (superproto && superproto.Abrupt) return superproto;
 
         if (typeof superproto !== 'object') {
-          return ThrowException('non_object_superproto');
+          return $$ThrowException('non_object_superproto');
         }
         superctor = superclass;
       }
@@ -17044,7 +17255,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       constructorCode = intrinsics.EmptyClass.code;
     }
 
-    var ctor = PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
+    var ctor = $$PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
     if (ctor && ctor.Abrupt) return ctor;
 
     if (name) {
@@ -17052,7 +17263,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       proto.define(intrinsics.toStringTag, brand);
     }
 
-    MakeConstructor(ctor, false, proto);
+    $$MakeConstructor(ctor, false, proto);
     ctor.Class = true;
     ctor.SetInheritance(superctor);
     ctor.set('name', brand);
@@ -17061,20 +17272,20 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     proto.IsClassProto = true;
 
     each(methods, function(method){
-      PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
+      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
     });
 
     return ctor;
   }
 
-  // ## InstantiateFunctionDeclaration
+  // ## $$InstantiateFunctionDeclaration
 
-  function InstantiateFunctionDeclaration(decl, env){
+  function $$InstantiateFunctionDeclaration(decl, env){
     var code = decl.code,
         $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
-    MakeConstructor(func);
+    $$MakeConstructor(func);
     return func;
   }
 
@@ -17093,22 +17304,22 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return object;
       }
 
-      iterable = ToObject(iterable);
+      iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iterator = Invoke(intrinsics.iterator, iterable);
+      var iterator = $$Invoke(intrinsics.iterator, iterable);
       if (iterator && iterator.Abrupt) return iterator;
 
       var adder = object.Get('set');
       if (adder && adder.Abrupt) return adder;
 
-      if (!IsCallable(adder)) {
-        return ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
+      if (!$$IsCallable(adder)) {
+        return $$ThrowException('called_on_incompatible_object', [name + '.prototype.set']);
       }
 
       var next;
-      while (next = ToObject(Invoke('next', iterator))) {
-        if (IsStopIteration(next)) {
+      while (next = $$ToObject($$Invoke('next', iterator))) {
+        if ($$IsStopIteration(next)) {
           return object;
         }
 
@@ -17192,7 +17403,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             if (receiver == null) {
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
-              receiver = ToObject(receiver);
+              receiver = $$ToObject(receiver);
               if (receiver.Abrupt) return receiver;
             }
           }
@@ -17225,7 +17436,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function Construct(args){
         if (this.ThisMode === 'lexical') {
-          return ThrowException('construct_arrow_function');
+          return $$ThrowException('construct_arrow_function');
         }
         var prototype = this.Get('prototype');
         if (prototype && prototype.Abrupt) return prototype;
@@ -17248,7 +17459,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (prototype.Abrupt) return prototype;
 
         if (typeof prototype !== 'object') {
-          return ThrowException('instanceof_nonobject_proto');
+          return $$ThrowException('instanceof_nonobject_proto');
         }
 
         while (arg) {
@@ -17268,7 +17479,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
       $Object.call(this, intrinsics.FunctionProto);
-      this.TargetFunction = target;
+      this.BoundTargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
       this.define('arguments', intrinsics.ThrowTypeError, __A);
@@ -17283,19 +17494,19 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$BoundFunction'
     }, [
       function Call(_, newArgs){
-        return this.TargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
+        return this.BoundTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.TargetFunction.Construct) {
-          return ThrowException('not_constructor', this.TargetFunction.name);
+        if (!this.BoundTargetFunction.Construct) {
+          return $$ThrowException('not_constructor', this.BoundTargetFunction.name);
         }
-        return this.TargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        return this.BoundTargetFunction.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.TargetFunction.HasInstance) {
-          return ThrowException('instanceof_function_expected', this.TargetFunction.name);
+        if (!this.BoundTargetFunction.HasInstance) {
+          return $$ThrowException('instanceof_function_expected', this.BoundTargetFunction.name);
         }
-        return This.TargetFunction.HasInstance(arg);
+        return this.BoundTargetFunction.HasInstance(arg);
       }
     ]);
 
@@ -17319,7 +17530,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             if (receiver == null) {
               receiver = this.Realm.global;
             } else if (typeof receiver !== 'object') {
-              receiver = ToObject(receiver);
+              receiver = $$ToObject(receiver);
               if (receiver.Abrupt) return receiver;
             }
           }
@@ -17382,13 +17593,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }, [
       function Send(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'send');
+          return $$ThrowException('generator_executing', 'send');
         } else if (this.State === CLOSED) {
-          return ThrowException('generator_closed', 'send');
+          return $$ThrowException('generator_closed', 'send');
         }
         if (this.State === NEWBORN) {
           if (value !== undefined) {
-            return ThrowException('generator_send_newborn');
+            return $$ThrowException('generator_send_newborn');
           }
           this.ExecutionContext.currentGenerator = this;
           this.State = EXECUTING;
@@ -17397,13 +17608,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        return Resume(this.ExecutionContext, Normal, value);
+        return $$Resume(this.ExecutionContext, Normal, value);
       },
       function Throw(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'throw');
+          return $$ThrowException('generator_executing', 'throw');
         } else if (this.State === CLOSED) {
-          return ThrowException('generator_closed', 'throw');
+          return $$ThrowException('generator_closed', 'throw');
         }
         if (this.State === NEWBORN) {
           this.State = CLOSED;
@@ -17412,11 +17623,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        return Resume(this.ExecutionContext, Throw, value);
+        return $$Resume(this.ExecutionContext, Throw, value);
       },
       function Close(value){
         if (this.State === EXECUTING) {
-          return ThrowException('generator_executing', 'close');
+          return $$ThrowException('generator_executing', 'close');
         } else if (this.State === CLOSED) {
           return;
         }
@@ -17428,14 +17639,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = EXECUTING;
-        var result = Resume(this.ExecutionContext, Return, value);
+        var result = $$Resume(this.ExecutionContext, Return, value);
         this.State = CLOSED;
         return result;
       }
     ]);
 
 
-    function Resume(ctx, completionType, value){
+    function $$Resume(ctx, completionType, value){
       ExecutionContext.push(ctx);
       if (completionType !== Normal) {
         value = new AbruptCompletion(completionType, value);
@@ -17728,7 +17939,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new $Object.$Enumerator([]);
+    var iterator = new (require('$Object').$Enumerator)([]);
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
@@ -17871,8 +18082,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
-          if (key === 'caller' && IsCallable(val) && val.strict) {
-            return ThrowException('strict_poison_pill');
+          if (key === 'caller' && $$IsCallable(val) && val.strict) {
+            return $$ThrowException('strict_poison_pill');
           }
           return val;
         }
@@ -17889,11 +18100,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function DefineOwnProperty(key, desc, strict){
         if (!DefineOwn.call(this, key, desc, false) && strict) {
-          return ThrowException('strict_lhs_assignment');
+          return $$ThrowException('strict_lhs_assignment');
         }
 
         if (this.isMapped && this.ParameterMap.has(key)) {
-          if (IsAccessorDescriptor(desc)) {
+          if ($$IsAccessorDescriptor(desc)) {
             this.ParameterMap.Delete(key, false);
           } else {
             if ('Value' in desc) {
@@ -17927,7 +18138,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     function ModuleGetter(ref){
       var getter = this.Get = {
         Call: function(){
-          var value = GetValue(ref);
+          var value = $$GetValue(ref);
           ref = null;
           getter.Call = function(){ return value };
           return value;
@@ -18223,16 +18434,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   })();
 
   var ExecutionContext = (function(){
-    var GetSymbol               = operations.getSymbol,
-        Element                 = operations.element,
-        SuperReference          = operations.superReference,
-        GetThisEnvironment      = operations.getThisEnvironment,
-        ThisResolution          = operations.thisResolution,
-        IsCallable              = operations.isCallable,
-        Invoke                  = operations.invoke,
-        SpreadDestructuring     = operations.spreadDestructuring,
-        GetTemplateCallSite     = operations.getTemplateCallSite,
-        DeliverAllChangeRecords = operations.deliverAllChangeRecords;
+    var $$GetSymbol           = operations.$$GetSymbol,
+        $$Element             = operations.$$Element,
+        $$SuperReference      = operations.$$SuperReference,
+        $$GetThisEnvironment  = operations.$$GetThisEnvironment,
+        $$ThisResolution      = operations.$$ThisResolution,
+        $$SpreadDestructuring = operations.$$SpreadDestructuring,
+        $$GetTemplateCallSite = operations.$$GetTemplateCallSite;
 
 
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
@@ -18272,11 +18480,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       isGlobal: false,
       strict: false,
       isEval: false,
-      constructFunction: operations.evaluateConstruct,
-      callFunction: operations.evaluateCall,
-      spreadArguments: operations.spreadArguments,
-      spreadArray: operations.spreadInitialization,
-      defineMethod: PropertyDefinitionEvaluation
+      constructFunction: operations.$$EvaluateConstruct,
+      callFunction     : operations.$$EvaluateCall,
+      spreadArguments  : operations.$$SpreadArguments,
+      spreadArray      : operations.$$SpreadInitialization,
+      defineMethod     : $$PropertyDefinitionEvaluation
     });
 
     define(ExecutionContext.prototype, [
@@ -18286,12 +18494,23 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
+      function calleeName(){
+        if (this.callee) {
+          return this.callee.Get('name');
+        }
+        return null;
+      },
+      function callerName(){
+        if (this.caller) {
+          return this.caller.calleeName();
+        }
+        return null;
+      },
       function createBinding(name, immutable){
         if (immutable) {
           return this.LexicalEnvironment.CreateImmutableBinding(name);
-        } else {
-          return this.LexicalEnvironment.CreateMutableBinding(name, false);
         }
+        return this.LexicalEnvironment.CreateMutableBinding(name, false);
       },
       function initializeBinding(name, value, strict){
         return this.LexicalEnvironment.InitializeBinding(name, value, strict);
@@ -18334,7 +18553,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function createClass(def, superclass){
         this.LexicalEnvironment = new DeclarativeEnv(this.LexicalEnvironment);
-        var ctor = ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
+        var ctor = $$ClassDefinitionEvaluation(def.name, superclass, def.ctor, def.methods, def.symbols);
         this.LexicalEnvironment = this.LexicalEnvironment.outer;
         return ctor;
       },
@@ -18350,7 +18569,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var func = new $F(code.lexicalType, name, code.params, code, env, code.flags.strict);
 
         if (code.lexicalType !== 'arrow') {
-          MakeConstructor(func);
+          $$MakeConstructor(func);
           isExpression && name && env.InitializeBinding(name, func);
         }
 
@@ -18373,7 +18592,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return new $RegExp(regex);
       },
       function getPropertyReference(name, obj){
-        return Element(this, name, obj);
+        return $$Element(this, name, obj);
       },
       function getReference(name){
         var origin = this.LexicalEnvironment || this.VariableEnvironment;
@@ -18393,22 +18612,22 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
-        return SuperReference(this, name);
+        return $$SuperReference(this, name);
       },
       function getThisEnvironment(){
-        return GetThisEnvironment(this);
+        return $$GetThisEnvironment(this);
       },
       function getThis(){
-        return ThisResolution(this);
+        return $$ThisResolution(this);
       },
       function destructureSpread(target, index){
-        return SpreadDestructuring(this, target, index);
+        return $$SpreadDestructuring(this, target, index);
       },
       function getTemplateCallSite(template){
-        return GetTemplateCallSite(this, template);
+        return $$GetTemplateCallSite(this, template);
       },
       function getSymbol(name){
-        return GetSymbol(this, name) || ThrowException('undefined_symbol', name);
+        return $$GetSymbol(this, name) || $$ThrowException('undefined_symbol', name);
       },
       function createSymbol(name, isPublic){
         return new $Symbol(name, isPublic);
@@ -18418,6 +18637,16 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     ]);
 
+
+    natives.add({
+      _callerName: function(){
+        return context.callerName();
+      },
+      _IsConstructCall: function(){
+        return context.isConstruct;
+      }
+    });
+
     return ExecutionContext;
   })();
 
@@ -18426,13 +18655,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   function notify(changeRecord){
     if (!('ChangeObservers' in this)) {
-      return ThrowException('called_on_incompatible_object', ['Notifier.prototype.notify']);
+      return $$ThrowException('called_on_incompatible_object', ['Notifier.prototype.notify']);
     }
 
-    changeRecord = ToObject(changeRecord);
+    changeRecord = $$ToObject(changeRecord);
     var type = changeRecord.Get('type');
     if (typeof type !== 'string') {
-      return  ThrowException('changerecord_type', [typeof type]);
+      return  $$ThrowException('changerecord_type', [typeof type]);
     }
 
     var changeObservers = this.ChangeObservers;
@@ -18447,7 +18676,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       newRecord.PreventExtensions();
-      EnqueueChangeRecord(newRecord, changeObservers);
+      $$EnqueueChangeRecord(newRecord, changeObservers);
     }
   }
 
@@ -18504,10 +18733,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
 
-    function CreateThrowTypeError(realm){
+    function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
-      thrower.call = function(){ return ThrowException('strict_poison_pill') };
+      thrower.call = function(){ return $$ThrowException('strict_poison_pill') };
       thrower.define('length', 0, ___);
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
@@ -18567,7 +18796,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       intrinsics.ArrayProto.length = ['length', 0, __W];
       intrinsics.ErrorProto.define('name', 'Error', _CW);
       intrinsics.ErrorProto.define('message', '', _CW);
-      intrinsics.ThrowTypeError = CreateThrowTypeError(realm);
+      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
       intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
@@ -18736,9 +18965,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     natives.add({
-      _IsConstructCall: function(){
-        return context.isConstruct;
-      },
       _eval: (function(){
         function builtinEval(obj, args, direct){
           var code = args[0];
@@ -18788,7 +19014,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return func;
       },
       _BoundFunctionCreate: function(obj, args){
-        return new $BoundFunction(args[0], args[1], toInternalArray(args[2]));
+        return new $BoundFunction(args[0], args[1], $$CreateListFromArray(args[2]));
       },
       _BooleanCreate: function(obj, args){
         return new $Boolean(args[0]);
@@ -18821,7 +19047,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         try {
           var result = new RegExp(pattern, flags);
         } catch (e) {
-          return ThrowException('invalid_regexp', [pattern+'']);
+          return $$ThrowException('invalid_regexp', [pattern+'']);
         }
         return new $RegExp(result);
       },
@@ -18870,7 +19096,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     });
 
     function deliverChangeRecordsAndReportErrors(){
-      var observerResults = DeliverAllChangeRecords();
+      var observerResults = $$DeliverAllChangeRecords();
       if (observerResults && observerResults instanceof Array) {
         each(observerResults, function(error){
           realm.emit('throw', error);
@@ -18900,7 +19126,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var realm = scope.Realm;
       }
       ExecutionContext.push(new ExecutionContext(null, scope, realm, bytecode));
-      var status = TopLevelDeclarationInstantiation(bytecode);
+      var status = $$TopLevelDeclarationInstantiation(bytecode);
       if (status && status.Abrupt) {
         realm.emit(status.type, status);
         return status;
@@ -19036,7 +19262,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       ExecutionContext.push(ctx);
-      var status = TopLevelDeclarationInstantiation(script.bytecode);
+      var status = $$TopLevelDeclarationInstantiation(script.bytecode);
       context === ctx && ExecutionContext.pop();
 
       if (status && status.Abrupt) {
@@ -20752,7 +20978,7 @@ exports.index = (function(exports){
       Realm           = runtime.Realm,
       Script          = runtime.Script,
       Renderer        = debug.Renderer,
-      ThrowException  = errors.ThrowException,
+      $$ThrowException  = errors.$$ThrowException,
       $NativeFunction = runtime.$NativeFunction,
       builtins        = runtime.builtins;
 
@@ -20840,19 +21066,19 @@ exports.index = (function(exports){
           return this.query(key) !== undefined;
         },
         function each(callback){
-          return ThrowException('missing_fundamental_handler', 'each');
+          return $$ThrowException('missing_fundamental_handler', 'each');
         },
         function get(key){
-          return ThrowException('missing_fundamental_handler', 'get');
+          return $$ThrowException('missing_fundamental_handler', 'get');
         },
         function set(key, value){
-          return ThrowException('missing_fundamental_handler', 'set');
+          return $$ThrowException('missing_fundamental_handler', 'set');
         },
         function query(key){
-          return ThrowException('missing_fundamental_handler', 'query');
+          return $$ThrowException('missing_fundamental_handler', 'query');
         },
         function update(key, attr){
-          return ThrowException('missing_fundamental_handler', 'update');
+          return $$ThrowException('missing_fundamental_handler', 'update');
         }
       ]);
 
