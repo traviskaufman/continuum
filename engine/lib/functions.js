@@ -39,38 +39,46 @@ var functions = (function(exports){
     _apply = Function.prototype.apply;
   } else {
     void function(){
-      function bind(receiver){
-        if (typeof this !== 'function') {
-          throw new TypeError("Function.prototype.bind called on non-callable");
-        }
+      var construct = (function(){
+        var ctors = new Array(6),
+            template = ['return function(F,_,$){ return new F(', ') }'];
 
-        var args = toArray(arguments),
-            params = '',
-            F = this;
+        void function(){
+          var pre = '';
 
-        for (var i=1; i < args.length; i++) {
-          if (i > 1) params += ',';
-          params += '$['+i+']';
-        }
-
-        var bound = function(){
-          if (this instanceof bound) {
-            var p = params;
-            for (var i=0; i < arguments.length; i++) {
-              p += ',_['+i+']';
+          for (var i=0; i < 6; i++) {
+            var post = '';
+            ctors[i] = new Array(6);
+            for (var j=0; j < 6; j++) {
+              ctors[i][j] = new Function(template[0]+(pre+post).slice(0, -1)+template[1])();
+              post += '$['+j+'],';
             }
-            return new Function('F,$,_', 'return new F('+p+')')(F, args, arguments);
-          } else {
-            var a = toArray(args);
-            for (var i=0; i < arguments.length; i++) {
-              a[a.length] = arguments[i];
-            }
-            return _call.apply(F, a);
+            pre += '_['+i+'],';
           }
-        };
+        }();
 
-        return bound;
-      }
+        return function construct(Ctor, boundArgs, args){
+          var boundArgsCount = boundArgs.length,
+              argsCount = args.length,
+              subset = boundArgsCount in ctors ? ctors[boundArgsCount] : (ctors[boundArgsCount] = []);
+
+          if (argsCount in subset) {
+            var constructs = subset[argsCount];
+          } else {
+            var params = '';
+            for (var i=0; i < boundArgsCount; i++) {
+              params += '_['+i+'],';
+            }
+            for (var i=0; i < argsCount; i++) {
+              params += '$['+i+'],';
+            }
+            var constructs = subset[argsCount] = new Function(template[0]+params.slice(0, -1)+template[1])();
+          }
+
+          return constructs(Ctor, boundArgs, args);
+        };
+      })();
+
 
       var iframe = document.createElement('iframe');
       iframe.style.display = 'none';
@@ -78,8 +86,30 @@ var functions = (function(exports){
       iframe.src = 'javascript:';
       _call = iframe.contentWindow.Function.prototype.call;
       _apply = _call.apply;
-      _bind = bind;
       iframe = null;
+      _bind = function bind(receiver){
+        if (typeof this !== 'function') {
+          throw new TypeError("Function.prototype.bind called on non-callable");
+        }
+
+        var boundTarget = this,
+            boundArgs = toArray(arguments);
+
+        var bound = function(){
+          if (this instanceof bound) {
+            return construct(boundTarget, boundArgs, arguments);
+          }
+
+          var args = toArray(boundArgs);
+          for (var i=0; i < arguments.length; i++) {
+            args[args.length] = arguments[i];
+          }
+
+          return _call.apply(boundTarget, args);
+        };
+
+        return bound;
+      };
     }();
   }
 
