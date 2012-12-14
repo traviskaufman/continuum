@@ -13196,6 +13196,7 @@ exports.operations = (function(exports){
   function $$DeliverChangeRecords(callback){
     var changeRecords = callback.PendingChangeRecords;
     if (changeRecords && changeRecords.length) {
+      callback.PendingChangeRecords = [];
       var result = callback.Call(undefined, [new $Array(changeRecords)]);
       if (result && result.Abrupt) return result;
       return true;
