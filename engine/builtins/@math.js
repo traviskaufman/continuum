@@ -11,12 +11,27 @@ export const
 
 function isFiniteNonZero(value) {
   return value === value
+      && value !== 0
       && value !== -Infinity
-      && value !== Infinity
-      && value !== 0;
+      && value !== Infinity;
 }
 
 internalFunction(isFiniteNonZero);
+
+
+function factorial(x){
+  var i = 2,
+      n = 1;
+
+  while (i <= x) {
+    n *= i++;
+  }
+
+  return n;
+}
+
+internalFunction(factorial);
+
 
 export function abs(x){
   x = $__ToNumber(x);
@@ -33,6 +48,11 @@ export function acosh(x){
   return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;
 }
 
+export function asin(x){
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__asin(x) : x;
+}
+
 export function asinh(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;
@@ -43,9 +63,9 @@ export function atan(x){
   return isFiniteNonZero(x) ? $__atan(x) : x;
 }
 
-export function asin(x){
+export function atan2(x){
   x = $__ToNumber(x);
-  return isFiniteNonZero(x) ? $__asin(x) : x;
+  return isFiniteNonZero(x) ? $__atan2(x) : x;
 }
 
 export function atanh(x) {
@@ -53,20 +73,9 @@ export function atanh(x) {
   return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;
 }
 
-export function atan2(x){
-  x = $__ToNumber(x);
-  return isFiniteNonZero(x) ? $__atan2(x) : x;
-}
-
-
 export function ceil(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? x + 1 >> 0 : x;
-}
-
-export function acos(x){
-  x = $__ToNumber(x);
-  return isFiniteNonZero(x) ? $__acos(x) : x;
 }
 
 export function cos(x){
@@ -90,20 +99,6 @@ export function exp(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? $__exp(x) : x;
 }
-
-function factorial(x){
-  var i = 2,
-      o = 1;
-
-  if (i <= x) {
-    do {
-      o *= i++;
-    } while (i <= x)
-  }
-  return o;
-}
-
-internalFunction(factorial);
 
 export function expm1(x) {
   x = $__ToNumber(x);
@@ -142,11 +137,6 @@ export function log(x){
   return isFiniteNonZero(x) ? $__log(x) : x;
 }
 
-export function log2(x){
-  x = $__ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;
-}
-
 export function log10(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;
@@ -175,6 +165,11 @@ export function log1p(x){
     }
     return o;
   }
+}
+
+export function log2(x){
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;
 }
 
 export function max(...values){
@@ -233,14 +228,14 @@ export function sign(x){
   return x === 0 || x !== x ? x : x < 0 ? -1 : 1;
 }
 
-export function sinh(x){
-  x = $__ToNumber(x);
-  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;
-}
-
 export function sin(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? $__sin(x) : x;
+}
+
+export function sinh(x){
+  x = $__ToNumber(x);
+  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;
 }
 
 export function sqrt(x, y){
@@ -280,4 +275,3 @@ for (let k in Math) {
     Math.@@update(k, FROZEN);
   }
 }
-
