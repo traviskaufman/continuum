@@ -983,7 +983,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new (require('$Object').$Enumerator)([]);
+    var iterator = new (require('./object-model/$Object').$Enumerator)([]);
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
