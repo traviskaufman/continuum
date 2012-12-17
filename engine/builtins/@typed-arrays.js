@@ -150,7 +150,7 @@ export class ArrayBuffer {
 }
 
 builtinClass(ArrayBuffer);
-var ArrayBufferPrototype = ArrayBuffer.prototype;
+const ArrayBufferPrototype = ArrayBuffer.prototype;
 
 private @get, @set;
 
