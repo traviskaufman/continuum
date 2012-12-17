@@ -129,7 +129,7 @@ var thunk = (function(exports){
       CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
       ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
       JUMP, JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET,
-      LITERAL, LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PUT, REF, REFSYMBOL,
+      LITERAL, LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, REF, REFSYMBOL,
       REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
       STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT, UNARY, UNDEFINED,
       UPDATE, VAR, WITH, YIELD];
@@ -691,25 +691,6 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function PROPERTY(){
-      var val    = stack[--sp],
-          obj    = stack[sp - 1],
-          key    = getKey(ops[ip][0]);
-
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
-
-      var status = DefineProperty(obj, key, val);
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
     function OBJECT(){
       stack[sp++] = context.createObject();
       return cmds[++ip];
@@ -732,6 +713,48 @@ var thunk = (function(exports){
 
     function POPN(){
       sp -= ops[ip][0];
+      return cmds[++ip];
+    }
+
+    function PROPERTY(){
+      var val = stack[--sp],
+          obj = stack[sp - 1],
+          key = getKey(ops[ip][0]);
+
+      if (key && key.Abrupt) {
+        error = key;
+        return unwind;
+      }
+
+      var status = DefineProperty(obj, key, val);
+      if (status && status.Abrupt) {
+        error = status;
+        return unwind;
+      }
+
+      return cmds[++ip];
+    }
+
+    function PROTO(){
+      var proto = stack[--sp],
+          obj = stack[sp - 1];
+
+      if (proto && proto.Abrupt) {
+        error = proto;
+        return unwind;
+      }
+
+      if (obj && obj.Abrupt) {
+        error = obj;
+        return unwind;
+      }
+
+      var status = obj.SetInheritance(proto);
+      if (status && status.Abrupt) {
+        error = status;
+        return unwind;
+      }
+
       return cmds[++ip];
     }
 

@@ -177,6 +177,7 @@ var assembler = (function(exports){
       POP              = new StandardOpCode(0, 'POP'),
       POPN             = new StandardOpCode(1, 'POPN'),
       PROPERTY         = new InternedOpCode(1, 'PROPERTY'),
+      PROTO            = new StandardOpCode(0, 'PROTO'),
       PUT              = new StandardOpCode(0, 'PUT'),
       REF              = new InternedOpCode(1, 'REF'),
       REFSYMBOL        = new InternedOpCode(1, 'REFSYMBOL'),
@@ -1966,7 +1967,12 @@ var assembler = (function(exports){
   function Property(node){
     var value = node.value;
     if (node.kind === 'init'){
-      var key = node.key.type === 'Identifier' ? node.key : node.key.value;
+      var key = node.key.type === 'Identifier' ? node.key : node.key.value,
+          name = key && key.name || key;
+
+      if (name === '__proto__') {
+        key = '';
+      }
       if (node.method) {
         pushNode(value);
         FunctionExpression(value, intern(key));
@@ -1979,7 +1985,11 @@ var assembler = (function(exports){
         recurse(value);
       }
       GET();
-      PROPERTY(symbol(node.key));
+      if (name === '__proto__') {
+        PROTO();
+      } else {
+        PROPERTY(symbol(node.key));
+      }
     } else {
       var code = new Code(value, null, 'normal', 'function');
       context.queue(code);
