@@ -24,19 +24,32 @@ var types = {
   },
   SourceRange: {
     fields: {
-      0: { content: [ 'Number' ] },
-      1: { content: [ 'Number' ] }
+      0: {
+        content: [ 'Number' ]
+      },
+      1: {
+        content: [ 'Number' ]
+      }
     }
   },
   ASTNode: {
     fields: {
-      loc: { optional: true, types: [ 'SourceLocation' ] },
-      range: { optional: true, types: [ 'SourceRange' ] }
+      loc: {
+        optional: true,
+        types: [ 'SourceLocation' ]
+      },
+      range: {
+        optional: true,
+        types: [ 'SourceRange' ]
+      }
     }
   },
   ASTNodeList: {
     fields: {
-      nodes: { indexed: true, types: [ 'ASTNode' ] }
+      nodes: {
+        indexed: true,
+        types: [ 'ASTNode' ]
+      }
     }
   },
   Expression: { kind: 'ASTNode' },
@@ -66,11 +79,24 @@ var types = {
   ArrowFunctionExpression: {
     kind: 'Expression',
     fields: {
-      params: { list: true, types: [ 'Identifier', 'Pattern' ] },
-      body: { types: [ 'Expression', 'BlockStatement' ] },
-      defaults: { list: true, types: [ 'Expression' ] },
-      rest: { optional: true, types: [ 'Identifier', 'Pattern' ] },
-      generator: { values: [ false, true ] }
+      params: {
+        list: true,
+        types: [ 'Identifier', 'Pattern' ]
+      },
+      body: {
+        types: [ 'Expression', 'BlockStatement' ]
+      },
+      defaults: {
+        list: true,
+        types: [ 'Expression' ]
+      },
+      rest: {
+        optional: true,
+        types: [ 'Identifier', 'Pattern' ]
+      },
+      generator: {
+        values: [ false, true ]
+      }
     }
   },
   AssignmentExpression: {
@@ -107,7 +133,13 @@ var types = {
   },
   BreakStatement: {
     kind: 'Statement',
-    fields: { label: { optional: true, content: [ 'String' ] } }
+    fields: {
+      label: {
+        optional: true,
+        content: [ 'String' ]
+      }
+
+    }
   },
   CallExpression: {
     kind: 'Expression',
@@ -329,9 +361,17 @@ var types = {
   ModuleDeclaration: {
     kind: 'Declaration',
     fields: {
-      id: { types: [ 'Identifier' ] },
-      body: { optional: true, types: [ 'BlockStatement' ] },
-      from: { optional: true, types: [ 'Identifier', 'Literal', 'Path' ] }
+      id: {
+        types: [ 'Identifier' ]
+      },
+      body: {
+        optional: true,
+        types: [ 'BlockStatement' ]
+      },
+      from: {
+        optional: true,
+        types: [ 'Identifier', 'Literal', 'Path' ]
+      }
     }
   },
   NewExpression: {
@@ -343,108 +383,202 @@ var types = {
   },
   ObjectExpression: {
     kind: 'Expression',
-    fields: { properties: { list: true, types: [ 'Property' ] } }
+    fields: {
+      properties: {
+        list: true,
+        types: [ 'Property' ]
+      }
+    }
   },
   ObjectPattern: {
     kind: 'Pattern',
-    fields: { properties: { list: true, types: [ 'Property' ] } }
+    fields: {
+      properties: {
+        list: true,
+        types: [ 'Property' ]
+      }
+    }
   },
   Path: {
     kind: 'ASTNode',
-    fields: { body: { list: true, types: [ 'Identifier' ] } }
+    fields: {
+      body: {
+        list: true,
+        types: [ 'Identifier' ]
+      }
+    }
   },
   Program: {
     kind: 'ASTNode',
-    fields: { body: { list: true, types: [ 'Statement' ] } }
+    fields: {
+      body: {
+        list: true,
+        types: [ 'Statement' ]
+      }
+    }
   },
   Property: {
     kind: 'ASTNode',
     fields: {
-      key: { types: [ 'AtSymbol', 'Identifier', 'Literal' ] },
-      value: { types: [ 'Expression' ] },
-      kind: { values: [ 'get', 'set', 'init' ] },
-      method: { values: [ false, true ] },
-      shorthand: { values: [ false, true ] }
+      key: {
+        types: [ 'AtSymbol', 'Identifier', 'Literal' ]
+      },
+      value: {
+        types: [ 'Expression' ]
+      },
+      kind: {
+        values: [ 'get', 'set', 'init' ]
+      },
+      method: {
+        values: [ false, true ]
+      },
+      shorthand: {
+        values: [ false, true ]
+      }
     }
   },
   ReturnStatement: {
     kind: 'Statement',
-    fields: { arg: { optional: true, types: [ 'Expression' ] } }
+    fields: {
+      argument: {
+        optional: true,
+        types: [ 'Expression' ]
+      }
+    }
   },
   SequenceExpression: {
     kind: 'Expression',
-    fields: { expressions: { list: true, types: [ 'Expression' ] } }
+    fields: {
+      expressions: {
+        list: true,
+        types: [ 'Expression' ]
+      }
+    }
   },
   SpreadElement: {
     kind: 'ASTNode',
-    fields: { arg: { types: [ 'Expression' ] } }
+    fields: {
+      argument: {
+        types: [ 'Expression' ]
+      }
+    }
   },
   SwitchStatement: {
     kind: 'Statement',
     fields: {
-      descriminant: { types: [ 'Expression' ] },
-      cases: { list: true, types: [ 'SwitchCase' ] }
+      descriminant: {
+        types: [ 'Expression' ]
+      },
+      cases: {
+        list: true,
+        types: [ 'SwitchCase' ]
+      }
     }
   },
   SwitchCase: {
     kind: 'ASTNode',
     fields: {
-      test: { optional: true, types: [ 'Expression' ] },
-      consequent: { list: true, types: [ 'Statement' ] }
+      test: {
+        optional: true,
+        types: [ 'Expression' ]
+      },
+      consequent: {
+        list: true,
+        types: [ 'Statement' ]
+      }
     }
   },
   SymbolDeclaration: {
     kind: 'Declaration',
     fields: {
-      kind: { values: [ 'symbol', 'private' ] },
-      declarations: { list: true, types: [ 'SymbolDeclarator' ] }
+      kind: {
+        values: [ 'symbol', 'private' ]
+      },
+      declarations: {
+        list: true,
+        types: [ 'SymbolDeclarator' ]
+      }
     }
   },
   SymbolDeclarator: {
     kind: 'ASTNode',
     fields: {
-      id: { types: [ 'AtSymbol' ] },
-      init: { optional: true, types: [ 'Expression' ] }
+      id: {
+        types: [ 'AtSymbol' ]
+      },
+      init: {
+        optional: true,
+        types: [ 'Expression' ]
+      }
     }
   },
   TaggedTemplateExpression: {
     kind: 'Expression',
     fields: {
-      tag: { types: [ 'Identifier' ] },
-      template: { types: [ 'TemplateLiteral' ] }
+      tag: {
+        types: [ 'Identifier' ]
+      },
+      template: {
+        types: [ 'TemplateLiteral' ]
+      }
     }
   },
   TemplateElement: {
     kind: 'ASTNode',
     fields: {
-      value: { content: [ 'Object' ] },
-      tail: { values: [ false, true ] }
+      value: {
+        content: [ 'Object' ]
+      },
+      tail: {
+        values: [ false, true ]
+      }
     }
   },
   TemplateLiteral: {
     kind: 'Expression',
     fields: {
-      elements: { list: true, types: [ 'TemplateElement' ] },
-      expressions: { list: true, types: [ 'Expression' ] }
+      elements: {
+        list: true,
+        types: [ 'TemplateElement' ]
+      },
+      expressions: {
+        list: true,
+        types: [ 'Expression' ]
+      }
     }
   },
-  ThisExpression: { kind: 'Expression' },
+  ThisExpression: {
+    kind: 'Expression'
+  },
   ThrowStatement: {
     kind: 'Statement',
-    fields: { arg: { types: [ 'Expression' ] } }
+    fields: {
+      argument: {
+        types: [ 'Expression' ]
+      }
+    }
   },
   TryStatement: {
     kind: 'Statement',
     fields: {
-      block: { types: [ 'BlockStatement' ] },
-      handlers: { list: true, types: [ 'CatchClause' ] },
-      finalizer: { types: [ 'BlockStatement' ] }
+      block: {
+        types: [ 'BlockStatement' ]
+      },
+      handlers: {
+        list: true,
+        types: [ 'CatchClause' ]
+      },
+      finalizer: {
+        types: [ 'BlockStatement' ]
+      }
     }
   },
   UnaryExpression: {
     kind: 'Expression',
     fields: {
-      arg: { types: [ 'Expression' ] },
+      argument: {
+        types: [ 'Expression' ]
+      },
       operator: {
         values: [ '!', '~', '+', '-', 'void', 'typeof' ]
       }
@@ -453,42 +587,73 @@ var types = {
   UpdateExpression: {
     kind: 'Expression',
     fields: {
-      arg: { types: [ 'Expression' ] },
-      operator: { values: [ '--', '++' ] },
-      prefix: { values: [ false, true ] }
+      argument: {
+        types: [ 'Expression' ]
+      },
+      operator: {
+        values: [ '--', '++' ]
+      },
+      prefix: {
+        values: [ false, true ]
+      }
     }
   },
   VariableDeclaration: {
     kind: 'Declaration',
     fields: {
-      kind: { values: [ 'var', 'const', 'let' ] },
-      declarations: { list: true, types: [ 'VariableDeclarator' ] }
+      kind: {
+        values: [ 'var', 'const', 'let' ]
+      },
+      declarations: {
+        list: true,
+        types: [ 'VariableDeclarator' ]
+      }
     }
   },
   VariableDeclarator: {
     kind: 'ASTNode',
     fields: {
-      id: { types: [ 'Identifier', 'Pattern' ] },
-      init: { optional: true, types: [ 'Expression' ] }
+      id: {
+        types: [ 'Identifier', 'Pattern' ]
+      },
+      init: {
+        optional: true,
+        types: [ 'Expression' ]
+      }
     }
   },
   WhileStatement: {
     kind: 'Statement',
     fields: {
-      test: { types: [ 'Expression' ] },
-      body: { optional: true, types: [ 'Statement' ] }
+      test: {
+        types: [ 'Expression' ]
+      },
+      body: {
+        optional: true,
+        types: [ 'Statement' ]
+      }
     }
   },
   WithStatement: {
     kind: 'Statement',
     fields: {
-      object: { types: [ 'Expression' ] },
-      body: { optional: true, types: [ 'Statement' ] }
+      object: {
+        types: [ 'Expression' ]
+      },
+      body: {
+        optional: true,
+        types: [ 'Statement' ]
+      }
     }
   },
   YieldExpression: {
     kind: 'Expression',
-    fields: { arg: { optional: true, types: [ 'Expression' ] } }
+    fields: {
+      argument: {
+        optional: true,
+        types: [ 'Expression' ]
+      }
+    }
   }
 };
 
@@ -584,9 +749,7 @@ function classes(){
 
 var replace = _('replace'),
     thisDotEl = _('#this').get('el'),
-    thisDotElDotFirstChild = thisDotEl.get('firstChild'),
-    thisDotElDotLastChild = thisDotEl.get('lastChild'),
-    thisDotElDotChildren = thisDotEl.get('children'),
+    children = _('#this').get('el').get('children'),
     loc = _('#this').set('location', _('location'));
 
 
@@ -610,7 +773,7 @@ function funcs(){
 
 
   function GETTER(details, index){
-    var get = thisDotElDotChildren.get(index);
+    var get = children.get(index);
     return PROPERTY(details.name, 'get', _('#return', get.get('ast')));
   }
 
@@ -620,7 +783,7 @@ function funcs(){
     var set = _('#call', replace, [
       details.name,
       thisDotEl,
-      thisDotElDotChildren.get(index),
+      children.get(index),
       callback ? _('#call', callback, [param]) : param
     ]);
     return PROPERTY(details.name, 'set', set, [param]);
@@ -631,7 +794,7 @@ function funcs(){
     var set = _('#call', replace, [
       details.name,
       thisDotEl,
-      thisDotElDotChildren.get(index),
+      children.get(index),
       callback ? _('#call', callback, [param]) : param
     ]);
     return PROPERTY(details.name, 'set', set, [param]);
@@ -685,7 +848,8 @@ function funcs(){
         methods.push(GETATTR(field));
         return methods.push(SETATTR(field, 'setting', _(name).get(field.name)));
       } else if ('content' in field && field.content !== undefined) {
-        return methods.push(SETTER(field, 'content', i, _(field.content[0])));
+        methods.push(GETTER(field, i));
+        return methods.push(SETTER(field, 'content', i++, _(field.content[0])));
       }
 
       var fieldTypes = field.types;
@@ -700,8 +864,6 @@ function funcs(){
       i++;
     });
     if (ctorBody) {
-      var create = _('#this').set('el', _('#call', _('createElement'), ['span']));
-      ctorBody.unshift(_('#this').get('el').set('ast', _('#this')));
       var inheritance = [name],
           kind = def;
 
@@ -709,7 +871,9 @@ function funcs(){
         inheritance.push(kind.kind);
         kind = types[kind.kind];
       }
-      ctorBody.unshift(_('#member', create, 'className').set(LITERAL(inheritance.join(' '))));
+      ctorBody.unshift(_('#this').get('el').set('ast', _('#this')));
+      ctorBody.unshift(_('#this').get('el').set('className', LITERAL(inheritance.join(' '))));
+      ctorBody.unshift(_('#call', _('define'), [_('#this'), 'el', _('#call', _('createElement'), ['span'])]));
     }
     var ctor = _('#functiondecl', name, ['node'], ctorBody);
 

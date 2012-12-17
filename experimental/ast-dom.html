@@ -298,8 +298,11 @@ var create = (function(){
     number: Number,
   };
 
+
+
 function SourcePosition(node) {
-  (this.el = createElement('span')).className = 'SourcePosition';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SourcePosition';
   this.el.ast = this;
   this.line = node.line;
   this.column = node.column;
@@ -310,16 +313,23 @@ define(SourcePosition, 'fields', ['line', 'column']);
 define(SourcePosition.prototype, {
   type: 'SourcePosition',
   fields: {},
+  get line() {
+    return this.el.children[0].ast;
+  },
   set line(content) {
     replace('line', this.el, this.el.children[0], Number(content));
   },
+  get column() {
+    return this.el.children[1].ast;
+  },
   set column(content) {
-    replace('column', this.el, this.el.children[0], Number(content));
+    replace('column', this.el, this.el.children[1], Number(content));
   }
 });
 
 function SourceLocation(node) {
-  (this.el = createElement('span')).className = 'SourceLocation';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SourceLocation';
   this.el.ast = this;
   this.start = node.start;
   this.end = node.end;
@@ -345,7 +355,8 @@ define(SourceLocation.prototype, {
 });
 
 function SourceRange(node) {
-  (this.el = createElement('span')).className = 'SourceRange';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SourceRange';
   this.el.ast = this;
   this[0] = node[0];
   this[1] = node[1];
@@ -356,16 +367,23 @@ define(SourceRange, 'fields', ['0', '1']);
 define(SourceRange.prototype, {
   type: 'SourceRange',
   fields: {},
+  get 0() {
+    return this.el.children[0].ast;
+  },
   set 0(content) {
     replace('0', this.el, this.el.children[0], Number(content));
   },
+  get 1() {
+    return this.el.children[1].ast;
+  },
   set 1(content) {
-    replace('1', this.el, this.el.children[0], Number(content));
+    replace('1', this.el, this.el.children[1], Number(content));
   }
 });
 
 function ASTNode(node) {
-  (this.el = createElement('span')).className = 'ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ASTNode';
   this.el.ast = this;
   this.loc = node.loc;
   this.range = node.range;
@@ -376,22 +394,23 @@ define(ASTNode, 'fields', ['loc', 'range']);
 define(ASTNode.prototype, {
   type: 'ASTNode',
   fields: { loc: SourceLocation, range: SourceRange },
-  get loc() {
-    return this.el.children[0].ast;
-  },
-  set loc(node) {
-    replace('loc', this.el, this.el.children[0], node);
-  },
-  get range() {
-    return this.el.children[1].ast;
-  },
-  set range(node) {
-    replace('range', this.el, this.el.children[1], node);
-  }
+  // get loc() {
+  //   return this.el.children[0].ast;
+  // },
+  // set loc(node) {
+  //   replace('loc', this.el, this.el.children[0], node);
+  // },
+  // get range() {
+  //   return this.el.children[1].ast;
+  // },
+  // set range(node) {
+  //   replace('range', this.el, this.el.children[1], node);
+  // }
 });
 
 function ASTNodeList(node) {
-  (this.el = createElement('span')).className = 'ASTNodeList';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ASTNodeList';
   this.el.ast = this;
   return index(this, nodes, 'nodes', ASTNode);
 }
@@ -410,7 +429,8 @@ define(ASTNodeList.prototype, {
 });
 
 function Expression(node) {
-  (this.el = createElement('span')).className = 'Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Expression ASTNode';
   this.el.ast = this;
 }
 
@@ -419,7 +439,8 @@ define(Expression, 'fields', []);
 inherit(Expression, ASTNode, { type: 'Expression', fields: {} });
 
 function Pattern(node) {
-  (this.el = createElement('span')).className = 'Pattern ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Pattern ASTNode';
   this.el.ast = this;
 }
 
@@ -428,7 +449,8 @@ define(Pattern, 'fields', []);
 inherit(Pattern, ASTNode, { type: 'Pattern', fields: {} });
 
 function Statement(node) {
-  (this.el = createElement('span')).className = 'Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Statement ASTNode';
   this.el.ast = this;
 }
 
@@ -437,7 +459,8 @@ define(Statement, 'fields', []);
 inherit(Statement, ASTNode, { type: 'Statement', fields: {} });
 
 function Declaration(node) {
-  (this.el = createElement('span')).className = 'Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Declaration Statement ASTNode';
   this.el.ast = this;
 }
 
@@ -446,7 +469,8 @@ define(Declaration, 'fields', []);
 inherit(Declaration, Statement, { type: 'Declaration', fields: {} });
 
 function ArrayExpression(node) {
-  (this.el = createElement('span')).className = 'ArrayExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ArrayExpression Expression ASTNode';
   this.el.ast = this;
   this.elements = node.elements;
 }
@@ -465,7 +489,8 @@ inherit(ArrayExpression, Expression, {
 });
 
 function ArrayPattern(node) {
-  (this.el = createElement('span')).className = 'ArrayPattern Pattern ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ArrayPattern Pattern ASTNode';
   this.el.ast = this;
   this.elements = node.elements;
 }
@@ -484,7 +509,8 @@ inherit(ArrayPattern, Pattern, {
 });
 
 function ArrowFunctionExpression(node) {
-  (this.el = createElement('span')).className = 'ArrowFunctionExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ArrowFunctionExpression Expression ASTNode';
   this.el.ast = this;
   this.params = node.params;
   this.body = node.body;
@@ -538,7 +564,8 @@ inherit(ArrowFunctionExpression, Expression, {
 });
 
 function AssignmentExpression(node) {
-  (this.el = createElement('span')).className = 'AssignmentExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'AssignmentExpression Expression ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -573,7 +600,8 @@ inherit(AssignmentExpression, Expression, {
 });
 
 function AtSymbol(node) {
-  (this.el = createElement('span')).className = 'AtSymbol Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'AtSymbol Expression ASTNode';
   this.el.ast = this;
   this.name = node.name;
   this.internal = node.internal;
@@ -586,6 +614,9 @@ enumeration(AtSymbol, 'internal', [false, true]);
 inherit(AtSymbol, Expression, {
   type: 'AtSymbol',
   fields: {},
+  get name() {
+    return this.el.children[0].ast;
+  },
   set name(content) {
     replace('name', this.el, this.el.children[0], String(content));
   },
@@ -598,7 +629,8 @@ inherit(AtSymbol, Expression, {
 });
 
 function BlockStatement(node) {
-  (this.el = createElement('span')).className = 'BlockStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'BlockStatement Statement ASTNode';
   this.el.ast = this;
   this.body = node.body;
 }
@@ -617,7 +649,8 @@ inherit(BlockStatement, Statement, {
 });
 
 function BinaryExpression(node) {
-  (this.el = createElement('span')).className = 'BinaryExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'BinaryExpression Expression ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -626,8 +659,30 @@ function BinaryExpression(node) {
 
 define(BinaryExpression, 'fields', ['left', 'right', 'operator']);
 
-enumeration(BinaryExpression, 'operator', ['+', '-', '/', '*', '%', '^', '&', '|', '>>', '<<', '>>>', '===',
-                                           '==', '>', '<', '!==', '!=', '>=', '<=', 'in', 'delete', 'instanceof']);
+enumeration(BinaryExpression, 'operator', [
+  '+',
+  '-',
+  '/',
+  '*',
+  '%',
+  '^',
+  '&',
+  '|',
+  '>>',
+  '<<',
+  '>>>',
+  '===',
+  '==',
+  '>',
+  '<',
+  '!==',
+  '!=',
+  '>=',
+  '<=',
+  'in',
+  'delete',
+  'instanceof'
+]);
 
 inherit(BinaryExpression, Expression, {
   type: 'BinaryExpression',
@@ -653,7 +708,8 @@ inherit(BinaryExpression, Expression, {
 });
 
 function BreakStatement(node) {
-  (this.el = createElement('span')).className = 'BreakStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'BreakStatement Statement ASTNode';
   this.el.ast = this;
   this.label = node.label;
 }
@@ -663,13 +719,17 @@ define(BreakStatement, 'fields', ['label']);
 inherit(BreakStatement, Statement, {
   type: 'BreakStatement',
   fields: {},
+  get label() {
+    return this.el.children[0].ast;
+  },
   set label(content) {
     replace('label', this.el, this.el.children[0], String(content));
   }
 });
 
 function CallExpression(node) {
-  (this.el = createElement('span')).className = 'CallExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'CallExpression Expression ASTNode';
   this.el.ast = this;
   this.callee = node.callee;
   this.args = node.args;
@@ -695,7 +755,8 @@ inherit(CallExpression, Expression, {
 });
 
 function CatchClause(node) {
-  (this.el = createElement('span')).className = 'CatchClause ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'CatchClause ASTNode';
   this.el.ast = this;
   this.param = node.param;
   this.body = node.body;
@@ -721,7 +782,8 @@ inherit(CatchClause, ASTNode, {
 });
 
 function ConditionalExpression(node) {
-  (this.el = createElement('span')).className = 'ConditionalExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ConditionalExpression Expression ASTNode';
   this.el.ast = this;
   this.test = node.test;
   this.consequent = node.consequent;
@@ -754,7 +816,8 @@ inherit(ConditionalExpression, Expression, {
 });
 
 function ClassBody(node) {
-  (this.el = createElement('span')).className = 'ClassBody ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ClassBody ASTNode';
   this.el.ast = this;
   this.body = node.body;
 }
@@ -773,7 +836,8 @@ inherit(ClassBody, ASTNode, {
 });
 
 function ClassDeclaration(node) {
-  (this.el = createElement('span')).className = 'ClassDeclaration Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ClassDeclaration Declaration Statement ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.body = node.body;
@@ -806,7 +870,8 @@ inherit(ClassDeclaration, Declaration, {
 });
 
 function ClassExpression(node) {
-  (this.el = createElement('span')).className = 'ClassExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ClassExpression Expression ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.body = node.body;
@@ -839,7 +904,8 @@ inherit(ClassExpression, Expression, {
 });
 
 function ContinueStatement(node) {
-  (this.el = createElement('span')).className = 'ContinueStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ContinueStatement Statement ASTNode';
   this.el.ast = this;
   this.label = node.label;
 }
@@ -849,13 +915,17 @@ define(ContinueStatement, 'fields', ['label']);
 inherit(ContinueStatement, Statement, {
   type: 'ContinueStatement',
   fields: {},
+  get label() {
+    return this.el.children[0].ast;
+  },
   set label(content) {
     replace('label', this.el, this.el.children[0], String(content));
   }
 });
 
 function ComprehensionBlock(node) {
-  (this.el = createElement('span')).className = 'ComprehensionBlock ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ComprehensionBlock ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -888,7 +958,8 @@ inherit(ComprehensionBlock, ASTNode, {
 });
 
 function ComprehensionExpression(node) {
-  (this.el = createElement('span')).className = 'ComprehensionExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ComprehensionExpression Expression ASTNode';
   this.el.ast = this;
   this.filter = node.filter;
   this.blocks = node.blocks;
@@ -921,7 +992,8 @@ inherit(ComprehensionExpression, Expression, {
 });
 
 function DoWhileStatement(node) {
-  (this.el = createElement('span')).className = 'DoWhileStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'DoWhileStatement Statement ASTNode';
   this.el.ast = this;
   this.body = node.body;
   this.test = node.test;
@@ -947,7 +1019,8 @@ inherit(DoWhileStatement, Statement, {
 });
 
 function DebuggerStatement(node) {
-  (this.el = createElement('span')).className = 'DebuggerStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'DebuggerStatement Statement ASTNode';
   this.el.ast = this;
 }
 
@@ -956,7 +1029,8 @@ define(DebuggerStatement, 'fields', []);
 inherit(DebuggerStatement, Statement, { type: 'DebuggerStatement', fields: {} });
 
 function EmptyStatement(node) {
-  (this.el = createElement('span')).className = 'EmptyStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'EmptyStatement Statement ASTNode';
   this.el.ast = this;
 }
 
@@ -965,7 +1039,8 @@ define(EmptyStatement, 'fields', []);
 inherit(EmptyStatement, Statement, { type: 'EmptyStatement', fields: {} });
 
 function ExportDeclaration(node) {
-  (this.el = createElement('span')).className = 'ExportDeclaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ExportDeclaration Statement ASTNode';
   this.el.ast = this;
   this.specifiers = node.specifiers;
   this.declaration = node.declaration;
@@ -991,7 +1066,8 @@ inherit(ExportDeclaration, Statement, {
 });
 
 function ExportSpecifier(node) {
-  (this.el = createElement('span')).className = 'ExportSpecifier ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ExportSpecifier ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.from = node.from;
@@ -1017,7 +1093,8 @@ inherit(ExportSpecifier, ASTNode, {
 });
 
 function ExportSpecifierSet(node) {
-  (this.el = createElement('span')).className = 'ExportSpecifierSet ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ExportSpecifierSet ASTNode';
   this.el.ast = this;
   this.specifiers = node.specifiers;
 }
@@ -1036,7 +1113,8 @@ inherit(ExportSpecifierSet, ASTNode, {
 });
 
 function ExpressionStatement(node) {
-  (this.el = createElement('span')).className = 'ExpressionStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ExpressionStatement Statement ASTNode';
   this.el.ast = this;
   this.expression = node.expression;
 }
@@ -1055,7 +1133,8 @@ inherit(ExpressionStatement, Statement, {
 });
 
 function ForStatement(node) {
-  (this.el = createElement('span')).className = 'ForStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ForStatement Statement ASTNode';
   this.el.ast = this;
   this.init = node.init;
   this.test = node.test;
@@ -1095,7 +1174,8 @@ inherit(ForStatement, Statement, {
 });
 
 function ForInStatement(node) {
-  (this.el = createElement('span')).className = 'ForInStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ForInStatement Statement ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -1128,7 +1208,8 @@ inherit(ForInStatement, Statement, {
 });
 
 function ForOfStatement(node) {
-  (this.el = createElement('span')).className = 'ForOfStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ForOfStatement Statement ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -1161,7 +1242,8 @@ inherit(ForOfStatement, Statement, {
 });
 
 function FunctionDeclaration(node) {
-  (this.el = createElement('span')).className = 'FunctionDeclaration Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'FunctionDeclaration Declaration Statement ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.params = node.params;
@@ -1223,7 +1305,8 @@ inherit(FunctionDeclaration, Declaration, {
 });
 
 function FunctionExpression(node) {
-  (this.el = createElement('span')).className = 'FunctionExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'FunctionExpression Expression ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.params = node.params;
@@ -1285,7 +1368,8 @@ inherit(FunctionExpression, Expression, {
 });
 
 function Glob(node) {
-  (this.el = createElement('span')).className = 'Glob ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Glob ASTNode';
   this.el.ast = this;
 }
 
@@ -1294,7 +1378,8 @@ define(Glob, 'fields', []);
 inherit(Glob, ASTNode, { type: 'Glob', fields: {} });
 
 function Identifier(node) {
-  (this.el = createElement('span')).className = 'Identifier Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Identifier Expression ASTNode';
   this.el.ast = this;
   this.name = node.name;
 }
@@ -1304,13 +1389,17 @@ define(Identifier, 'fields', ['name']);
 inherit(Identifier, Expression, {
   type: 'Identifier',
   fields: {},
+  get name() {
+    return this.el.children[0].ast;
+  },
   set name(content) {
     replace('name', this.el, this.el.children[0], String(content));
   }
 });
 
 function IfStatement(node) {
-  (this.el = createElement('span')).className = 'IfStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'IfStatement Statement ASTNode';
   this.el.ast = this;
   this.test = node.test;
   this.consequent = node.consequent;
@@ -1343,7 +1432,8 @@ inherit(IfStatement, Statement, {
 });
 
 function ImportDeclaration(node) {
-  (this.el = createElement('span')).className = 'ImportDeclaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ImportDeclaration Statement ASTNode';
   this.el.ast = this;
   this.specifiers = node.specifiers;
   this.from = node.from;
@@ -1369,7 +1459,8 @@ inherit(ImportDeclaration, Statement, {
 });
 
 function ImportSpecifier(node) {
-  (this.el = createElement('span')).className = 'ImportSpecifier ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ImportSpecifier ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.from = node.from;
@@ -1395,7 +1486,8 @@ inherit(ImportSpecifier, ASTNode, {
 });
 
 function Literal(node) {
-  (this.el = createElement('span')).className = 'Literal Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Literal Expression ASTNode';
   this.el.ast = this;
   this.value = node.value;
 }
@@ -1405,13 +1497,17 @@ define(Literal, 'fields', ['value']);
 inherit(Literal, Expression, {
   type: 'Literal',
   fields: {},
+  get value() {
+    return this.el.children[0].ast;
+  },
   set value(content) {
     replace('value', this.el, this.el.children[0], String(content));
   }
 });
 
 function LabeledStatement(node) {
-  (this.el = createElement('span')).className = 'LabeledStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'LabeledStatement Statement ASTNode';
   this.el.ast = this;
   this.label = node.label;
   this.body = node.body;
@@ -1422,19 +1518,23 @@ define(LabeledStatement, 'fields', ['label', 'body']);
 inherit(LabeledStatement, Statement, {
   type: 'LabeledStatement',
   fields: { body: Statement },
+  get label() {
+    return this.el.children[0].ast;
+  },
   set label(content) {
     replace('label', this.el, this.el.children[0], String(content));
   },
   get body() {
-    return this.el.children[0].ast;
+    return this.el.children[1].ast;
   },
   set body(node) {
-    replace('body', this.el, this.el.children[0], node);
+    replace('body', this.el, this.el.children[1], node);
   }
 });
 
 function LogicalExpression(node) {
-  (this.el = createElement('span')).className = 'LogicalExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'LogicalExpression Expression ASTNode';
   this.el.ast = this;
   this.left = node.left;
   this.right = node.right;
@@ -1469,7 +1569,8 @@ inherit(LogicalExpression, Expression, {
 });
 
 function MemberExpression(node) {
-  (this.el = createElement('span')).className = 'MemberExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'MemberExpression Expression ASTNode';
   this.el.ast = this;
   this.object = node.object;
   this.property = node.property;
@@ -1504,7 +1605,8 @@ inherit(MemberExpression, Expression, {
 });
 
 function MethodDefinition(node) {
-  (this.el = createElement('span')).className = 'MethodDefinition ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'MethodDefinition ASTNode';
   this.el.ast = this;
   this.key = node.key;
   this.value = node.value;
@@ -1539,7 +1641,8 @@ inherit(MethodDefinition, ASTNode, {
 });
 
 function ModuleDeclaration(node) {
-  (this.el = createElement('span')).className = 'ModuleDeclaration Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ModuleDeclaration Declaration Statement ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.body = node.body;
@@ -1572,7 +1675,8 @@ inherit(ModuleDeclaration, Declaration, {
 });
 
 function NewExpression(node) {
-  (this.el = createElement('span')).className = 'NewExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'NewExpression Expression ASTNode';
   this.el.ast = this;
   this.callee = node.callee;
   this.args = node.args;
@@ -1598,7 +1702,8 @@ inherit(NewExpression, Expression, {
 });
 
 function ObjectExpression(node) {
-  (this.el = createElement('span')).className = 'ObjectExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ObjectExpression Expression ASTNode';
   this.el.ast = this;
   this.properties = node.properties;
 }
@@ -1617,7 +1722,8 @@ inherit(ObjectExpression, Expression, {
 });
 
 function ObjectPattern(node) {
-  (this.el = createElement('span')).className = 'ObjectPattern Pattern ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ObjectPattern Pattern ASTNode';
   this.el.ast = this;
   this.properties = node.properties;
 }
@@ -1636,7 +1742,8 @@ inherit(ObjectPattern, Pattern, {
 });
 
 function Path(node) {
-  (this.el = createElement('span')).className = 'Path ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Path ASTNode';
   this.el.ast = this;
   this.body = node.body;
 }
@@ -1655,7 +1762,8 @@ inherit(Path, ASTNode, {
 });
 
 function Program(node) {
-  (this.el = createElement('span')).className = 'Program ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Program ASTNode';
   this.el.ast = this;
   this.body = node.body;
 }
@@ -1674,7 +1782,8 @@ inherit(Program, ASTNode, {
 });
 
 function Property(node) {
-  (this.el = createElement('span')).className = 'Property ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'Property ASTNode';
   this.el.ast = this;
   this.key = node.key;
   this.value = node.value;
@@ -1727,7 +1836,8 @@ inherit(Property, ASTNode, {
 });
 
 function ReturnStatement(node) {
-  (this.el = createElement('span')).className = 'ReturnStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ReturnStatement Statement ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
 }
@@ -1746,7 +1856,8 @@ inherit(ReturnStatement, Statement, {
 });
 
 function SequenceExpression(node) {
-  (this.el = createElement('span')).className = 'SequenceExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SequenceExpression Expression ASTNode';
   this.el.ast = this;
   this.expressions = node.expressions;
 }
@@ -1765,7 +1876,8 @@ inherit(SequenceExpression, Expression, {
 });
 
 function SpreadElement(node) {
-  (this.el = createElement('span')).className = 'SpreadElement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SpreadElement ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
 }
@@ -1784,7 +1896,8 @@ inherit(SpreadElement, ASTNode, {
 });
 
 function SwitchStatement(node) {
-  (this.el = createElement('span')).className = 'SwitchStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SwitchStatement Statement ASTNode';
   this.el.ast = this;
   this.descriminant = node.descriminant;
   this.cases = node.cases;
@@ -1810,7 +1923,8 @@ inherit(SwitchStatement, Statement, {
 });
 
 function SwitchCase(node) {
-  (this.el = createElement('span')).className = 'SwitchCase ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SwitchCase ASTNode';
   this.el.ast = this;
   this.test = node.test;
   this.consequent = node.consequent;
@@ -1836,7 +1950,8 @@ inherit(SwitchCase, ASTNode, {
 });
 
 function SymbolDeclaration(node) {
-  (this.el = createElement('span')).className = 'SymbolDeclaration Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SymbolDeclaration Declaration Statement ASTNode';
   this.el.ast = this;
   this.kind = node.kind;
   this.declarations = node.declarations;
@@ -1864,7 +1979,8 @@ inherit(SymbolDeclaration, Declaration, {
 });
 
 function SymbolDeclarator(node) {
-  (this.el = createElement('span')).className = 'SymbolDeclarator ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'SymbolDeclarator ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.init = node.init;
@@ -1890,7 +2006,8 @@ inherit(SymbolDeclarator, ASTNode, {
 });
 
 function TaggedTemplateExpression(node) {
-  (this.el = createElement('span')).className = 'TaggedTemplateExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'TaggedTemplateExpression Expression ASTNode';
   this.el.ast = this;
   this.tag = node.tag;
   this.template = node.template;
@@ -1916,7 +2033,8 @@ inherit(TaggedTemplateExpression, Expression, {
 });
 
 function TemplateElement(node) {
-  (this.el = createElement('span')).className = 'TemplateElement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'TemplateElement ASTNode';
   this.el.ast = this;
   this.value = node.value;
   this.tail = node.tail;
@@ -1929,6 +2047,9 @@ enumeration(TemplateElement, 'tail', [false, true]);
 inherit(TemplateElement, ASTNode, {
   type: 'TemplateElement',
   fields: {},
+  get value() {
+    return this.el.children[0].ast;
+  },
   set value(content) {
     replace('value', this.el, this.el.children[0], Object(content));
   },
@@ -1941,7 +2062,8 @@ inherit(TemplateElement, ASTNode, {
 });
 
 function TemplateLiteral(node) {
-  (this.el = createElement('span')).className = 'TemplateLiteral Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'TemplateLiteral Expression ASTNode';
   this.el.ast = this;
   this.elements = node.elements;
   this.expressions = node.expressions;
@@ -1967,7 +2089,8 @@ inherit(TemplateLiteral, Expression, {
 });
 
 function ThisExpression(node) {
-  (this.el = createElement('span')).className = 'ThisExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ThisExpression Expression ASTNode';
   this.el.ast = this;
 }
 
@@ -1976,7 +2099,8 @@ define(ThisExpression, 'fields', []);
 inherit(ThisExpression, Expression, { type: 'ThisExpression', fields: {} });
 
 function ThrowStatement(node) {
-  (this.el = createElement('span')).className = 'ThrowStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'ThrowStatement Statement ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
 }
@@ -1995,7 +2119,8 @@ inherit(ThrowStatement, Statement, {
 });
 
 function TryStatement(node) {
-  (this.el = createElement('span')).className = 'TryStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'TryStatement Statement ASTNode';
   this.el.ast = this;
   this.block = node.block;
   this.handlers = node.handlers;
@@ -2028,7 +2153,8 @@ inherit(TryStatement, Statement, {
 });
 
 function UnaryExpression(node) {
-  (this.el = createElement('span')).className = 'UnaryExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'UnaryExpression Expression ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
   this.operator = node.operator;
@@ -2056,7 +2182,8 @@ inherit(UnaryExpression, Expression, {
 });
 
 function UpdateExpression(node) {
-  (this.el = createElement('span')).className = 'UpdateExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'UpdateExpression Expression ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
   this.operator = node.operator;
@@ -2093,7 +2220,8 @@ inherit(UpdateExpression, Expression, {
 });
 
 function VariableDeclaration(node) {
-  (this.el = createElement('span')).className = 'VariableDeclaration Declaration Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'VariableDeclaration Declaration Statement ASTNode';
   this.el.ast = this;
   this.kind = node.kind;
   this.declarations = node.declarations;
@@ -2121,7 +2249,8 @@ inherit(VariableDeclaration, Declaration, {
 });
 
 function VariableDeclarator(node) {
-  (this.el = createElement('span')).className = 'VariableDeclarator ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'VariableDeclarator ASTNode';
   this.el.ast = this;
   this.id = node.id;
   this.init = node.init;
@@ -2147,7 +2276,8 @@ inherit(VariableDeclarator, ASTNode, {
 });
 
 function WhileStatement(node) {
-  (this.el = createElement('span')).className = 'WhileStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'WhileStatement Statement ASTNode';
   this.el.ast = this;
   this.test = node.test;
   this.body = node.body;
@@ -2173,7 +2303,8 @@ inherit(WhileStatement, Statement, {
 });
 
 function WithStatement(node) {
-  (this.el = createElement('span')).className = 'WithStatement Statement ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'WithStatement Statement ASTNode';
   this.el.ast = this;
   this.object = node.object;
   this.body = node.body;
@@ -2199,7 +2330,8 @@ inherit(WithStatement, Statement, {
 });
 
 function YieldExpression(node) {
-  (this.el = createElement('span')).className = 'YieldExpression Expression ASTNode';
+  define(this, 'el', createElement('span'));
+  this.el.className = 'YieldExpression Expression ASTNode';
   this.el.ast = this;
   this.arg = node.arg;
 }
@@ -2216,6 +2348,7 @@ inherit(YieldExpression, Expression, {
     replace('arg', this.el, this.el.children[0], node);
   }
 });
+
 
 
   function create(ast){
