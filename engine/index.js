@@ -8,16 +8,16 @@ var index = (function(exports){
       constants = require('./constants'),
       errors    = require('./errors');
 
-  var assign          = objects.assign,
-      assignAll       = objects.assignAll,
-      define          = objects.define,
-      inherit         = objects.inherit,
-      Realm           = runtime.Realm,
-      Script          = runtime.Script,
-      Renderer        = debug.Renderer,
-      $$ThrowException  = errors.$$ThrowException,
-      $NativeFunction = runtime.$NativeFunction,
-      builtins        = runtime.builtins;
+  var assign           = objects.assign,
+      assignAll        = objects.assignAll,
+      define           = objects.define,
+      inherit          = objects.inherit,
+      Realm            = runtime.Realm,
+      Script           = runtime.Script,
+      Renderer         = debug.Renderer,
+      $$ThrowException = errors.$$ThrowException,
+      $NativeFunction  = runtime.$NativeFunction,
+      builtins         = runtime.builtins;
 
 
   var exoticTemplates = {
