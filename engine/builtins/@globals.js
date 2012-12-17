@@ -1,4 +1,5 @@
 $__global.@@define(@toStringTag, 'global');
+$__StopIteration.@@define(@toStringTag, 'StopIteration');
 
 
 export function decodeURI(value){
