@@ -795,14 +795,14 @@ function funcs(){
       details.name,
       thisDotEl,
       children.get(index),
-      callback ? _('#call', callback, [param]) : param
+      callback ? _('#call', callback, [_(param)]) : _(param)
     ]);
-    return PROPERTY(details.name, 'set', set, [param]);
+    return PROPERTY(details.name, 'set', set, [_(param)]);
   }
 
   function SETATTR(details, param, callback){
-    var set = _('#call', thisDotEl.get('setAttribute'), [details.name, _('#call', callback, [param])]);
-    return PROPERTY(details.name, 'set', set, [param]);
+    var set = _('#call', thisDotEl.get('setAttribute'), [details.name, _('#call', callback, [_(param)])]);
+    return PROPERTY(details.name, 'set', set, [_(param)]);
   }
 
   function GETATTR(details){
