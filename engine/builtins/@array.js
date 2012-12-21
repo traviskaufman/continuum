@@ -1,6 +1,6 @@
 import Iterator from '@iter';
 
-const joinArray = (target, separator) => {
+function joinArray(target, separator){
   const array = $__ToObject(target),
         len   = $__ToUint32(array.length),
         sep   = $__ToString(separator);
@@ -14,7 +14,9 @@ const joinArray = (target, separator) => {
     result += sep + array[i];
   }
   return result;
-};
+}
+
+internalFunction(joinArray);
 
 
 const K = 0x01,
