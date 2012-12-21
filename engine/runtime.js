@@ -1053,6 +1053,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function IsSealed(){
         return true;
+      },
+      function DefaultValue(){
+        return '[object Symbol]';
       }
     ]);
 
