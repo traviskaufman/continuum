@@ -1489,6 +1489,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$SpreadDestructuring = operations.$$SpreadDestructuring,
         $$GetTemplateCallSite = operations.$$GetTemplateCallSite;
 
+    var strictUnfound = new Hash,
+        unfound = new Hash;
+
 
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
       this.caller = caller;
@@ -1642,21 +1645,32 @@ var runtime = (function(GLOBAL, exports, undefined){
         return $$Element(this, name, obj);
       },
       function getReference(name){
-        var origin = this.LexicalEnvironment || this.VariableEnvironment;
-        origin.cache || (origin.cache = new Hash);
-        if (name in origin.cache) {
-          return origin.cache[name];
+        var origin = this.LexicalEnvironment || this.VariableEnvironment,
+            cache = origin.cache;
+
+        if (cache) {
+          if (name in cache) {
+            return cache[name];
+          }
+        } else {
+          cache = origin.cache = new Hash;
         }
+
 
         var lex = origin,
             strict = this.strict;
 
         do {
           if (lex.HasBinding(name)) {
-            return origin.cache[name] = new Reference(lex, name, strict);
+            return cache[name] = new Reference(lex, name, strict);
           }
         } while (lex = lex.outer)
-        return new Reference(undefined, name, strict);
+
+        cache = strict ? strictUnfound : unfound;
+        if (name in cache) {
+          return cache[name];
+        }
+        return cache[name] = new Reference(undefined, name, strict);
       },
       function getSuperReference(name){
         return $$SuperReference(this, name);
@@ -1850,7 +1864,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit(Intrinsics, DeclarativeEnv, {
-      type: 'Intrinsics',
+      type: 'Intrinsics'
     }, [
       function binding(options){
         if (typeof options === 'function') {
@@ -2139,7 +2153,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
         }
         callback.Call(undefined, [result]);
-      },
+      }
     });
 
     function deliverChangeRecordsAndReportErrors(){

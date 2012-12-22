@@ -1384,7 +1384,7 @@ var debug = (function(exports){
       return o instanceof Mirror;
     },
     introspect,
-    Renderer,
+    Renderer
   ]);
 
 

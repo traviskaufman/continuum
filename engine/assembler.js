@@ -1292,7 +1292,7 @@ var assembler = (function(exports){
 
     define(Symbol.prototype, 'length', 2);
     define(Symbol.prototype, [
-      Array.prototype.join,
+      Array.prototype.join
     ]);
 
     return function symbol(node){
