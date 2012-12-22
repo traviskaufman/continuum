@@ -32,7 +32,7 @@ export class Object {
   }
 
   hasOwnProperty(key){
-    return $__ToObject(this).@@HasOwnProperty($__ToPropertyName(key));
+    return $__ToObject(this).@@HasOwnProperty($__ToPropertyKey(key));
   }
 
   propertyIsEnumerable(key){
@@ -79,7 +79,7 @@ export function create(prototype, properties){
 export function defineProperty(object, key, property){
   ensureObject(object, 'Object.defineProperty');
   ensureDescriptor(property);
-  object.@@DefineOwnProperty($__ToPropertyName(key), property);
+  object.@@DefineOwnProperty($__ToPropertyKey(key), property);
   return object;
 }
 
@@ -117,7 +117,7 @@ export function freeze(object){
 
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
-  return object.@@GetOwnProperty($__ToPropertyName(key));
+  return object.@@GetOwnProperty($__ToPropertyKey(key));
 }
 
 export function getOwnPropertyNames(object){
@@ -127,7 +127,7 @@ export function getOwnPropertyNames(object){
 
 export function getPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getPropertyDescriptor');
-  return object.@@GetProperty($__ToPropertyName(key));
+  return object.@@GetProperty($__ToPropertyKey(key));
 }
 
 export function getPropertyNames(object){
@@ -279,7 +279,7 @@ builtinFunction(isPrototypeOf);
 
 
 export function hasOwnProperty(object, key){
-  return $__ToObject(object).@@HasOwnProperty($__ToPropertyNames(key));
+  return $__ToObject(object).@@HasOwnProperty($__ToPropertyKeys(key));
 }
 
 builtinFunction(hasOwnProperty);

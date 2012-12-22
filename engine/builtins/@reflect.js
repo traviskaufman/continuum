@@ -246,13 +246,13 @@ builtinFunction(construct);
 export function defineProperty(target, name, desc){
   ensureObject(target, '@Reflect.defineProperty');
   ensureDescriptor(desc);
-  return target.@@DefineOwnProperty($__ToPropertyName(name), desc);
+  return target.@@DefineOwnProperty($__ToPropertyKey(name), desc);
 }
 builtinFunction(defineProperty);
 
 export function deleteProperty(target, name){
   ensureObject(target, '@Reflect.deleteProperty');
-  return target.@@Delete($__ToPropertyName(name), false);
+  return target.@@Delete($__ToPropertyKey(name), false);
 }
 builtinFunction(deleteProperty);
 
@@ -288,13 +288,13 @@ builtinFunction(freeze);
 
 export function get(target, name, receiver){
   receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__ToObject(target).@@GetP($__ToPropertyName(name), receiver);
+  return $__ToObject(target).@@GetP($__ToPropertyKey(name), receiver);
 }
 builtinFunction(get);
 
 export function getOwnPropertyDescriptor(target, name){
   ensureObject(target, '@Reflect.getOwnPropertyDescriptor');
-  return target.@@GetOwnProperty($__ToPropertyName(name));
+  return target.@@GetOwnProperty($__ToPropertyKey(name));
 }
 builtinFunction(getOwnPropertyDescriptor);
 
@@ -311,12 +311,12 @@ export function getPrototypeOf(target){
 builtinFunction(getPrototypeOf);
 
 export function has(target, name){
-  return $__ToObject(target).@@HasProperty($__ToPropertyName(name));
+  return $__ToObject(target).@@HasProperty($__ToPropertyKey(name));
 }
 builtinFunction(has);
 
 export function hasOwn(target, name){
-  return $__ToObject(target).@@HasOwnProperty($__ToPropertyName(name));
+  return $__ToObject(target).@@HasOwnProperty($__ToPropertyKey(name));
 }
 builtinFunction(hasOwn);
 
@@ -395,6 +395,6 @@ builtinFunction(seal);
 
 export function set(target, name, value, receiver){
   receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__ToObject(target).@@SetP($__ToPropertyName(name), value, receiver);
+  return $__ToObject(target).@@SetP($__ToPropertyKey(name), value, receiver);
 }
 builtinFunction(set);
