@@ -99,16 +99,17 @@ export class Array {
         n   = 0,
         i   = 0;
 
+
     do {
       if (isArray(obj)) {
         var len = $__ToInt32(obj.length),
             j   = 0;
 
-        while (j < len) {
+        do {
           if (j in obj) {
             array[n++] = obj[j];
           }
-        }
+        } while (++j < len)
       } else {
         array[n++] = obj;
       }
