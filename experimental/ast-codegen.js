@@ -657,101 +657,21 @@ var types = {
   }
 };
 
+var push = [].push;
+
+var _this = _('#this'),
+    _define = _('define'),
+    _inherit = _('inherit'),
+    _replace = _('replace'),
+    _el = _this.get('el');
 
 
-
-function classes(){
-  function METHOD(name, type, body, args, rest){
-    if (type === 'get') {
-      args = [];
-    } else if (type === 'set') {
-      args = args ? args : ['val'];
-    } else if (!args) {
-      args = [];
-    }
-    if (!body) {
-      body = [];
-    } else if (!(body instanceof Array)) {
-      body = [body];
-    }
-    return _('#method', name, _('#functionexpr', name, args, body, rest), type);
-  }
-
-
-  function GETTER(name){
-    return METHOD(name, 'get', _('#return', _('#this').get(_('#at', name))));
-  }
-
-  function SETTER(name, param){
-    param = _(param || 'val');
-    return METHOD(name, 'set', _('#this').set(_('#at', name), param), [param]);
-  }
-
-
-  function CLASS(name, inherits, args, methods){
-    var ctor = METHOD('constructor', '', map(args, function(arg){
-      return _('#this').set(arg, _('#call', _(arg)));
-    }), args);
-    methods = methods || [];
-    methods.push(ctor);
-    return _('#class', name, _('#classbody', methods), inherits);
-  }
-
-  var out = _('#module', 'AST', []);
-  each(types, function(def, name){
-    var args = [];
-    var methods = [];
-    var rest;
-    var decl = _('#symbol', 'private');
-
-    var ctorBody = map(def.fields, function(details, name){
-      details.name = name;
-      decl.declare(name);
-      if (details.indexed) {
-        rest = name;
-        return _('#return', _('#call', 'index', [
-          _('#this'),
-          _(name),
-          _('#at', name),
-          _('#array', details.types.map(_))
-        ]));
-      } else {
-        args.push(name);
-        return _('#this').set(name, _(name));
-      }
-    });
-
-    var ctor = METHOD('constructor', '', ctorBody, args, rest);
-
-    if (decl.declarations.length) {
-      methods.push(decl);
-    }
-
-    if (args.length || rest) {
-      methods.push(ctor);
-    }
-
-    each(args, function(arg){
-      var field = def.fields[arg];
-      methods.push(GETTER(arg));
-      if (/[A-Z]/.test(field.types[0][0])) {
-        methods.push(SETTER(arg, field.list ? 'nodelist' : 'node'));
-      } else {
-        methods.push(SETTER(arg));
-      }
-    });
-
-
-    out.append(_('#export', _('#class', name, _('#classbody', methods), def.kind)));
+var children = (function(){
+  var children = _el.get('children');
+  return Array.apply(null, new Array(10)).map(function(_, index){
+    return children.get(index);
   });
-  console.log(out.toSource());
-}
-
-var replace = _('replace'),
-    thisDotEl = _('#this').get('el'),
-    children = _('#this').get('el').get('children'),
-    loc = _('#this').set('location', _('location'));
-
+})();
 
 function funcs(){
   function PROPERTY(name, type, body, args){
@@ -773,40 +693,32 @@ function funcs(){
 
 
   function GETTER(details, index){
-    var get = children.get(index);
-    return PROPERTY(details.name, 'get', _('#return', get.get('ast')));
+    return PROPERTY(details.name, 'get', _('#return', children[index].get('ast')));
   }
 
 
   function SETTER(details, param, index, callback){
     param = _(param || 'val');
-    var set = _('#call', replace, [
-      details.name,
-      thisDotEl,
-      children.get(index),
-      callback ? _('#call', callback, [param]) : param
-    ]);
+    callback = callback ? callback.call(param) : param;
+    var set = _replace.call([details.name, _el, children[index], callback]);
     return PROPERTY(details.name, 'set', set, [param]);
   }
 
   function CONTENT(details, param, index, callback){
     param = _(param || 'val');
-    var set = _('#call', replace, [
-      details.name,
-      thisDotEl,
-      children.get(index),
-      callback ? _('#call', callback, [_(param)]) : _(param)
-    ]);
-    return PROPERTY(details.name, 'set', set, [_(param)]);
+    callback = callback ? callback.call(param) : param
+    var set = _replace.call([details.name, _el, children[index], callback]);
+    return PROPERTY(details.name, 'set', set, [param]);
   }
 
   function SETATTR(details, param, callback){
-    var set = _('#call', thisDotEl.get('setAttribute'), [details.name, _('#call', callback, [_(param)])]);
-    return PROPERTY(details.name, 'set', set, [_(param)]);
+    param = _(param);
+    var set = _el.get('setAttribute').call([details.name, callback.call(param)]);
+    return PROPERTY(details.name, 'set', set, [param]);
   }
 
   function GETATTR(details){
-    var get = _('#call', thisDotEl.get('getAttribute'), [details.name]);
+    var get = _el.get('getAttribute').call([details.name]);
     return PROPERTY(details.name, 'get', _('#return', get), []);
   }
 
@@ -818,33 +730,31 @@ function funcs(){
   var hash = _('#object');
 
   each(types, function(def, name){
-    var args = [];
-    var methodsNames = [];
-    var methods = [_('#property', 'init', 'type', name)];
+    var args = [],
+        methodsNames = [],
+        methods = [_('#property', 'init', 'type', name)],
+        propTypes = _('#object'),
+        enumerations = [],
+        i = 0;
 
     var ctorBody = map(def.fields, function(details, name){
       details.name = name;
       args.push(+name === +name ? '$'+name : name);
       methodsNames.push(name);
       if (details.indexed) {
-        return _('#return', _('#call', 'index', [_('#this'), _(name), name,
-          details.types.length === 1 ? _(details.types[0]) : _('#array', details.types.map(_))
-        ]));
+        var types = details.types.length === 1 ? _(details.types[0]) : _('#array', details.types.map(_));
+        return _('#return', _('index').call([_this, _(name), name, types]));
       } else {
-        return _('#this').set(name, _('node').get(name));
+        return _this.set(name, _('node').get(name));
       }
-    }) || [];
+    });
 
-    var propTypes = _('#object');
     methods.push(_('#property', 'init', 'fields', propTypes));
-    var enumerations = [];
 
-    var i = 0;
     each(methodsNames, function(arg){
       var field = def.fields[arg];
       if ('values' in field) {
-        var options = _('#array', field.values.map(LITERAL));
-        enumerations.push(_('#call', _('enumeration'), [_(name), field.name, options]));
+        enumerations.push(_('enumeration').call([_(name), field.name, _('#array', field.values.map(LITERAL))]));
         methods.push(GETATTR(field));
         return methods.push(SETATTR(field, 'setting', _(name).get(field.name)));
       } else if ('content' in field && field.content !== undefined) {
@@ -852,10 +762,8 @@ function funcs(){
         return methods.push(SETTER(field, 'content', i++, _(field.content[0])));
       }
 
-      var fieldTypes = field.types;
-
       methods.push(GETTER(field, i));
-      propTypes.set(field.name, fieldTypes.length === 1 ? _(fieldTypes[0]) : _('#array', fieldTypes));
+      propTypes.set(field.name, field.types.length === 1 ? _(field.types[0]) : _('#array', field.types));
       if (/[A-Z]/.test(field.types[0][0])) {
         methods.push(SETTER(field, field.list ? 'nodelist' : 'node', i));
       } else {
@@ -863,6 +771,7 @@ function funcs(){
       }
       i++;
     });
+
     if (ctorBody) {
       var inheritance = [name],
           kind = def;
@@ -871,30 +780,26 @@ function funcs(){
         inheritance.push(kind.kind);
         kind = types[kind.kind];
       }
-      ctorBody.unshift(_('#this').get('el').set('ast', _('#this')));
-      ctorBody.unshift(_('#this').get('el').set('className', LITERAL(inheritance.join(' '))));
-      ctorBody.unshift(_('#call', _('define'), [_('#this'), 'el', _('#call', _('createElement'), ['span'])]));
-    }
-    var ctor = _('#functiondecl', name, ['node'], ctorBody);
 
+      var ctor = _('#functiondecl', name, ['node'], [
+        _define.call([_this, 'el', _('createElement').call(['span'])]),
+        _el.set('className', LITERAL(inheritance.join(' '))),
+        _el.set('ast', _this)
+      ].concat(ctorBody));
+    } else {
+      var ctor = _('#functiondecl', name, ['node']);
+    }
 
     out.push(ctor);
-    out.push(_('#call', _('define'), [_(name), 'fields', _('#array', methodsNames.map(LITERAL))]));
-    if (enumerations.length) out.push.apply(out, enumerations);
-    if (def.kind) {
-      out.push(_('#call', _('inherit'), [_(name), _(def.kind), _('#object', methods)]));
-    } else {
-      out.push(_('#call', _('define'), [_(name).get('prototype'), _('#object', methods)]));
-    }
-    hash.set(name, _(name));
+    out.push(_define.call([_(name), 'fields', _('#array', methodsNames.map(LITERAL))]));
+    push.apply(out, enumerations);
+    out.push(def.kind ? _inherit.call([_(name), _(def.kind), _('#object', methods)])
+                      : _define.call([_(name).get('prototype'), _('#object', methods)]));
   });
+
   out.push(_('#var').declare('types', hash));
   console.log(_('#program', out).toSource());
 }
 
 
 funcs();
-
-// console.log(Object.keys(types).map(function(type){
-//   return '.'+type + '\n{}\n\n';
-// }).join(''));
