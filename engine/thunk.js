@@ -402,9 +402,9 @@ var thunk = (function(exports){
     }
 
     function ELEMENT(){
-      var obj    = stack[--sp],
-          key    = stack[--sp],
-          result = context.getPropertyReference(obj, key);
+      var key    = stack[--sp],
+          obj    = stack[--sp],
+          result = context.getPropertyReference(key, obj);
 
       if (result && result.Abrupt) {
         error = result;
