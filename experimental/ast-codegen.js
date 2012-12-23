@@ -42,8 +42,10 @@ function PROPERTY(name, type, body, args){
   return _('#property', type, name, _('#functionexpr', name, args, body));
 }
 
-function GETTER(details, index){
-  return PROPERTY(details.name, 'get', _('#return', children[index].get('ast')));
+function GETTER(details, index, callback){
+  var ret = children[index].get('ast');
+  if (callback) ret = callback.call(ret);
+  return PROPERTY(details.name, 'get', _('#return', ret));
 }
 
 function SETTER(details, param, index, callback){
@@ -66,9 +68,9 @@ function SETATTR(details, param, callback){
   return PROPERTY(details.name, 'set', set, [param]);
 }
 
-function GETATTR(details){
+function GETATTR(details, callback){
   var get = _el.get('getAttribute').call([details.name]);
-  return PROPERTY(details.name, 'get', _('#return', get), []);
+  return PROPERTY(details.name, 'get', _('#return', callback.call(get)), []);
 }
 
 function LITERAL(value){
@@ -106,21 +108,21 @@ each(types, function(def, name){
     var field = def.fields[arg];
     if ('values' in field) {
       enumerations.push(_('enumeration').call([_(name), field.name, _('#array', field.values.map(LITERAL))]));
-      methods.push(GETATTR(field));
-      return methods.push(SETATTR(field, 'setting', _(name).get(field.name)));
+      var callback = _(name).get(field.name);
+      methods.push(GETATTR(field, callback));
+      methods.push(SETATTR(field, 'setting', callback));
     } else if ('content' in field && field.content !== undefined) {
-      methods.push(GETTER(field, i));
-      return methods.push(SETTER(field, 'content', i++, _(field.content[0])));
-    }
-
-    methods.push(GETTER(field, i));
-    propTypes.set(field.name, field.types.length === 1 ? _(field.types[0]) : _('#array', field.types));
-    if (/[A-Z]/.test(field.types[0][0])) {
-      methods.push(SETTER(field, field.list ? 'nodelist' : 'node', i));
+      methods.push(GETTER(field, i, _(field.content[0])));
+      methods.push(SETTER(field, 'content', i++, _(field.content[0])));
     } else {
-      methods.push(SETTER(field, 'node', i));
+      methods.push(GETTER(field, i));
+      propTypes.set(field.name, field.types.length === 1 ? _(field.types[0]) : _('#array', field.types));
+      if (/[A-Z]/.test(field.types[0][0])) {
+        methods.push(SETTER(field, field.list ? 'nodelist' : 'node', i++));
+      } else {
+        methods.push(SETTER(field, 'node', i++));
+      }
     }
-    i++;
   });
 
 
