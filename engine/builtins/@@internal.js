@@ -112,6 +112,7 @@ let HIDDEN = 6,
 
 function internalFunction(func){
   func.@@setInternal('InternalFunction', true);
+  func.@@setInternal('strict', false);
   func.@@delete('prototype');
   func.@@delete('caller');
   func.@@delete('arguments');
