@@ -305,18 +305,18 @@ var create = (function(){
   define(SourcePosition.prototype, {
     type: 'SourcePosition',
     fields: {},
-    get line() {
-      return this.el.children[0].ast;
-    },
-    set line(content) {
-      replace('line', this.el, this.el.children[0], Number(content));
-    },
-    get column() {
-      return this.el.children[1].ast;
-    },
-    set column(content) {
-      replace('column', this.el, this.el.children[1], Number(content));
-    }
+    // get line() {
+    //   return this.el.children[0].ast;
+    // },
+    // set line(content) {
+    //   replace('line', this.el, this.el.children[0], Number(content));
+    // },
+    // get column() {
+    //   return this.el.children[1].ast;
+    // },
+    // set column(content) {
+    //   replace('column', this.el, this.el.children[1], Number(content));
+    // }
   });
 
   function SourceLocation(node) {
@@ -386,18 +386,18 @@ var create = (function(){
   define(ASTNode.prototype, {
     type: 'ASTNode',
     fields: { loc: SourceLocation, range: SourceRange },
-    // get loc() {
-    //   return this.el.children[0].ast;
-    // },
-    // set loc(node) {
-    //   replace('loc', this.el, this.el.children[0], node);
-    // },
-    // get range() {
-    //   return this.el.children[1].ast;
-    // },
-    // set range(node) {
-    //   replace('range', this.el, this.el.children[1], node);
-    // }
+    get loc() {
+      return this.el.children[0].ast;
+    },
+    set loc(node) {
+      replace('loc', this.el, this.el.children[0], node);
+    },
+    get range() {
+      return this.el.children[1].ast;
+    },
+    set range(node) {
+      replace('range', this.el, this.el.children[1], node);
+    }
   });
 
   function ASTNodeList(node) {
@@ -551,7 +551,7 @@ var create = (function(){
       return this.el.getAttribute('generator');
     },
     set generator(setting) {
-      this.el.setAttribute('generator', ArrowFunctionExpression.generator('setting'));
+      this.el.setAttribute('generator', ArrowFunctionExpression.generator(setting));
     }
   });
 
@@ -587,7 +587,7 @@ var create = (function(){
       return this.el.getAttribute('operator');
     },
     set operator(setting) {
-      this.el.setAttribute('operator', AssignmentExpression.operator('setting'));
+      this.el.setAttribute('operator', AssignmentExpression.operator(setting));
     }
   });
 
@@ -616,7 +616,7 @@ var create = (function(){
       return this.el.getAttribute('internal');
     },
     set internal(setting) {
-      this.el.setAttribute('internal', AtSymbol.internal('setting'));
+      this.el.setAttribute('internal', AtSymbol.internal(setting));
     }
   });
 
@@ -652,28 +652,8 @@ var create = (function(){
   define(BinaryExpression, 'fields', ['left', 'right', 'operator']);
 
   enumeration(BinaryExpression, 'operator', [
-    '+',
-    '-',
-    '/',
-    '*',
-    '%',
-    '^',
-    '&',
-    '|',
-    '>>',
-    '<<',
-    '>>>',
-    '===',
-    '==',
-    '>',
-    '<',
-    '!==',
-    '!=',
-    '>=',
-    '<=',
-    'in',
-    'delete',
-    'instanceof'
+    '+', '-', '/', '*', '%', '^', '&', '|', '>>', '<<', '>>>', '===', '==',
+    '>', '<', '!==', '!=', '>=', '<=', 'in', 'delete', 'instanceof'
   ]);
 
   inherit(BinaryExpression, Expression, {
@@ -695,7 +675,7 @@ var create = (function(){
       return this.el.getAttribute('operator');
     },
     set operator(setting) {
-      this.el.setAttribute('operator', BinaryExpression.operator('setting'));
+      this.el.setAttribute('operator', BinaryExpression.operator(setting));
     }
   });
 
@@ -1292,7 +1272,7 @@ var create = (function(){
       return this.el.getAttribute('generator');
     },
     set generator(setting) {
-      this.el.setAttribute('generator', FunctionDeclaration.generator('setting'));
+      this.el.setAttribute('generator', FunctionDeclaration.generator(setting));
     }
   });
 
@@ -1355,7 +1335,7 @@ var create = (function(){
       return this.el.getAttribute('generator');
     },
     set generator(setting) {
-      this.el.setAttribute('generator', FunctionExpression.generator('setting'));
+      this.el.setAttribute('generator', FunctionExpression.generator(setting));
     }
   });
 
@@ -1556,7 +1536,7 @@ var create = (function(){
       return this.el.getAttribute('operator');
     },
     set operator(setting) {
-      this.el.setAttribute('operator', LogicalExpression.operator('setting'));
+      this.el.setAttribute('operator', LogicalExpression.operator(setting));
     }
   });
 
@@ -1592,7 +1572,7 @@ var create = (function(){
       return this.el.getAttribute('computed');
     },
     set computed(setting) {
-      this.el.setAttribute('computed', MemberExpression.computed('setting'));
+      this.el.setAttribute('computed', MemberExpression.computed(setting));
     }
   });
 
@@ -1628,7 +1608,7 @@ var create = (function(){
       return this.el.getAttribute('kind');
     },
     set kind(setting) {
-      this.el.setAttribute('kind', MethodDefinition.kind('setting'));
+      this.el.setAttribute('kind', MethodDefinition.kind(setting));
     }
   });
 
@@ -1811,19 +1791,19 @@ var create = (function(){
       return this.el.getAttribute('kind');
     },
     set kind(setting) {
-      this.el.setAttribute('kind', Property.kind('setting'));
+      this.el.setAttribute('kind', Property.kind(setting));
     },
     get method() {
       return this.el.getAttribute('method');
     },
     set method(setting) {
-      this.el.setAttribute('method', Property.method('setting'));
+      this.el.setAttribute('method', Property.method(setting));
     },
     get shorthand() {
       return this.el.getAttribute('shorthand');
     },
     set shorthand(setting) {
-      this.el.setAttribute('shorthand', Property.shorthand('setting'));
+      this.el.setAttribute('shorthand', Property.shorthand(setting));
     }
   });
 
@@ -1831,19 +1811,19 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'ReturnStatement Statement ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
   }
 
-  define(ReturnStatement, 'fields', ['arg']);
+  define(ReturnStatement, 'fields', ['argument']);
 
   inherit(ReturnStatement, Statement, {
     type: 'ReturnStatement',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     }
   });
 
@@ -1871,19 +1851,19 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'SpreadElement ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
   }
 
-  define(SpreadElement, 'fields', ['arg']);
+  define(SpreadElement, 'fields', ['argument']);
 
   inherit(SpreadElement, ASTNode, {
     type: 'SpreadElement',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     }
   });
 
@@ -1960,7 +1940,7 @@ var create = (function(){
       return this.el.getAttribute('kind');
     },
     set kind(setting) {
-      this.el.setAttribute('kind', SymbolDeclaration.kind('setting'));
+      this.el.setAttribute('kind', SymbolDeclaration.kind(setting));
     },
     get declarations() {
       return this.el.children[0].ast;
@@ -2049,7 +2029,7 @@ var create = (function(){
       return this.el.getAttribute('tail');
     },
     set tail(setting) {
-      this.el.setAttribute('tail', TemplateElement.tail('setting'));
+      this.el.setAttribute('tail', TemplateElement.tail(setting));
     }
   });
 
@@ -2094,19 +2074,19 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'ThrowStatement Statement ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
   }
 
-  define(ThrowStatement, 'fields', ['arg']);
+  define(ThrowStatement, 'fields', ['argument']);
 
   inherit(ThrowStatement, Statement, {
     type: 'ThrowStatement',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     }
   });
 
@@ -2148,28 +2128,28 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'UnaryExpression Expression ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
     this.operator = node.operator;
   }
 
-  define(UnaryExpression, 'fields', ['arg', 'operator']);
+  define(UnaryExpression, 'fields', ['argument', 'operator']);
 
   enumeration(UnaryExpression, 'operator', ['!', '~', '+', '-', 'void', 'typeof']);
 
   inherit(UnaryExpression, Expression, {
     type: 'UnaryExpression',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     },
     get operator() {
       return this.el.getAttribute('operator');
     },
     set operator(setting) {
-      this.el.setAttribute('operator', UnaryExpression.operator('setting'));
+      this.el.setAttribute('operator', UnaryExpression.operator(setting));
     }
   });
 
@@ -2177,12 +2157,12 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'UpdateExpression Expression ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
     this.operator = node.operator;
     this.prefix = node.prefix;
   }
 
-  define(UpdateExpression, 'fields', ['arg', 'operator', 'prefix']);
+  define(UpdateExpression, 'fields', ['argument', 'operator', 'prefix']);
 
   enumeration(UpdateExpression, 'operator', ['--', '++']);
 
@@ -2190,24 +2170,24 @@ var create = (function(){
 
   inherit(UpdateExpression, Expression, {
     type: 'UpdateExpression',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     },
     get operator() {
       return this.el.getAttribute('operator');
     },
     set operator(setting) {
-      this.el.setAttribute('operator', UpdateExpression.operator('setting'));
+      this.el.setAttribute('operator', UpdateExpression.operator(setting));
     },
     get prefix() {
       return this.el.getAttribute('prefix');
     },
     set prefix(setting) {
-      this.el.setAttribute('prefix', UpdateExpression.prefix('setting'));
+      this.el.setAttribute('prefix', UpdateExpression.prefix(setting));
     }
   });
 
@@ -2230,7 +2210,7 @@ var create = (function(){
       return this.el.getAttribute('kind');
     },
     set kind(setting) {
-      this.el.setAttribute('kind', VariableDeclaration.kind('setting'));
+      this.el.setAttribute('kind', VariableDeclaration.kind(setting));
     },
     get declarations() {
       return this.el.children[0].ast;
@@ -2325,22 +2305,21 @@ var create = (function(){
     define(this, 'el', createElement('span'));
     this.el.className = 'YieldExpression Expression ASTNode';
     this.el.ast = this;
-    this.arg = node.arg;
+    this.argument = node.argument;
   }
 
-  define(YieldExpression, 'fields', ['arg']);
+  define(YieldExpression, 'fields', ['argument']);
 
   inherit(YieldExpression, Expression, {
     type: 'YieldExpression',
-    fields: { arg: Expression },
-    get arg() {
+    fields: { argument: Expression },
+    get argument() {
       return this.el.children[0].ast;
     },
-    set arg(node) {
-      replace('arg', this.el, this.el.children[0], node);
+    set argument(node) {
+      replace('argument', this.el, this.el.children[0], node);
     }
   });
-
 
 
   var types = {
