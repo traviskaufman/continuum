@@ -120,7 +120,7 @@ h1, h2
     .ƒkey, .ƒbranch, .ƒleaf
     { display: inline-block; }
     .ƒkey
-    { vertical-align: top }
+    { vertical-align: top; white-space: pre; }
       .ƒkey:after
       { content: ':'; color: #aaa; margin-right: 5px; }
     .ƒbranch
