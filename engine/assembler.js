@@ -511,7 +511,7 @@ var assembler = (function(exports){
 
 
   var scope = (function(){
-    var types = create(null);
+    var types = new Hash;
 
     var Scope = types.normal = (function(){
       function Scope(outer){
@@ -580,9 +580,7 @@ var assembler = (function(exports){
 
       inherit(GlobalScope, Scope, {
         type: 'global'
-      }, [
-
-      ]);
+      });
 
       return GlobalScope;
     })();
@@ -594,9 +592,7 @@ var assembler = (function(exports){
 
       inherit(ModuleScope, GlobalScope, {
         type: 'module'
-      }, [
-
-      ]);
+      });
 
       return ModuleScope;
     })();
@@ -610,7 +606,6 @@ var assembler = (function(exports){
       inherit(EvalScope, Scope, {
         type: 'eval'
       }, [
-
       ]);
 
       return EvalScope;
@@ -1050,14 +1045,14 @@ var assembler = (function(exports){
     }
 
 
-    var isWrapped = set('wrapped', true),
+    var isWrapped   = set('wrapped', true),
         isntWrapped = set('wrapped', false),
-        isTail = set('tail', true),
-        isntTail = set('tail', false),
-        wrap = either(isWrapped, isntWrapped),
-        tail = either(isTail, isntTail),
-        copyWrap = copier('wrapped'),
-        copyTail = copier('tail');
+        isTail      = set('tail', true),
+        isntTail    = set('tail', false),
+        wrap        = either(isWrapped, isntWrapped),
+        tail        = either(isTail, isntTail),
+        copyWrap    = copier('wrapped'),
+        copyTail    = copier('tail');
 
     function dispatcher(node){
       return node.type || CONTINUE;
@@ -1112,7 +1107,8 @@ var assembler = (function(exports){
       function FunctionExpression(node){
         isntWrapped(node.body);
         this.push(node.body);
-      },      function IfStatement(node){
+      },
+      function IfStatement(node){
         copyWrap(node, node.consequent);
         copyWrap(node, node.alternate);
         return RECURSE;
