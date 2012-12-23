@@ -730,12 +730,15 @@ function funcs(){
   var hash = _('#object');
 
   each(types, function(def, name){
+    hash.set(name, _(name));
+
     var args = [],
         methodsNames = [],
         methods = [_('#property', 'init', 'type', name)],
         propTypes = _('#object'),
         enumerations = [],
         i = 0;
+
 
     var ctorBody = map(def.fields, function(details, name){
       details.name = name;
@@ -772,25 +775,20 @@ function funcs(){
       i++;
     });
 
-    if (ctorBody) {
-      var inheritance = [name],
-          kind = def;
+    var inheritance = [name],
+        kind = def;
 
-      while (kind && kind.kind) {
-        inheritance.push(kind.kind);
-        kind = types[kind.kind];
-      }
-
-      var ctor = _('#functiondecl', name, ['node'], [
-        _define.call([_this, 'el', _('createElement').call(['span'])]),
-        _el.set('className', LITERAL(inheritance.join(' '))),
-        _el.set('ast', _this)
-      ].concat(ctorBody));
-    } else {
-      var ctor = _('#functiondecl', name, ['node']);
+    while (kind && kind.kind) {
+      inheritance.push(kind.kind);
+      kind = types[kind.kind];
     }
 
-    out.push(ctor);
+    out.push(_('#functiondecl', name, ['node'], [
+      _define.call([_this, 'el', _('createElement').call(['span'])]),
+      _el.set('className', LITERAL(inheritance.join(' '))),
+      _el.set('ast', _this)
+    ].concat(ctorBody || [])));
+
     out.push(_define.call([_(name), 'fields', _('#array', methodsNames.map(LITERAL))]));
     push.apply(out, enumerations);
     out.push(def.kind ? _inherit.call([_(name), _(def.kind), _('#object', methods)])
