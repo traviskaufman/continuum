@@ -3,14 +3,8 @@ export class Object {
     return value == null ? {} : $__ToObject(value);
   }
 
-  toString(){
-    if (this === undefined) {
-      return '[object Undefined]';
-    } else if (this === null) {
-      return '[object Null]';
-    } else {
-      return '[object ' + $__ToObject(this).@toStringTag + ']';
-    }
+  hasOwnProperty(key){
+    return $__ToObject(this).@@HasOwnProperty($__ToPropertyKey(key));
   }
 
   isPrototypeOf(object){
@@ -23,20 +17,25 @@ export class Object {
     return false;
   }
 
+  propertyIsEnumerable(key){
+    return $__ToBoolean($__ToObject(this).@@query(key) & HIDDEN);
+  }
+
   toLocaleString(){
     return this.toString();
   }
 
+  toString(){
+    if (this === undefined) {
+      return '[object Undefined]';
+    } else if (this === null) {
+      return '[object Null]';
+    }
+    return '[object ' + $__ToObject(this).@toStringTag + ']';
+  }
+
   valueOf(){
     return $__ToObject(this);
-  }
-
-  hasOwnProperty(key){
-    return $__ToObject(this).@@HasOwnProperty($__ToPropertyKey(key));
-  }
-
-  propertyIsEnumerable(key){
-    return !!($__ToObject(this).@@query(key) & 1);
   }
 }
 
@@ -57,7 +56,7 @@ export function assign(target, source){
 }
 
 export function create(prototype, properties){
-  if (typeof prototype !== 'object') {
+  if ($__Type(prototype) !== 'Object') {
     throw $__Exception('proto_object_or_null', [])
   }
 
@@ -163,10 +162,8 @@ export function isFrozen(object){
 
   for (var i=0; i < props.length; i++) {
     var desc = object.@@GetOwnProperty(props[i]);
-    if (desc) {
-      if (desc.configurable || 'writable' in desc && desc.writable) {
-        return false;
-      }
+    if (desc && desc.configurable || 'writable' in desc && desc.writable) {
+      return false;
     }
   }
 
@@ -250,10 +247,7 @@ export function deliverChangeRecords(callback){
 
 export function getNotifier(object){
   ensureObject(object, 'Object.getNotifier');
-  if (isFrozen(object)) {
-    return null;
-  }
-  return $__GetNotifier(object);
+  return isFrozen(object) ? null : $__GetNotifier(object);
 }
 
 
