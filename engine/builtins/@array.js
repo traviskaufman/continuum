@@ -1,4 +1,7 @@
 import Iterator from '@iter';
+import Set from '@set';
+
+const arrays = new Set;
 
 const K = 0x01,
       V = 0x02,
@@ -183,21 +186,28 @@ export class Array {
   }
 
   join(...separator){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length),
-          sep   = $__ToString(separator.length ? separator[0] : ',');
+    const array = $__ToObject(this);
+
+    if (arrays.has(array)) {
+      return '';
+    }
+    arrays.add(array);
+
+    const sep = $__ToString(separator.length ? separator[0] : ','),
+          len = $__ToUint32(array.length);
 
     if (len === 0) {
       return '';
     }
 
-    var result = $__ToString(array[0]),
+    var result = '0' in array ? $__ToString(array[0]) : '',
         index  = 0;
 
     while (++index < len) {
-      result += sep + array[index];
+      result += index in array ? ',' + $__ToString(array[index]) : ',';
     }
 
+    arrays.delete(array);
     return result;
   }
 
@@ -250,11 +260,13 @@ export class Array {
 
   pop(){
     const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length) - 1,
-          result = array[len];
+          len    = $__ToUint32(array.length) - 1;
 
-    array.length = len;
-    return result;
+    if (len >= 0) {
+      const result = array[len];
+      array.length = len;
+      return result;
+    }
   }
 
   push(...values){
@@ -353,6 +365,31 @@ export class Array {
     return result;
   }
 
+  shift(){
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          result = array[0];
+
+    if (!len) {
+      return result;
+    }
+
+    let oldIndex = 1,
+        newIndex = 0;
+
+    do {
+      if (oldIndex in array) {
+        array[newIndex] = array[oldIndex];
+      } else if (newIndex in array) {
+        delete array[newIndex];
+      }
+      newIndex++;
+    } while (++oldIndex < len)
+
+    array.length = len - 1;
+    return result;
+  }
+
   some(callbackfn, context){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
@@ -380,6 +417,36 @@ export class Array {
     }
 
     return func.@@Call(array, []);
+  }
+
+  unshift(...values){
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length),
+          newLen = len + values.length;
+
+    if (len === newLen) {
+      return newLen;
+    }
+
+    array.length = newLen;
+
+    let oldIndex = len,
+        newIndex = newLen;
+
+    while (oldIndex-- > 0) {
+      newIndex--;
+      if (oldIndex in array) {
+        array[newIndex] = array[oldIndex];
+      } else if (newIndex in array) {
+        delete array[newIndex];
+      }
+    }
+
+    while (newIndex-- > 0) {
+      array[newIndex] = values[newIndex];
+    }
+
+    return newLen;
   }
 
   values(){
