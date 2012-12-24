@@ -237,5 +237,12 @@ function ensureFunction(o, name){
 internalFunction(ensureFunction);
 
 
+function ensureCallback(o, name){
+  if (typeof o !== 'function') {
+    throw $__Exception('callback_must_be_callable', [name]);
+  }
+}
+
+internalFunction(ensureCallback);
 
 $__EmptyClass = function(...args){ super(...args) };

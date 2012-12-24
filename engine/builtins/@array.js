@@ -44,9 +44,8 @@ class ArrayIterator extends Iterator {
   }
 
   next(){
-    if (!$__IsObject(this)) {
-      throw $__Exception('called_on_non_object', ['ArrayIterator.prototype.next']);
-    }
+    ensureObject(this);
+
     if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {
       throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
     }
@@ -99,10 +98,9 @@ export class Array {
         n   = 0,
         i   = 0;
 
-
     do {
       if (isArray(obj)) {
-        var len = $__ToInt32(obj.length),
+        let len = $__ToInt32(obj.length),
             j   = 0;
 
         do {
@@ -119,40 +117,43 @@ export class Array {
     return array;
   }
 
+  entries(){
+    return new ArrayIterator(this, 'key+value');
+  }
+
   every(callback, context){
+    ensureCallback(callback);
+
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);
-    }
-
-    var i = 0;
-    while (i < len) {
-      if (i in array && !callback.@@Call(context, [array[i], i, array])) {
-        return false;
-      }
+    if (len) {
+      let index = 0;
+      do {
+        if (index in array && !callback.@@Call(context, [array[index], index, array])) {
+          return false;
+        }
+      } while (++index < len)
     }
 
     return true;
   }
 
   filter(callback, context){
+    ensureCallback(callback);
+
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.every']);
-    }
+    var index = 0;
 
-    var i = 0;
-    while (i < len) {
-      if (i in array) {
-        var element = array[i];
-        if (i in array && !callback.@@Call(context, [element, i, array])) {
-          result[count++] = element;
+    while (index < len) {
+      if (index in array) {
+        var element = array[index];
+        if (callback.@@Call(context, [element, index, array])) {
+          result[result.length] = element;
         }
       }
     }
@@ -160,12 +161,10 @@ export class Array {
   }
 
   forEach(callback, context){
-    var array = $__ToObject(this),
-        len   = $__ToUint32(array.length);
+    ensureCallback(callback);
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.forEach']);
-    }
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
 
     for (var i=0; i < len; i++) {
       if (i in array) {
@@ -174,158 +173,163 @@ export class Array {
     }
   }
 
-  indexOf(search, fromIndex){
-    var array = $__ToObject(this),
-        len   = $__ToUint32(array.length);
+  indexOf(search, fromIndex = 0){
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
 
     if (len === 0) {
       return -1;
     }
 
     var i = $__ToInteger(fromIndex);
-    if (i > len) {
+    if (i >= len) {
       return -1;
+    } else if (i < 0) {
+      i += len;
+      if (i < 0) {
+        return -1;
+      }
     }
 
-    for (; i < len; i++) {
+    do {
       if (i in array && array[i] === search) {
         return i;
       }
-    }
+    } while (++i < len)
 
     return -1;
   }
 
-  items(){
-    return new ArrayIterator(this, 'key+value');
-  }
-
-  join(separator){
-    return joinArray(this, arguments.length ? separator : ',');
+  join(separator = ','){
+    return joinArray(this, separator);
   }
 
   keys(){
     return new ArrayIterator(this, 'key');
   }
 
-  lastIndexOf(search, fromIndex){
-    var array = $__ToObject(this),
-        len   = $__ToUint32(array.length);
+  lastIndexOf(search, fromIndex = -1){
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
 
     if (len === 0) {
       return -1;
     }
 
-    var i = arguments.length > 1 ? $__ToInteger(fromIndex) : len - 1;
-
-    if (i >= len) {
-      i = len - 1;
-    } else if (i < 0) {
-      i += i;
-    }
-
-    for (; i >= 0; i--) {
-      if (i in array && array[i] === search) {
-        return i;
+    var index = $__ToInteger(fromIndex);
+    if (index >= len) {
+      index = len - 1;
+    } else if (index < 0) {
+      index += len;
+      if (index < 0) {
+        return -1;
       }
     }
+
+    do {
+      if (index in array && array[index] === search) {
+        return index;
+      }
+    } while (index--)
 
     return -1;
   }
 
   map(callback, context){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
+    ensureCallback(callback);
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.map']);
-    }
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          result = [];
+
 
     for (var i=0; i < len; i++) {
       if (i in array) {
         result[i] = callback.@@Call(context, [array[i], i, this]);
       }
     }
+
     return result;
   }
 
   pop(){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = array[len - 1];
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length) - 1,
+          result = array[len];
 
-    array.length = len - 1;
+    array.length = len;
     return result;
   }
 
   push(...values){
-    var array = $__ToObject(this),
-        len   = $__ToUint32(array.length),
-        count = values.length;
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length),
+          count = values.length;
+
+    var index = len;
 
     array.length += count;
 
     for (var i=0; i < count; i++) {
-      array[len++] = values[i];
+      array[index++] = values[i];
     }
 
-    return len;
+    return index;
   }
 
-  reduce(callback, initial){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
+  reduce(callback, ...initialValue){
+    ensureCallback(callback);
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduce']);
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
+
+    if (initialValue.length) {
+      var current = initialValue[0],
+          index   = 0;
+    } else {
+      var current = array[0],
+          index   = 1;
     }
 
-    var i = 0;
-    if (arguments.length === 1) {
-      initial = array[0];
-      i = 1;
+    do {
+      if (index in array) {
+        current = callback.@@Call(this, [current, array[index], array]);
+      }
+    } while (++index < len)
+
+    return current;
+  }
+
+  reduceRight(callback, ...initialValue){
+    ensureCallback(callback);
+
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
+
+    if (initialValue.length) {
+      var current = initialValue[0],
+          index   = len;
+    } else {
+      var current = array[len - 1],
+          index   = len - 1;
     }
 
-    for (; i < len; i++) {
-      if (i in array) {
-        initial = callback.@@Call(this, [initial, array[i], array]);
+    while (--index >= 0) {
+      if (index in array) {
+        current = callback.@@Call(this, [current, array[index], array]);
       }
     }
-    return initial;
+
+    return current;
   }
 
-  reduceRight(callback, initial){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
+  slice(start = 0, end = -1){
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          result = [];
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.reduceRight']);
-    }
-
-    var i = len - 1;
-    if (arguments.length === 1) {
-      initial = array[i];
-      i--;
-    }
-
-    for (; i >= 0; i--) {
-      if (i in array) {
-        initial = callback.@@Call(this, [initial, array[i], array]);
-      }
-    }
-    return initial;
-  }
-
-  slice(start, end){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
-
-    start = start === undefined ? 0 : +start || 0;
-    end = end === undefined ? len - 1 : +end || 0;
+    start = $__ToInteger(start);
+    end = $__ToInteger(end);
 
     if (start < 0) {
       start += len;
@@ -338,7 +342,7 @@ export class Array {
     }
 
     if (start > end || end < start || start === end) {
-      return [];
+      return result;
     }
 
     for (var i=0, count = start - end; i < count; i++) {
@@ -349,18 +353,18 @@ export class Array {
   }
 
   some(callback, context){
-    var array  = $__ToObject(this),
-        len    = $__ToUint32(array.length),
-        result = [];
+    ensureCallback(callback);
 
-    if (typeof callback !== 'function') {
-      throw $__Exception('callback_must_be_callable', ['Array.prototype.some']);
-    }
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
 
-    for (var i = 0; i < len; i++) {
-      if (i in array && callback.@@Call(context, [array[i], i, array])) {
-        return true;
-      }
+    if (len) {
+      let index = 0;
+      do {
+        if (index in array && callback.@@Call(context, [array[index], index, array])) {
+          return true;
+        }
+      } while (++index < len)
     }
 
     return false;
@@ -381,20 +385,19 @@ export class Array {
 
 builtinClass(Array);
 
-[ 'every', 'filter', 'forEach', 'indexOf', 'lastIndexOf',
-  'map', 'reduce', 'reduceRight', 'some'
-].forEach(name => Array.prototype[name].@@set('length', 1));
+['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'some'].forEach(name => Array.prototype[name].@@set('length', 1));
 
 
 export function isArray(array){
-  return array ? array.@@GetBuiltinBrand() === 'Array' : false;
+  return $__Type(array) === 'Object' ? array.@@GetBuiltinBrand() === 'Array' : false;
 }
 
 export function from(arrayLike){
   arrayLike = $__ToObject(arrayLike);
-  var len   = $__ToUint32(arrayLike.length),
-      Ctor  = $__IsConstructor(this) ? this : Array,
-      out   = new Ctor(len);
+
+  const len   = $__ToUint32(arrayLike.length),
+        Ctor  = $__IsConstructor(this) ? this : Array,
+        out   = new Ctor(len);
 
   for (var i = 0; i < len; i++) {
     if (i in arrayLike) {
@@ -407,9 +410,10 @@ export function from(arrayLike){
 }
 
 export function of(...items){
-  var len  = $__ToInteger(items.length),
-      Ctor = $__IsConstructor(this) ? this : Array,
-      out  = new Ctor(len);
+  const len  = items.length,
+        Ctor = $__IsConstructor(this) ? this : Array,
+        out  = new Ctor(len);
+
 
   for (var i=0; i < len; i++) {
     out[i] = items[i];
