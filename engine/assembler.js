@@ -949,7 +949,7 @@ var assembler = (function(exports){
     function operation(left, right, operator){
       var result = { operator: operator };
       if (left !== _) result.left = convert(left);
-      if (left !== _) result.right = convert(right);
+      if (right !== _) result.right = convert(right);
       return result;
     }
     function binary(node){
@@ -978,7 +978,7 @@ var assembler = (function(exports){
         return node.name;
       },
       Literal: function(node){
-        return node.value;
+        return { value: node.value };
       },
       ObjectExpression: objects,
       ObjectPattern: objects,

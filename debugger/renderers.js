@@ -453,7 +453,9 @@ var FunctionBranch = (function(){
       });
       return array;
     } else if (isObject(param)) {
-      if (param.operator && 'left' in param || 'right' in param) {
+      if ('value' in param) {
+        return render('preview', introspect(param.value));
+      } else if (param.operator && 'left' in param || 'right' in param) {
         var op = inline('', 'Operation');
         if ('left' in param) {
           op.append(destructure(param.left));
