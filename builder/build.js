@@ -1,10 +1,15 @@
-require('./Builder')
+var minify = true;
+//var minify = false;
+
+require('./builder')
 
 .create()
 
 .addFiles('./header.js')
 
-.addFiles('../third_party/esprima/esprima.js', function(name, source){
+.addFiles([
+  '../third_party/esprima/esprima.js'
+], function(name, source){
   return 'exports.'+name+' = (function(exports){\n'+source+'\nreturn exports;\n})({});';
 })
 
@@ -58,8 +63,7 @@ require('./Builder')
 .addFiles('./footer.js')
 
 
-//.writeFile('../continuum', { minify: false });
-.writeFile('../continuum', { minify: true });
+.writeFile('../continuum', { minify: minify });
 
 
 
