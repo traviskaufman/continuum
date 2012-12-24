@@ -56,7 +56,7 @@ export function assign(target, source){
 }
 
 export function create(prototype, properties){
-  if ($__Type(prototype) !== 'Object') {
+  if (prototype !== null && $__Type(prototype) !== 'Object') {
     throw $__Exception('proto_object_or_null', [])
   }
 
