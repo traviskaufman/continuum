@@ -41,6 +41,8 @@ export class Object {
 
 builtinClass(Object);
 
+$__ObjectToString = Object.prototype.toString;
+
 
 export function assign(target, source){
   ensureObject(target, 'Object.assign');

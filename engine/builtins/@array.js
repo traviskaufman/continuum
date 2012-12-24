@@ -1,24 +1,5 @@
 import Iterator from '@iter';
 
-function joinArray(target, separator){
-  const array = $__ToObject(target),
-        len   = $__ToUint32(array.length),
-        sep   = $__ToString(separator);
-
-  if (len === 0) return '';
-
-  var result = $__ToString(array[0]),
-      i = 0;
-
-  while (++i < len) {
-    result += sep + array[i];
-  }
-  return result;
-}
-
-internalFunction(joinArray);
-
-
 const K = 0x01,
       V = 0x02,
       S = 0x04;
@@ -94,25 +75,25 @@ export class Array {
     const array = [],
           count = items.length;
 
-    var obj = $__ToObject(this),
-        n   = 0,
-        i   = 0;
+    var obj   = $__ToObject(this),
+        n     = 0,
+        index = 0;
 
     do {
       if (isArray(obj)) {
         let len = $__ToInt32(obj.length),
-            j   = 0;
+            i   = 0;
 
         do {
-          if (j in obj) {
-            array[n++] = obj[j];
+          if (i in obj) {
+            array[n++] = obj[i];
           }
-        } while (++j < len)
+        } while (++i < len)
       } else {
         array[n++] = obj;
       }
-      obj = items[i];
-    } while (i++ < count)
+      obj = items[index];
+    } while (index++ < count)
 
     return array;
   }
@@ -121,17 +102,16 @@ export class Array {
     return new ArrayIterator(this, 'key+value');
   }
 
-  every(callback, context){
-    ensureCallback(callback);
-
+  every(callbackfn, context){
     const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
-          result = [];
+          len    = $__ToUint32(array.length);
+
+    ensureCallback(callbackfn);
 
     if (len) {
       let index = 0;
       do {
-        if (index in array && !callback.@@Call(context, [array[index], index, array])) {
+        if (index in array && !callbackfn.@@Call(context, [array[index], index, array])) {
           return false;
         }
       } while (++index < len)
@@ -140,35 +120,37 @@ export class Array {
     return true;
   }
 
-  filter(callback, context){
-    ensureCallback(callback);
-
+  filter(callbackfn, context){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
 
-    var index = 0;
+    ensureCallback(callbackfn);
 
-    while (index < len) {
-      if (index in array) {
-        var element = array[index];
-        if (callback.@@Call(context, [element, index, array])) {
-          result[result.length] = element;
+    if (len) {
+      let index = 0;
+      do {
+        if (index in array) {
+          let element = array[index];
+          if (callbackfn.@@Call(context, [element, index, array])) {
+            result[result.length] = element;
+          }
         }
-      }
+      } while (++index < len)
     }
+
     return result;
   }
 
-  forEach(callback, context){
-    ensureCallback(callback);
-
+  forEach(callbackfn, context){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
+    ensureCallback(callbackfn);
+
     for (var i=0; i < len; i++) {
       if (i in array) {
-        callback.@@Call(context, [array[i], i, this]);
+        callbackfn.@@Call(context, [array[i], i, this]);
       }
     }
   }
@@ -181,27 +163,42 @@ export class Array {
       return -1;
     }
 
-    var i = $__ToInteger(fromIndex);
-    if (i >= len) {
+    var index = $__ToInteger(fromIndex);
+    if (index >= len) {
       return -1;
-    } else if (i < 0) {
-      i += len;
-      if (i < 0) {
+    } else if (index < 0) {
+      index += len;
+      if (index < 0) {
         return -1;
       }
     }
 
     do {
-      if (i in array && array[i] === search) {
-        return i;
+      if (index in array && array[index] === search) {
+        return index;
       }
-    } while (++i < len)
+    } while (++index < len)
 
     return -1;
   }
 
-  join(separator = ','){
-    return joinArray(this, separator);
+  join(...separator){
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length),
+          sep   = $__ToString(separator.length ? separator[0] : ',');
+
+    if (len === 0) {
+      return '';
+    }
+
+    var result = $__ToString(array[0]),
+        index  = 0;
+
+    while (++index < len) {
+      result += sep + array[index];
+    }
+
+    return result;
   }
 
   keys(){
@@ -235,17 +232,16 @@ export class Array {
     return -1;
   }
 
-  map(callback, context){
-    ensureCallback(callback);
-
+  map(callbackfn, context){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
 
+    ensureCallback(callbackfn);
 
     for (var i=0; i < len; i++) {
       if (i in array) {
-        result[i] = callback.@@Call(context, [array[i], i, this]);
+        result[i] = callbackfn.@@Call(context, [array[i], i, this]);
       }
     }
 
@@ -277,50 +273,55 @@ export class Array {
     return index;
   }
 
-  reduce(callback, ...initialValue){
-    ensureCallback(callback);
-
+  reduce(callbackfn, ...initialValue){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
+    var accumulator, index;
+
+    ensureCallback(callbackfn);
+
+
     if (initialValue.length) {
-      var current = initialValue[0],
-          index   = 0;
+      accumulator = initialValue[0];
+      index = 0;
     } else {
-      var current = array[0],
-          index   = 1;
+      accumulator = array[0];
+      index = 1;
     }
 
     do {
       if (index in array) {
-        current = callback.@@Call(this, [current, array[index], array]);
+        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);
       }
     } while (++index < len)
 
-    return current;
+    return accumulator;
   }
 
-  reduceRight(callback, ...initialValue){
-    ensureCallback(callback);
-
+  reduceRight(callbackfn, ...initialValue){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
+    var accumulator, index;
+
+    ensureCallback(callbackfn);
+
     if (initialValue.length) {
-      var current = initialValue[0],
-          index   = len;
+      accumulator = initialValue[0];
+      index = len - 1;
     } else {
-      var current = array[len - 1],
-          index   = len - 1;
+      accumulator = array[len - 1];
+      index = len - 2;
     }
 
-    while (--index >= 0) {
+    do {
       if (index in array) {
-        current = callback.@@Call(this, [current, array[index], array]);
+        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);
       }
-    }
+    } while (--index >= 0)
 
-    return current;
+    return accumulator;
   }
 
   slice(start = 0, end = -1){
@@ -352,16 +353,16 @@ export class Array {
     return result;
   }
 
-  some(callback, context){
-    ensureCallback(callback);
-
+  some(callbackfn, context){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
+
+    ensureCallback(callbackfn);
 
     if (len) {
       let index = 0;
       do {
-        if (index in array && callback.@@Call(context, [array[index], index, array])) {
+        if (index in array && callbackfn.@@Call(context, [array[index], index, array])) {
           return true;
         }
       } while (++index < len)
@@ -371,7 +372,14 @@ export class Array {
   }
 
   toString(){
-    return joinArray(this, ',');
+    const array = $__ToObject(this);
+    var func = array.join;
+
+    if (typeof func !== 'function') {
+      func = $__ObjectToString;
+    }
+
+    return func.@@Call(array, []);
   }
 
   values(){
@@ -385,7 +393,8 @@ export class Array {
 
 builtinClass(Array);
 
-['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'some'].forEach(name => Array.prototype[name].@@set('length', 1));
+['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'some'
+].forEach(name => Array.prototype[name].@@set('length', 1));
 
 
 export function isArray(array){
@@ -395,9 +404,9 @@ export function isArray(array){
 export function from(arrayLike){
   arrayLike = $__ToObject(arrayLike);
 
-  const len   = $__ToUint32(arrayLike.length),
-        Ctor  = $__IsConstructor(this) ? this : Array,
-        out   = new Ctor(len);
+  const len  = $__ToUint32(arrayLike.length),
+        Ctor = $__IsConstructor(this) ? this : Array,
+        out  = new Ctor(len);
 
   for (var i = 0; i < len; i++) {
     if (i in arrayLike) {
