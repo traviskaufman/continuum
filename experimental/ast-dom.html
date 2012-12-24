@@ -282,11 +282,11 @@ var create = (function(){
         fallback = options[0];
 
     options.forEach(function(opt, i){
-      opts[opt] = i;
+      opts[opt] = opt;
     });
 
     Ctor[field] = function(value){
-      return value in opts ? value : fallback;
+      return value in opts ? opts[value] : fallback;
     };
   }
 
