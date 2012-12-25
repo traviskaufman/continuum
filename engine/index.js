@@ -15,9 +15,10 @@ var index = (function(exports){
       Realm            = runtime.Realm,
       Script           = runtime.Script,
       Renderer         = debug.Renderer,
+      AbruptCompletion = errors.AbruptCompletion,
       $$ThrowException = errors.$$ThrowException,
-      $NativeFunction  = runtime.$NativeFunction,
-      builtins         = runtime.builtins;
+      builtins         = runtime.builtins,
+      $NativeFunction  = builtins.$NativeFunction;
 
 
   var exoticTemplates = {
@@ -64,6 +65,9 @@ var index = (function(exports){
     },
     function createFunction(options){
       return new $NativeFunction(options);
+    },
+    function createAbruptCompletion(value){
+      return new AbruptCompletion(value);
     },
     function createExotic(inherits, handlers){
       if (typeof inherits === 'string') {
@@ -167,105 +171,110 @@ var index = (function(exports){
     return Ctor;
   }
 
-  function $IndexedInterceptor(target){
-    builtins.$Object.call(this);
-    this.target = target;
-    this.length = target.length;
-    this.properties.set('length', target.length, 0);
-  }
-
-  inherit($IndexedInterceptor, builtins.$Object, {
-    indexAttribute: 5
-  }, [
-    function remove(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return delete this.target[index];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.remove(key);
-      }
-    },
-    function describe(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return [index+'', this.target[index], this.indexAttribute];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.getProperty(key);
-      }
-    },
-    function define(key, value, attrs){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return this.target[index] = value;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.set(key, value, attrs);
-      }
-    },
-    function has(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return true;
-      }
-
-      return this.properties.has(key);
-    },
-    function each(callback){
-      var len = this.target.length;
-
-      for (var i=0; i < len; i++) {
-        callback([i+'', this.target[i], this.indexAttribute]);
-      }
-
-
-      this.properties.forEach(callback);
-    },
-    function get(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-       return this.target[index];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.get(key);
-      }
-    },
-    function set(key, value){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-       return this.target[index] = value;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.set(key, value);
-      }
-    },
-    function query(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return this.indexAttribute;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.getAttribute(key);
-      }
-    },
-    function update(key, attr){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return false;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.setAttribute(key, attr);
-      }
+  var $IndexedInterceptor = (function(){
+    function $IndexedInterceptor(target){
+      builtins.$Object.call(this);
+      this.target = target;
+      this.length = target.length;
+      this.properties.set('length', target.length, 0);
     }
-  ]);
+
+    inherit($IndexedInterceptor, builtins.$Object, {
+      indexAttribute: 5
+    }, [
+      function remove(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return delete this.target[index];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.remove(key);
+        }
+      },
+      function describe(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return [index+'', this.target[index], this.indexAttribute];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.describe(key);
+        }
+      },
+      (function(){
+        return function define(key, value, attrs){
+          var index = +key;
+          if (index >= 0 && index < this.target.length) {
+            return this.target[index] = value;
+          }
+
+          if (this.properties.has(key)) {
+            return this.properties.set(key, value, attrs);
+          }
+        };
+      })(),
+      function has(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return true;
+        }
+
+        return this.properties.has(key);
+      },
+      function each(callback){
+        var len = this.target.length;
+
+        for (var i=0; i < len; i++) {
+          callback([i+'', this.target[i], this.indexAttribute]);
+        }
+
+        this.properties.each(callback);
+      },
+      function get(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+         return this.target[index];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.get(key);
+        }
+      },
+      function set(key, value){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+         return this.target[index] = value;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.set(key, value);
+        }
+      },
+      function query(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return this.indexAttribute;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.query(key);
+        }
+      },
+      function update(key, attr){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return false;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.update(key, attr);
+        }
+      }
+    ]);
+
+    return $IndexedInterceptor;
+  })();
 
   function brainTransplant(func, call, construct){
     if (!(func instanceof $NativeFunction)) {
