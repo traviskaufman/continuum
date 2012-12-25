@@ -2,6 +2,7 @@
 
 var utility          = continuum.utility,
     Feeder           = utility.Feeder,
+    ObjectMap        = utility.ObjectMap,
     uid              = utility.uid,
     fname            = utility.fname,
     hasOwn           = utility.hasOwn,
@@ -60,6 +61,9 @@ void function(){
     }
   });
 
+  //var settings = createPanel('pulldown');
+  //main.append(settings);
+
   instructions.children.shift();
 
   var scroll = _(document.querySelector('.CodeMirror-scroll')),
@@ -97,7 +101,7 @@ var ops = new Feeder(function(op){
 
 
 var realm = window.realm = continuum.createRealmAsync();
-
+//realm.debugBuiltins = true;
 realm.on('throw', inspect);
 realm.on('write', stdout.write, stdout);
 realm.on('clear', stdout.clear, stdout);
@@ -144,86 +148,8 @@ realm.on('ready', function(){
 
 function initializeDOM(realm){
   var wrap = (function(){
-    var id = uid();
-
-    var map = (function(){
-      if (typeof Map === 'function') {
-        var weakmap = new Map;
-        return {
-          set: function set(key, value){
-            try { weakmap.set(key, value) } catch (e) { console.log(e) }
-          },
-          get: function get(key){
-            try { return weakmap.get(key) } catch (e) { console.log(e) }
-          },
-          has: function has(key){
-            try { return weakmap.has(key) } catch (e) { console.log(e) }
-          },
-          remove: function remove(key){
-            try { return weakmap['delete'](key) } catch (e) { console.log(e) }
-          }
-        };
-      } else {
-        var keys = [],
-            vals = [];
-
-        return {
-          set: function set(key, value){
-            if (isExtensible(key)) {
-              safeDefine(key, id, value);
-            } else {
-              var index = key === this.lastKey ? this.lastIndex : keys.indexOf(key);
-              if (~index) {
-                keys[index] = key;
-                vals[index] = value;
-              } else {
-                keys.push(key);
-                vals.push(value);
-              }
-            }
-          },
-          get: function get(key){
-            if (isExtensible(key)) {
-              return key[id];
-            } else {
-              var index = key === this.lastKey ? this.lastIndex : keys.indexOf(key);
-              if (~index) {
-                return vals[index];
-              }
-            }
-          },
-          has: function has(key){
-            if (isExtensible(key)) {
-              return hasOwn(key, id);
-            } else {
-              var lastIndex = keys.indexOf(key);
-              if (~lastIndex) {
-                this.lastIndex = lastIndex;
-                this.lastKey = key;
-                return true;
-              }
-            }
-            return false;
-          },
-          remove: function remove(key){
-            if (isExtensible(key)) {
-              if (hasOwn(key, id)) {
-                delete key[id];
-                return true;
-              }
-            } else {
-              var index = keys.indexOf(key);
-              if (!index) {
-                keys.splice(index, 1);
-                vals.splice(index, 1);
-                return true;
-              }
-            }
-            return false;
-          }
-        };
-      }
-    })();
+    var map = new ObjectMap;
+    var id = map.tag;
 
     function unwrap(value){
       if (isObject(value)) {
@@ -319,7 +245,9 @@ function initializeDOM(realm){
           }
 
           if (typeof object === 'function') {
-            try { fname(object) } catch (e) {}
+            try {
+              fname(object);
+            } catch (e) {}
           }
         },
         function remove(key){
@@ -331,7 +259,7 @@ function initializeDOM(realm){
         function describe(key){
           if (key === id) return;
           if (this.properties.has(key)) {
-            return this.properties.getProperty(key);
+            return this.properties.describe(key);
           }
           var desc = getDescriptor(this.object, key);
           if (desc) {
@@ -342,8 +270,7 @@ function initializeDOM(realm){
               var val = { Get: wrap(desc.get),
                           Set: wrap(desc.set) };
             }
-            var prop = [key, val, attrs];
-            return prop;
+            return [key, val, attrs];
           }
         },
         function define(key, value, attrs){
@@ -361,14 +288,12 @@ function initializeDOM(realm){
           return this.properties.has(key) || key in this.object;
         },
         function each(callback){
-          this.properties.forEach(callback, this);
+          this.properties.each(callback, this);
           var keys = ownProperties(this.object);
           for (var i=0; i < keys.length; i++) {
-            if (keys[i] === id) continue;
-
-            var val = this.describe(keys[i]);
-            if (typeof val === 'object' && val !== null) {
-              callback(val);
+            if (keys[i] !== id) {
+              var val = this.describe(keys[i]);
+              val && callback(val);
             }
           }
         },
@@ -376,9 +301,12 @@ function initializeDOM(realm){
           if (this.properties.has(key)) {
             return this.properties.get(key);
           }
+
           try {
             return wrap(this.object[key]);
-          } catch (e) { console.log(e) }
+          } catch (e) {
+            console.log(e);
+          }
         },
         function set(key, value){
           if (this.properties.has(key)) {
@@ -388,7 +316,7 @@ function initializeDOM(realm){
         },
         function query(key){
           if (this.properties.has(key)) {
-            return this.properties.getAttribute(key);
+            return this.properties.query(key);
           }
           var desc = describeProperty(this.object, key);
           if (desc) {
@@ -397,33 +325,33 @@ function initializeDOM(realm){
         },
         function update(key, attr){
           if (this.properties.has(key)) {
-            return this.properties.setAttribute(key, attr);
+            return this.properties.update(key, attr);
           }
           safeDefineProperty(this.object, key, attrsToDesc(attr));
         }
       ];
     })();
 
-    var applyNew = continuum.utility.applyNew;
-    var $ExoticObject = continuum.createExotic('Object', handlers);
-    var $ExoticFunction = continuum.createExotic('Function', handlers);
+    var applyNew = utility.applyNew,
+        $ExoticObject = continuum.createExotic('Object', handlers),
+        $ExoticFunction = continuum.createExotic('Function', handlers);
 
-
-    $ExoticFunction.prototype.Call = function Call(receiver, args){
-      try {
-        return wrap(this.call.apply(unwrap(receiver), args.map(unwrap)));
-      } catch (e) {
-        console.log(e);
+    define($ExoticFunction.prototype, [
+      function Call(receiver, args){
+        try {
+          return wrap(this.call.apply(unwrap(receiver), map(args, unwrap)));
+        } catch (e) {
+          return continuum.createAbruptCompletion(wrap(e));
+        }
+      },
+      function Construct(args){
+        try {
+          return wrap(applyNew(this.call, args.map(unwrap)));
+        } catch (e) {
+          return continuum.createAbruptCompletion(wrap(e));
+        }
       }
-    };
-
-    $ExoticFunction.prototype.Construct = function Construct(args){
-      try {
-        return wrap(applyNew(this.call, args.map(unwrap)));
-      } catch (e) {
-        console.log(e);
-      }
-    };
+    ]);
 
     return wrap;
   })();
