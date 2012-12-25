@@ -7545,6 +7545,7 @@ exports.ObjectMap = (function(module){
   var define        = objects.define,
       inherit       = objects.inherit,
       assign        = objects.assign,
+      hasOwn        = objects.hasOwn,
       Hash          = objects.Hash,
       uid           = utility.uid,
       bind          = functions.bind,
@@ -7575,12 +7576,21 @@ exports.ObjectMap = (function(module){
     }
   ]);
 
+
   function tag(map, object){
-    if (map.tag in object) {
+    if (hasOwn(object, map.tag)) {
       return object[map.tag];
     }
     var id = uid();
-    define(object, map.tag, id);
+    try {
+      define(object, map.tag, id);
+    } catch (e) {
+      var index = map.frozenKeys.indexOf(object);
+      if (~index) {
+        return map.frozenIds[index];
+      }
+      map.frozenIds[index] = id;
+    }
     return id;
   }
 
@@ -7602,7 +7612,7 @@ exports.ObjectMap = (function(module){
 
   define(ObjectMap.prototype, [
     function get(key){
-      var item = this.objects[key[this.tag]];
+      var item = this.objects[tag(this, key)];
       if (item) {
         return item.data;
       }
@@ -7623,24 +7633,24 @@ exports.ObjectMap = (function(module){
       return value;
     },
     function has(key){
-      return !!this.objects[key[this.tag]];
+      return !!this.objects[tag(this, key)];
     },
     function remove(key){
-      if (this.tag in key) {
-        var id = key[this.tag],
-            item = this.objects[id];
+      var id = tag(this, key),
+          item = this.objects[id];
 
-        if (item) {
-          item.unlink();
-          this.objects[id] = null;
-          this.size = this.list.size;
-          return true;
-        }
+      if (item) {
+        item.unlink();
+        this.objects[id] = null;
+        this.size = this.list.size;
+        return true;
       }
       return false;
     },
     function clear(){
       define(this, 'objects', new Hash);
+      define(this, 'frozenKeys', []);
+      define(this, 'frozenIds', []);
       this.list.clear();
       this.size = 0;
     },
@@ -7798,7 +7808,6 @@ exports.PropertyList = (function(module){
       Iterator      = iteration.Iterator,
       StopIteration = iteration.StopIteration;
 
-  var proto = require('./utility').uid();
 
   var PropertyListIterator = (function(){
     var types = {
@@ -7829,6 +7838,7 @@ exports.PropertyList = (function(module){
     return PropertyListIterator;
   })();
 
+
   function PropertyList(){
     this.hash = new Hash;
     this.props = [];
@@ -7838,21 +7848,18 @@ exports.PropertyList = (function(module){
 
   define(PropertyList.prototype, [
     function get(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       if (index !== undefined) {
         return this.props[index][1];
       }
     },
     function set(key, value){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name],
-          prop;
+      var name = '$'+key,
+          index = this.hash[name];
 
       if (index === undefined) {
         index = this.hash[name] = this.props.length;
-        prop = this.props[index] = [key, value, 7];
+        this.props[index] = [key, value, 7];
         this.length++;
       } else {
         this.props[index][1] = value;
@@ -7861,14 +7868,11 @@ exports.PropertyList = (function(module){
       return true;
     },
     function query(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       return index === undefined ? null : this.props[index][2];
     },
     function update(key, attr){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
+      var index = this.hash['$'+key];
 
       if (index !== undefined) {
         this.props[index][2] = attr;
@@ -7878,30 +7882,27 @@ exports.PropertyList = (function(module){
       return false;
     },
     function describe(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       return index === undefined ? null : this.props[index];
     },
     function define(key, value, attr){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name],
-          prop;
+      var name = '$'+key,
+          index = this.hash[name];
 
       if (index === undefined) {
         index = this.hash[name] = this.props.length;
-        prop = this.props[index] = [key, value, attr];
+        this.props[index] = [key, value, attr];
         this.length++;
       } else {
-        prop = this.props[index];
+        var prop = this.props[index];
         prop[1] = value;
         prop[2] = attr;
       }
 
-      return true;
+      return this;
     },
     function remove(key){
-      var name = key === '__proto__' ? proto : key,
+      var name = '$'+key,
           index = this.hash[name];
 
       if (index !== undefined) {
@@ -7914,12 +7915,10 @@ exports.PropertyList = (function(module){
       return false;
     },
     function has(key){
-      var name = key === '__proto__' ? proto : key;
-      return this.hash[name] !== undefined;
+      return this.hash['$'+key] !== undefined;
     },
     function setProperty(prop){
-      var key = prop[0],
-          name = key === '__proto__' ? proto : key,
+      var name = '$'+prop[0],
           index = this.hash[name];
 
       if (index === undefined) {
@@ -7930,9 +7929,7 @@ exports.PropertyList = (function(module){
       this.props[index] = prop;
     },
     function hasAttribute(key, mask){
-      var name = key === '__proto__' ? proto : key,
-          attr = this.query(name);
-
+      var attr = this.query('$'+key);
       if (attr !== null) {
         return (attr & mask) > 0;
       }
@@ -7949,9 +7946,8 @@ exports.PropertyList = (function(module){
 
       for (var i=0; i < len; i++) {
         if (prop = props[i]) {
-          var name = prop[0] === '__proto__' ? proto : prop[0];
           this.props[index] = prop;
-          this.hash[name] = index++;
+          this.hash['$'+prop[0]] = index++;
         }
       }
     },
@@ -7993,9 +7989,8 @@ exports.PropertyList = (function(module){
 
       this.each(function(prop){
         prop = callback.call(context, prop);
-        var name = prop[0] === '__proto__' ? proto : prop[0];
         out.props[index++] = prop;
-        out.hash[name] = index;
+        out.hash['$'+prop[0]] = index;
       });
 
       return out;
@@ -8008,9 +8003,8 @@ exports.PropertyList = (function(module){
 
       this.each(function(prop){
         if (callback.call(context, prop)) {
-          var name = prop[0] === '__proto__' ? proto : prop[0];
           out.props[index] = prop;
-          out.hash[name] = index++;
+          out.hash['$'+prop[0]] = index++;
         }
       });
 
@@ -8037,7 +8031,7 @@ exports.PropertyList = (function(module){
       });
     },
     function merge(list){
-      each(list, this.define, this);
+      iterate(list, this.define, this);
     },
     function __iterator__(type){
       return new PropertyListIterator(this, type);
@@ -15417,7 +15411,7 @@ exports.natives = (function(module){
       return false;
     },
 
-    _Function$$ToString: function(obj, args){
+    _FunctionToString: function(obj, args){
       if (obj.Proxy) {
         obj = obj.ProxyTarget;
       }
@@ -15432,10 +15426,10 @@ exports.natives = (function(module){
         return code.source.slice(code.range[0], code.range[1]);
       }
     },
-    _Number$$ToString: function(obj, args){
+    _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _RegExp$$ToString: function(obj, args){
+    _RegExpToString: function(obj, args){
       return ''+obj.PrimitiveValue;
     },
     _RegExpExec: function(obj, args){
@@ -17969,13 +17963,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new (require('./object-model/$Object').$Enumerator)([]);
+    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
+        prefix = uid();
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
       this.Name = name;
       this.Private = !isPublic;
-      this.gensym = '_'+this.id;
+      this.gensym = prefix+this.id;
     }
 
     inherit($Symbol, $Object, {
@@ -18778,12 +18773,17 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       ExecutionContext  : ExecutionContext
     };
 
-
+    function FunctionPrototypeCall(){}
+    function FunctionPrototypeHasInstance(){
+      return false;
+    }
 
     function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
-      thrower.call = function(){ return $$ThrowException('strict_poison_pill') };
+      thrower.call = function(){
+        return $$ThrowException('strict_poison_pill');
+      };
       thrower.define('length', 0, ___);
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
@@ -18824,8 +18824,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
       }
 
-      intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
-      intrinsics.StopIteration.BuiltinBrand = BRANDS.StopIteration;
 
       for (var i=0; i < 6; i++) {
         var prototype = intrinsics[$errors[i] + 'Proto'] = create($Error.prototype);
@@ -18833,17 +18831,23 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         prototype.define('name', $errors[i], _CW);
       }
 
+      intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
+      intrinsics.StopIteration.BuiltinBrand = BRANDS.StopIteration;
+
       intrinsics.FunctionProto.FormalParameters = [];
-      intrinsics.FunctionProto.Call = function(){};
-      intrinsics.FunctionProto.HasInstance = function(){ return false };
+      intrinsics.FunctionProto.Call = FunctionPrototypeCall;
+      intrinsics.FunctionProto.HasInstance = FunctionPrototypeHasInstance;
       intrinsics.FunctionProto.BuiltinBrand = BRANDS.BuiltinFunction;
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;
+      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
+
       intrinsics.ArrayProto.array = [];
       intrinsics.ArrayProto.length = ['length', 0, __W];
+
       intrinsics.ErrorProto.define('name', 'Error', _CW);
       intrinsics.ErrorProto.define('message', '', _CW);
-      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
+
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
       intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
@@ -18915,8 +18919,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return esprima.parse(src, options ? new ParseOptions(options) : ParseOptions.prototype);
       } catch (e) {
         if (!realm || !intrinsics) return e;
-        var err = new $Error('SyntaxError', undefined, e.message);
-        err.setCode({ start: { line: e.lineNumber, column: e.column } }, src);
+        var err = new $Error('SyntaxError', undefined, e.message),
+            loc = { line: e.lineNumber, column: e.column  };
+
+        err.setCode({ start: loc, end: loc }, src);
         err.setOrigin(origin, type);
         return new AbruptCompletion('throw', err);
       }
@@ -19155,9 +19161,16 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     function initialize(realm, Ω, ƒ){
       if (realm.initialized) Ω();
-      var fakeLoader = { global: realm.global, baseURL: '' },
-          builtins = require('./builtins'),
+      var builtins = require('./builtins'),
           init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
+
+      var fakeLoader = {
+        Get: function(key){
+          if (key === 'global') return realm.global;
+          if (key === 'baseURL') return '';
+        }
+      };
+
 
       realm.state = 'initializing';
       realm.initialized = true;
@@ -19304,10 +19317,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       var scope = realm.globalEnv,
           ctx = new ExecutionContext(context, scope, realm, script.bytecode);
 
-      if (!script.thunk) {
-        script.thunk = new Thunk(script.bytecode);
-      }
-
       ExecutionContext.push(ctx);
       var status = $$TopLevelDeclarationInstantiation(script.bytecode);
       context === ctx && ExecutionContext.pop();
@@ -19315,7 +19324,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       if (status && status.Abrupt) {
         return ƒ(status);
       }
-
 
       resolveImports(realm.loader, script.bytecode, function(modules){
         each(script.bytecode.imports, function(imported){
@@ -19333,7 +19341,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
                 var obj = module;
 
                 each(path, function(part){
-                  var o = obj;
                   obj = obj.Get(part);
                 });
 
@@ -19370,7 +19377,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       realm.scripts.push(script);
 
-      var sandbox = createSandbox(loader.global, loader);
+      var sandbox = createSandbox(loader.Get('global'), loader);
 
       runScript(sandbox, script, function(){
         Ω(new $Module(sandbox.globalEnv, script.bytecode.exportedNames));
@@ -19383,20 +19390,19 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       Emitter.call(this);
       realms.push(this);
-      this.active = false;
-      this.quiet = false;
-      this.initialized = false;
+      this.active        = false;
+      this.quiet         = false;
+      this.initialized   = false;
       this.mutationScope = null;
-      this.scripts = [];
-      this.templates = {};
-      this.state = 'bootstrapping';
+      this.scripts       = [];
+      this.templates     = {};
+      this.state         = 'bootstrapping';
 
       new Intrinsics(this);
 
       hide(intrinsics.FunctionProto, 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
-      hide(this, 'active');
       hide(this, 'templates');
       hide(this, 'scripts');
       hide(this, 'globalEnv');
@@ -19405,15 +19411,15 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'mutationScope');
 
       iterate(natives, function(item){
-        var key = item[0],
+        var key   = item[0],
             value = item[1],
-            name = key[0] === '_' ? key.slice(1) : key;
+            name  = key[0] === '_' ? key.slice(1) : key;
 
         intrinsics[name] = new $NativeFunction({
           unwrapped: key[0] === '_',
-          name: name,
-          length: value.length,
-          call: value
+          length   : value.length,
+          name     : name,
+          call     : value
         });
       });
 
@@ -19459,9 +19465,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             callback = noop;
           }
         }
+
         if (typeof errback !== 'function') {
           errback = noop;
         }
+
         resolveModule(loader, source, name, callback, errback);
       },
       function evaluateAsync(subject, callback, errback){
@@ -19469,7 +19477,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             self = this;
 
         callback || (callback = noop);
-        errback || (errback = callback);
+        errback  || (errback = callback);
 
         if (script.error) {
           nextTick(function(){
@@ -19501,11 +19509,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         var result = prepareToRun(script.bytecode, this.globalEnv)
                   || run(this, script.thunk, script.bytecode);
 
-        if (result && result.Abrupt) {
-          this.emit('throw', result);
-        } else {
-          this.emit('complete', result);
-        }
+        var completionType = result && result.Abrupt ? 'throw' : 'complete';
+        this.emit(completionType, result);
         return result;
       }
     ]);
@@ -19513,6 +19518,13 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return Realm;
   })();
 
+
+  var realms = [],
+      realmStack = [],
+      realm = null,
+      global = null,
+      context = null,
+      intrinsics = null;
 
   function activate(target){
     if (realm !== target) {
@@ -19539,14 +19551,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       target.emit('dectivate');
     }
   }
-
-  var realms = [],
-      realmStack = [],
-      realm = null,
-      global = null,
-      context = null,
-      intrinsics = null;
-
 
 
   exports.Realm = Realm;
@@ -21025,9 +21029,10 @@ exports.index = (function(exports){
       Realm            = runtime.Realm,
       Script           = runtime.Script,
       Renderer         = debug.Renderer,
+      AbruptCompletion = errors.AbruptCompletion,
       $$ThrowException = errors.$$ThrowException,
-      $NativeFunction  = runtime.$NativeFunction,
-      builtins         = runtime.builtins;
+      builtins         = runtime.builtins,
+      $NativeFunction  = builtins.$NativeFunction;
 
 
   var exoticTemplates = {
@@ -21074,6 +21079,9 @@ exports.index = (function(exports){
     },
     function createFunction(options){
       return new $NativeFunction(options);
+    },
+    function createAbruptCompletion(value){
+      return new AbruptCompletion(value);
     },
     function createExotic(inherits, handlers){
       if (typeof inherits === 'string') {
@@ -21177,105 +21185,110 @@ exports.index = (function(exports){
     return Ctor;
   }
 
-  function $IndexedInterceptor(target){
-    builtins.$Object.call(this);
-    this.target = target;
-    this.length = target.length;
-    this.properties.set('length', target.length, 0);
-  }
-
-  inherit($IndexedInterceptor, builtins.$Object, {
-    indexAttribute: 5
-  }, [
-    function remove(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return delete this.target[index];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.remove(key);
-      }
-    },
-    function describe(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return [index+'', this.target[index], this.indexAttribute];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.getProperty(key);
-      }
-    },
-    function define(key, value, attrs){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return this.target[index] = value;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.set(key, value, attrs);
-      }
-    },
-    function has(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return true;
-      }
-
-      return this.properties.has(key);
-    },
-    function each(callback){
-      var len = this.target.length;
-
-      for (var i=0; i < len; i++) {
-        callback([i+'', this.target[i], this.indexAttribute]);
-      }
-
-
-      this.properties.forEach(callback);
-    },
-    function get(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-       return this.target[index];
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.get(key);
-      }
-    },
-    function set(key, value){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-       return this.target[index] = value;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.set(key, value);
-      }
-    },
-    function query(key){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return this.indexAttribute;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.getAttribute(key);
-      }
-    },
-    function update(key, attr){
-      var index = +key;
-      if (index >= 0 && index < this.target.length) {
-        return false;
-      }
-
-      if (this.properties.has(key)) {
-        return this.properties.setAttribute(key, attr);
-      }
+  var $IndexedInterceptor = (function(){
+    function $IndexedInterceptor(target){
+      builtins.$Object.call(this);
+      this.target = target;
+      this.length = target.length;
+      this.properties.set('length', target.length, 0);
     }
-  ]);
+
+    inherit($IndexedInterceptor, builtins.$Object, {
+      indexAttribute: 5
+    }, [
+      function remove(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return delete this.target[index];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.remove(key);
+        }
+      },
+      function describe(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return [index+'', this.target[index], this.indexAttribute];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.describe(key);
+        }
+      },
+      (function(){
+        return function define(key, value, attrs){
+          var index = +key;
+          if (index >= 0 && index < this.target.length) {
+            return this.target[index] = value;
+          }
+
+          if (this.properties.has(key)) {
+            return this.properties.set(key, value, attrs);
+          }
+        };
+      })(),
+      function has(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return true;
+        }
+
+        return this.properties.has(key);
+      },
+      function each(callback){
+        var len = this.target.length;
+
+        for (var i=0; i < len; i++) {
+          callback([i+'', this.target[i], this.indexAttribute]);
+        }
+
+        this.properties.each(callback);
+      },
+      function get(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+         return this.target[index];
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.get(key);
+        }
+      },
+      function set(key, value){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+         return this.target[index] = value;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.set(key, value);
+        }
+      },
+      function query(key){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return this.indexAttribute;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.query(key);
+        }
+      },
+      function update(key, attr){
+        var index = +key;
+        if (index >= 0 && index < this.target.length) {
+          return false;
+        }
+
+        if (this.properties.has(key)) {
+          return this.properties.update(key, attr);
+        }
+      }
+    ]);
+
+    return $IndexedInterceptor;
+  })();
 
   function brainTransplant(func, call, construct){
     if (!(func instanceof $NativeFunction)) {
@@ -21346,11 +21359,11 @@ exports.builtins["@function"] = "private @toString;\n\nexport class Function {\n
 
 exports.builtins["@globals"] = "$__global.@@define(@toStringTag, 'global');\n$__StopIteration.@@define(@toStringTag, 'StopIteration');\n\n\nexport function decodeURI(value){\n  return $__decodeURI($__ToString(value));\n}\n\nbuiltinFunction(decodeURI);\n\n\nexport function decodeURIComponent(value){\n  return $__decodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(decodeURIComponent);\n\n\nexport function encodeURI(value){\n  return $__encodeURI($__ToString(value));\n}\n\nbuiltinFunction(encodeURI);\n\n\nexport function encodeURIComponent(value){\n  return $__encodeURIComponent($__ToString(value));\n}\n\nbuiltinFunction(encodeURIComponent);\n\n\nexport function escape(value){\n  return $__escape($__ToString(value));\n}\n\nbuiltinFunction(escape);\n\n\nexport function eval(source){}\nbuiltinFunction(eval);\neval.@@setInternal('Call', $__eval.@@getInternal('Call'));\neval.@@setInternal('Construct', $__eval.@@getInternal('Construct'));\n\n\nexport function isFinite(number){\n  number = $__ToNumber(number);\n  return number === number && number !== Infinity && number !== -Infinity;\n}\n\nbuiltinFunction(isFinite);\n\n\nexport function isNaN(number){\n  number = $__ToNumber(number);\n  return number !== number;\n}\n\nbuiltinFunction(isNaN);\n\n\nexport function parseFloat(value){\n  return $__parseFloat($__ToPrimitive(value));\n}\n\nbuiltinFunction(parseFloat);\n\n\nexport function parseInt(value, radix){\n  return $__parseInt($__ToPrimitive(value), +radix);\n}\n\nbuiltinFunction(parseInt);\n\n\nexport function unescape(value){\n  return $__unescape($__ToString(value));\n}\n\nbuiltinFunction(unescape);\n";
 
-exports.builtins["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\nexport function items(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(items);\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\nexport function allItems(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allItems);\n";
+exports.builtins["@iter"] = "export const iterator = @iterator;\n\nexport class Iterator {\n  @iterator(){\n    return this;\n  }\n}\n\nbuiltinClass(Iterator);\n\n\nexport function keys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield x;\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(keys);\n\n\nexport function values(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield obj[x];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(values);\n\n\nexport function entries(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        if (obj.@@has(x)) {\n          yield [x, obj[x]];\n        }\n      }\n    })()\n  };\n}\n\nbuiltinFunction(entries);\n\n\nexport function allKeys(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield x;\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allKeys);\n\n\nexport function allValues(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield obj[x];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allValues);\n\n\nexport function allEntries(obj){\n  return {\n    @iterator: ()=> (function*(){\n      for (let x in obj) {\n        yield [x, obj[x]];\n      }\n    })()\n  };\n}\n\nbuiltinFunction(allEntries);\n";
 
 exports.builtins["@json"] = "let ReplacerFunction, PropertyList, stack, indent, gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  const stepback = indent,\n        partial = [];\n\n  var brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if (value.@@GetBuiltinBrand() === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || value.@@Enumerate(false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  var final;\n  if (!partial.length) {\n    final = brackets[0] + brackets[1];\n  } else if (!gap) {\n    final = brackets[0] + partial.join(',') + brackets[1];\n  } else {\n    final = brackets[0] + '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback + brackets[1];\n  }\n  stack.delete(value);\n  indent = stepback;\n  return final;\n}\n\ninternalFunction(J);\n\nfunction Str(key, holder){\n  var value = holder[key];\n  if ($__Type(value) === 'Object') {\n    var toJSON = value.toJSON;\n    if (typeof toJSON === 'function') {\n      value = toJSON.@@Call(value, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    value = ReplacerFunction.@@Call(holder, [key, value]);\n  }\n\n  if ($__Type(value) === 'Object') {\n    var brand = value.@@GetBuiltinBrand();\n    if (brand === 'Number') {\n      value = $__ToNumber(value);\n    } else if (brand === 'String') {\n      value = $__ToString(value);\n    } else if (brand === 'Boolean') {\n      value = value.@@PrimitiveValue;\n    }\n  }\n\n\n  if (value === null) {\n    return 'null';\n  } else if (value === true) {\n    return 'true';\n  } else if (value === false) {\n    return 'false';\n  }\n\n  var type = typeof value;\n  if (type === 'string') {\n    return $__Quote(value);\n  } else if (type === 'number') {\n    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;\n  } else if (type === 'object') {\n    return J(value);\n  }\n\n}\n\ninternalFunction(Str);\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if (replacer.@@GetBuiltinBrand() === 'Array') {\n      let props = new Set;\n\n      for (let value of replacer) {\n        var item,\n            type = $__Type(value);\n\n        if (type === 'String') {\n          item = value;\n        } else if (type === 'Number') {\n          item = value + '';\n        } else if (type === 'Object') {\n          let brand = value.@@GetBuiltinBrand();\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(value);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = space.@@PrimitiveValue;\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\nexport function parse(source, reviver){\n  return $__JSONParse(source, reviver);\n}\n\n\n\nexport let JSON = {};\nJSON.@@extend({ stringify, parse });\nJSON.@@SetBuiltinBrand('BuiltinJSON');\nJSON.@@define(@toStringTag, 'JSON');\n";
 
-exports.builtins["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;\n    return mapCreate(map, iterable);\n  }\n\n  get size(){\n    if (this && this.@@hasInternal('MapData')) {\n      return $__MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  return $__MapClear(map);\n}\n\nfunction mapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('MapData')) {\n    throw $__Exception('double_initialization', ['Map']);\n  }\n\n  $__MapInitialization(target, iterable);\n  return target;\n}\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $__MapDelete(map, key);\n}\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $__MapGet(map, key);\n}\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $__MapHas(map, key);\n}\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  return $__MapSet(map, key, value);\n}\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $__MapSize(map);\n}\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));\n}\n\nexport let\n  clear   = mapClear,\n  create  = mapCreate,\n  //delete  = mapDelete, TODO: fix exporting reserved names\n  get     = mapGet,\n  has     = mapHas,\n  iterate = mapIterate,\n  set     = mapSet,\n  size    = mapSize;\n";
+exports.builtins["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('MapData')) {\n    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!(this.@@has(@map) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw $__StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;\n    return mapCreate(map, iterable);\n  }\n\n  get size(){\n    if (this && this.@@hasInternal('MapData')) {\n      return $__MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  items(){\n    ensureMap(this, 'items');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n\n  @iterator(){\n    ensureMap(this, '@iterator');\n    return new MapIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  return $__MapClear(map);\n}\n\nbuiltinFunction(mapClear);\n\nfunction mapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('MapData')) {\n    throw $__Exception('double_initialization', ['Map']);\n  }\n\n  $__MapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(mapCreate);\n\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $__MapDelete(map, key);\n}\n\nbuiltinFunction(mapDelete);\n\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $__MapGet(map, key);\n}\n\nbuiltinFunction(mapGet);\n\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $__MapHas(map, key);\n}\n\nbuiltinFunction(mapHas);\n\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));\n}\n\nbuiltinFunction(mapIterate);\n\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  return $__MapSet(map, key, value);\n}\n\nbuiltinFunction(mapSet);\n\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $__MapSize(map);\n}\n\nbuiltinFunction(mapSize);\n\n\nexport const clear   = mapClear,\n             create  = mapCreate,\n           //delete  = mapDelete, TODO: fix exporting reserved names\n             get     = mapGet,\n             has     = mapHas,\n             iterate = mapIterate,\n             set     = mapSet,\n             size    = mapSize;\n";
 
 exports.builtins["@math"] = "export const\n  E       = 2.718281828459045,\n  LN10    = 2.302585092994046,\n  LN2     = 0.6931471805599453,\n  LOG10E  = 0.4342944819032518,\n  LOG2E   = 1.4426950408889634,\n  PI      = 3.141592653589793,\n  SQRT1_2 = 0.7071067811865476,\n  SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== -Infinity\n      && value !== Infinity;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  var i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  }\n  return ($__exp(x) + $__exp(-x)) / 2;\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function max(...values){\n  var i = values.length,\n      maximum = -Infinity,\n      current;\n\n  while (i--) {\n    current = +values[i];\n    if (current !== current) {\n      return NaN;\n    }\n    if (current > maximum) {\n      maximum = current;\n    }\n  }\n\n  return maximum;\n}\n\nmax.@@set('length', 2);\n\nexport function min(...values){\n  var i = values.length,\n      minimum = Infinity,\n      current;\n\n  while (i--) {\n    current = $__ToNumber(values[i]);\n    if (current !== current) {\n      return NaN;\n    }\n    if (current < minimum) {\n      minimum = current;\n    }\n  }\n\n  return minimum;\n}\n\nmin.@@set('length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\nMath.@@SetBuiltinBrand('BuiltinMath');\nMath.@@define(@toStringTag, 'Math');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    Math.@@update(k, HIDDEN);\n  } else {\n    Math.@@update(k, FROZEN);\n  }\n}\n";
 
@@ -21364,7 +21377,7 @@ exports.builtins["@reflect"] = "export class Proxy {\n  constructor(target, hand
 
 exports.builtins["@regexp"] = "private @test, @exec, @toString;\n\nexport class RegExp {\n  constructor(pattern, flags){\n    if ($__IsConstructCall()) {\n      if (pattern === undefined) {\n        pattern = '';\n      } else if (typeof pattern === 'string') {\n      } else if (pattern && pattern.@@GetBuiltinBrand() === 'RegExp') {\n        if (flags !== undefined) {\n          throw $__Exception('regexp_flags', []);\n        }\n      } else {\n        pattern = $__ToString(pattern);\n      }\n      return $__RegExpCreate(pattern, flags);\n    } else {\n      if (flags === undefined && pattern) {\n        if (pattern && pattern.@@GetBuiltinBrand() === 'RegExp') {\n          return pattern;\n        }\n      }\n      return $__RegExpCreate(pattern, flags);\n    }\n  }\n\n  exec(string){\n    if (this.@@GetBuiltinBrand() === 'RegExp') {\n      return this.@exec($__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.exec']);\n  }\n\n  test(string){\n    if (this.@@GetBuiltinBrand() === 'RegExp') {\n      return this.@test($__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.test']);\n  }\n\n  toString(){\n    if (this.@@GetBuiltinBrand() === 'RegExp') {\n      return this.@toString();\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.toString']);\n  }\n}\n\nbuiltinClass(RegExp);\nRegExp.prototype.@test = $__RegExpTest;\nRegExp.prototype.@exec = $__RegExpExec;\nRegExp.prototype.@toString = $__RegExpToString;\n\nexport function exec(regexp, string){\n  if (regexp && regexp.@@GetBuiltinBrand() === 'RegExp') {\n    return $__RegExpExec.@@Call(regexp, $__ToString(string));\n  }\n  throw $__Exception('not_generic', ['@regexp.exec']);\n}\n\nbuiltinFunction(exec);\n\n\nexport function test(regexp, string){\n  if (regexp && regexp.@@GetBuiltinBrand() === 'RegExp') {\n    return $__RegExpTest.@@Call(regexp, [$__ToString(string)]);\n  }\n  throw $__Exception('not_generic', ['@regexp.test']);\n}\n\nbuiltinFunction(test);\n";
 
-exports.builtins["@set"] = "import Map from '@map';\nimport Iterator from '@iter';\n\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = o.@@getInternal('SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\ninternalFunction(ensureSet);\n\n\n\nclass SetIterator extends Iterator {\n  private @data, // Set\n          @key,  // SetNextKey\n          @kind; // SetIterationKind\n\n  constructor(set, kind){\n    this.@data = ensureSet($__ToObject(set), 'SetIterator');\n    this.@key  = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n    if (!(this.@@has(@data) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n\n    var data = this.@data,\n        key  = this.@key,\n        kind = this.@kind,\n        item = $__MapNext(data, key);\n\n    this.@key = item[0];\n    return kind === 'key+value' ? [item[1], item[1]] : item[1];\n  }\n}\n\nbuiltinClass(SetIterator);\n\n\n\n\nexport class Set {\n  constructor(iterable){\n    var set = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : this;\n    return setCreate(set, iterable);\n  }\n\n  get size(){\n    if (this && this.@@hasInternal('SetData')) {\n      return $__MapSize(this.@@getInternal('SetData'));\n    }\n    return 0;\n  }\n\n  clear(){\n    return $__MapClear(ensureSet(this, 'clear'));\n  }\n\n  add(value){\n    return $__MapSet(ensureSet(this, 'add'), value, value);\n  }\n\n  has(value){\n    return $__MapHas(ensureSet(this, 'has'), value);\n  }\n\n  delete(value){\n    return $__MapDelete(ensureSet(this, 'delete'), value);\n  }\n\n  items(){\n    return new SetIterator(this, 'key+value');\n  }\n\n  keys(){\n    return new SetIterator(this, 'key');\n  }\n\n  values(){\n    return new SetIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new SetIterator(this, 'value');\n  }\n}\n\nbuiltinClass(Set);\nconst SetPrototype = Set.prototype;\n\n\n\nfunction setAdd(set, value){\n  return $__MapSet(ensureSet(set, '@set.add'), value, value);\n}\n\nfunction setClear(set){\n  return $__MapClear(ensureSet(set, '@set.clear'));\n}\n\nfunction setCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  const data = new Map;\n  target.@@setInternal('SetData', data);\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    for (var [key, value] of iterable) {\n      $__MapSet(data, value, value);\n    }\n  }\n\n  return target;\n}\n\nfunction setDelete(set, value){\n  return $__MapDelete(ensureSet(set, '@set.delete'), value);\n}\n\nfunction setHas(set, value){\n  return $__MapHas(ensureSet(set, '@set.has'), value);\n}\n\nfunction setSize(set){\n  return $__MapSize(ensureMap(set, '@set.size'));\n}\n\nfunction setIterate(set, kind){\n  return new SetIterator(set, 'value');\n}\n\nexport let\n  add     = setAdd,\n  clear   = setClear,\n  create  = setCreate,\n  //delete  = setDelete, //uhg\n  has     = setHas,\n  iterate = setIterate,\n  size    = setSize;\n";
+exports.builtins["@set"] = "import Map from '@map';\nimport Iterator from '@iter';\n\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = o.@@getInternal('SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\ninternalFunction(ensureSet);\n\n\n\nclass SetIterator extends Iterator {\n  private @data, // Set\n          @key,  // SetNextKey\n          @kind; // SetIterationKind\n\n  constructor(set, kind){\n    this.@data = ensureSet($__ToObject(set), 'SetIterator');\n    this.@key  = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n    if (!(this.@@has(@data) && this.@@has(@key) && this.@@has(@kind))) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n\n    var data = this.@data,\n        key  = this.@key,\n        kind = this.@kind,\n        item = $__MapNext(data, key);\n\n    this.@key = item[0];\n    return kind === 'key+value' ? [item[1], item[1]] : item[1];\n  }\n}\n\nbuiltinClass(SetIterator);\n\n\n\n\nexport class Set {\n  constructor(iterable){\n    var set = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : this;\n    return setCreate(set, iterable);\n  }\n\n  get size(){\n    if (this && this.@@hasInternal('SetData')) {\n      return $__MapSize(this.@@getInternal('SetData'));\n    }\n    return 0;\n  }\n\n  clear(){\n    return $__MapClear(ensureSet(this, 'clear'));\n  }\n\n  add(value){\n    return $__MapSet(ensureSet(this, 'add'), value, value);\n  }\n\n  has(value){\n    return $__MapHas(ensureSet(this, 'has'), value);\n  }\n\n  delete(value){\n    return $__MapDelete(ensureSet(this, 'delete'), value);\n  }\n\n  entries(){\n    return new SetIterator(this, 'key+value');\n  }\n\n  keys(){\n    return new SetIterator(this, 'key');\n  }\n\n  values(){\n    return new SetIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new SetIterator(this, 'value');\n  }\n}\n\nbuiltinClass(Set);\nconst SetPrototype = Set.prototype;\n\n\n\nfunction setAdd(set, value){\n  return $__MapSet(ensureSet(set, '@set.add'), value, value);\n}\n\nbuiltinFunction(setAdd);\n\n\nfunction setClear(set){\n  return $__MapClear(ensureSet(set, '@set.clear'));\n}\n\nbuiltinFunction(setClear);\n\n\nfunction setCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  const data = new Map;\n  target.@@setInternal('SetData', data);\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    for (var [key, value] of iterable) {\n      $__MapSet(data, value, value);\n    }\n  }\n\n  return target;\n}\n\nbuiltinFunction(setCreate);\n\n\nfunction setDelete(set, value){\n  return $__MapDelete(ensureSet(set, '@set.delete'), value);\n}\n\nbuiltinFunction(setDelete);\n\n\nfunction setHas(set, value){\n  return $__MapHas(ensureSet(set, '@set.has'), value);\n}\n\nbuiltinFunction(setHas);\n\n\nfunction setSize(set){\n  return $__MapSize(ensureMap(set, '@set.size'));\n}\n\nbuiltinFunction(setSize);\n\n\nfunction setIterate(set, kind){\n  return new SetIterator(set, 'value');\n}\n\nbuiltinFunction(setIterate);\n\n\nexport const add     = setAdd,\n             clear   = setClear,\n             create  = setCreate,\n           //delete  = setDelete, TODO: fix exporting reserved names\n             has     = setHas,\n             iterate = setIterate,\n             size    = setSize;\n";
 
 exports.builtins["@std"] = "// standard constants\nconst NaN       = +'NaN';\nconst Infinity  = 1 / 0;\nconst undefined = void 0;\n\n// standard functions\nimport { escape,\n         decodeURI,\n         decodeURIComponent,\n         encodeURI,\n         encodeURIComponent,\n         eval,\n         isFinite,\n         isNaN,\n         parseFloat,\n         parseInt,\n         unescape } from '@globals';\n\n\nimport { clearInterval,\n         clearTimeout,\n         setInterval,\n         setTimeout } from '@timers';\n\n// standard types\nimport Array    from '@array';\nimport Boolean  from '@boolean';\nimport Date     from '@date';\nimport Function from '@function';\nimport Map      from '@map';\nimport Number   from '@number';\nimport Object   from '@object';\nimport Proxy    from '@reflect';\nimport RegExp   from '@regexp';\nimport Set      from '@set';\nimport String   from '@string';\nimport WeakMap  from '@weakmap';\n\n\n\n// standard errors\nimport { Error,\n         EvalError,\n         RangeError,\n         ReferenceError,\n         SyntaxError,\n         TypeError,\n         URIError } from '@error';\n\nimport { ArrayBuffer,\n         DataView,\n         Float32Array,\n         Float64Array,\n         Int16Array,\n         Int32Array,\n         Int8Array,\n         Uint16Array,\n         Uint32Array,\n         Uint8Array } from '@typed-arrays';\n\n// standard pseudo-modules\nimport JSON from '@json';\nimport Math from '@math';\n\nimport Symbol from '@symbol';\nimport Iterator from '@iter';\n\nimport console from '@console';\n\nlet StopIteration = $__StopIteration\n\n\n\nexport Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,\n       Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,\n       ArrayBuffer, DataView, Float32Array, Float64Array, Int16Array,\n       Int32Array, Int8Array, Uint16Array, Uint32Array, Uint8Array,\n       clearInterval, clearTimeout, decodeURI, decodeURIComponent, escape, encodeURI, encodeURIComponent,\n       eval, isFinite, isNaN, parseFloat, parseInt, setInterval, setTimeout, unescape,\n       console, StopIteration, JSON, Math,\n       NaN, Infinity, undefined;\n";
 
@@ -21372,13 +21385,13 @@ exports.builtins["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp
 
 exports.builtins["@symbol"] = "export class Symbol {\n  constructor(name, isPublic){\n    if (name == null) {\n      throw $__Exception('unnamed_symbol', []);\n    }\n    return $__SymbolCreate(name, !!isPublic);\n  }\n}\n\nbuiltinClass(Symbol);\n";
 
-exports.builtins["@system"] = "class Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader = loader;\n    this.@mrl = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback = errback;\n  }\n\n  fulfill(src){\n    var loader = this.@loader;\n\n    var translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    loader.@evaluate(translated, this.@resolved, module => {\n      module.@@setInternal('loader', loader);\n      module.@@setInternal('resolved', this.@resolved);\n      module.@@setInternal('mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    var loader = this.@loader,\n        resolved = this.@resolved = (loader.@resolve)(mrl, baseURL);\n\n    this.@mrl = mrl;\n\n    var module = loader.get(resolved);\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\nprivate @translate, @resolve, @fetch, @strict, @modules, @evaluate;\n\nexport class Loader {\n  constructor(parent, options){\n    options = options || {};\n    this.linkedTo   = options.linkedTo  || null;\n    this.@strict    = true;\n    this.@modules   = $__ObjectCreate(null);\n    this.@translate = options.translate || parent.@translate;\n    this.@resolve   = options.resolve   || parent.@resolve;\n    this.@fetch     = options.fetch     || parent.@fetch;\n    this.@@setInternal('global', options.global || (parent ? parent.global : $__global));\n    this.@@setInternal('baseURL', options.baseURL || (parent ? parent.baseURL : ''));\n  }\n\n  get global(){\n    return this.@@getInternal('global');\n  }\n\n  get baseURL(){\n    return this.@@getInternal('baseURL');\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return this.@evaluate(src);\n  }\n\n  evalAsync(src, callback, errback){\n    this.@evaluate(src, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    object || (object = this.global);\n    for (var k in std) {\n      desc.value = std[k];\n      object.@@DefineOwnProperty(k, desc);\n    }\n\n    return object;\n  }\n}\nLoader.prototype.@evaluate = $__EvaluateModule;\n\n\nexport function Module(object){\n  if (object.@@GetBuiltinBrand() === 'Module') {\n    return object;\n  }\n  return $__ToModule($__ToObject(object));\n}\n\nbuiltinFunction(Module);\n\n\nexport let System = new Loader(null, {\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__SetDefaultLoader(System);\n\n\nlet internalLoader = $__internalLoader = new Loader(System, { global: this });\ninternalLoader.@strict = false;\n\nlet std = internalLoader.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\n\nfor (let k in internalLoader.@modules) {\n  System.@modules[k] = internalLoader.@modules[k];\n}\n\nstd.@@each((key, value, attr) => {\n  value = std[key];\n  $__global.@@define(key, value, $__Type(value) === 'Object' ? 6 : 0);\n});\n\n";
+exports.builtins["@system"] = "class Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader   = loader;\n    this.@mrl      = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback  = errback;\n  }\n\n  fulfill(src){\n    const loader = this.@loader;\n    let translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n'+translated;\n    }\n\n    loader.@evaluate(translated, this.@resolved, module => {\n      module.@@setInternal('loader', loader);\n      module.@@setInternal('resolved', this.@resolved);\n      module.@@setInternal('mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    const loader   = this.@loader,\n          resolved = this.@resolved = (loader.@resolve)(mrl, baseURL),\n          module   = loader.get(resolved);\n\n    this.@mrl = mrl;\n\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\n\nprivate @strict, @resolve, @modules, @translate, @fetch, @evaluate;\n\n\nexport class Loader {\n  private @options, @parent;\n\n  constructor(parent, options = {}){\n    this.@strict  = true;\n    this.@modules = $__ObjectCreate(null);\n    this.@options = options = options || $__ToObject(options);\n    this.@parent  = parent && parent.@options ? parent : System || {};\n    this.linkedTo = options.linkedTo || null;\n  }\n\n  get global(){\n    return this.@options.global || this.@parent.global || $__global;\n  }\n\n  get baseURL(){\n    return this.@options.baseURL || this.@parent.baseURL || '';\n  }\n\n  get @translate(){\n    return this.@options.translate || this.@parent.@translate;\n  }\n\n  get @resolve(){\n    return this.@options.resolve || this.@parent.@resolve;\n  }\n\n  get @fetch(){\n    return this.@options.fetch || this.@parent.@fetch;\n  }\n\n  load(mrl, callback, errback){\n    var key = (this.@resolve)(mrl, this.baseURL),\n        module = this.@modules[key];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);\n    }\n  }\n\n  eval(src){\n    return this.@evaluate(src);\n  }\n\n  evalAsync(src, callback, errback){\n    this.@evaluate(src, callback, errback);\n  }\n\n  get(mrl){\n    var canonical = (this.@resolve)(mrl, this.baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    let canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else if ($__Type(canonical) === 'Object') {\n      for (var k in canonical) {\n        this.@modules[k] = canonical[k];\n      }\n    }\n  }\n\n  defineBuiltins(object = this.global){\n    var desc = { configurable: true,\n                 enumerable: false,\n                 writable: true,\n                 value: undefined };\n\n    for (var k in std) {\n      desc.value = std[k];\n      object.@@DefineOwnProperty(k, desc);\n    }\n\n    return object;\n  }\n}\n\nLoader.prototype.@evaluate = $__EvaluateModule;\n\n\nexport function Module(object, mrl){\n  object = $__ToObject(object);\n  if (object.@@GetBuiltinBrand() === 'Module') {\n    return object;\n  }\n  var module = $__ToModule(object);\n  module.@@setInternal('loader', System);\n  module.@@setInternal('resolved', mrl || '');\n  module.@@setInternal('mrl', mrl || '');\n  return module;\n}\n\nbuiltinFunction(Module);\n\n\nexport var System = new Loader(null, {\n  global: $__global,\n  baseURL: '',\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__SetDefaultLoader(System);\n\n\nlet internalLoader = $__internalLoader = new Loader(System, { global: this });\ninternalLoader.@strict = false;\n\nSystem.@modules['@system'] = internalLoader.@modules['@system'] = new Module({\n  Module: Module,\n  System: System,\n  Loader: Loader\n}, '@system');\n\nlet std = internalLoader.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\nfor (let k in internalLoader.@modules) {\n  System.@modules[k] = internalLoader.@modules[k];\n}\n\nstd.@@each(key => $__global.@@define(key, std[key], $__Type(std[key]) === 'Object' ? HIDDEN : FROZEN));\n\n";
 
 exports.builtins["@timers"] = "export function clearInterval(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearInterval);\n\n\nexport function clearTimeout(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearTimeout);\n\n\nexport function setInterval(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, true);\n}\n\nbuiltinFunction(setInterval);\n\n\nexport function setTimeout(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, false);\n}\n\nbuiltinFunction(setTimeout);\n";
 
 exports.builtins["@typed-arrays"] = "\n\nfunction wrappingClamp(number, min, max){\n  if (number < min) {\n    number += max;\n  }\n  return number < min ? min : number > max ? max : number;\n}\n\ninternalFunction(wrappingClamp);\n\n\nfunction createArrayBuffer(nativeBuffer, byteLength){\n  var buffer = $__ObjectCreate(ArrayBufferPrototype);\n  buffer.@@define('byteLength', byteLength, 0);\n  buffer.@@setInternal('NativeBuffer', nativeBuffer);\n  buffer.@@setInternal('ConstructorName', 'ArrayBuffer');\n  buffer.@@SetBuiltinBrand('BuiltinArrayBuffer');\n  return buffer;\n}\n\ninternalFunction(createArrayBuffer);\n\n\nfunction createTypedArray(Type, buffer, byteOffset, length){\n  if (typeof buffer === 'number') {\n    length = $__ToUint32(buffer);\n    var byteLength = length * Type.BYTES_PER_ELEMENT;\n    byteOffset = 0;\n    buffer = new ArrayBuffer(byteLength);\n    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n  } else {\n    buffer = $__ToObject(buffer);\n\n    if (buffer.@@GetBuiltinBrand() === 'ArrayBuffer') {\n      byteOffset = $__ToUint32(byteOffset);\n      if (byteOffset % Type.BYTES_PER_ELEMENT) {\n        throw $__Exception('buffer_unaligned_offset', [Type.name]);\n      }\n\n      var bufferLength = buffer.byteLength,\n          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;\n\n      if (byteOffset + byteLength > bufferLength) {\n        throw $__Exception('buffer_out_of_bounds', [Type.name]);\n      }\n\n      length = byteLength / Type.BYTES_PER_ELEMENT;\n\n      if ($__ToInteger(length) !== length) {\n        throw $__Exception('buffer_unaligned_length', [Type.name]);\n      }\n\n      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n    } else {\n      length = $__ToUint32(buffer.length);\n      var byteLength = length * Type.BYTES_PER_ELEMENT;\n      byteOffset = 0;\n      buffer = new ArrayBuffer(length);\n\n      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n      for (var i=0; i < length; i++) {\n        typedArray[i] = buffer[i];\n      }\n\n      return typedArray;\n    }\n  }\n}\n\ninternalFunction(createTypedArray);\n\n\nfunction set(Type, instance, array, offset){\n  if (instance.@@GetBuiltinBrand() !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);\n  }\n\n  offset = $__ToUint32(offset);\n  array = $__ToObject(array);\n  var srcLength = $__ToUint32(array.length),\n      targetLength = instance.length;\n\n  if (srcLength + offset > targetLength) {\n    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);\n  }\n\n  var temp = new Type(srcLength),\n      k = 0;\n\n  while (k < srcLength) {\n    temp[k] = array[k];\n  }\n\n  k = offset;\n  while (k < targetLength) {\n    instance[k] = temp[k - offset];\n  }\n}\n\ninternalFunction(set);\n\n\nfunction subarray(Type, instance, begin, end){\n  if (instance.@@GetBuiltinBrand() !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);\n  }\n\n  var srcLength = instance.length;\n\n  begin = $__ToInt32(begin);\n  end = end === undefined ? srcLength : $__ToInt32(end);\n\n  begin = wrappingClamp(begin, 0, srcLength);\n  end = wrappingClamp(end, 0, srcLength);\n\n  if (end < begin) {\n    [begin, end] = [end, begin];\n  }\n\n  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);\n}\n\ninternalFunction(subarray);\n\n\nexport class ArrayBuffer {\n  constructor(byteLength){\n    byteLength = $__ToUint32(byteLength);\n    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);\n  }\n\n  slice(begin = 0, end = this.byteLength){\n    var sourceBuffer = $__ToObject(this),\n        sourceNativeBuffer = sourceBuffer.@@getInternal('NativeBuffer');\n\n    if (!sourceNativeBuffer) {\n      throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);\n    }\n\n    var byteLength = sourceBuffer.byteLength;\n    begin = wrappingClamp($__ToInt32(begin), 0, byteLength);\n    end = wrappingClamp($__ToInt32(end), 0, byteLength);\n\n    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);\n  }\n}\n\nbuiltinClass(ArrayBuffer);\nconst ArrayBufferPrototype = ArrayBuffer.prototype;\n\nprivate @get, @set;\n\nexport class DataView {\n  constructor(buffer, byteOffset = 0, byteLength = buffer.byteLength - byteOffset){\n    buffer = $__ToObject(buffer);\n    if (buffer.@@GetBuiltinBrand() !== 'ArrayBuffer') {\n      throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);\n    }\n\n    byteOffset = $__ToUint32(byteOffset);\n    byteLength = $__ToUint32(byteLength);\n\n    if (byteOffset + byteLength > buffer.byteLength) {\n      throw $__Exception('buffer_out_of_bounds', ['DataView']);\n    }\n\n    this.@@define('byteLength', byteLength, 1);\n    this.@@define('byteOffset', byteOffset, 1);\n    this.@@define('buffer', buffer, 1);\n    this.@@setInternal('View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));\n    this.@@SetBuiltinBrand('BuiltinDataView');\n  }\n  getUint8(byteOffset){\n    return this.@get('Uint8', byteOffset);\n  }\n  getUint16(byteOffset, littleEndian){\n    return this.@get('Uint16', byteOffset, littleEndian);\n  }\n  getUint32(byteOffset, littleEndian){\n    return this.@get('Uint32', byteOffset, littleEndian);\n  }\n  getInt8(byteOffset){\n    return this.@get('Int8', byteOffset);\n  }\n  getInt16(byteOffset, littleEndian){\n    return this.@get('Int16', byteOffset, littleEndian);\n  }\n  getInt32(byteOffset, littleEndian){\n    return this.@get('Int32', byteOffset, littleEndian);\n  }\n  getFloat32(byteOffset, littleEndian){\n    return this.@get('Float32', byteOffset, littleEndian);\n  }\n  getFloat64(byteOffset, littleEndian){\n    return this.@get('Float64', byteOffset, littleEndian);\n  }\n  setUint8(byteOffset, value){\n    return this.@set('Uint8', byteOffset, value);\n  }\n  setUint16(byteOffset, value, littleEndian){\n    return this.@set('Uint16', byteOffset, value, littleEndian);\n  }\n  setUint32(byteOffset, value, littleEndian){\n    return this.@set('Uint32', byteOffset, value, littleEndian);\n  }\n  setInt8(byteOffset, value){\n    return this.@set('Int8', byteOffset, value);\n  }\n  setInt16(byteOffset, value, littleEndian){\n    return this.@set('Int16', byteOffset, value, littleEndian);\n  }\n  setInt32(byteOffset, value, littleEndian){\n    return this.@set('Int32', byteOffset, value, littleEndian);\n  }\n  setFloat32(byteOffset, value, littleEndian){\n    return this.@set('Float32', byteOffset, value, littleEndian);\n  }\n  setFloat64(byteOffset, value, littleEndian){\n    return this.@set('Float64', byteOffset, value, littleEndian);\n  }\n}\n\nbuiltinClass(DataView);\nDataView.prototype.@get = $__DataViewGet\nDataView.prototype.@set = $__DataViewSet\n\n\n\nexport class Float64Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float64Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float64Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float64Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Float64Array);\nFloat64Array.@@define('BYTES_PER_ELEMENT', 8, 0);\n\n\nexport class Float32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Float32Array);\nFloat32Array.@@define('BYTES_PER_ELEMENT', 4, 0);\n\n\nexport class Int32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int32Array);\nInt32Array.@@define('BYTES_PER_ELEMENT', 4, 0);\n\n\nexport class Int16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int16Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int16Array);\nInt16Array.@@define('BYTES_PER_ELEMENT', 2, 0);\n\n\nexport class Int8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int8Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int8Array);\nInt8Array.@@define('BYTES_PER_ELEMENT', 1, 0);\n\n\nexport class Uint32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint32Array);\nUint32Array.@@define('BYTES_PER_ELEMENT', 4, 0);\n\n\nexport class Uint16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint16Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint16Array);\nUint16Array.@@define('BYTES_PER_ELEMENT', 2, 0);\n\n\nexport class Uint8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint8Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint8Array);\nUint8Array.@@define('BYTES_PER_ELEMENT', 1, 0);\n";
 
-exports.builtins["@weakmap"] = "function ensureWeakMap(o, p, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('WeakMapData')) {\n    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);\n  }\n  if (typeof p === 'object' ? p === null : typeof p !== 'function') {\n    throw $__Exception('invalid_weakmap_key', []);\n  }\n}\n\n\nexport class WeakMap {\n  constructor(iterable){\n    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;\n    return weakmapCreate(map, iterable);\n  }\n\n  delete(key){\n    ensureWeakMap(this, key, 'delete');\n    return $__WeakMapDelete(this, key);\n  }\n\n  get(key){\n    ensureWeakMap(this, key, 'get');\n    return $__WeakMapGet(this, key);\n  }\n\n  has(key){\n    ensureWeakMap(this, key, 'has');\n    return $__WeakMapHas(this, key);\n  }\n\n  set(key, value){\n    ensureWeakMap(this, key, 'set');\n    return $__WeakMapSet(this, key, value);\n  }\n}\n\nbuiltinClass(WeakMap);\n\nvar WeakMapPrototype = WeakMap.prototype;\n\n\n\n\nfunction weakmapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('WeakMapData')) {\n    throw $__Exception('double_initialization', ['WeakMap']);\n  }\n\n  $__WeakMapInitialization(target, iterable);\n  return target;\n}\n\nfunction weakmapDelete(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.delete');\n  return $__WeakMapDelete(weakmap, key);\n}\n\nfunction weakmapGet(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.get');\n  return $__WeakMapGet(weakmap, key);\n}\n\nfunction weakmapHas(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.has');\n  return $__WeakMapHas(weakmap, key);\n}\n\nfunction weakmapSet(weakmap, key, value){\n  ensureWeakMap(weakmap, key, '@weakmap.set');\n  return $__WeakMapSet(weakmap, key, value);\n}\n\nexport let\n  create  = weakmapCreate,\n//delete  = weakmapDelete, TODO: fix exporting reserved names\n  get     = weakmapGet,\n  has     = weakmapHas,\n  set     = weakmapSet;\n";
+exports.builtins["@weakmap"] = "function ensureWeakMap(o, p, name){\n  if (!o || typeof o !== 'object' || !o.@@hasInternal('WeakMapData')) {\n    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);\n  }\n  if (typeof p === 'object' ? p === null : typeof p !== 'function') {\n    throw $__Exception('invalid_weakmap_key', []);\n  }\n}\n\n\nexport class WeakMap {\n  constructor(iterable){\n    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;\n    return weakmapCreate(map, iterable);\n  }\n\n  delete(key){\n    ensureWeakMap(this, key, 'delete');\n    return $__WeakMapDelete(this, key);\n  }\n\n  get(key){\n    ensureWeakMap(this, key, 'get');\n    return $__WeakMapGet(this, key);\n  }\n\n  has(key){\n    ensureWeakMap(this, key, 'has');\n    return $__WeakMapHas(this, key);\n  }\n\n  set(key, value){\n    ensureWeakMap(this, key, 'set');\n    return $__WeakMapSet(this, key, value);\n  }\n}\n\nbuiltinClass(WeakMap);\n\nvar WeakMapPrototype = WeakMap.prototype;\n\n\n\n\nfunction weakmapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if (target.@@hasInternal('WeakMapData')) {\n    throw $__Exception('double_initialization', ['WeakMap']);\n  }\n\n  $__WeakMapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(weakmapCreate);\n\n\nfunction weakmapDelete(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.delete');\n  return $__WeakMapDelete(weakmap, key);\n}\n\nbuiltinFunction(weakmapDelete);\n\n\nfunction weakmapGet(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.get');\n  return $__WeakMapGet(weakmap, key);\n}\n\nbuiltinFunction(weakmapGet);\n\n\nfunction weakmapHas(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.has');\n  return $__WeakMapHas(weakmap, key);\n}\n\nbuiltinFunction(weakmapHas);\n\n\nfunction weakmapSet(weakmap, key, value){\n  ensureWeakMap(weakmap, key, '@weakmap.set');\n  return $__WeakMapSet(weakmap, key, value);\n}\n\nbuiltinFunction(weakmapSet);\n\n\nexport const create  = weakmapCreate,\n           //delete  = weakmapDelete, TODO: fix exporting reserved names\n             get     = weakmapGet,\n             has     = weakmapHas,\n             set     = weakmapSet;\n";
 
 
 
