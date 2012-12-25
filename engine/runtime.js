@@ -2181,9 +2181,16 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function initialize(realm, Ω, ƒ){
       if (realm.initialized) Ω();
-      var fakeLoader = { global: realm.global, baseURL: '' },
-          builtins = require('./builtins'),
+      var builtins = require('./builtins'),
           init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
+
+      var fakeLoader = {
+        Get: function(key){
+          if (key === 'global') return realm.global;
+          if (key === 'baseURL') return '';
+        }
+      };
+
 
       realm.state = 'initializing';
       realm.initialized = true;
@@ -2390,7 +2397,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       realm.scripts.push(script);
 
-      var sandbox = createSandbox(loader.global, loader);
+      var sandbox = createSandbox(loader.Get('global'), loader);
 
       runScript(sandbox, script, function(){
         Ω(new $Module(sandbox.globalEnv, script.bytecode.exportedNames));
