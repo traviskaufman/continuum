@@ -1792,12 +1792,17 @@ var runtime = (function(GLOBAL, exports, undefined){
       ExecutionContext  : ExecutionContext
     };
 
-
+    function FunctionPrototypeCall(){}
+    function FunctionPrototypeHasInstance(){
+      return false;
+    }
 
     function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
       $Object.call(thrower, realm.intrinsics.FunctionProto);
-      thrower.call = function(){ return $$ThrowException('strict_poison_pill') };
+      thrower.call = function(){
+        return $$ThrowException('strict_poison_pill');
+      };
       thrower.define('length', 0, ___);
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
@@ -1838,8 +1843,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       }
 
-      intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
-      intrinsics.StopIteration.BuiltinBrand = BRANDS.StopIteration;
 
       for (var i=0; i < 6; i++) {
         var prototype = intrinsics[$errors[i] + 'Proto'] = create($Error.prototype);
@@ -1847,17 +1850,23 @@ var runtime = (function(GLOBAL, exports, undefined){
         prototype.define('name', $errors[i], _CW);
       }
 
+      intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
+      intrinsics.StopIteration.BuiltinBrand = BRANDS.StopIteration;
+
       intrinsics.FunctionProto.FormalParameters = [];
-      intrinsics.FunctionProto.Call = function(){};
-      intrinsics.FunctionProto.HasInstance = function(){ return false };
+      intrinsics.FunctionProto.Call = FunctionPrototypeCall;
+      intrinsics.FunctionProto.HasInstance = FunctionPrototypeHasInstance;
       intrinsics.FunctionProto.BuiltinBrand = BRANDS.BuiltinFunction;
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;
+      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
+
       intrinsics.ArrayProto.array = [];
       intrinsics.ArrayProto.length = ['length', 0, __W];
+
       intrinsics.ErrorProto.define('name', 'Error', _CW);
       intrinsics.ErrorProto.define('message', '', _CW);
-      intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
+
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
       intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
@@ -1929,8 +1938,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         return esprima.parse(src, options ? new ParseOptions(options) : ParseOptions.prototype);
       } catch (e) {
         if (!realm || !intrinsics) return e;
-        var err = new $Error('SyntaxError', undefined, e.message);
-        err.setCode({ start: { line: e.lineNumber, column: e.column } }, src);
+        var err = new $Error('SyntaxError', undefined, e.message),
+            loc = { line: e.lineNumber, column: e.column  };
+
+        err.setCode({ start: loc, end: loc }, src);
         err.setOrigin(origin, type);
         return new AbruptCompletion('throw', err);
       }
@@ -2318,10 +2329,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       var scope = realm.globalEnv,
           ctx = new ExecutionContext(context, scope, realm, script.bytecode);
 
-      if (!script.thunk) {
-        script.thunk = new Thunk(script.bytecode);
-      }
-
       ExecutionContext.push(ctx);
       var status = $$TopLevelDeclarationInstantiation(script.bytecode);
       context === ctx && ExecutionContext.pop();
@@ -2329,7 +2336,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (status && status.Abrupt) {
         return ƒ(status);
       }
-
 
       resolveImports(realm.loader, script.bytecode, function(modules){
         each(script.bytecode.imports, function(imported){
@@ -2397,20 +2403,19 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       Emitter.call(this);
       realms.push(this);
-      this.active = false;
-      this.quiet = false;
-      this.initialized = false;
+      this.active        = false;
+      this.quiet         = false;
+      this.initialized   = false;
       this.mutationScope = null;
-      this.scripts = [];
-      this.templates = {};
-      this.state = 'bootstrapping';
+      this.scripts       = [];
+      this.templates     = {};
+      this.state         = 'bootstrapping';
 
       new Intrinsics(this);
 
       hide(intrinsics.FunctionProto, 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
-      hide(this, 'active');
       hide(this, 'templates');
       hide(this, 'scripts');
       hide(this, 'globalEnv');
@@ -2419,15 +2424,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'mutationScope');
 
       iterate(natives, function(item){
-        var key = item[0],
+        var key   = item[0],
             value = item[1],
-            name = key[0] === '_' ? key.slice(1) : key;
+            name  = key[0] === '_' ? key.slice(1) : key;
 
         intrinsics[name] = new $NativeFunction({
           unwrapped: key[0] === '_',
-          name: name,
-          length: value.length,
-          call: value
+          length   : value.length,
+          name     : name,
+          call     : value
         });
       });
 
@@ -2473,9 +2478,11 @@ var runtime = (function(GLOBAL, exports, undefined){
             callback = noop;
           }
         }
+
         if (typeof errback !== 'function') {
           errback = noop;
         }
+
         resolveModule(loader, source, name, callback, errback);
       },
       function evaluateAsync(subject, callback, errback){
@@ -2483,7 +2490,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             self = this;
 
         callback || (callback = noop);
-        errback || (errback = callback);
+        errback  || (errback = callback);
 
         if (script.error) {
           nextTick(function(){
@@ -2515,11 +2522,8 @@ var runtime = (function(GLOBAL, exports, undefined){
         var result = prepareToRun(script.bytecode, this.globalEnv)
                   || run(this, script.thunk, script.bytecode);
 
-        if (result && result.Abrupt) {
-          this.emit('throw', result);
-        } else {
-          this.emit('complete', result);
-        }
+        var completionType = result && result.Abrupt ? 'throw' : 'complete';
+        this.emit(completionType, result);
         return result;
       }
     ]);
@@ -2527,6 +2531,13 @@ var runtime = (function(GLOBAL, exports, undefined){
     return Realm;
   })();
 
+
+  var realms = [],
+      realmStack = [],
+      realm = null,
+      global = null,
+      context = null,
+      intrinsics = null;
 
   function activate(target){
     if (realm !== target) {
@@ -2553,14 +2564,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       target.emit('dectivate');
     }
   }
-
-  var realms = [],
-      realmStack = [],
-      realm = null,
-      global = null,
-      context = null,
-      intrinsics = null;
-
 
 
   exports.Realm = Realm;
