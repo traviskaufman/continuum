@@ -8,6 +8,7 @@ var ObjectMap = (function(module){
   var define        = objects.define,
       inherit       = objects.inherit,
       assign        = objects.assign,
+      hasOwn        = objects.hasOwn,
       Hash          = objects.Hash,
       uid           = utility.uid,
       bind          = functions.bind,
@@ -38,12 +39,21 @@ var ObjectMap = (function(module){
     }
   ]);
 
+
   function tag(map, object){
-    if (map.tag in object) {
+    if (hasOwn(object, map.tag)) {
       return object[map.tag];
     }
     var id = uid();
-    define(object, map.tag, id);
+    try {
+      define(object, map.tag, id);
+    } catch (e) {
+      var index = map.frozenKeys.indexOf(object);
+      if (~index) {
+        return map.frozenIds[index];
+      }
+      map.frozenIds[index] = id;
+    }
     return id;
   }
 
@@ -65,7 +75,7 @@ var ObjectMap = (function(module){
 
   define(ObjectMap.prototype, [
     function get(key){
-      var item = this.objects[key[this.tag]];
+      var item = this.objects[tag(this, key)];
       if (item) {
         return item.data;
       }
@@ -86,24 +96,24 @@ var ObjectMap = (function(module){
       return value;
     },
     function has(key){
-      return !!this.objects[key[this.tag]];
+      return !!this.objects[tag(this, key)];
     },
     function remove(key){
-      if (this.tag in key) {
-        var id = key[this.tag],
-            item = this.objects[id];
+      var id = tag(this, key),
+          item = this.objects[id];
 
-        if (item) {
-          item.unlink();
-          this.objects[id] = null;
-          this.size = this.list.size;
-          return true;
-        }
+      if (item) {
+        item.unlink();
+        this.objects[id] = null;
+        this.size = this.list.size;
+        return true;
       }
       return false;
     },
     function clear(){
       define(this, 'objects', new Hash);
+      define(this, 'frozenKeys', []);
+      define(this, 'frozenIds', []);
       this.list.clear();
       this.size = 0;
     },
