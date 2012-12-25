@@ -407,7 +407,7 @@ var natives = (function(module){
       return false;
     },
 
-    _Function$$ToString: function(obj, args){
+    _FunctionToString: function(obj, args){
       if (obj.Proxy) {
         obj = obj.ProxyTarget;
       }
@@ -422,10 +422,10 @@ var natives = (function(module){
         return code.source.slice(code.range[0], code.range[1]);
       }
     },
-    _Number$$ToString: function(obj, args){
+    _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _RegExp$$ToString: function(obj, args){
+    _RegExpToString: function(obj, args){
       return ''+obj.PrimitiveValue;
     },
     _RegExpExec: function(obj, args){
