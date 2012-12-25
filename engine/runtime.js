@@ -983,13 +983,14 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new (require('./object-model/$Object').$Enumerator)([]);
+    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
+        prefix = uid();
 
     function $Symbol(name, isPublic){
       $Object.call(this, intrinsics.SymbolProto);
       this.Name = name;
       this.Private = !isPublic;
-      this.gensym = '_'+this.id;
+      this.gensym = prefix+this.id;
     }
 
     inherit($Symbol, $Object, {
@@ -2353,7 +2354,6 @@ var runtime = (function(GLOBAL, exports, undefined){
                 var obj = module;
 
                 each(path, function(part){
-                  var o = obj;
                   obj = obj.Get(part);
                 });
 
