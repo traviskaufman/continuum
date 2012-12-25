@@ -9,7 +9,6 @@ var PropertyList = (function(module){
       Iterator      = iteration.Iterator,
       StopIteration = iteration.StopIteration;
 
-  var proto = require('./utility').uid();
 
   var PropertyListIterator = (function(){
     var types = {
@@ -40,6 +39,7 @@ var PropertyList = (function(module){
     return PropertyListIterator;
   })();
 
+
   function PropertyList(){
     this.hash = new Hash;
     this.props = [];
@@ -49,21 +49,18 @@ var PropertyList = (function(module){
 
   define(PropertyList.prototype, [
     function get(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       if (index !== undefined) {
         return this.props[index][1];
       }
     },
     function set(key, value){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name],
-          prop;
+      var name = '$'+key,
+          index = this.hash[name];
 
       if (index === undefined) {
         index = this.hash[name] = this.props.length;
-        prop = this.props[index] = [key, value, 7];
+        this.props[index] = [key, value, 7];
         this.length++;
       } else {
         this.props[index][1] = value;
@@ -72,14 +69,11 @@ var PropertyList = (function(module){
       return true;
     },
     function query(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       return index === undefined ? null : this.props[index][2];
     },
     function update(key, attr){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
+      var index = this.hash['$'+key];
 
       if (index !== undefined) {
         this.props[index][2] = attr;
@@ -89,30 +83,27 @@ var PropertyList = (function(module){
       return false;
     },
     function describe(key){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name];
-
+      var index = this.hash['$'+key];
       return index === undefined ? null : this.props[index];
     },
     function define(key, value, attr){
-      var name = key === '__proto__' ? proto : key,
-          index = this.hash[name],
-          prop;
+      var name = '$'+key,
+          index = this.hash[name];
 
       if (index === undefined) {
         index = this.hash[name] = this.props.length;
-        prop = this.props[index] = [key, value, attr];
+        this.props[index] = [key, value, attr];
         this.length++;
       } else {
-        prop = this.props[index];
+        var prop = this.props[index];
         prop[1] = value;
         prop[2] = attr;
       }
 
-      return true;
+      return this;
     },
     function remove(key){
-      var name = key === '__proto__' ? proto : key,
+      var name = '$'+key,
           index = this.hash[name];
 
       if (index !== undefined) {
@@ -125,12 +116,10 @@ var PropertyList = (function(module){
       return false;
     },
     function has(key){
-      var name = key === '__proto__' ? proto : key;
-      return this.hash[name] !== undefined;
+      return this.hash['$'+key] !== undefined;
     },
     function setProperty(prop){
-      var key = prop[0],
-          name = key === '__proto__' ? proto : key,
+      var name = '$'+prop[0],
           index = this.hash[name];
 
       if (index === undefined) {
@@ -141,9 +130,7 @@ var PropertyList = (function(module){
       this.props[index] = prop;
     },
     function hasAttribute(key, mask){
-      var name = key === '__proto__' ? proto : key,
-          attr = this.query(name);
-
+      var attr = this.query('$'+key);
       if (attr !== null) {
         return (attr & mask) > 0;
       }
@@ -160,9 +147,8 @@ var PropertyList = (function(module){
 
       for (var i=0; i < len; i++) {
         if (prop = props[i]) {
-          var name = prop[0] === '__proto__' ? proto : prop[0];
           this.props[index] = prop;
-          this.hash[name] = index++;
+          this.hash['$'+prop[0]] = index++;
         }
       }
     },
@@ -204,9 +190,8 @@ var PropertyList = (function(module){
 
       this.each(function(prop){
         prop = callback.call(context, prop);
-        var name = prop[0] === '__proto__' ? proto : prop[0];
         out.props[index++] = prop;
-        out.hash[name] = index;
+        out.hash['$'+prop[0]] = index;
       });
 
       return out;
@@ -219,9 +204,8 @@ var PropertyList = (function(module){
 
       this.each(function(prop){
         if (callback.call(context, prop)) {
-          var name = prop[0] === '__proto__' ? proto : prop[0];
           out.props[index] = prop;
-          out.hash[name] = index++;
+          out.hash['$'+prop[0]] = index++;
         }
       });
 
@@ -248,7 +232,7 @@ var PropertyList = (function(module){
       });
     },
     function merge(list){
-      each(list, this.define, this);
+      iterate(list, this.define, this);
     },
     function __iterator__(type){
       return new PropertyListIterator(this, type);
