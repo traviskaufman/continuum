@@ -53,29 +53,43 @@ function weakmapCreate(target, iterable){
   return target;
 }
 
+builtinFunction(weakmapCreate);
+
+
 function weakmapDelete(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.delete');
   return $__WeakMapDelete(weakmap, key);
 }
+
+builtinFunction(weakmapDelete);
+
 
 function weakmapGet(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.get');
   return $__WeakMapGet(weakmap, key);
 }
 
+builtinFunction(weakmapGet);
+
+
 function weakmapHas(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.has');
   return $__WeakMapHas(weakmap, key);
 }
+
+builtinFunction(weakmapHas);
+
 
 function weakmapSet(weakmap, key, value){
   ensureWeakMap(weakmap, key, '@weakmap.set');
   return $__WeakMapSet(weakmap, key, value);
 }
 
-export let
-  create  = weakmapCreate,
-//delete  = weakmapDelete, TODO: fix exporting reserved names
-  get     = weakmapGet,
-  has     = weakmapHas,
-  set     = weakmapSet;
+builtinFunction(weakmapSet);
+
+
+export const create  = weakmapCreate,
+           //delete  = weakmapDelete, TODO: fix exporting reserved names
+             get     = weakmapGet,
+             has     = weakmapHas,
+             set     = weakmapSet;

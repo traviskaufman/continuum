@@ -81,7 +81,7 @@ export class Set {
     return $__MapDelete(ensureSet(this, 'delete'), value);
   }
 
-  items(){
+  entries(){
     return new SetIterator(this, 'key+value');
   }
 
@@ -107,9 +107,15 @@ function setAdd(set, value){
   return $__MapSet(ensureSet(set, '@set.add'), value, value);
 }
 
+builtinFunction(setAdd);
+
+
 function setClear(set){
   return $__MapClear(ensureSet(set, '@set.clear'));
 }
+
+builtinFunction(setClear);
+
 
 function setCreate(target, iterable){
   target = $__ToObject(target);
@@ -131,27 +137,41 @@ function setCreate(target, iterable){
   return target;
 }
 
+builtinFunction(setCreate);
+
+
 function setDelete(set, value){
   return $__MapDelete(ensureSet(set, '@set.delete'), value);
 }
+
+builtinFunction(setDelete);
+
 
 function setHas(set, value){
   return $__MapHas(ensureSet(set, '@set.has'), value);
 }
 
+builtinFunction(setHas);
+
+
 function setSize(set){
   return $__MapSize(ensureMap(set, '@set.size'));
 }
+
+builtinFunction(setSize);
+
 
 function setIterate(set, kind){
   return new SetIterator(set, 'value');
 }
 
-export let
-  add     = setAdd,
-  clear   = setClear,
-  create  = setCreate,
-  //delete  = setDelete, //uhg
-  has     = setHas,
-  iterate = setIterate,
-  size    = setSize;
+builtinFunction(setIterate);
+
+
+export const add     = setAdd,
+             clear   = setClear,
+             create  = setCreate,
+           //delete  = setDelete, TODO: fix exporting reserved names
+             has     = setHas,
+             iterate = setIterate,
+             size    = setSize;

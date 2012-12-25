@@ -23,6 +23,7 @@ export function keys(obj){
 
 builtinFunction(keys);
 
+
 export function values(obj){
   return {
     @iterator: ()=> (function*(){
@@ -37,7 +38,8 @@ export function values(obj){
 
 builtinFunction(values);
 
-export function items(obj){
+
+export function entries(obj){
   return {
     @iterator: ()=> (function*(){
       for (let x in obj) {
@@ -49,7 +51,8 @@ export function items(obj){
   };
 }
 
-builtinFunction(items);
+builtinFunction(entries);
+
 
 export function allKeys(obj){
   return {
@@ -63,6 +66,7 @@ export function allKeys(obj){
 
 builtinFunction(allKeys);
 
+
 export function allValues(obj){
   return {
     @iterator: ()=> (function*(){
@@ -75,7 +79,8 @@ export function allValues(obj){
 
 builtinFunction(allValues);
 
-export function allItems(obj){
+
+export function allEntries(obj){
   return {
     @iterator: ()=> (function*(){
       for (let x in obj) {
@@ -85,4 +90,4 @@ export function allItems(obj){
   };
 }
 
-builtinFunction(allItems);
+builtinFunction(allEntries);

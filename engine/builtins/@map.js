@@ -118,6 +118,8 @@ function mapClear(map){
   return $__MapClear(map);
 }
 
+builtinFunction(mapClear);
+
 function mapCreate(target, iterable){
   target = $__ToObject(target);
 
@@ -129,42 +131,62 @@ function mapCreate(target, iterable){
   return target;
 }
 
+builtinFunction(mapCreate);
+
+
 function mapDelete(map, key){
   ensureMap(map, '@map.delete');
   return $__MapDelete(map, key);
 }
+
+builtinFunction(mapDelete);
+
 
 function mapGet(map, key){
   ensureMap(map, '@map.get');
   return $__MapGet(map, key);
 }
 
+builtinFunction(mapGet);
+
+
 function mapHas(map, key){
   ensureMap(map, '@map.has');
   return $__MapHas(map, key);
 }
 
-function mapSet(map, key, value){
-  ensureMap(map, '@map.set');
-  return $__MapSet(map, key, value);
-}
+builtinFunction(mapHas);
 
-function mapSize(map){
-  ensureMap(map, '@map.size');
-  return $__MapSize(map);
-}
 
 function mapIterate(map, kind){
   ensureMap(map, '@map.iterate');
   return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));
 }
 
-export let
-  clear   = mapClear,
-  create  = mapCreate,
-  //delete  = mapDelete, TODO: fix exporting reserved names
-  get     = mapGet,
-  has     = mapHas,
-  iterate = mapIterate,
-  set     = mapSet,
-  size    = mapSize;
+builtinFunction(mapIterate);
+
+
+function mapSet(map, key, value){
+  ensureMap(map, '@map.set');
+  return $__MapSet(map, key, value);
+}
+
+builtinFunction(mapSet);
+
+
+function mapSize(map){
+  ensureMap(map, '@map.size');
+  return $__MapSize(map);
+}
+
+builtinFunction(mapSize);
+
+
+export const clear   = mapClear,
+             create  = mapCreate,
+           //delete  = mapDelete, TODO: fix exporting reserved names
+             get     = mapGet,
+             has     = mapHas,
+             iterate = mapIterate,
+             set     = mapSet,
+             size    = mapSize;
