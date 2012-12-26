@@ -134,17 +134,6 @@ var $Object = (function(exports){
   exports.$$HasProperty = $$HasProperty;
 
 
-  function $$GetMethod(object, key){
-    var func = object.GetP(key, object);
-    if (func !== undefined && !$$IsCallable(func)) {
-      return $$ThrowException('called_non_callable', [key]);
-    }
-    return func;
-  }
-
-  exports.$$GetMethod = $$GetMethod;
-
-
   function $$OrdinaryDefineOwnProperty(object, key, desc){
     var current = $$OrdinaryGetOwnProperty(object, key),
         extensible = object.IsExtensible();
