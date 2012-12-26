@@ -287,14 +287,14 @@ var assembler = (function(exports){
           this.reduced = [];
           this.boundNames = [];
         }
-        this.Rest = node.rest;
-        this.ExpectedArgumentCount = this.length;
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
         this.loc = node.loc;
         this.range = node.range;
         this.defaults = node.defaults || [];
+        this.Rest = node.rest;
+        this.ExpectedArgumentCount = this.length - this.defaults.length;
       }
 
       define(Parameters.prototype, [
@@ -830,7 +830,7 @@ var assembler = (function(exports){
     });
 
 
-    var getexportedNames = collector({
+    var getExportedNames = collector({
       ArrayPattern       : 'elements',
       ObjectPattern      : 'properties',
       Property           : 'value',
@@ -844,7 +844,7 @@ var assembler = (function(exports){
     });
 
     return function getExports(node){
-      return getexportedNames(getExportedDecls(collectExportDecls(node)));
+      return getExportedNames(getExportedDecls(collectExportDecls(node)));
     };
   })();
 
