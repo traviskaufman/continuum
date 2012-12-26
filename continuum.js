@@ -13021,6 +13021,17 @@ exports.operations = (function(exports){
   exports.$$EvaluateCall = $$EvaluateCall;
 
 
+  function $$GetMethod(object, key){
+    var func = object.GetP(key, object);
+    if (func !== undefined && !$$IsCallable(func)) {
+      return $$ThrowException('called_non_callable', [key]);
+    }
+    return func;
+  }
+
+  exports.$$GetMethod = $$GetMethod;
+
+
   var emptyArgs = [];
 
   function $$Invoke(receiver, key, args){
@@ -13438,17 +13449,6 @@ exports.$Object = (function(exports){
   }
 
   exports.$$HasProperty = $$HasProperty;
-
-
-  function $$GetMethod(object, key){
-    var func = object.GetP(key, object);
-    if (func !== undefined && !$$IsCallable(func)) {
-      return $$ThrowException('called_non_callable', [key]);
-    }
-    return func;
-  }
-
-  exports.$$GetMethod = $$GetMethod;
 
 
   function $$OrdinaryDefineOwnProperty(object, key, desc){
