@@ -1,5 +1,6 @@
 import Iterator from '@iter';
 import Set from '@set';
+import { min, max } from '@math';
 
 const arrays = new Set;
 
@@ -387,8 +388,8 @@ export class Array {
     do {
       if (oldIndex in array) {
         array[newIndex] = array[oldIndex];
-      } else if (newIndex in array) {
-        delete array[newIndex];
+      } else if (!delete array[newIndex]) {
+        throw $__Exception('delete_array_index', ['Array.prototype.shift', newIndex]);
       }
       newIndex++;
     } while (++oldIndex < len)
@@ -413,6 +414,85 @@ export class Array {
     }
 
     return false;
+  }
+
+  splice(start, deleteCount, ...items){
+    const array     = $__ToObject(this),
+          len       = $__ToUint32(array.length),
+          itemCount = items.length,
+          result    = [];
+
+    start = $__ToInteger(start);
+    if (start < 0) {
+      start = max(len + start, 0);
+    } else {
+      start = min(start, len);
+    }
+
+    deleteCount = min(max($__ToInteger(deleteCount), 0), len - start);
+
+    if (deleteCount > 0) {
+      let index = 0;
+
+      do {
+        let from = index + start;
+
+        if (from in array) {
+          result[index] = array[from];
+        }
+
+        index++;
+      } while (index < deleteCount)
+
+      result.length = deleteCount;
+    }
+
+    const count = len - deleteCount;
+
+    if (itemCount < deleteCount) {
+      let index = start;
+
+      while (index < count) {
+        let from = index + deleteCount,
+            to   = index + itemCount;
+
+        if (from in array) {
+          array[to] = array[from];
+        } else if (!delete array[to]) {
+          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);
+        }
+
+        index++;
+      }
+    } else if (itemCount > deleteCount) {
+      let index = count;
+
+      while (index > start) {
+        let from = index + deleteCount - 1,
+            to   = index + itemCount - 1;
+
+        if (from in array) {
+          array[to] = array[from];
+        } else if (!delete array[to]) {
+          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);
+        }
+
+        index--;
+      }
+    }
+
+    if (itemCount) {
+      let itemIndex = 0,
+          index     = start;
+
+      do {
+        array[index++] = items[itemIndex++];
+      } while (itemIndex < itemCount)
+    }
+
+    array.length = len - deleteCount + itemCount;
+
+    return result;
   }
 
   toString(){
@@ -444,8 +524,8 @@ export class Array {
       newIndex--;
       if (oldIndex in array) {
         array[newIndex] = array[oldIndex];
-      } else if (newIndex in array) {
-        delete array[newIndex];
+      } else if (!delete array[newIndex]) {
+        throw $__Exception('delete_array_index', ['Array.prototype.unshift', newIndex]);
       }
     }
 

@@ -136,6 +136,7 @@ var errors = (function(errors, messages, exports){
     called_on_non_function         : ["$0", " called on non-function"],
     called_on_non_object           : ["$0", " called on non-object"],
     called_on_null_or_undefined    : ["$0", " called on null or undefined"],
+    delete_array_index             : ["$0", " cannot delete index '", "$1", "'"],
     strict_delete_property         : ["Cannot delete property '", "$0", "' of ", "$1"],
     super_delete_property          : ["Cannot delete property '", "$0", "' from super"],
     strict_read_only_property      : ["Cannot assign to read only property '", "$0", "' of ", "$1"],
