@@ -428,13 +428,15 @@ function functionName(name){
 
 var FunctionBranch = (function(){
   var atoms = {
-    'this': 'This',
-    'super': 'Super',
-    'byteOffset': 'NumberValue',
-    'byteLength': 'NumberValue',
-    'length': 'NumberValue',
+    'byteLength' : 'NumberValue',
+    'byteOffset' : 'NumberValue',
     'constructor': 'FunctionName',
-    'prototype': 'This'
+    'length'     : 'NumberValue',
+    'null'       : 'NullValue',
+    'prototype'  : 'This',
+    'super'      : 'Super',
+    'this'       : 'This',
+    'undefined'  : 'UndefinedValue'
   };
 
   function destructure(param, firstLevel){
