@@ -1,6 +1,6 @@
-[submodule "node_modules/esprima"]
-	path = node_modules/esprima
+[submodule "third_party/esprima"]
+	path = third_party/esprima
   url = git@github.com:Benvie/esprima.git
-[submodule "node_modules/CodeMirror"]
-	path = node_modules/CodeMirror
+[submodule "third_party/CodeMirror"]
+	path = third_party/CodeMirror
 	url = git@github.com:Benvie/CodeMirror.git
