@@ -13,8 +13,8 @@ function ensureCoercible(target, method){
 internalFunction(ensureCoercible);
 
 function ToHTML(tag, content, attrName, attrVal){
-  attrVal = $__ToString(attrVal);
-  var attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace(attrVal, '"', '&quot;')+'"';
+  const attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace($__ToString(attrVal), '"', '&quot;')+'"';
+
   return '<'+tag+attr+'>'+content+'</'+tag+'>';
 }
 
@@ -27,22 +27,23 @@ function isRegExp(subject){
 internalFunction(isRegExp);
 
 function stringIndexOf(string, search, position){
-  search = $__ToString(search);
-  position = $__ToInteger(position);
+  const searchStr = $__ToString(search),
+        pos       = $__ToInteger(position),
+        len       = string.length,
+        searchLen = searchStr.length,
+        maxLen    = len - searchLen;
 
-  var len = string.length,
-      searchLen = search.length,
-      i = position > 0 ? position < len ? position : len : 0,
-      maxLen = len - searchLen;
+  let index = pos > 0 ? pos < len ? pos : len : 0;
 
-  while (i < maxLen) {
-    var j = 0;
-    while (j < searchLen && search[j] === string[i + j]) {
-      if (j++ === searchLen - 1) {
-        return i;
+  while (index < maxLen) {
+    let offset = 0;
+    while (offset < searchLen && searchStr[offset] === string[index + offset]) {
+      if (offset++ === searchLen - 1) {
+        return index;
       }
     }
   }
+
   return -1;
 }
 
@@ -53,31 +54,34 @@ function stringMatch(string, regexp){
   if (!isRegExp(regexp)) {
     regexp = new RegExp(regexp);
   }
+
   if (!regexp.global) {
     return regexp.exec(string);
   }
+
+  const array = [];
+  let previous  = 0,
+      index     = 0,
+      lastMatch = true;
+
   regexp.lastIndex = 0;
-  var array = [],
-      previous = 0,
-      lastMatch = true,
-      n = 0;
 
   while (lastMatch) {
-    var result = regexp.exec(string);
+    let result = regexp.exec(string);
     if (result === null) {
       lastMatch = false;
     } else {
-      var thisIndex = regexp.lastIndex;
+      let thisIndex = regexp.lastIndex;
       if (thisIndex === lastIndex) {
         previous = regexp.lastIndex = thisIndex + 1;
       } else {
         previous = thisIndex;
       }
-      array[n++] = result[0];
+      array[index++] = result[0];
     }
   }
 
-  return n === 0 ? null : array;
+  return index === 0 ? null : array;
 }
 
 internalFunction(stringMatch);
@@ -92,9 +96,10 @@ internalFunction(useHost);
 
 
 export class String {
-  constructor(string){
-    string = arguments.length ? $__ToString(string) : '';
-    return $__IsConstructCall() ? $__StringCreate(string) : string;
+  constructor(...string){
+    const str = string.length ? $__ToString(string[0]) : '';
+
+    return $__IsConstructCall() ? $__StringCreate(str) : str;
   }
 
   anchor(name){
@@ -150,50 +155,53 @@ export class String {
   }
 
   charAt(position){
-    var string = ensureCoercible(this, 'charAt');
+    const string = ensureCoercible(this, 'charAt');
+
     position = $__ToInteger(position);
+
     return position < 0 || position >= string.length ? '' : string[position];
   }
 
   charCodeAt(position){
-    var string = ensureCoercible(this, 'charCodeAt');
+    const string = ensureCoercible(this, 'charCodeAt');
+
     position = $__ToInteger(position);
+
     return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);
   }
 
   concat(...args){
-    var string = ensureCoercible(this, 'concat');
+    let string = ensureCoercible(this, 'concat');
+
     for (var i=0; i < args.length; i++) {
       string += $__ToString(args[i]);
     }
+
     return string;
   }
 
-  indexOf(search){
-    return stringIndexOf(ensureCoercible(this, 'indexOf'), search, arguments[1]);
+  indexOf(searchString, position = 0){
+    return stringIndexOf(ensureCoercible(this, 'indexOf'), searchString, position);
   }
 
-  lastIndexOf(search){
-    var string = ensureCoercible(this, 'lastIndexOf'),
-        len = string.length,
-        position = $__ToNumber(arguments[1]);
+  lastIndexOf(searchString, position = Infinity){
+    const string    = ensureCoercible(this, 'lastIndexOf'),
+          search    = $__ToString(searchString),
+          len       = string.length,
+          searchLen = searchString.length,
+          pos       = $__ToInteger(position) - searchLen;
 
-    search = $__ToString(search);
-    var searchLen = search.length;
+    let index = pos > 0 ? pos < len ? pos : len : 0;
 
-    position = position !== position ? Infinity : $__ToInteger(position);
-    position -= searchLen;
-
-    var i = position > 0 ? position < len ? position : len : 0;
-
-    while (i--) {
-      var j = 0;
-      while (j < searchLen && search[j] === string[i + j]) {
-        if (j++ === searchLen - 1) {
-          return i;
+    while (index--) {
+      let offset = 0;
+      while (offset < searchLen && searchString[offset] === string[index + offset]) {
+        if (++offset === searchLen) {
+          return index;
         }
       }
     }
+
     return -1;
   }
 
@@ -206,16 +214,16 @@ export class String {
   }
 
   repeat(count){
-    var string = ensureCoercible(this, 'repeat'),
-        n = $__ToInteger(count),
-        o = '';
+    let string = ensureCoercible(this, 'repeat'),
+        factor = $__ToInteger(count),
+        o      = '';
 
     if (n <= 1 || n === Infinity || n === -Infinity) {
       throw $__Exception('invalid_repeat_count', []);
     }
 
     while (n > 0) {
-      n & 1 && (o += string);
+      (n & 1) && (o += string);
       n >>= 1;
       string += string;
     }
@@ -224,10 +232,10 @@ export class String {
   }
 
   replace(search, replace){
-    var string = ensureCoercible(this, 'replace');
+    const string = ensureCoercible(this, 'replace');
 
     if (typeof replace === 'function') {
-      var match, count;
+      let match, count;
       if (isRegExp(search)) {
         match = stringMatch(string, search);
         count = matches.length;
@@ -241,41 +249,45 @@ export class String {
       if (!isRegExp(search)) {
         search = $__ToString(search);
       }
+
       return $__StringReplace(string, search, replace);
     }
   }
 
   search(regexp){
-    var string = ensureCoercible(this, 'search');
+    const string = ensureCoercible(this, 'search');
+
     if (!isRegExp(regexp)) {
       regexp = new RegExp(regexp);
     }
+
     return $__StringSearch(string, regexp);
   }
 
-  slice(start, end){
-    var string = ensureCoercible(this, 'slice');
+  slice(start = 0, end = this.length){
+    const string = ensureCoercible(this, 'slice');
+
     start = $__ToInteger(start);
-    if (end === undefined) {
-      return $__StringSlice(string, start);
-    } else {
-      return $__StringSlice(string, start, $__ToInteger(end));
-    }
+    end = $__ToInteger(end);
+
+    return $__StringSlice(string, start, end);
   }
 
-  split(separator, limit){
-    var string = ensureCoercible(this, 'split');
-    limit = limit === undefined ? MAX_INTEGER - 1 : $__ToInteger(limit);
+  split(separator, limit = MAX_INTEGER - 1){
+    const string = ensureCoercible(this, 'split');
+
+    limit = $__ToInteger(limit);
     separator = isRegExp(separator) ? separator : $__ToString(separator);
+
     return $__StringSplit(string, separator, limit);
   }
 
-  substr(start, length){
-    var string = ensureCoercible(this, 'substr'),
-        start = $__ToInteger(start),
-        chars = string.length;
+  substr(start = 0, length = Infinity){
+    const string = ensureCoercible(this, 'substr'),
+          chars  = string.length;
 
-    length = length === undefined ? Infinity : $__ToInteger(length);
+    start = $__ToInteger(start);
+    length = $__ToInteger(length);
 
     if (start < 0) {
       start += chars;
@@ -291,32 +303,32 @@ export class String {
     return length <= 0 ? '' : $__StringSlice(string, start, start + length);
   }
 
-  substring(start, end){
-    var string = ensureCoercible(this, 'substring'),
-        start = $__ToInteger(start),
-        len = string.length;
+  substring(start = 0, end = this.length){
+    const string = ensureCoercible(this, 'substring'),
+          len    = string.length;
 
-    end = end === undefined ? len : $__ToInteger(end);
+    start = $__ToInteger(start);
+    end = $__ToInteger(end);
 
     start = start > 0 ? start < len ? start : len : 0;
     end = end > 0 ? end < len ? end : len : 0;
 
-    var from = start < end ? start : end,
-        to = start > end ? start : end;
+    const from = start < end ? start : end,
+          to = start > end ? start : end;
 
     return $__StringSlice(string, from, to);
   }
 
   toLocaleLowerCase(){
-    return useHost(this, 'toLocaleLowerCase');
+    return $__CallBuiltin(ensureCoercible(this, 'toLocaleLowerCase'), 'toLocaleLowerCase');
   }
 
   toLocaleUpperCase(){
-    return useHost(this, 'toLocaleUpperCase');
+    return $__CallBuiltin(ensureCoercible(this, 'toLocaleUpperCase'), 'toLocaleUpperCase');
   }
 
   toLowerCase(){
-    return useHost(this, 'toLowerCase');
+    return $__CallBuiltin(ensureCoercible(this, 'toLowerCase'), 'toLowerCase');
   }
 
   toString(){
@@ -329,7 +341,7 @@ export class String {
   }
 
   toUpperCase(){
-    return useHost(this, 'toUpperCase');
+    return $__CallBuiltin(ensureCoercible(this, 'toUpperCase'), 'toUpperCase');
   }
 
   trim(){
@@ -357,15 +369,14 @@ String.prototype.@@DefineOwnProperty(@@PrimitiveValue, {
 
 
 export function fromCharCode(...codeUnits){
-  var length = codeUnits.length,
-      str = '';
+  const length = codeUnits.length;
+  let result = '';
+
   for (var i=0; i < length; i++) {
-    str += $__FromCharCode($__ToUint16(codeUnits[i]));
+    result += $__FromCharCode($__ToUint16(codeUnits[i]));
   }
-  return str;
+
+  return result;
 }
 
 String.@@extend({ fromCharCode });
-
-
-
