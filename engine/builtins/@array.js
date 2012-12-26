@@ -336,7 +336,7 @@ export class Array {
     return accumulator;
   }
 
-  slice(start = 0, end = -1){
+  slice(start = 0, end = this.length){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
@@ -346,6 +346,9 @@ export class Array {
 
     if (start < 0) {
       start += len;
+      if (start < 0) {
+        start = 0;
+      }
     }
 
     if (end < 0) {
@@ -354,15 +357,16 @@ export class Array {
         return result;
       }
     } else if (end >= len) {
-      end = len - 1;
+      end = len;
     }
 
-    if (start > end || end < start || start === end) {
-      return result;
-    }
+    if (start < end) {
+      let newIndex = 0,
+          oldIndex = start;
 
-    for (var i=0, count = start - end; i < count; i++) {
-      result[i] = array[i + start];
+      do {
+        result[newIndex++] = array[oldIndex++];
+      } while (oldIndex < end)
     }
 
     return result;
