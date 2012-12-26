@@ -350,6 +350,9 @@ export class Array {
 
     if (end < 0) {
       end += len;
+      if (end < 0) {
+        return result;
+      }
     } else if (end >= len) {
       end = len - 1;
     }
