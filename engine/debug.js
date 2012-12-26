@@ -978,6 +978,12 @@ var debug = (function(exports){
       function getScope(){
         return this.target.getScope();
       },
+      function isConstructor(){
+        return this.target.isConstructor() || this.subject.constructCount > 0;
+      },
+      function isClass(){
+        return this.target.isClass();
+      },
       function isStrict(){
         return this.target.isStrict();
       },
