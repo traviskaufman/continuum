@@ -2041,6 +2041,26 @@ var runtime = (function(GLOBAL, exports, undefined){
       };
     }
 
+    function fromInternal(object){
+      if (object instanceof Array) {
+        var out = new $Array;
+        each(object, function(item, index){
+          out.set(index, fromInternal(item));
+        });
+        return out;
+      } else if (typeof object === 'function') {
+        return new $InternalFunction(object);
+      } else if (object === null || typeof object !== 'object') {
+        return object;
+      } else {
+        var out = new $Object;
+        each(object, function(val, key){
+          out.set(key, fromInternal(val));
+        });
+        return out;
+      }
+    }
+
     natives.add({
       _eval: (function(){
         function builtinEval(obj, args, direct){
@@ -2139,7 +2159,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (ast.Abrupt) {
           return ast;
         }
-        return fromJSON(ast);
+        return fromInternal(ast);
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),

@@ -79,22 +79,6 @@ var natives = (function(module){
     }
   }
 
-  function fromJSON(object){
-    if (object instanceof Array) {
-      return new $Array(object);
-    } else if (typeof object === 'function') {
-      return new $InternalFunction(object);
-    } else if (object === null || typeof object !== 'object') {
-      return object;
-    } else {
-      var out = new $Object;
-      each(object, function(val, key){
-        out.set(key, fromJSON(val));
-      });
-      return out;
-    }
-  }
-
   natives.add({
     ToObject: operators.$$ToObject,
     ToString: operators.$$ToString,
