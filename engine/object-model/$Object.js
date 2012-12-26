@@ -220,9 +220,10 @@ var $Object = (function(exports){
       if ($$IsDataDescriptor(current)) {
         object.set(key, new Accessor(desc.Get, desc.Set));
       } else {
-        'Set' in desc && (prop[1].Set = desc.Set);
-        'Get' in desc && (prop[1].Get = desc.Get);
-        ('Set' in desc || 'Get' in desc) && object.set(key, prop[1])
+        var accessor = current.getAccessor();
+        'Set' in desc && (accessor.Set = desc.Set);
+        'Get' in desc && (accessor.Get = desc.Get);
+        ('Set' in desc || 'Get' in desc) && object.set(key, accessor);
       }
     } else {
       if ($$IsAccessorDescriptor(current)) {

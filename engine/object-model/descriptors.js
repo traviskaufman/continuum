@@ -77,7 +77,14 @@ var descriptors = (function(exports){
     type: 'AccessorDescriptor',
     isDataDescriptor: false,
     isAccessorDescriptor: true
-  });
+  }, [
+     function getAccessor(){
+      if (this.accessor) {
+        return this.accessor;
+      }
+      return this.accessor = new Accessor(this.Get, this.Set);
+    }
+  ]);
 
 
   function DataDescriptor(value, attributes){
@@ -96,9 +103,10 @@ var descriptors = (function(exports){
 
 
 
-  function AccessorDescriptor(accessors, attributes){
-    this.Get = accessors.Get;
-    this.Set = accessors.Set;
+  function AccessorDescriptor(accessor, attributes){
+    this.accessor = accessor;
+    this.Get = accessor.Get;
+    this.Set = accessor.Set;
     this.Enumerable = (attributes & E) > 0;
     this.Configurable = (attributes & C) > 0;
   }
