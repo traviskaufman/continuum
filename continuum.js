@@ -9148,14 +9148,14 @@ exports.assembler = (function(exports){
           this.reduced = [];
           this.boundNames = [];
         }
-        this.Rest = node.rest;
-        this.ExpectedArgumentCount = this.length;
         if (node.rest) {
           this.boundNames.push(node.rest.name);
         }
         this.loc = node.loc;
         this.range = node.range;
         this.defaults = node.defaults || [];
+        this.Rest = node.rest;
+        this.ExpectedArgumentCount = this.length - this.defaults.length;
       }
 
       define(Parameters.prototype, [
@@ -9691,7 +9691,7 @@ exports.assembler = (function(exports){
     });
 
 
-    var getexportedNames = collector({
+    var getExportedNames = collector({
       ArrayPattern       : 'elements',
       ObjectPattern      : 'properties',
       Property           : 'value',
@@ -9705,7 +9705,7 @@ exports.assembler = (function(exports){
     });
 
     return function getExports(node){
-      return getexportedNames(getExportedDecls(collectExportDecls(node)));
+      return getExportedNames(getExportedDecls(collectExportDecls(node)));
     };
   })();
 
@@ -19021,12 +19021,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return new $InternalFunction(object);
       } else if (object === null || typeof object !== 'object') {
         return object;
-      } else if (object instanceof Array) {
-        var out = new $Array;
-        each(object, function(item, index){
-          out.set(index, fromInternal(item));
-        });
-        return out;
       } else if (object instanceof RegExp) {
         return new $RegExp(object);
       } else if (object instanceof Number) {
@@ -19035,6 +19029,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return new $String(object);
       } else if (object instanceof Boolean) {
         return new $Boolean(object);
+      } else if (object instanceof Array) {
+        var out = new $Array;
+        each(object, function(item, index){
+          out.set(index, fromInternal(item));
+        });
+        return out;
       }
 
       var out = new $Object;
