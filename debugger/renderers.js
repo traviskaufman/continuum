@@ -528,7 +528,7 @@ var FunctionBranch = (function(){
         param.append(destructure(params[i], true));
         if (offset <= i) {
           param.append(inline('=', 'DefaultAssign'));
-          param.append(destructure(defaults[i - offset], true)).addClass('default');
+          param.append(destructure(defaults[i - offset])).addClass('default');
         }
         container.append(param);
       }
