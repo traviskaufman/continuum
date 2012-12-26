@@ -11372,7 +11372,14 @@ exports.descriptors = (function(exports){
     type: 'AccessorDescriptor',
     isDataDescriptor: false,
     isAccessorDescriptor: true
-  });
+  }, [
+     function getAccessor(){
+      if (this.accessor) {
+        return this.accessor;
+      }
+      return this.accessor = new Accessor(this.Get, this.Set);
+    }
+  ]);
 
 
   function DataDescriptor(value, attributes){
@@ -11391,9 +11398,10 @@ exports.descriptors = (function(exports){
 
 
 
-  function AccessorDescriptor(accessors, attributes){
-    this.Get = accessors.Get;
-    this.Set = accessors.Set;
+  function AccessorDescriptor(accessor, attributes){
+    this.accessor = accessor;
+    this.Get = accessor.Get;
+    this.Set = accessor.Set;
     this.Enumerable = (attributes & E) > 0;
     this.Configurable = (attributes & C) > 0;
   }
@@ -13537,9 +13545,10 @@ exports.$Object = (function(exports){
       if ($$IsDataDescriptor(current)) {
         object.set(key, new Accessor(desc.Get, desc.Set));
       } else {
-        'Set' in desc && (prop[1].Set = desc.Set);
-        'Get' in desc && (prop[1].Get = desc.Get);
-        ('Set' in desc || 'Get' in desc) && object.set(key, prop[1])
+        var accessor = current.getAccessor();
+        'Set' in desc && (accessor.Set = desc.Set);
+        'Get' in desc && (accessor.Get = desc.Get);
+        ('Set' in desc || 'Get' in desc) && object.set(key, accessor);
       }
     } else {
       if ($$IsAccessorDescriptor(current)) {
@@ -15082,22 +15091,6 @@ exports.natives = (function(module){
       each(observerResults, function(error){
         require('./runtime').emit('throw', error);
       });
-    }
-  }
-
-  function fromJSON(object){
-    if (object instanceof Array) {
-      return new $Array(object);
-    } else if (typeof object === 'function') {
-      return new $InternalFunction(object);
-    } else if (object === null || typeof object !== 'object') {
-      return object;
-    } else {
-      var out = new $Object;
-      each(object, function(val, key){
-        out.set(key, fromJSON(val));
-      });
-      return out;
     }
   }
 
@@ -19023,6 +19016,26 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       };
     }
 
+    function fromInternal(object){
+      if (object instanceof Array) {
+        var out = new $Array;
+        each(object, function(item, index){
+          out.set(index, fromInternal(item));
+        });
+        return out;
+      } else if (typeof object === 'function') {
+        return new $InternalFunction(object);
+      } else if (object === null || typeof object !== 'object') {
+        return object;
+      } else {
+        var out = new $Object;
+        each(object, function(val, key){
+          out.set(key, fromInternal(val));
+        });
+        return out;
+      }
+    }
+
     natives.add({
       _eval: (function(){
         function builtinEval(obj, args, direct){
@@ -19121,7 +19134,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         if (ast.Abrupt) {
           return ast;
         }
-        return fromJSON(ast);
+        return fromInternal(ast);
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
