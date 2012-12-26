@@ -1,5 +1,5 @@
 import Iterator from '@iter';
-import Set from '@set';
+import { Set, add, has } from '@set';
 import { min, max } from '@math';
 
 const arrays = new Set;
@@ -189,10 +189,10 @@ export class Array {
   join(...separator){
     const array = $__ToObject(this);
 
-    if (arrays.has(array)) {
+    if (has(arrays, array)) {
       return '';
     }
-    arrays.add(array);
+    add(arrays, array);
 
     const sep = $__ToString(separator.length ? separator[0] : ','),
           len = $__ToUint32(array.length);
@@ -290,7 +290,7 @@ export class Array {
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
-    var accumulator, index;
+    let accumulator, index;
 
     ensureCallback(callbackfn);
 
@@ -492,6 +492,31 @@ export class Array {
 
     array.length = len - deleteCount + itemCount;
 
+    return result;
+  }
+
+  toLocaleString(){
+    const array = $__ToObject(this),
+          len   = $__ToUint32(array.length);
+
+    if (len === 0 || has(arrays, array)) {
+      return '';
+    }
+    add(arrays, array);
+
+    let nextElement = array[0],
+        result = nextElement == null ? '' : nextElement.toLocaleString(),
+        index  = 0;
+
+    while (++index < len) {
+      result += ',';
+      nextElement = array[index];
+      if (nextElement != null) {
+        result += nextElement.toLocaleString();
+      }
+    }
+
+    arrays.delete(array);
     return result;
   }
 
