@@ -13022,7 +13022,7 @@ exports.operations = (function(exports){
 
 
   function $$GetMethod(object, key){
-    var func = object.GetP(key, object);
+    var func = object.GetP(object, key);
     if (func !== undefined && !$$IsCallable(func)) {
       return $$ThrowException('called_non_callable', [key]);
     }
@@ -20557,6 +20557,12 @@ exports.debug = (function(exports){
       },
       function getScope(){
         return this.target.getScope();
+      },
+      function isConstructor(){
+        return this.target.isConstructor() || this.subject.constructCount > 0;
+      },
+      function isClass(){
+        return this.target.isClass();
       },
       function isStrict(){
         return this.target.isStrict();
