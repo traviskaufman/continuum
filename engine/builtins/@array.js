@@ -106,7 +106,7 @@ export class Array {
     return new ArrayIterator(this, 'key+value');
   }
 
-  every(callbackfn, context){
+  every(callbackfn, context = undefined){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length);
 
@@ -124,7 +124,7 @@ export class Array {
     return true;
   }
 
-  filter(callbackfn, context){
+  filter(callbackfn, context = undefined){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
@@ -146,7 +146,7 @@ export class Array {
     return result;
   }
 
-  forEach(callbackfn, context){
+  forEach(callbackfn, context = undefined){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
@@ -216,7 +216,7 @@ export class Array {
     return new ArrayIterator(this, 'key');
   }
 
-  lastIndexOf(search, fromIndex = -1){
+  lastIndexOf(search, fromIndex = this.length){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
@@ -243,7 +243,7 @@ export class Array {
     return -1;
   }
 
-  map(callbackfn, context){
+  map(callbackfn, context = undefined){
     const array  = $__ToObject(this),
           len    = $__ToUint32(array.length),
           result = [];
@@ -398,7 +398,7 @@ export class Array {
     return result;
   }
 
-  some(callbackfn, context){
+  some(callbackfn, context = undefined){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
