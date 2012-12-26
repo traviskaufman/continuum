@@ -2046,12 +2046,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         return new $InternalFunction(object);
       } else if (object === null || typeof object !== 'object') {
         return object;
-      } else if (object instanceof Array) {
-        var out = new $Array;
-        each(object, function(item, index){
-          out.set(index, fromInternal(item));
-        });
-        return out;
       } else if (object instanceof RegExp) {
         return new $RegExp(object);
       } else if (object instanceof Number) {
@@ -2060,6 +2054,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         return new $String(object);
       } else if (object instanceof Boolean) {
         return new $Boolean(object);
+      } else if (object instanceof Array) {
+        var out = new $Array;
+        each(object, function(item, index){
+          out.set(index, fromInternal(item));
+        });
+        return out;
       }
 
       var out = new $Object;
