@@ -224,6 +224,7 @@ var operations = (function(exports){
     }
 
     if ($$IsConstructor(func)) {
+      func.constructCount = (func.constructCount || 0) + 1;
       return func.Construct(args);
     } else {
       return $$ThrowException('not_constructor', func);

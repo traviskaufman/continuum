@@ -413,6 +413,8 @@ h1, h2
 .ƒProperty      {}
 .ƒElement       {}
 
+.ƒConstructor  { font-weight: bold; }
+/*.ƒClass        { font-style: italic; }*/
 
 
 .ƒECW            { color: #ccc } /* hsl(  0,   0%, 80%) */

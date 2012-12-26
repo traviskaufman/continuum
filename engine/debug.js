@@ -607,6 +607,12 @@ var debug = (function(exports){
       function isStrict(){
         return !!this.subject.strict;
       },
+      function isClass(){
+        return !!this.subject.IsClass;
+      },
+      function isConstructor(){
+        return !!this.subject.IsConstructor || this.subject.constructCount > 0;
+      },
       function ownAttrs(props){
         var strict = this.isStrict();
         props || (props = new Hash);

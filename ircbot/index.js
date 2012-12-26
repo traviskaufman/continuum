@@ -184,6 +184,6 @@ module.exports = function(){
     nick: 'continuum',
     user: 'continuum',
     real: 'continuum',
-    channels: ['#continuum', '##javascript', '#node.js', '#appjs']
+    channels: ['#continuum', '##javascript', '#node.js', '#appjs', '#inimino']
   }]);
 }

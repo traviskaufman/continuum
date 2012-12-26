@@ -503,16 +503,22 @@ var FunctionBranch = (function(){
   creator(FunctionBranch);
   inherit(FunctionBranch, Branch, [
     function createLabel(){
-      var label = Branch.prototype.createLabel.call(this),
-          name = this.mirror.getName(),
-          details = this.mirror.getDetails(),
-          rest = details.rest,
-          params = details.params,
+      var label    = Branch.prototype.createLabel.call(this),
+          name     = this.mirror.getName(),
+          details  = this.mirror.getDetails(),
+          rest     = details.rest,
+          params   = details.params,
           defaults = details.defaults,
-          offset = params.length - defaults.length;
+          offset   = params.length - defaults.length;
 
 
-      label.append(functionName(name));
+      var nameElement = label.append(functionName(name));
+      if (this.mirror.isConstructor()) {
+        nameElement.addClass('Constructor');
+      }
+      if (this.mirror.isClass()) {
+        nameElement.addClass('Class');
+      }
 
       var container = inline('', 'Params');
       for (var i=0; i < params.length; i++) {
@@ -530,6 +536,7 @@ var FunctionBranch = (function(){
         container.append(param);
       }
       label.append(container);
+
       return label;
     },
     function createPreview(){
@@ -694,7 +701,13 @@ var FunctionPreview = (function(){
   creator(FunctionPreview);
   inherit(FunctionPreview, Preview, [
     function createPreview(){
-      this.append(functionName(this.mirror.getName()));
+      var nameElement = this.append(functionName(this.mirror.getName()));
+      if (this.mirror.isConstructor()) {
+        nameElement.addClass('Constructor');
+      }
+      if (this.mirror.isClass()) {
+        nameElement.addClass('Class');
+      }
     }
   ]);
 

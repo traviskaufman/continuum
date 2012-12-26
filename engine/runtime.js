@@ -308,7 +308,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     $$MakeConstructor(ctor, false, proto);
-    ctor.Class = true;
+    ctor.IsClass = true;
+    ctor.IsConstructor = true;
     ctor.SetInheritance(superctor);
     ctor.set('name', brand);
     ctor.define('prototype', proto, ___);
@@ -541,16 +542,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.BoundTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
       function Construct(newArgs){
-        if (!this.BoundTargetFunction.Construct) {
-          return $$ThrowException('not_constructor', this.BoundTargetFunction.name);
+        var target = this.BoundTargetFunction;
+        if (!target.Construct) {
+          return $$ThrowException('not_constructor', target.name);
         }
-        return this.BoundTargetFunction.Construct(this.BoundArgs.concat(newArgs));
+        target.constructCount = (target.constructCount || 0) + 1;
+        return target.Construct(this.BoundArgs.concat(newArgs));
       },
       function HasInstance(arg){
-        if (!this.BoundTargetFunction.HasInstance) {
-          return $$ThrowException('instanceof_function_expected', this.BoundTargetFunction.name);
+        var target = this.BoundTargetFunction;
+        if (!target.HasInstance) {
+          return $$ThrowException('instanceof_function_expected', target.name);
         }
-        return this.BoundTargetFunction.HasInstance(arg);
+        return target.HasInstance(arg);
       }
     ]);
 
