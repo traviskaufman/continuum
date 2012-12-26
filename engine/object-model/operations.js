@@ -255,7 +255,7 @@ var operations = (function(exports){
 
 
   function $$GetMethod(object, key){
-    var func = object.GetP(key, object);
+    var func = object.GetP(object, key);
     if (func !== undefined && !$$IsCallable(func)) {
       return $$ThrowException('called_non_callable', [key]);
     }
