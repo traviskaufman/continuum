@@ -19017,23 +19017,31 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     function fromInternal(object){
-      if (object instanceof Array) {
+      if (typeof object === 'function') {
+        return new $InternalFunction(object);
+      } else if (object === null || typeof object !== 'object') {
+        return object;
+      } else if (object instanceof Array) {
         var out = new $Array;
         each(object, function(item, index){
           out.set(index, fromInternal(item));
         });
         return out;
-      } else if (typeof object === 'function') {
-        return new $InternalFunction(object);
-      } else if (object === null || typeof object !== 'object') {
-        return object;
-      } else {
-        var out = new $Object;
-        each(object, function(val, key){
-          out.set(key, fromInternal(val));
-        });
-        return out;
+      } else if (object instanceof RegExp) {
+        return new $RegExp(object);
+      } else if (object instanceof Number) {
+        return new $Number(object);
+      } else if (object instanceof String) {
+        return new $String(object);
+      } else if (object instanceof Boolean) {
+        return new $Boolean(object);
       }
+
+      var out = new $Object;
+      each(object, function(val, key){
+        out.set(key, fromInternal(val));
+      });
+      return out;
     }
 
     natives.add({
