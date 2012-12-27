@@ -1,6 +1,6 @@
 
-export function parse(src, { loc, range, raw, tokens, comment, source } = { range: false, loc: false, raw: false, source: null, comment: false, tokens: false }){
-  return $__parse(src, loc, range, raw, tokens, comment, source);
+export function parse(src, { loc, range, raw, tokens, comment, source, tolerant } = { source: null }){
+  return $__parse(src, loc, range, raw, tokens, comment, tolerant, source);
 }
 
 export class Position {

@@ -1948,6 +1948,22 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
+    natives.add({
+      parse: function(src, loc, range, raw, tokens, comment, tolerant, source){
+        var ast = parse(src, source, 'script', {
+          loc     : !!loc,
+          range   : !!range,
+          raw     : !!raw,
+          tokens  : !!tokens,
+          comment : !!comment,
+          tolerant: !!tolerant
+        });
+
+        if (ast.Abrupt) return ast;
+        return fromInternal(ast);
+      }
+    });
+
     var load = (function(){
       if (typeof process !== 'undefined') {
         var fs = require('fs');
@@ -2023,6 +2039,35 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  function fromInternal(object){
+    if (typeof object === 'function') {
+      return new $InternalFunction(object);
+    } else if (object === null || typeof object !== 'object') {
+      return object;
+    } else if (object instanceof RegExp) {
+      return new $RegExp(object);
+    } else if (object instanceof Number) {
+      return new $Number(object);
+    } else if (object instanceof String) {
+      return new $String(object);
+    } else if (object instanceof Boolean) {
+      return new $Boolean(object);
+    } else if (object instanceof Array) {
+      var out = new $Array;
+      each(object, function(item, index){
+        out.set(index, fromInternal(item));
+      });
+      return out;
+    }
+
+    var out = new $Object;
+    each(object, function(val, key){
+      out.set(key, fromInternal(val));
+    });
+    return out;
+  }
+
+
   var Realm = (function(){
     function wrapFunction(f){
       if (f._wrapper) {
@@ -2035,34 +2080,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
         return f.Call(receiver, arguments);
       };
-    }
-
-    function fromInternal(object){
-      if (typeof object === 'function') {
-        return new $InternalFunction(object);
-      } else if (object === null || typeof object !== 'object') {
-        return object;
-      } else if (object instanceof RegExp) {
-        return new $RegExp(object);
-      } else if (object instanceof Number) {
-        return new $Number(object);
-      } else if (object instanceof String) {
-        return new $String(object);
-      } else if (object instanceof Boolean) {
-        return new $Boolean(object);
-      } else if (object instanceof Array) {
-        var out = new $Array;
-        each(object, function(item, index){
-          out.set(index, fromInternal(item));
-        });
-        return out;
-      }
-
-      var out = new $Object;
-      each(object, function(val, key){
-        out.set(key, fromInternal(val));
-      });
-      return out;
     }
 
     natives.add({
@@ -2151,19 +2168,6 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$ThrowException('invalid_regexp', [pattern+'']);
         }
         return new $RegExp(result);
-      },
-      parse: function(src, loc, range, raw, tokens, comment, tolerant, source){
-        var ast = Script.parse(src, source, 'script', {
-          loc     : !!loc,
-          range   : !!range,
-          raw     : !!raw,
-          tokens  : !!tokens,
-          comment : !!comment,
-          tolerant: !!tolerant
-        });
-
-        if (ast.Abrupt) return ast;
-        return fromInternal(ast);
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
