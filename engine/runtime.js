@@ -295,10 +295,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       context.LexicalEnvironment.CreateImmutableBinding(name);
     }
 
-    if (!constructorCode) {
-      constructorCode = intrinsics.EmptyClass.code;
-    }
-
     var ctor = $$PropertyDefinitionEvaluation('method', proto, 'constructor', constructorCode);
     if (ctor && ctor.Abrupt) return ctor;
 
@@ -1932,8 +1928,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     ParseOptions.prototype = {
       loc     : true,
       range   : true,
-      raw     : true,
-      comment : true,
+      raw     : false,
+      comment : false,
       tokens  : false,
       tolerant: false
     };
@@ -2156,17 +2152,17 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
         return new $RegExp(result);
       },
-      parse: function(src, loc, range, raw, tokens, comment, source){
+      parse: function(src, loc, range, raw, tokens, comment, tolerant, source){
         var ast = Script.parse(src, source, 'script', {
-          loc    : !!loc,
-          range  : !!range,
-          raw    : !!raw,
-          tokens : !!tokens,
-          comment: !!comment
+          loc     : !!loc,
+          range   : !!range,
+          raw     : !!raw,
+          tokens  : !!tokens,
+          comment : !!comment,
+          tolerant: !!tolerant
         });
-        if (ast.Abrupt) {
-          return ast;
-        }
+
+        if (ast.Abrupt) return ast;
         return fromInternal(ast);
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),

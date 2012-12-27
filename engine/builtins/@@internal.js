@@ -244,5 +244,3 @@ function ensureCallback(o, name){
 }
 
 internalFunction(ensureCallback);
-
-$__EmptyClass = function(...args){ super(...args) };
