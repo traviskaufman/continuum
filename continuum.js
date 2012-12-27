@@ -11863,19 +11863,13 @@ exports.operators = (function(exports){
       Uninitialized = SYMBOLS.Uninitialized,
       BuiltinSymbol  = require('../constants').BRANDS.BuiltinSymbol;
 
-  var BOOLEAN   = 'boolean',
-      FUNCTION  = 'function',
-      NUMBER    = 'number',
-      OBJECT    = 'object',
-      STRING    = 'string',
-      UNDEFINED = 'undefined';
-
-
 
   function $$HasPrimitiveBase(v){
     var type = typeof v.base;
-    return type === STRING || type === NUMBER || type === BOOLEAN;
+    return type === 'string' || type === 'number' || type === 'boolean';
   }
+
+  exports.$$HasPrimitiveBase = $$HasPrimitiveBase;
 
 
   // ## $$GetValue
@@ -11889,8 +11883,8 @@ exports.operators = (function(exports){
     } else {
       var type = typeof base;
 
-      if (type !== OBJECT) {
-        if (type === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
+      if (type !== 'object') {
+        if (type === 'string' && v.name === 'length' || v.name >= 0 && v.name < base.length) {
           return base[v.name];
         }
         base = $$ToObject(base);
@@ -11934,7 +11928,7 @@ exports.operators = (function(exports){
       return exports.global.Put(v.name, w, false);
     }
 
-    if (typeof base !== OBJECT) {
+    if (typeof base !== 'object') {
       base = $$ToObject(base);
     }
 
@@ -12003,7 +11997,7 @@ exports.operators = (function(exports){
 
 
   function $$ToPrimitive(argument, hint){
-    if (argument && typeof argument === OBJECT && !argument.Abrupt) {
+    if (argument && typeof argument === 'object' && !argument.Abrupt) {
       return $$ToPrimitive(argument.DefaultValue(hint), hint);
     }
     return argument;
@@ -12019,7 +12013,7 @@ exports.operators = (function(exports){
 
 
   function $$ToNumber(argument){
-    if (argument !== null && typeof argument === OBJECT) {
+    if (argument !== null && typeof argument === 'object') {
       if (argument.Abrupt) return argument;
       return $$ToNumber($$ToPrimitive(argument, 'Number'));
     }
@@ -12068,7 +12062,7 @@ exports.operators = (function(exports){
   function $$ToUint16(argument){
     argument = $$ToNumber(argument);
     if (argument && argument.Abrupt) return argument;
-    return (argument >>> 0) % (1 << 16);
+    return argument >>> 0 & 0xffff;
   }
   exports.$$ToUint16 = $$ToUint16;
 
@@ -12078,7 +12072,7 @@ exports.operators = (function(exports){
   function $$ToPropertyKey(argument){
     if (!argument) return argument + '';
     var type = typeof argument;
-    if (type === STRING || type === OBJECT && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
+    if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
     }
     return $$ToString(argument);
@@ -12089,11 +12083,11 @@ exports.operators = (function(exports){
 
   function $$ToString(argument){
     switch (typeof argument) {
-      case STRING: return argument;
-      case UNDEFINED:
-      case NUMBER:
-      case BOOLEAN: return ''+argument;
-      case OBJECT:
+      case 'string': return argument;
+      case 'undefined':
+      case 'number':
+      case 'boolean': return ''+argument;
+      case 'object':
         if (argument === null) {
           return 'null';
         } else if (argument.Abrupt) {
@@ -12105,12 +12099,11 @@ exports.operators = (function(exports){
   exports.$$ToString = $$ToString;
 
 
-  var PRE_INC, POST_INC, PRE_DEC, POST_DEC;
   void function(createChanger){
-    exports.PRE_INC = PRE_INC = createChanger(true, 1);
-    exports.POST_INC = POST_INC = createChanger(false, 1);
-    exports.PRE_DEC = PRE_DEC = createChanger(true, -1);
-    exports.POST_DEC = POST_DEC = createChanger(false, -1);
+    exports.PRE_INC  = createChanger(true, 1);
+    exports.POST_INC = createChanger(false, 1);
+    exports.PRE_DEC  = createChanger(true, -1);
+    exports.POST_DEC = createChanger(false, -1);
   }(function(pre, change){
     return function(ref) {
       var val = $$ToNumber($$GetValue(ref));
@@ -12124,71 +12117,14 @@ exports.operators = (function(exports){
     };
   });
 
-  function VOID(ref){
-    var val = $$GetValue(ref);
-    if (val && val.Abrupt) return val;
-  }
-  exports.VOID = VOID;
-
-  function TYPEOF(val) {
-    var type = typeof val;
-    switch (type) {
-      case UNDEFINED:
-      case BOOLEAN:
-      case NUMBER:
-      case STRING: return type;
-      case OBJECT:
-        if (val === null) {
-          return OBJECT;
-        }
-
-        if (val.Abrupt) return val;
-
-        if (val.Reference) {
-          if (val.base === undefined) {
-            return UNDEFINED;
-          }
-          return TYPEOF($$GetValue(val));
-        }
-
-        if ('Call' in val) {
-          return FUNCTION;
-        }
-        return OBJECT;
-      }
-  }
-  exports.TYPEOF = TYPEOF;
-
-
-  function POSITIVE(ref){
-    return $$ToNumber($$GetValue(ref));
-  }
-  exports.POSITIVE = POSITIVE;
-
-  var NEGATIVE, BIT_NOT, NOT;
-  void function(createUnaryOp){
-    exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber, function(n){ return -n });
-    exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32, function(n){ return ~n });
-    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
-  }(function(convert, finalize){
-    return function(ref){
-      if (!ref || typeof ref !== OBJECT) {
-        return finalize(ref);
-      }
-
-      var val = convert($$GetValue(ref));
-      if (val && val.Abrupt) return val;
-      return finalize(val);
-    }
-  });
   var MUL, DIV, MOD, SUB, BIT_OR, BIT_AND;
   void function(makeMathOp){
-    exports.MUL = MUL = makeMathOp(function(l, r){ return l * r });
-    exports.DIV = DIV = makeMathOp(function(l, r){ return l / r });
-    exports.MOD = MOD = makeMathOp(function(l, r){ return l % r });
-    exports.SUB = SUB = makeMathOp(function(l, r){ return l - r });
+    exports.MUL     = MUL     = makeMathOp(function(l, r){ return l * r });
+    exports.DIV     = DIV     = makeMathOp(function(l, r){ return l / r });
+    exports.MOD     = MOD     = makeMathOp(function(l, r){ return l % r });
+    exports.SUB     = SUB     = makeMathOp(function(l, r){ return l - r });
     exports.BIT_AND = BIT_AND = makeMathOp(function(l, r){ return l & r });
-    exports.BIT_OR = BIT_OR = makeMathOp(function(l, r){ return l | r });
+    exports.BIT_OR  = BIT_OR  = makeMathOp(function(l, r){ return l | r });
   }(function(finalize){
     return function(lval, rval) {
       lval = $$ToNumber(lval);
@@ -12219,22 +12155,17 @@ exports.operators = (function(exports){
     rval = $$ToPrimitive(rval);
     if (rval && rval.Abrupt) return rval;
 
-    if (typeof lval === STRING || typeof rval === STRING) {
-      var type = STRING,
-          converter = $$ToString;
-    } else {
-      var type = NUMBER,
-          converter = $$ToNumber;
+    if (typeof lval === 'string' || typeof rval === 'string') {
+      return convertAdd(lval, rval, 'string', $$ToString);
     }
-
-    return convertAdd(lval, rval, type, converter);
+    return convertAdd(lval, rval, 'number', $$ToNumber);
   }
   exports.ADD = ADD;
 
 
 
   function STRING_ADD(lval, rval){
-    return convertAdd(lval, rval, STRING, $$ToString);
+    return convertAdd(lval, rval, 'string', $$ToString);
   }
   exports.STRING_ADD = STRING_ADD;
 
@@ -12251,7 +12182,7 @@ exports.operators = (function(exports){
       if (lval && lval.Abrupt) return lval;
       rval = $$ToUint32(rval);
       if (rval && rval.Abrupt) return rval;
-      return finalize(lval, rval & 0x1F);
+      return finalize(lval, rval & 0x1f);
     };
   });
 
@@ -12275,27 +12206,27 @@ exports.operators = (function(exports){
     var ltype = typeof lval,
         rtype = typeof rval;
 
-    if (ltype === STRING || rtype === STRING) {
-      if (ltype !== STRING) {
+    if (ltype === 'string' || rtype === 'string') {
+      if (ltype !== 'string') {
         lval = $$ToString(lval);
         if (lval && lval.Abrupt) return lval;
-      } else if (rtype !== STRING) {
+      } else if (rtype !== 'string') {
         rval = $$ToString(rval);
         if (rval && rval.Abrupt) return rval;
       }
-      if (typeof lval === STRING && typeof rval === STRING) {
+      if (typeof lval === 'string' && typeof rval === 'string') {
         return lval < rval;
       }
     } else {
-      if (ltype !== NUMBER) {
+      if (ltype !== 'number') {
         lval = $$ToNumber(lval);
         if (lval && lval.Abrupt) return lval;
       }
-      if (rtype !== NUMBER) {
+      if (rtype !== 'number') {
         rval = $$ToNumber(rval);
         if (rval && rval.Abrupt) return rval;
       }
-      if (typeof lval === NUMBER && typeof rval === NUMBER) {
+      if (typeof lval === 'number' && typeof rval === 'number') {
         return lval < rval;
       }
     }
@@ -12320,23 +12251,136 @@ exports.operators = (function(exports){
 
       if (result === undefined) {
         return false;
-      } else if (left) {
-        return !result;
-      } else {
-        return result;
       }
+      return left ? !result : result;
     };
   });
 
 
   function INSTANCE_OF(lval, rval) {
-    if (rval === null || typeof rval !== OBJECT || !('HasInstance' in rval)) {
-      return $$ThrowException('instanceof_function_expected', lval);
+    if (rval === null || typeof rval !== 'object' || !('HasInstance' in rval)) {
+      return $$ThrowException('instanceof_function_expected', [typeof rval]);
     }
 
     return rval.HasInstance(lval);
   }
   exports.INSTANCE_OF = INSTANCE_OF;
+
+
+
+
+  function EQUAL(lval, rval) {
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+    return lval === rval;
+  }
+  exports.EQUAL = EQUAL;
+
+  function NOT_EQUAL(lval, rval){
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+    return lval !== rval;
+  }
+  exports.NOT_EQUAL = NOT_EQUAL;
+
+
+  function EQUIVALENT(lval, rval){
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+
+    var ltype = typeof lval,
+        rtype = typeof rval;
+
+    if (ltype === rtype) {
+      return EQUAL(lval, rval);
+    } else if (lval == null) {
+      return rval == null;
+    } else if (rval == null) {
+      return lval == null;
+    } else if (ltype === 'number' || rtype === 'string') {
+      return EQUIVALENT(lval, $$ToNumber(rval));
+    } else if (ltype === 'string' || rtype === 'number') {
+      return EQUIVALENT($$ToNumber(lval), rval);
+    } else if (rtype === 'boolean') {
+      return EQUIVALENT(lval, $$ToNumber(rval));
+    } else if (ltype === 'boolean') {
+      return EQUIVALENT($$ToNumber(lval), rval);
+    } else if (rtype === 'object' && ltype === 'number' || ltype === 'string') {
+      return EQUIVALENT(lval, $$ToPrimitive(rval));
+    } else if (ltype === 'object' && rtype === 'number' || rtype === 'object') {
+      return EQUIVALENT($$ToPrimitive(lval), rval);
+    }
+    return false;
+  }
+  exports.EQUIVALENT = EQUIVALENT;
+
+  function NOT_EQUIVALENT(lval, rval){
+    var result = EQUIVALENT(lval, rval);
+    return typeof result === 'boolean' ? !result : result
+
+  }
+  exports.NOT_EQUAL = NOT_EQUAL;
+
+
+
+  function VOID(ref){
+    var val = $$GetValue(ref);
+    if (val && val.Abrupt) return val;
+  }
+  exports.VOID = VOID;
+
+  function TYPEOF(val) {
+    var type = typeof val;
+    switch (type) {
+      case 'undefined':
+      case 'boolean':
+      case 'number':
+      case 'string': return type;
+      case 'object':
+        if (val === null) {
+          return 'object';
+        }
+
+        if (val.Abrupt) return val;
+
+        if (val.Reference) {
+          if (val.base === undefined) {
+            return 'undefined';
+          }
+          return TYPEOF($$GetValue(val));
+        }
+
+        if ('Call' in val) {
+          return 'function';
+        }
+        return 'object';
+      }
+  }
+  exports.TYPEOF = TYPEOF;
+
+
+  function POSITIVE(ref){
+    return $$ToNumber($$GetValue(ref));
+  }
+  exports.POSITIVE = POSITIVE;
+
+
+  var NEGATIVE, BIT_NOT, NOT;
+  void function(createUnaryOp){
+    exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber,  function(n){ return -n });
+    exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32,   function(n){ return ~n });
+    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
+  }(function(convert, finalize){
+    return function(ref){
+      if (!ref || typeof ref !== 'object') {
+        return finalize(ref);
+      }
+
+      var val = convert($$GetValue(ref));
+      if (val && val.Abrupt) return val;
+      return finalize(val);
+    }
+  });
 
 
   function DELETE(ref){
@@ -12351,7 +12395,6 @@ exports.operators = (function(exports){
       }
       return true;
     }
-
 
     if (base.Delete) {
       if ('thisValue' in ref) {
@@ -12368,8 +12411,8 @@ exports.operators = (function(exports){
 
 
   function IN(lval, rval) {
-    if (rval === null || typeof rval !== OBJECT) {
-      return $$ThrowException('invalid_in_operator_use', [lval, rval]);
+    if (rval === null || typeof rval !== 'object') {
+      return $$ThrowException('invalid_in_operator_use', [lval, typeof rval]);
     }
 
     lval = $$ToPropertyKey(lval);
@@ -12381,47 +12424,7 @@ exports.operators = (function(exports){
 
 
 
-
-  function STRICT_EQUAL(x, y) {
-    if (x && x.Abrupt) return x;
-    if (y && y.Abrupt) return y;
-    return x === y;
-  }
-  exports.STRICT_EQUAL = STRICT_EQUAL;
-
-
-  function EQUAL(x, y){
-    if (x && x.Abrupt) return x;
-    if (y && y.Abrupt) return y;
-
-    var ltype = typeof x,
-        rtype = typeof y;
-
-    if (ltype === rtype) {
-      return x === y;
-    } else if (x == null || y == null) {
-      return x == null && y == null;
-    } else if (ltype === NUMBER || rtype === STRING) {
-      return EQUAL(x, $$ToNumber(y));
-    } else if (ltype === STRING || rtype === NUMBER) {
-      return EQUAL($$ToNumber(x), y);
-    } else if (rtype === BOOLEAN) {
-      return EQUAL(x, $$ToNumber(y));
-    } else if (ltype === BOOLEAN) {
-      return EQUAL($$ToNumber(x), y);
-    } else if (rtype === OBJECT && ltype === NUMBER || ltype === STRING) {
-      return EQUAL(x, $$ToPrimitive(y));
-    } else if (ltype === OBJECT && rtype === NUMBER || rtype === OBJECT) {
-      return EQUAL($$ToPrimitive(x), y);
-    }
-    return false;
-  }
-
-  exports.EQUAL = EQUAL;
-
-
-
-  function UnaryOp(operator, val) {
+  function UnaryOperation(operator, val) {
     switch (operator) {
       case 'delete': return DELETE(val);
       case 'void':   return VOID(val);
@@ -12432,18 +12435,18 @@ exports.operators = (function(exports){
       case '!':      return NOT(val);
     }
   }
-  exports.UnaryOp = UnaryOp;
+  exports.UnaryOperation = UnaryOperation;
 
 
 
-  function BinaryOp(operator, lval, rval) {
+  function BinaryOperation(operator, lval, rval) {
     switch (operator) {
       case 'instanceof': return INSTANCE_OF(lval, rval);
       case 'in':         return IN(lval, rval);
-      case '==':         return EQUAL(lval, rval);
-      case '!=':         return NOT(EQUAL(lval, rval));
-      case '===':        return STRICT_EQUAL(lval, rval);
-      case '!==':        return NOT(STRICT_EQUAL(lval, rval));
+      case '==':         return EQUIVALENT(lval, rval);
+      case '!=':         return NOT_EQUIVALENT(lval, rval);
+      case '===':        return EQUAL(lval, rval);
+      case '!==':        return NOT_EQUAL(lval, rval);
       case '<':          return LT(lval, rval);
       case '>':          return GT(lval, rval);
       case '<=':         return LTE(lval, rval);
@@ -12462,7 +12465,7 @@ exports.operators = (function(exports){
       case '^':          return BIT_XOR(lval, rval);
     }
   }
-  exports.BinaryOp = BinaryOp;
+  exports.BinaryOperation = BinaryOperation;
 
 
   return exports;
@@ -15642,33 +15645,29 @@ exports.natives = (function(module){
 exports.thunk = (function(exports){
   "use strict";
   var objects   = require('./lib/objects'),
+      constants = require('./constants'),
+      operators = require('./object-model/operators'),
       Emitter   = require('./lib/Emitter');
 
-  var define  = objects.define,
-      inherit = objects.inherit,
-      Hash    = objects.Hash;
-
-  var operators    = require('./object-model/operators'),
-      STRICT_EQUAL = operators.STRICT_EQUAL,
-      ToObject     = operators.$$ToObject,
-      UnaryOp      = operators.UnaryOp,
-      BinaryOp     = operators.BinaryOp,
-      GetValue     = operators.$$GetValue,
-      PutValue     = operators.$$PutValue,
-      PRE_INC      = operators.PRE_INC,
-      POST_INC     = operators.POST_INC,
-      PRE_DEC      = operators.PRE_DEC,
-      POST_DEC     = operators.POST_DEC;
-
-  var constants = require('./constants'),
-      AST       = constants.AST.array,
-      Pause     = constants.SYMBOLS.Pause,
-      Empty     = constants.SYMBOLS.Empty,
-      Resume    = constants.SYMBOLS.Resume,
-      StopIteration = constants.BRANDS.StopIteration;
+  var define          = objects.define,
+      inherit         = objects.inherit,
+      Hash            = objects.Hash,
+      UnaryOperation  = operators.UnaryOperation,
+      BinaryOperation = operators.BinaryOperation,
+      ToObject        = operators.$$ToObject,
+      $$GetValue      = operators.$$GetValue,
+      $$PutValue      = operators.$$PutValue,
+      STRICT_EQUAL    = operators.STRICT_EQUAL,
+      PRE_INC         = operators.PRE_INC,
+      POST_INC        = operators.POST_INC,
+      PRE_DEC         = operators.PRE_DEC,
+      POST_DEC        = operators.POST_DEC,
+      Pause           = constants.SYMBOLS.Pause,
+      Empty           = constants.SYMBOLS.Empty,
+      Resume          = constants.SYMBOLS.Resume,
+      StopIteration   = constants.BRANDS.StopIteration;
 
   var AbruptCompletion = require('./errors').AbruptCompletion;
-
 
 
 
@@ -15677,6 +15676,8 @@ exports.thunk = (function(exports){
   }
 
   Desc.prototype = {
+    isDataDescriptor: true,
+    isDescriptor: true,
     Configurable: true,
     Enumerable: true,
     Writable: true
@@ -15700,15 +15701,6 @@ exports.thunk = (function(exports){
     }
     return d;
   })([], 8);
-
-
-  function DefineProperty(obj, key, val) {
-    if (val && val.Abrupt) {
-      return val;
-    }
-
-    return obj.DefineOwnProperty(key, new Desc(val), false);
-  }
 
   var log = false;
 
@@ -15899,7 +15891,7 @@ exports.thunk = (function(exports){
     function BINARY(){
       var right  = stack[--sp],
           left   = stack[--sp],
-          result = BinaryOp(ops[ip][0], GetValue(left), GetValue(right));
+          result = BinaryOperation(ops[ip][0], $$GetValue(left), $$GetValue(right));
 
       if (result && result.Abrupt) {
         error = result;
@@ -16115,7 +16107,7 @@ exports.thunk = (function(exports){
 
 
     function GET(){
-      var result = GetValue(stack[--sp]);
+      var result = $$GetValue(stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -16367,7 +16359,13 @@ exports.thunk = (function(exports){
         return unwind;
       }
 
-      var status = DefineProperty(obj, key, val);
+      if (val && val.Abrupt) {
+        error = val;
+        return unwind;
+      }
+
+      var status = obj.DefineOwnProperty(key, new Desc(val), false);
+
       if (status && status.Abrupt) {
         error = status;
         return unwind;
@@ -16402,7 +16400,7 @@ exports.thunk = (function(exports){
     function PUT(){
       var val    = stack[--sp],
           ref    = stack[--sp],
-          status = PutValue(ref, val);
+          status = $$PutValue(ref, val);
 
       if (status && status.Abrupt) {
         error = status;
@@ -16646,7 +16644,7 @@ exports.thunk = (function(exports){
     }
 
     function UNARY(){
-      var result = UnaryOp(ops[ip][0], stack[--sp]);
+      var result = UnaryOperation(ops[ip][0], stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -16683,7 +16681,7 @@ exports.thunk = (function(exports){
     }
 
     function WITH(){
-      var result = ToObject(GetValue(stack[--sp]));
+      var result = ToObject($$GetValue(stack[--sp]));
 
       if (result && result.Abrupt) {
         error = result;
@@ -16866,7 +16864,7 @@ exports.thunk = (function(exports){
     }
 
     function normalCleanup(){
-      var result = GetValue(completion);
+      var result = $$GetValue(completion);
       if (thunkStack.length) {
         var v = thunkStack.pop();
         ip = v.ip;
@@ -21382,7 +21380,7 @@ exports.index = (function(exports){
 
 exports.builtins["@@internal"] = "private @@Call,\n        @@Construct,\n        @@DefineOwnProperty,\n        @@Enumerate,\n        @@GetBuiltinBrand,\n        @@GetP,\n        @@GetProperty,\n        @@GetPrototype,\n        @@HasOwnProperty,\n        @@HasProperty,\n        @@IsExtensible,\n        @@PreventExtensions,\n        @@PrimitiveValue,\n        @@Put,\n        @@SetBuiltinBrand,\n        @@SetP,\n        @@SetPrototype,\n        @@GetOwnProperty;\n\nprivate @@define,\n        @@delete,\n        @@each,\n        @@get,\n        @@getInternal,\n        @@has,\n        @@hasInternal,\n        @@query,\n        @@set,\n        @@setInternal,\n        @@update;\n\nprivate @@extend;\n\nsymbol  @toStringTag,\n        @iterator;\n\n\n$__iterator = @iterator;\n$__toStringTag = @toStringTag;\n\nvar Genesis = $__Genesis;\nGenesis.@@Call              = $__Call;\nGenesis.@@Construct         = $__Construct;\nGenesis.@@DefineOwnProperty = $__DefineOwnProperty;\nGenesis.@@Enumerate         = $__Enumerate;\nGenesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;\nGenesis.@@GetOwnProperty    = $__GetOwnProperty;\nGenesis.@@GetP              = $__GetP;\nGenesis.@@GetProperty       = $__GetProperty;\nGenesis.@@GetPrototype      = $__GetPrototype;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasOwnProperty    = $__HasOwnProperty;\nGenesis.@@HasProperty       = $__HasProperty;\nGenesis.@@IsExtensible      = $__IsExtensible;\nGenesis.@@PreventExtensions = $__PreventExtensions;\nGenesis.@@Put               = $__Put;\nGenesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;\nGenesis.@@SetP              = $__SetP;\nGenesis.@@SetPrototype      = $__SetPrototype;\n\nGenesis.@@define            = $__define;\nGenesis.@@delete            = $__delete;\nGenesis.@@each              = $__each;\nGenesis.@@get               = $__get;\nGenesis.@@getInternal       = $__getInternal;\nGenesis.@@has               = $__has;\nGenesis.@@hasInternal       = $__hasInternal;\nGenesis.@@query             = $__query;\nGenesis.@@set               = $__set;\nGenesis.@@setInternal       = $__setInternal;\nGenesis.@@update            = $__update;\n\nGenesis.@@extend            = extend;\n\n\nGenesis.@@each((key, value, attr) => {\n  if ($__Type(Genesis[key]) === 'Object') {\n    Genesis[key].@@set('name', key);\n    internalFunction(Genesis[key]);\n  }\n});\n\n\nfunction extend(properties){\n  var keys = properties.@@Enumerate(false, false),\n      i = keys.length;\n\n  while (i--) {\n    var key = keys[i];\n    var desc = properties.@@GetOwnProperty(key);\n    desc.enumerable = false;\n\n    if (typeof desc.value === 'number') {\n      desc.configurable = desc.writable = false;\n    } else if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n\n    this.@@DefineOwnProperty(key, desc);\n  }\n};\n\n\n\n\nlet HIDDEN = 6,\n    FROZEN = 0,\n    Infinity = 1 / 0,\n    NaN = +'NaN',\n    undefined;\n\n\nfunction internalFunction(func){\n  func.@@setInternal('InternalFunction', true);\n  func.@@setInternal('strict', false);\n  func.@@delete('prototype');\n  func.@@delete('caller');\n  func.@@delete('arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      prototype.@@extend(Ctor.prototype);\n    }\n    Ctor.@@set('prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  Ctor.@@setInternal('BuiltinConstructor', true);\n  Ctor.@@setInternal('BuiltinFunction', true);\n  Ctor.@@setInternal('strict', false);\n  Ctor.@@update('prototype', FROZEN);\n  Ctor.@@set('length', 1);\n  Ctor.@@define('caller', null, 0);\n  Ctor.@@define('arguments', null, 0);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    Ctor.prototype.@@SetBuiltinBrand(brand);\n    Ctor.prototype.@@define(@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  func.@@setInternal('BuiltinFunction', true);\n  func.@@delete('prototype');\n  func.@@update('name', FROZEN);\n  func.@@define('caller', null, 0);\n  func.@@define('arguments', null, 0);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  var keys = o.@@Enumerate(false, true),\n      i = keys.length;\n\n  while (i--) {\n    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  var brand = o.@@GetBuiltinBrand();\n  return brand === 'Array' || brand === 'Arguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\nfunction ensureCallback(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('callback_must_be_callable', [name]);\n  }\n}\n\ninternalFunction(ensureCallback);\n\n$__EmptyClass = function(...args){ super(...args) };\n";
 
-exports.builtins["@array"] = "import Iterator from '@iter';\nimport { Set, add, has } from '@set';\nimport { min, max } from '@math';\n\nconst arrays = new Set;\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    ensureObject(this);\n\n    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    var obj   = $__ToObject(this),\n        n     = 0,\n        index = 0;\n\n    do {\n      if (isArray(obj)) {\n        let len = $__ToInt32(obj.length),\n            i   = 0;\n\n        do {\n          if (i in obj) {\n            array[n++] = obj[i];\n          }\n        } while (++i < len)\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[index];\n    } while (index++ < count)\n\n    return array;\n  }\n\n  entries(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  every(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && !callbackfn.@@Call(context, [array[index], index, array])) {\n          return false;\n        }\n      } while (++index < len)\n    }\n\n    return true;\n  }\n\n  filter(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array) {\n          let element = array[index];\n          if (callbackfn.@@Call(context, [element, index, array])) {\n            result[result.length] = element;\n          }\n        }\n      } while (++index < len)\n    }\n\n    return result;\n  }\n\n  forEach(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        callbackfn.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex = 0){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      return -1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (++index < len)\n\n    return -1;\n  }\n\n  join(...separator){\n    const array = $__ToObject(this);\n\n    if (has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    const sep = $__ToString(separator.length ? separator[0] : ','),\n          len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return '';\n    }\n\n    var result = '0' in array ? $__ToString(array[0]) : '',\n        index  = 0;\n\n    while (++index < len) {\n      result += index in array ? ',' + $__ToString(array[index]) : ',';\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex = this.length){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    var index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      index = len - 1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (index--)\n\n    return -1;\n  }\n\n  map(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callbackfn.@@Call(context, [array[i], i, this]);\n      }\n    }\n\n    return result;\n  }\n\n  pop(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length) - 1;\n\n    if (len >= 0) {\n      const result = array[len];\n      array.length = len;\n      return result;\n    }\n  }\n\n  push(...values){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length),\n          count = values.length;\n\n    var index = len;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[index++] = values[i];\n    }\n\n    return index;\n  }\n\n  reduce(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    let accumulator, index;\n\n    ensureCallback(callbackfn);\n\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = 0;\n    } else {\n      accumulator = array[0];\n      index = 1;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);\n      }\n    } while (++index < len)\n\n    return accumulator;\n  }\n\n  reduceRight(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    var accumulator, index;\n\n    ensureCallback(callbackfn);\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = len - 1;\n    } else {\n      accumulator = array[len - 1];\n      index = len - 2;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);\n      }\n    } while (--index >= 0)\n\n    return accumulator;\n  }\n\n  slice(start = 0, end = this.length){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    if (start < 0) {\n      start += len;\n      if (start < 0) {\n        start = 0;\n      }\n    }\n\n    if (end < 0) {\n      end += len;\n      if (end < 0) {\n        return result;\n      }\n    } else if (end >= len) {\n      end = len;\n    }\n\n    if (start < end) {\n      let newIndex = 0,\n          oldIndex = start;\n\n      do {\n        result[newIndex++] = array[oldIndex++];\n      } while (oldIndex < end)\n    }\n\n    return result;\n  }\n\n  shift(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = array[0];\n\n    if (!len) {\n      return result;\n    }\n\n    let oldIndex = 1,\n        newIndex = 0;\n\n    do {\n      if (oldIndex in array) {\n        array[newIndex] = array[oldIndex];\n      } else if (!delete array[newIndex]) {\n        throw $__Exception('delete_array_index', ['Array.prototype.shift', newIndex]);\n      }\n      newIndex++;\n    } while (++oldIndex < len)\n\n    array.length = len - 1;\n    return result;\n  }\n\n  some(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && callbackfn.@@Call(context, [array[index], index, array])) {\n          return true;\n        }\n      } while (++index < len)\n    }\n\n    return false;\n  }\n\n  splice(start, deleteCount, ...items){\n    const array     = $__ToObject(this),\n          len       = $__ToUint32(array.length),\n          itemCount = items.length,\n          result    = [];\n\n    start = $__ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    } else {\n      start = min(start, len);\n    }\n\n    deleteCount = min(max($__ToInteger(deleteCount), 0), len - start);\n\n    if (deleteCount > 0) {\n      let index = 0;\n\n      do {\n        let from = index + start;\n\n        if (from in array) {\n          result[index] = array[from];\n        }\n\n        index++;\n      } while (index < deleteCount)\n\n      result.length = deleteCount;\n    }\n\n    const count = len - deleteCount;\n\n    if (itemCount < deleteCount) {\n      let index = start;\n\n      while (index < count) {\n        let from = index + deleteCount,\n            to   = index + itemCount;\n\n        if (from in array) {\n          array[to] = array[from];\n        } else if (!delete array[to]) {\n          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);\n        }\n\n        index++;\n      }\n    } else if (itemCount > deleteCount) {\n      let index = count;\n\n      while (index > start) {\n        let from = index + deleteCount - 1,\n            to   = index + itemCount - 1;\n\n        if (from in array) {\n          array[to] = array[from];\n        } else if (!delete array[to]) {\n          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);\n        }\n\n        index--;\n      }\n    }\n\n    if (itemCount) {\n      let itemIndex = 0,\n          index     = start;\n\n      do {\n        array[index++] = items[itemIndex++];\n      } while (itemIndex < itemCount)\n    }\n\n    array.length = len - deleteCount + itemCount;\n\n    return result;\n  }\n\n  toLocaleString(){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0 || has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    let nextElement = array[0],\n        result = nextElement == null ? '' : nextElement.toLocaleString(),\n        index  = 0;\n\n    while (++index < len) {\n      result += ',';\n      nextElement = array[index];\n      if (nextElement != null) {\n        result += nextElement.toLocaleString();\n      }\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  toString(){\n    const array = $__ToObject(this);\n    var func = array.join;\n\n    if (typeof func !== 'function') {\n      func = $__ObjectToString;\n    }\n\n    return func.@@Call(array, []);\n  }\n\n  unshift(...values){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length),\n          newLen = len + values.length;\n\n    if (len === newLen) {\n      return newLen;\n    }\n\n    array.length = newLen;\n\n    let oldIndex = len,\n        newIndex = newLen;\n\n    while (oldIndex-- > 0) {\n      newIndex--;\n      if (oldIndex in array) {\n        array[newIndex] = array[oldIndex];\n      } else if (!delete array[newIndex]) {\n        throw $__Exception('delete_array_index', ['Array.prototype.unshift', newIndex]);\n      }\n    }\n\n    while (newIndex-- > 0) {\n      array[newIndex] = values[newIndex];\n    }\n\n    return newLen;\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return $__Type(array) === 'Object' ? array.@@GetBuiltinBrand() === 'Array' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n\n  const len  = $__ToUint32(arrayLike.length),\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  const len  = items.length,\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
+exports.builtins["@array"] = "import Iterator from '@iter';\nimport { Set, add, has } from '@set';\nimport { min, max } from '@math';\n\nconst arrays = new Set;\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    ensureObject(this);\n\n    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\nbuiltinClass(ArrayIterator);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    let obj   = $__ToObject(this),\n        n     = 0,\n        index = 0;\n\n    do {\n      if (isArray(obj)) {\n        let len = $__ToInt32(obj.length),\n            i   = 0;\n\n        do {\n          if (i in obj) {\n            array[n++] = obj[i];\n          }\n        } while (++i < len)\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[index];\n    } while (index++ < count)\n\n    return array;\n  }\n\n  entries(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  every(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && !callbackfn.@@Call(context, [array[index], index, array])) {\n          return false;\n        }\n      } while (++index < len)\n    }\n\n    return true;\n  }\n\n  filter(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array) {\n          let element = array[index];\n          if (callbackfn.@@Call(context, [element, index, array])) {\n            result[result.length] = element;\n          }\n        }\n      } while (++index < len)\n    }\n\n    return result;\n  }\n\n  forEach(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    for (let i=0; i < len; i++) {\n      if (i in array) {\n        callbackfn.@@Call(context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex = 0){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      return -1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (++index < len)\n\n    return -1;\n  }\n\n  join(...separator){\n    const array = $__ToObject(this);\n\n    if (has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    const sep = $__ToString(separator.length ? separator[0] : ','),\n          len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return '';\n    }\n\n    let result = '0' in array ? $__ToString(array[0]) : '',\n        index  = 0;\n\n    while (++index < len) {\n      result += index in array ? ',' + $__ToString(array[index]) : ',';\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex = this.length){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      index = len - 1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (index--)\n\n    return -1;\n  }\n\n  map(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = callbackfn.@@Call(context, [array[i], i, this]);\n      }\n    }\n\n    return result;\n  }\n\n  pop(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length) - 1;\n\n    if (len >= 0) {\n      const result = array[len];\n      array.length = len;\n      return result;\n    }\n  }\n\n  push(...values){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length),\n          count = values.length;\n\n    let index = len;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[index++] = values[i];\n    }\n\n    return index;\n  }\n\n  reduce(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    let accumulator, index;\n\n    ensureCallback(callbackfn);\n\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = 0;\n    } else {\n      accumulator = array[0];\n      index = 1;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);\n      }\n    } while (++index < len)\n\n    return accumulator;\n  }\n\n  reduceRight(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    let accumulator, index;\n\n    ensureCallback(callbackfn);\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = len - 1;\n    } else {\n      accumulator = array[len - 1];\n      index = len - 2;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);\n      }\n    } while (--index >= 0)\n\n    return accumulator;\n  }\n\n  slice(start = 0, end = this.length){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    if (start < 0) {\n      start += len;\n      if (start < 0) {\n        start = 0;\n      }\n    }\n\n    if (end < 0) {\n      end += len;\n      if (end < 0) {\n        return result;\n      }\n    } else if (end >= len) {\n      end = len;\n    }\n\n    if (start < end) {\n      let newIndex = 0,\n          oldIndex = start;\n\n      do {\n        result[newIndex++] = array[oldIndex++];\n      } while (oldIndex < end)\n    }\n\n    return result;\n  }\n\n  shift(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = array[0];\n\n    if (!len) {\n      return result;\n    }\n\n    let oldIndex = 1,\n        newIndex = 0;\n\n    do {\n      if (oldIndex in array) {\n        array[newIndex] = array[oldIndex];\n      } else if (!delete array[newIndex]) {\n        throw $__Exception('delete_array_index', ['Array.prototype.shift', newIndex]);\n      }\n      newIndex++;\n    } while (++oldIndex < len)\n\n    array.length = len - 1;\n    return result;\n  }\n\n  some(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && callbackfn.@@Call(context, [array[index], index, array])) {\n          return true;\n        }\n      } while (++index < len)\n    }\n\n    return false;\n  }\n\n  splice(start, deleteCount, ...items){\n    const array     = $__ToObject(this),\n          len       = $__ToUint32(array.length),\n          itemCount = items.length,\n          result    = [];\n\n    start = $__ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    } else {\n      start = min(start, len);\n    }\n\n    deleteCount = min(max($__ToInteger(deleteCount), 0), len - start);\n\n    if (deleteCount > 0) {\n      let index = 0;\n\n      do {\n        let from = index + start;\n\n        if (from in array) {\n          result[index] = array[from];\n        }\n\n        index++;\n      } while (index < deleteCount)\n\n      result.length = deleteCount;\n    }\n\n    const count = len - deleteCount;\n\n    if (itemCount < deleteCount) {\n      let index = start;\n\n      while (index < count) {\n        let from = index + deleteCount,\n            to   = index + itemCount;\n\n        if (from in array) {\n          array[to] = array[from];\n        } else if (!delete array[to]) {\n          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);\n        }\n\n        index++;\n      }\n    } else if (itemCount > deleteCount) {\n      let index = count;\n\n      while (index > start) {\n        let from = index + deleteCount - 1,\n            to   = index + itemCount - 1;\n\n        if (from in array) {\n          array[to] = array[from];\n        } else if (!delete array[to]) {\n          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);\n        }\n\n        index--;\n      }\n    }\n\n    if (itemCount) {\n      let itemIndex = 0,\n          index     = start;\n\n      do {\n        array[index++] = items[itemIndex++];\n      } while (itemIndex < itemCount)\n    }\n\n    array.length = len - deleteCount + itemCount;\n\n    return result;\n  }\n\n  toLocaleString(){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0 || has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    let nextElement = array[0],\n        result = nextElement == null ? '' : nextElement.toLocaleString(),\n        index  = 0;\n\n    while (++index < len) {\n      result += ',';\n      nextElement = array[index];\n      if (nextElement != null) {\n        result += nextElement.toLocaleString();\n      }\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  toString(){\n    const array = $__ToObject(this);\n    let func = array.join;\n\n    if (typeof func !== 'function') {\n      func = $__ObjectToString;\n    }\n\n    return func.@@Call(array, []);\n  }\n\n  unshift(...values){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length),\n          newLen = len + values.length;\n\n    if (len === newLen) {\n      return newLen;\n    }\n\n    array.length = newLen;\n\n    let oldIndex = len,\n        newIndex = newLen;\n\n    while (oldIndex-- > 0) {\n      newIndex--;\n      if (oldIndex in array) {\n        array[newIndex] = array[oldIndex];\n      } else if (!delete array[newIndex]) {\n        throw $__Exception('delete_array_index', ['Array.prototype.unshift', newIndex]);\n      }\n    }\n\n    while (newIndex-- > 0) {\n      array[newIndex] = values[newIndex];\n    }\n\n    return newLen;\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n\n  @iterator(){\n    return new ArrayIterator(this, 'key+value');\n  }\n}\n\nbuiltinClass(Array);\n\n['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'some'\n].forEach(name => Array.prototype[name].@@set('length', 1));\n\n\nexport function isArray(array){\n  return $__Type(array) === 'Object' ? array.@@GetBuiltinBrand() === 'Array' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n\n  const len  = $__ToUint32(arrayLike.length),\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  const len  = items.length,\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nArray.@@extend({ isArray, from, of });\n";
 
 exports.builtins["@boolean"] = "export class Boolean {\n  constructor(value){\n    value = $__ToBoolean(value);\n    return $__IsConstructCall() ? $__BooleanCreate(value) : value;\n  }\n\n  toString(){\n    var type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {\n      return this.@@PrimitiveValue ? 'true' : 'false';\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    var type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {\n      return this.@@PrimitiveValue;\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Boolean);\n\nBoolean.prototype.@@DefineOwnProperty(@@PrimitiveValue, {\n  configurable: true,\n  enumerable: false,\n  get: $__GetPrimitiveValue,\n  set: $__SetPrimitiveValue\n});\n";
 
