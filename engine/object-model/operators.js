@@ -17,19 +17,13 @@ var operators = (function(exports){
       Uninitialized = SYMBOLS.Uninitialized,
       BuiltinSymbol  = require('../constants').BRANDS.BuiltinSymbol;
 
-  var BOOLEAN   = 'boolean',
-      FUNCTION  = 'function',
-      NUMBER    = 'number',
-      OBJECT    = 'object',
-      STRING    = 'string',
-      UNDEFINED = 'undefined';
-
-
 
   function $$HasPrimitiveBase(v){
     var type = typeof v.base;
-    return type === STRING || type === NUMBER || type === BOOLEAN;
+    return type === 'string' || type === 'number' || type === 'boolean';
   }
+
+  exports.$$HasPrimitiveBase = $$HasPrimitiveBase;
 
 
   // ## $$GetValue
@@ -43,8 +37,8 @@ var operators = (function(exports){
     } else {
       var type = typeof base;
 
-      if (type !== OBJECT) {
-        if (type === STRING && v.name === 'length' || v.name >= 0 && v.name < base.length) {
+      if (type !== 'object') {
+        if (type === 'string' && v.name === 'length' || v.name >= 0 && v.name < base.length) {
           return base[v.name];
         }
         base = $$ToObject(base);
@@ -88,7 +82,7 @@ var operators = (function(exports){
       return exports.global.Put(v.name, w, false);
     }
 
-    if (typeof base !== OBJECT) {
+    if (typeof base !== 'object') {
       base = $$ToObject(base);
     }
 
@@ -157,7 +151,7 @@ var operators = (function(exports){
 
 
   function $$ToPrimitive(argument, hint){
-    if (argument && typeof argument === OBJECT && !argument.Abrupt) {
+    if (argument && typeof argument === 'object' && !argument.Abrupt) {
       return $$ToPrimitive(argument.DefaultValue(hint), hint);
     }
     return argument;
@@ -173,7 +167,7 @@ var operators = (function(exports){
 
 
   function $$ToNumber(argument){
-    if (argument !== null && typeof argument === OBJECT) {
+    if (argument !== null && typeof argument === 'object') {
       if (argument.Abrupt) return argument;
       return $$ToNumber($$ToPrimitive(argument, 'Number'));
     }
@@ -222,7 +216,7 @@ var operators = (function(exports){
   function $$ToUint16(argument){
     argument = $$ToNumber(argument);
     if (argument && argument.Abrupt) return argument;
-    return (argument >>> 0) % (1 << 16);
+    return argument >>> 0 & 0xffff;
   }
   exports.$$ToUint16 = $$ToUint16;
 
@@ -232,7 +226,7 @@ var operators = (function(exports){
   function $$ToPropertyKey(argument){
     if (!argument) return argument + '';
     var type = typeof argument;
-    if (type === STRING || type === OBJECT && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
+    if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
     }
     return $$ToString(argument);
@@ -243,11 +237,11 @@ var operators = (function(exports){
 
   function $$ToString(argument){
     switch (typeof argument) {
-      case STRING: return argument;
-      case UNDEFINED:
-      case NUMBER:
-      case BOOLEAN: return ''+argument;
-      case OBJECT:
+      case 'string': return argument;
+      case 'undefined':
+      case 'number':
+      case 'boolean': return ''+argument;
+      case 'object':
         if (argument === null) {
           return 'null';
         } else if (argument.Abrupt) {
@@ -259,12 +253,11 @@ var operators = (function(exports){
   exports.$$ToString = $$ToString;
 
 
-  var PRE_INC, POST_INC, PRE_DEC, POST_DEC;
   void function(createChanger){
-    exports.PRE_INC = PRE_INC = createChanger(true, 1);
-    exports.POST_INC = POST_INC = createChanger(false, 1);
-    exports.PRE_DEC = PRE_DEC = createChanger(true, -1);
-    exports.POST_DEC = POST_DEC = createChanger(false, -1);
+    exports.PRE_INC  = createChanger(true, 1);
+    exports.POST_INC = createChanger(false, 1);
+    exports.PRE_DEC  = createChanger(true, -1);
+    exports.POST_DEC = createChanger(false, -1);
   }(function(pre, change){
     return function(ref) {
       var val = $$ToNumber($$GetValue(ref));
@@ -278,71 +271,14 @@ var operators = (function(exports){
     };
   });
 
-  function VOID(ref){
-    var val = $$GetValue(ref);
-    if (val && val.Abrupt) return val;
-  }
-  exports.VOID = VOID;
-
-  function TYPEOF(val) {
-    var type = typeof val;
-    switch (type) {
-      case UNDEFINED:
-      case BOOLEAN:
-      case NUMBER:
-      case STRING: return type;
-      case OBJECT:
-        if (val === null) {
-          return OBJECT;
-        }
-
-        if (val.Abrupt) return val;
-
-        if (val.Reference) {
-          if (val.base === undefined) {
-            return UNDEFINED;
-          }
-          return TYPEOF($$GetValue(val));
-        }
-
-        if ('Call' in val) {
-          return FUNCTION;
-        }
-        return OBJECT;
-      }
-  }
-  exports.TYPEOF = TYPEOF;
-
-
-  function POSITIVE(ref){
-    return $$ToNumber($$GetValue(ref));
-  }
-  exports.POSITIVE = POSITIVE;
-
-  var NEGATIVE, BIT_NOT, NOT;
-  void function(createUnaryOp){
-    exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber, function(n){ return -n });
-    exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32, function(n){ return ~n });
-    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
-  }(function(convert, finalize){
-    return function(ref){
-      if (!ref || typeof ref !== OBJECT) {
-        return finalize(ref);
-      }
-
-      var val = convert($$GetValue(ref));
-      if (val && val.Abrupt) return val;
-      return finalize(val);
-    }
-  });
   var MUL, DIV, MOD, SUB, BIT_OR, BIT_AND;
   void function(makeMathOp){
-    exports.MUL = MUL = makeMathOp(function(l, r){ return l * r });
-    exports.DIV = DIV = makeMathOp(function(l, r){ return l / r });
-    exports.MOD = MOD = makeMathOp(function(l, r){ return l % r });
-    exports.SUB = SUB = makeMathOp(function(l, r){ return l - r });
+    exports.MUL     = MUL     = makeMathOp(function(l, r){ return l * r });
+    exports.DIV     = DIV     = makeMathOp(function(l, r){ return l / r });
+    exports.MOD     = MOD     = makeMathOp(function(l, r){ return l % r });
+    exports.SUB     = SUB     = makeMathOp(function(l, r){ return l - r });
     exports.BIT_AND = BIT_AND = makeMathOp(function(l, r){ return l & r });
-    exports.BIT_OR = BIT_OR = makeMathOp(function(l, r){ return l | r });
+    exports.BIT_OR  = BIT_OR  = makeMathOp(function(l, r){ return l | r });
   }(function(finalize){
     return function(lval, rval) {
       lval = $$ToNumber(lval);
@@ -373,22 +309,17 @@ var operators = (function(exports){
     rval = $$ToPrimitive(rval);
     if (rval && rval.Abrupt) return rval;
 
-    if (typeof lval === STRING || typeof rval === STRING) {
-      var type = STRING,
-          converter = $$ToString;
-    } else {
-      var type = NUMBER,
-          converter = $$ToNumber;
+    if (typeof lval === 'string' || typeof rval === 'string') {
+      return convertAdd(lval, rval, 'string', $$ToString);
     }
-
-    return convertAdd(lval, rval, type, converter);
+    return convertAdd(lval, rval, 'number', $$ToNumber);
   }
   exports.ADD = ADD;
 
 
 
   function STRING_ADD(lval, rval){
-    return convertAdd(lval, rval, STRING, $$ToString);
+    return convertAdd(lval, rval, 'string', $$ToString);
   }
   exports.STRING_ADD = STRING_ADD;
 
@@ -405,7 +336,7 @@ var operators = (function(exports){
       if (lval && lval.Abrupt) return lval;
       rval = $$ToUint32(rval);
       if (rval && rval.Abrupt) return rval;
-      return finalize(lval, rval & 0x1F);
+      return finalize(lval, rval & 0x1f);
     };
   });
 
@@ -429,27 +360,27 @@ var operators = (function(exports){
     var ltype = typeof lval,
         rtype = typeof rval;
 
-    if (ltype === STRING || rtype === STRING) {
-      if (ltype !== STRING) {
+    if (ltype === 'string' || rtype === 'string') {
+      if (ltype !== 'string') {
         lval = $$ToString(lval);
         if (lval && lval.Abrupt) return lval;
-      } else if (rtype !== STRING) {
+      } else if (rtype !== 'string') {
         rval = $$ToString(rval);
         if (rval && rval.Abrupt) return rval;
       }
-      if (typeof lval === STRING && typeof rval === STRING) {
+      if (typeof lval === 'string' && typeof rval === 'string') {
         return lval < rval;
       }
     } else {
-      if (ltype !== NUMBER) {
+      if (ltype !== 'number') {
         lval = $$ToNumber(lval);
         if (lval && lval.Abrupt) return lval;
       }
-      if (rtype !== NUMBER) {
+      if (rtype !== 'number') {
         rval = $$ToNumber(rval);
         if (rval && rval.Abrupt) return rval;
       }
-      if (typeof lval === NUMBER && typeof rval === NUMBER) {
+      if (typeof lval === 'number' && typeof rval === 'number') {
         return lval < rval;
       }
     }
@@ -474,23 +405,136 @@ var operators = (function(exports){
 
       if (result === undefined) {
         return false;
-      } else if (left) {
-        return !result;
-      } else {
-        return result;
       }
+      return left ? !result : result;
     };
   });
 
 
   function INSTANCE_OF(lval, rval) {
-    if (rval === null || typeof rval !== OBJECT || !('HasInstance' in rval)) {
-      return $$ThrowException('instanceof_function_expected', lval);
+    if (rval === null || typeof rval !== 'object' || !('HasInstance' in rval)) {
+      return $$ThrowException('instanceof_function_expected', [typeof rval]);
     }
 
     return rval.HasInstance(lval);
   }
   exports.INSTANCE_OF = INSTANCE_OF;
+
+
+
+
+  function EQUAL(lval, rval) {
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+    return lval === rval;
+  }
+  exports.EQUAL = EQUAL;
+
+  function NOT_EQUAL(lval, rval){
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+    return lval !== rval;
+  }
+  exports.NOT_EQUAL = NOT_EQUAL;
+
+
+  function EQUIVALENT(lval, rval){
+    if (lval && lval.Abrupt) return lval;
+    if (rval && rval.Abrupt) return rval;
+
+    var ltype = typeof lval,
+        rtype = typeof rval;
+
+    if (ltype === rtype) {
+      return EQUAL(lval, rval);
+    } else if (lval == null) {
+      return rval == null;
+    } else if (rval == null) {
+      return lval == null;
+    } else if (ltype === 'number' || rtype === 'string') {
+      return EQUIVALENT(lval, $$ToNumber(rval));
+    } else if (ltype === 'string' || rtype === 'number') {
+      return EQUIVALENT($$ToNumber(lval), rval);
+    } else if (rtype === 'boolean') {
+      return EQUIVALENT(lval, $$ToNumber(rval));
+    } else if (ltype === 'boolean') {
+      return EQUIVALENT($$ToNumber(lval), rval);
+    } else if (rtype === 'object' && ltype === 'number' || ltype === 'string') {
+      return EQUIVALENT(lval, $$ToPrimitive(rval));
+    } else if (ltype === 'object' && rtype === 'number' || rtype === 'object') {
+      return EQUIVALENT($$ToPrimitive(lval), rval);
+    }
+    return false;
+  }
+  exports.EQUIVALENT = EQUIVALENT;
+
+  function NOT_EQUIVALENT(lval, rval){
+    var result = EQUIVALENT(lval, rval);
+    return typeof result === 'boolean' ? !result : result
+
+  }
+  exports.NOT_EQUAL = NOT_EQUAL;
+
+
+
+  function VOID(ref){
+    var val = $$GetValue(ref);
+    if (val && val.Abrupt) return val;
+  }
+  exports.VOID = VOID;
+
+  function TYPEOF(val) {
+    var type = typeof val;
+    switch (type) {
+      case 'undefined':
+      case 'boolean':
+      case 'number':
+      case 'string': return type;
+      case 'object':
+        if (val === null) {
+          return 'object';
+        }
+
+        if (val.Abrupt) return val;
+
+        if (val.Reference) {
+          if (val.base === undefined) {
+            return 'undefined';
+          }
+          return TYPEOF($$GetValue(val));
+        }
+
+        if ('Call' in val) {
+          return 'function';
+        }
+        return 'object';
+      }
+  }
+  exports.TYPEOF = TYPEOF;
+
+
+  function POSITIVE(ref){
+    return $$ToNumber($$GetValue(ref));
+  }
+  exports.POSITIVE = POSITIVE;
+
+
+  var NEGATIVE, BIT_NOT, NOT;
+  void function(createUnaryOp){
+    exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber,  function(n){ return -n });
+    exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32,   function(n){ return ~n });
+    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
+  }(function(convert, finalize){
+    return function(ref){
+      if (!ref || typeof ref !== 'object') {
+        return finalize(ref);
+      }
+
+      var val = convert($$GetValue(ref));
+      if (val && val.Abrupt) return val;
+      return finalize(val);
+    }
+  });
 
 
   function DELETE(ref){
@@ -505,7 +549,6 @@ var operators = (function(exports){
       }
       return true;
     }
-
 
     if (base.Delete) {
       if ('thisValue' in ref) {
@@ -522,8 +565,8 @@ var operators = (function(exports){
 
 
   function IN(lval, rval) {
-    if (rval === null || typeof rval !== OBJECT) {
-      return $$ThrowException('invalid_in_operator_use', [lval, rval]);
+    if (rval === null || typeof rval !== 'object') {
+      return $$ThrowException('invalid_in_operator_use', [lval, typeof rval]);
     }
 
     lval = $$ToPropertyKey(lval);
@@ -535,47 +578,7 @@ var operators = (function(exports){
 
 
 
-
-  function STRICT_EQUAL(x, y) {
-    if (x && x.Abrupt) return x;
-    if (y && y.Abrupt) return y;
-    return x === y;
-  }
-  exports.STRICT_EQUAL = STRICT_EQUAL;
-
-
-  function EQUAL(x, y){
-    if (x && x.Abrupt) return x;
-    if (y && y.Abrupt) return y;
-
-    var ltype = typeof x,
-        rtype = typeof y;
-
-    if (ltype === rtype) {
-      return x === y;
-    } else if (x == null || y == null) {
-      return x == null && y == null;
-    } else if (ltype === NUMBER || rtype === STRING) {
-      return EQUAL(x, $$ToNumber(y));
-    } else if (ltype === STRING || rtype === NUMBER) {
-      return EQUAL($$ToNumber(x), y);
-    } else if (rtype === BOOLEAN) {
-      return EQUAL(x, $$ToNumber(y));
-    } else if (ltype === BOOLEAN) {
-      return EQUAL($$ToNumber(x), y);
-    } else if (rtype === OBJECT && ltype === NUMBER || ltype === STRING) {
-      return EQUAL(x, $$ToPrimitive(y));
-    } else if (ltype === OBJECT && rtype === NUMBER || rtype === OBJECT) {
-      return EQUAL($$ToPrimitive(x), y);
-    }
-    return false;
-  }
-
-  exports.EQUAL = EQUAL;
-
-
-
-  function UnaryOp(operator, val) {
+  function UnaryOperation(operator, val) {
     switch (operator) {
       case 'delete': return DELETE(val);
       case 'void':   return VOID(val);
@@ -586,18 +589,18 @@ var operators = (function(exports){
       case '!':      return NOT(val);
     }
   }
-  exports.UnaryOp = UnaryOp;
+  exports.UnaryOperation = UnaryOperation;
 
 
 
-  function BinaryOp(operator, lval, rval) {
+  function BinaryOperation(operator, lval, rval) {
     switch (operator) {
       case 'instanceof': return INSTANCE_OF(lval, rval);
       case 'in':         return IN(lval, rval);
-      case '==':         return EQUAL(lval, rval);
-      case '!=':         return NOT(EQUAL(lval, rval));
-      case '===':        return STRICT_EQUAL(lval, rval);
-      case '!==':        return NOT(STRICT_EQUAL(lval, rval));
+      case '==':         return EQUIVALENT(lval, rval);
+      case '!=':         return NOT_EQUIVALENT(lval, rval);
+      case '===':        return EQUAL(lval, rval);
+      case '!==':        return NOT_EQUAL(lval, rval);
       case '<':          return LT(lval, rval);
       case '>':          return GT(lval, rval);
       case '<=':         return LTE(lval, rval);
@@ -616,7 +619,7 @@ var operators = (function(exports){
       case '^':          return BIT_XOR(lval, rval);
     }
   }
-  exports.BinaryOp = BinaryOp;
+  exports.BinaryOperation = BinaryOperation;
 
 
   return exports;

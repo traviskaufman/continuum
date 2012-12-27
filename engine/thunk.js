@@ -1,33 +1,29 @@
 var thunk = (function(exports){
   "use strict";
   var objects   = require('./lib/objects'),
+      constants = require('./constants'),
+      operators = require('./object-model/operators'),
       Emitter   = require('./lib/Emitter');
 
-  var define  = objects.define,
-      inherit = objects.inherit,
-      Hash    = objects.Hash;
-
-  var operators    = require('./object-model/operators'),
-      STRICT_EQUAL = operators.STRICT_EQUAL,
-      ToObject     = operators.$$ToObject,
-      UnaryOp      = operators.UnaryOp,
-      BinaryOp     = operators.BinaryOp,
-      GetValue     = operators.$$GetValue,
-      PutValue     = operators.$$PutValue,
-      PRE_INC      = operators.PRE_INC,
-      POST_INC     = operators.POST_INC,
-      PRE_DEC      = operators.PRE_DEC,
-      POST_DEC     = operators.POST_DEC;
-
-  var constants = require('./constants'),
-      AST       = constants.AST.array,
-      Pause     = constants.SYMBOLS.Pause,
-      Empty     = constants.SYMBOLS.Empty,
-      Resume    = constants.SYMBOLS.Resume,
-      StopIteration = constants.BRANDS.StopIteration;
+  var define          = objects.define,
+      inherit         = objects.inherit,
+      Hash            = objects.Hash,
+      UnaryOperation  = operators.UnaryOperation,
+      BinaryOperation = operators.BinaryOperation,
+      ToObject        = operators.$$ToObject,
+      $$GetValue      = operators.$$GetValue,
+      $$PutValue      = operators.$$PutValue,
+      STRICT_EQUAL    = operators.STRICT_EQUAL,
+      PRE_INC         = operators.PRE_INC,
+      POST_INC        = operators.POST_INC,
+      PRE_DEC         = operators.PRE_DEC,
+      POST_DEC        = operators.POST_DEC,
+      Pause           = constants.SYMBOLS.Pause,
+      Empty           = constants.SYMBOLS.Empty,
+      Resume          = constants.SYMBOLS.Resume,
+      StopIteration   = constants.BRANDS.StopIteration;
 
   var AbruptCompletion = require('./errors').AbruptCompletion;
-
 
 
 
@@ -36,6 +32,8 @@ var thunk = (function(exports){
   }
 
   Desc.prototype = {
+    isDataDescriptor: true,
+    isDescriptor: true,
     Configurable: true,
     Enumerable: true,
     Writable: true
@@ -59,15 +57,6 @@ var thunk = (function(exports){
     }
     return d;
   })([], 8);
-
-
-  function DefineProperty(obj, key, val) {
-    if (val && val.Abrupt) {
-      return val;
-    }
-
-    return obj.DefineOwnProperty(key, new Desc(val), false);
-  }
 
   var log = false;
 
@@ -258,7 +247,7 @@ var thunk = (function(exports){
     function BINARY(){
       var right  = stack[--sp],
           left   = stack[--sp],
-          result = BinaryOp(ops[ip][0], GetValue(left), GetValue(right));
+          result = BinaryOperation(ops[ip][0], $$GetValue(left), $$GetValue(right));
 
       if (result && result.Abrupt) {
         error = result;
@@ -474,7 +463,7 @@ var thunk = (function(exports){
 
 
     function GET(){
-      var result = GetValue(stack[--sp]);
+      var result = $$GetValue(stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -726,7 +715,13 @@ var thunk = (function(exports){
         return unwind;
       }
 
-      var status = DefineProperty(obj, key, val);
+      if (val && val.Abrupt) {
+        error = val;
+        return unwind;
+      }
+
+      var status = obj.DefineOwnProperty(key, new Desc(val), false);
+
       if (status && status.Abrupt) {
         error = status;
         return unwind;
@@ -761,7 +756,7 @@ var thunk = (function(exports){
     function PUT(){
       var val    = stack[--sp],
           ref    = stack[--sp],
-          status = PutValue(ref, val);
+          status = $$PutValue(ref, val);
 
       if (status && status.Abrupt) {
         error = status;
@@ -1005,7 +1000,7 @@ var thunk = (function(exports){
     }
 
     function UNARY(){
-      var result = UnaryOp(ops[ip][0], stack[--sp]);
+      var result = UnaryOperation(ops[ip][0], stack[--sp]);
 
       if (result && result.Abrupt) {
         error = result;
@@ -1042,7 +1037,7 @@ var thunk = (function(exports){
     }
 
     function WITH(){
-      var result = ToObject(GetValue(stack[--sp]));
+      var result = ToObject($$GetValue(stack[--sp]));
 
       if (result && result.Abrupt) {
         error = result;
@@ -1225,7 +1220,7 @@ var thunk = (function(exports){
     }
 
     function normalCleanup(){
-      var result = GetValue(completion);
+      var result = $$GetValue(completion);
       if (thunkStack.length) {
         var v = thunkStack.pop();
         ip = v.ip;
