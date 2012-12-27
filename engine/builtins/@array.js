@@ -79,7 +79,7 @@ export class Array {
     const array = [],
           count = items.length;
 
-    var obj   = $__ToObject(this),
+    let obj   = $__ToObject(this),
         n     = 0,
         index = 0;
 
@@ -152,7 +152,7 @@ export class Array {
 
     ensureCallback(callbackfn);
 
-    for (var i=0; i < len; i++) {
+    for (let i=0; i < len; i++) {
       if (i in array) {
         callbackfn.@@Call(context, [array[i], i, this]);
       }
@@ -167,7 +167,7 @@ export class Array {
       return -1;
     }
 
-    var index = $__ToInteger(fromIndex);
+    let index = $__ToInteger(fromIndex);
     if (index >= len) {
       return -1;
     } else if (index < 0) {
@@ -201,7 +201,7 @@ export class Array {
       return '';
     }
 
-    var result = '0' in array ? $__ToString(array[0]) : '',
+    let result = '0' in array ? $__ToString(array[0]) : '',
         index  = 0;
 
     while (++index < len) {
@@ -224,7 +224,7 @@ export class Array {
       return -1;
     }
 
-    var index = $__ToInteger(fromIndex);
+    let index = $__ToInteger(fromIndex);
     if (index >= len) {
       index = len - 1;
     } else if (index < 0) {
@@ -275,7 +275,7 @@ export class Array {
           len   = $__ToUint32(array.length),
           count = values.length;
 
-    var index = len;
+    let index = len;
 
     array.length += count;
 
@@ -316,7 +316,7 @@ export class Array {
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
-    var accumulator, index;
+    let accumulator, index;
 
     ensureCallback(callbackfn);
 
@@ -522,7 +522,7 @@ export class Array {
 
   toString(){
     const array = $__ToObject(this);
-    var func = array.join;
+    let func = array.join;
 
     if (typeof func !== 'function') {
       func = $__ObjectToString;
