@@ -86,22 +86,24 @@ var PropertyList = (function(module){
       var index = this.hash['$'+key];
       return index === undefined ? null : this.props[index];
     },
-    function define(key, value, attr){
-      var name = '$'+key,
-          index = this.hash[name];
+    (function(){
+      return function define(key, value, attr){
+        var name = '$'+key,
+            index = this.hash[name];
 
-      if (index === undefined) {
-        index = this.hash[name] = this.props.length;
-        this.props[index] = [key, value, attr];
-        this.length++;
-      } else {
-        var prop = this.props[index];
-        prop[1] = value;
-        prop[2] = attr;
-      }
+        if (index === undefined) {
+          index = this.hash[name] = this.props.length;
+          this.props[index] = [key, value, attr];
+          this.length++;
+        } else {
+          var prop = this.props[index];
+          prop[1] = value;
+          prop[2] = attr;
+        }
 
-      return this;
-    },
+        return this;
+      };
+    })(),
     function remove(key){
       var name = '$'+key,
           index = this.hash[name];
