@@ -990,6 +990,9 @@ var debug = (function(exports){
       function list(hidden, own){
         return this.target.list.call(this, hidden, own);
       },
+      function label(){
+        return this.target.label();
+      },
       function set(key, value){
         realm().enterMutationContext();
         var result = introspect(this.subject.Set(key, value));
@@ -1012,9 +1015,6 @@ var debug = (function(exports){
           out[k.toLowerCase()] = desc[k];
         }
         return out;
-      },
-      function label(){
-        return MirrorObject.prototype.label.call(this);
       },
       function get(key){
         return introspect(this.subject.Get(key));
