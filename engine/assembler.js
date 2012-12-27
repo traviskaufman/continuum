@@ -12,6 +12,7 @@ var assembler = (function(exports){
 
   var walk          = traversal.walk,
       collector     = traversal.collector,
+      clone         = traversal.clone,
       Visitor       = traversal.Visitor,
       fname         = functions.fname,
       define        = objects.define,
@@ -407,9 +408,11 @@ var assembler = (function(exports){
 
 
   var ClassDefinition = (function(){
-    function ClassDefinition(node){
+    var ctor = require('esprima').parse('class X { constructor(...args){ super(...args) } }').body[0].body.body[0];
+
+    function ClassDefinition(node, name){
       var self = this;
-      this.name = node.id ? node.id.name : null;
+      this.name = name || (node.id ? node.id.name : null);
       this.methods = [];
       this.symbols = [[], []];
       this.scope = scope.create('normal', context.currentScope);
@@ -422,6 +425,12 @@ var assembler = (function(exports){
           self.defineMethod(node);
         }
       });
+
+      if (!this.ctor) {
+        var constructor = clone(ctor);
+        node.body.body.push(constructor);
+        this.defineMethod(constructor);
+      }
 
       this.hasSuper = !!node.superClass;
       if (this.hasSuper) {
@@ -642,22 +651,25 @@ var assembler = (function(exports){
   }
 
   function isFunction(node){
-    return node.type === 'FunctionDeclaration'
-        || node.type === 'FunctionExpression'
+    return node.type === 'FunctionExpression'
+        || node.type === 'FunctionDeclaration'
         || node.type === 'ArrowFunctionExpression';
   }
 
   function isDeclaration(node){
-    return node.type === 'FunctionDeclaration'
-        || node.type === 'ClassDeclaration'
+    return node.type === 'ClassDeclaration'
+        || node.type === 'FunctionDeclaration'
         || node.type === 'VariableDeclaration';
   }
 
-  function isAnonymousFunction(node){
+  function isAnonymous(node){
     return !!node && !(node.id && node.id.name)
-        && node.type === 'FunctionExpression'
+        && node.type === 'ClassExpression'
+        || node.type === 'FunctionExpression'
         || node.type === 'ArrowFunctionExpression';
   }
+
+  var renameables = define({}, [FunctionExpression, ArrowFunctionExpression, ClassExpression]);
 
   function isUseStrictDirective(node){
     return node.type === 'ExpressionStatement'
@@ -1711,8 +1723,10 @@ var assembler = (function(exports){
     CLASS_DECL(new ClassDefinition(node));
   }
 
-  function ClassExpression(node){
-    CLASS_EXPR(new ClassDefinition(node));
+  function ClassExpression(node, methodName){
+    var definition = new ClassDefinition(node, methodName);
+    CLASS_EXPR(definition);
+    return definition.ctor;
   }
 
   function ClassHeritage(node){}
@@ -1973,10 +1987,8 @@ var assembler = (function(exports){
         pushNode(value);
         FunctionExpression(value, intern(key));
         popNode();
-      } else if (isAnonymousFunction(value)) {
-        var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
-        var code = Expr(value, key);
-        code.flags.writableName = true;
+      } else if (isAnonymous(value)) {
+        renameables[node.type](value, key).flags.writableName = true;
       } else {
         recurse(value);
       }
@@ -2102,9 +2114,7 @@ var assembler = (function(exports){
         GET();
         BINARY('string+');
       }
-      if (i) {
-        BINARY('string+');
-      }
+      i && BINARY('string+');
     });
   }
 
@@ -2200,11 +2210,9 @@ var assembler = (function(exports){
       }
 
       if (item.init) {
-        if (item.id && item.id.type === 'Identifier' && isAnonymousFunction(item.init)) {
-          var Expr = node.type === 'FunctionExpression' ? FunctionExpression : ArrowFunctionExpression;
+        if (item.id && item.id.type === 'Identifier' && isAnonymous(item.init)) {
           recurse(item.id);
-          var code = Expr(item.init, item.id.name);
-          code.flags.writableName = true;
+          renameables[item.init.type](item.init, item.id.name).flags.writableName = true;
         } else {
           recurse(item.init);
           GET();
