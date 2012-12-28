@@ -2,11 +2,12 @@ var collections = (function(exports){
   "use strict";
   var objects   = require('../lib/objects');
 
-  var Hash = objects.Hash,
-      create = objects.create,
-      define = objects.define,
+  var Hash    = objects.Hash,
+      create  = objects.create,
+      define  = objects.define,
       inherit = objects.inherit,
-      tag = require('../lib/utility').tag;
+      hasOwn  = objects.hasOwn,
+      tag     = require('../lib/utility').tag;
 
 
   exports.MapData = (function(){
@@ -43,10 +44,17 @@ var collections = (function(exports){
     define(MapData.prototype, [
       function reset(){
         this.size = 0;
-        this.strings = new Hash;
         this.numbers = [];
+        this.strings = new Hash;
         this.others = new Hash;
         this.lastLookup = this.guard.next = this.guard.previous = this.guard;
+      },
+      function clone(){
+        var result = new MapData;
+        this.forEach(function(value, key){
+          result.set(key, value);
+        });
+        return result;
       },
       function forEach(callback, context){
         var item = this.guard.next;
@@ -82,7 +90,10 @@ var collections = (function(exports){
         } else if (key !== null && type === 'object') {
           return key.storage[this.id];
         } else {
-          return this.getStorage(key)[key];
+          var storage = this.getStorage(key);
+          if (hasOwn(storage, key)) {
+            return storage[key];
+          }
         }
       },
       function getStorage(key){
@@ -99,12 +110,11 @@ var collections = (function(exports){
         var type = typeof key;
         if (key !== null && type === 'object') {
           var item = key.storage[this.id] || (key.storage[this.id] = this.add(key));
-          item.value = value;
         } else {
-          var container = this.getStorage(key);
-          var item = container[key] || (container[key] = this.add(key));
-          item.value = value;
+          var items = this.getStorage(key),
+              item  = items[key] || (items[key] = this.add(key));
         }
+        item.value = value;
       },
       function get(key){
         var item = this.lookup(key);
@@ -116,17 +126,17 @@ var collections = (function(exports){
         return !!this.lookup(key);
       },
       function remove(key){
-        var item;
         if (key !== null && typeof key === 'object') {
-          item = key.storage[this.id];
+          var item = key.storage[this.id];
           if (item) {
             delete key.storage[this.id];
           }
         } else {
-          var container = this.getStorage(key);
-          item = container[key];
+          var items = this.getStorage(key),
+              item  = items[key];
+
           if (item) {
-            delete container[key];
+            delete items[key];
           }
         }
 
