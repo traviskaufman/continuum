@@ -44,7 +44,7 @@ var collections = (function(exports){
       function reset(){
         this.size = 0;
         this.strings = new Hash;
-        this.numbers = new Hash;
+        this.numbers = [];
         this.others = new Hash;
         this.lastLookup = this.guard.next = this.guard.previous = this.guard;
       },
