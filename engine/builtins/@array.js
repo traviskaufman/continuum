@@ -572,8 +572,7 @@ export class Array {
 
 builtinClass(Array);
 
-['every', 'filter', 'forEach', 'indexOf', 'lastIndexOf', 'map', 'reduce', 'reduceRight', 'some'
-].forEach(name => Array.prototype[name].@@set('length', 1));
+['push'].forEach(name => Array.prototype[name].@@set('length', 1));
 
 
 export function isArray(array){
