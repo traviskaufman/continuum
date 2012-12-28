@@ -20,30 +20,23 @@ internalFunction(ensureSet);
 
 class SetIterator extends Iterator {
   private @data, // Set
-          @key,  // SetNextKey
-          @kind; // SetIterationKind
+          @key;  // SetNextKey
 
-  constructor(set, kind){
+  constructor(set){
     this.@data = ensureSet($__ToObject(set), 'SetIterator');
     this.@key  = $__MapSigil();
-    this.@kind = kind;
   }
 
   next(){
     if (!$__IsObject(this)) {
       throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);
     }
-    if (!(this.@@has(@data) && this.@@has(@key) && this.@@has(@kind))) {
+
+    if (!(this.@@has(@data) && this.@@has(@key))) {
       throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
-    var data = this.@data,
-        key  = this.@key,
-        kind = this.@kind,
-        item = $__MapNext(data, key);
-
-    this.@key = item[0];
-    return kind === 'key+value' ? [item[1], item[1]] : item[1];
+    return this.@key = $__MapNext(this.@data, this.@key)[0];
   }
 }
 
@@ -81,25 +74,14 @@ export class Set {
     return $__MapDelete(ensureSet(this, 'delete'), value);
   }
 
-  entries(){
-    return new SetIterator(this, 'key+value');
-  }
-
-  keys(){
-    return new SetIterator(this, 'key');
-  }
-
   values(){
-    return new SetIterator(this, 'value');
-  }
-
-  @iterator(){
-    return new SetIterator(this, 'value');
+    return new SetIterator(this);
   }
 }
 
 builtinClass(Set);
 const SetPrototype = Set.prototype;
+SetPrototype.@@define(@iterator, SetPrototype.values);
 
 
 
@@ -130,7 +112,7 @@ function setCreate(target, iterable){
   if (iterable !== undefined) {
     iterable = $__ToObject(iterable);
     for (var [key, value] of iterable) {
-      $__MapSet(data, value, value);
+      $__MapSet(data, value, true);
     }
   }
 
@@ -161,8 +143,8 @@ function setSize(set){
 builtinFunction(setSize);
 
 
-function setIterate(set, kind){
-  return new SetIterator(set, 'value');
+function setIterate(set){
+  return new SetIterator(set);
 }
 
 builtinFunction(setIterate);
