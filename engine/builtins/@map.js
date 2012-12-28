@@ -2,7 +2,7 @@ import Iterator from '@iter';
 
 function ensureMap(o, name){
   if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {
-    throw Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
+    throw $__Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
   }
 }
 
