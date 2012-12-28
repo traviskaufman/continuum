@@ -31,7 +31,7 @@ class ArrayIterator extends Iterator {
   next(){
     ensureObject(this);
 
-    if (!this.@@has(@array) || !this.@@has(@index) || !this.@@has(@kind)) {
+    if (!$__has(this, @array) || !$__has(this, @index) || !$__has(this, @kind)) {
       throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
     }
 
@@ -62,6 +62,22 @@ class ArrayIterator extends Iterator {
 }
 
 builtinClass(ArrayIterator);
+
+
+
+function defaultComparefn(x, y){
+  return 1 - ($__ToString(x) < $__ToString(y));
+}
+
+internalFunction(defaultComparefn);
+
+
+function truncate(value, shift){
+  return value >> shift << shift;
+}
+
+internalFunction(truncate);
+
 
 
 
@@ -115,7 +131,7 @@ export class Array {
     if (len) {
       let index = 0;
       do {
-        if (index in array && !callbackfn.@@Call(context, [array[index], index, array])) {
+        if (index in array && !$__Call(callbackfn, context, [array[index], index, array])) {
           return false;
         }
       } while (++index < len)
@@ -136,7 +152,7 @@ export class Array {
       do {
         if (index in array) {
           let element = array[index];
-          if (callbackfn.@@Call(context, [element, index, array])) {
+          if ($__Call(callbackfn, context, [element, index, array])) {
             result[result.length] = element;
           }
         }
@@ -154,7 +170,7 @@ export class Array {
 
     for (let i=0; i < len; i++) {
       if (i in array) {
-        callbackfn.@@Call(context, [array[i], i, this]);
+        $__Call(callbackfn, context, [array[i], i, this]);
       }
     }
   }
@@ -252,7 +268,7 @@ export class Array {
 
     for (var i=0; i < len; i++) {
       if (i in array) {
-        result[i] = callbackfn.@@Call(context, [array[i], i, this]);
+        result[i] = $__Call(callbackfn, context, [array[i], i, this]);
       }
     }
 
@@ -305,7 +321,7 @@ export class Array {
 
     do {
       if (index in array) {
-        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);
+        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);
       }
     } while (++index < len)
 
@@ -330,11 +346,32 @@ export class Array {
 
     do {
       if (index in array) {
-        accumulator = callbackfn.@@Call(this, [accumulator, array[index], array]);
+        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);
       }
     } while (--index >= 0)
 
     return accumulator;
+  }
+
+  reverse(){
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
+          middle = floor(len / 2);
+
+    let lower = 0;
+    while (lower !== middle) {
+      const upper       = len - lower - 1,
+            lowerP      = $__ToString(lower),
+            upperP      = $__ToString(upper),
+            lowerValue  = array[lowerP],
+            upperValue  = array[upperP],
+            lowerExists = lowerP in array,
+            upperExists = upperP in array;
+
+      if (lowerExists && upperExists) {
+        $__Put(array, lowerP, upperValue, true);
+      }
+    }
   }
 
   slice(start = 0, end = this.length){
@@ -400,13 +437,88 @@ export class Array {
     if (len) {
       let index = 0;
       do {
-        if (index in array && callbackfn.@@Call(context, [array[index], index, array])) {
+        if (index in array && $__Call(callbackfn, context, [array[index], index, array])) {
           return true;
         }
       } while (++index < len)
     }
 
     return false;
+  }
+
+  sort(comparefn = defaultComparefn){
+    const array = $__ToObject(this),
+          len   = array.length;
+
+    ensureCallback(comparefn);
+
+    if (len >= 2) {
+      let trunc = 1;
+
+      for (var start = truncate(len - 2, trunc); start >= 0; start -= 2) {
+        if (comparefn(array[start], array[start + 1]) > 0) {
+          [array[start], array[start + 1]] = [array[start + 1], array[start]];
+        }
+      }
+
+      if (len > 2) {
+        let arrayA = array,
+            arrayB = new Array(len),
+            size   = 2;
+
+        do {
+          let start  = truncate(len - 1, ++trunc),
+              countA = start + size,
+              countB = len;
+
+          countA = min(countA, len);
+
+          while (start >= 0) {
+            let toIndex   = start,
+                fromA     = toIndex,
+                fromB     = countA,
+                continues = true;
+
+            do {
+              if (fromA < countA) {
+                if (fromB < countB) {
+                  if (comparefn(arrayA[fromA], arrayA[fromB]) > 0) {
+                    arrayB[toIndex++] = arrayA[fromB++];
+                  } else {
+                    arrayB[toIndex++] = arrayA[fromA++];
+                  }
+                } else {
+                  while (fromA < countA) {
+                    arrayB[toIndex++] = arrayA[fromA++];
+                  }
+                  continues = false;
+                }
+              } else {
+                while (fromB < countB) {
+                  arrayB[toIndex++] = arrayA[fromB++];
+                }
+                continues = false;
+              }
+            } while (continues)
+
+            countB = start;
+            start -= 2 * size;
+            countA = start + size;
+          }
+
+          [arrayA, arrayB] = [arrayB, arrayA];
+          size *= 2;
+        } while (len > size);
+
+        if (!(trunc & 1)) {
+          for (var i = len - 1; i >= 0; i--) {
+            array[i] = arrayA[i];
+          }
+        }
+      }
+    }
+
+    return array;
   }
 
   splice(start, deleteCount, ...items){
@@ -433,7 +545,6 @@ export class Array {
         if (from in array) {
           result[index] = array[from];
         }
-
         index++;
       } while (index < deleteCount)
 
@@ -454,7 +565,6 @@ export class Array {
         } else if (!delete array[to]) {
           throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);
         }
-
         index++;
       }
     } else if (itemCount > deleteCount) {
@@ -521,7 +631,7 @@ export class Array {
       func = $__ObjectToString;
     }
 
-    return func.@@Call(array, []);
+    return $__Call(func, array, []);
   }
 
   unshift(...values){
@@ -561,13 +671,52 @@ export class Array {
 
 builtinClass(Array);
 const ArrayPrototype = Array.prototype;
-ArrayPrototype.@@define(@iterator, ArrayPrototype.values);
+$__define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 
-['push'].forEach(name => ArrayPrototype[name].@@set('length', 1));
+//['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
 
-
+/*
+1. Let O be the result of calling ToObject passing the this value as the argument.
+2. ReturnIfAbrupt(O).
+3. Let lenVal be the result of Get(O, "length").
+4. Let len be ToUint32(lenVal).
+5. ReturnIfAbrupt(len).
+6. Let middle be floor(len/2).
+7. Let lower be 0.
+8. Repeat, while lower !== middle
+  a. Let upper be len- lower -1.
+  b. Let upperP be ToString(upper).
+  c. Let lowerP be ToString(lower).
+  d. Let lowerValue be the result of Get(O, lowerP).
+  e. ReturnIfAbrupt(lowerValue).
+  f. Let upperValue be the result of Get(O, upper).
+  g. ReturnIfAbrupt(upperValue).
+  h. Let lowerExists be the result of HasProperty(O, lowerP).
+  i. ReturnIfAbrupt(lowerExists).
+  j. Let upperExists be the result of HasProperty(O, upperP).
+  k. ReturnIfAbrupt(upperExists).
+  l. If lowerExists is true and upperExists is true, then
+    i. Let putStatus be the result of Put(O, lowerP, upperValue, true).
+    ii. ReturnIfAbrupt(putStatus).
+    iii. Let putStatus be the result of Put(O, upperP, lowerValue, true).
+    iv. ReturnIfAbrupt(putStatus).
+  m. Else if lowerExists is false and upperExists is true, then
+    i. Let putStatus be the result of Put(O, lowerP, upperValue, true).
+    ii. ReturnIfAbrupt(putStatus).
+    iii. Let deleteStatus be the result of DeletePropertyOrThrow (O, upperP).
+    iv. ReturnIfAbrupt(deleteStatus).
+  n. Else if lowerExists is true and upperExists is false, then
+    i. Let deleteStatus be the result of DeletePropertyOrThrow (O, lowerP).
+    ii. ReturnIfAbrupt(deleteStatus).
+    iii. Let putStatus be the result of Put(O, upperP, lowerValue, true).
+    iv. ReturnIfAbrupt(putStatus).
+  o. Else both lowerExists and upperExists are false,
+  i. No action is required.
+  p. Increase lower by 1.
+9. Return O .
+*/
 export function isArray(array){
-  return $__Type(array) === 'Object' ? array.@@GetBuiltinBrand() === 'Array' : false;
+  return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'Array' : false;
 }
 
 export function from(arrayLike){
@@ -601,4 +750,4 @@ export function of(...items){
   return out;
 }
 
-Array.@@extend({ isArray, from, of });
+extend(Array, { isArray, from, of });

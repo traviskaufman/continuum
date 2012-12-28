@@ -13,7 +13,7 @@ function J(value){
   indent += gap;
   stack.add(value);
 
-  if (value.@@GetBuiltinBrand() === 'Array') {
+  if ($__GetBuiltinBrand(value) === 'Array') {
     brackets = ['[', ']'];
 
     for (var i=0, len = value.length; i < len; i++) {
@@ -21,7 +21,7 @@ function J(value){
       partial[i] = prop === undefined ? 'null' : prop;
     }
   } else {
-    var keys = PropertyList || value.@@Enumerate(false, true),
+    var keys = PropertyList || $__Enumerate(value, false, true),
         colon = gap ? ': ' : ':';
 
     brackets = ['{', '}'];
@@ -54,22 +54,22 @@ function Str(key, holder){
   if ($__Type(value) === 'Object') {
     var toJSON = value.toJSON;
     if (typeof toJSON === 'function') {
-      value = toJSON.@@Call(value, [key]);
+      value = $__Call(toJSON, value, [key]);
     }
   }
 
   if (ReplacerFunction) {
-    value = ReplacerFunction.@@Call(holder, [key, value]);
+    value = $__Call(ReplacerFunction, holder, [key, value]);
   }
 
   if ($__Type(value) === 'Object') {
-    var brand = value.@@GetBuiltinBrand();
+    var brand = $__GetBuiltinBrand(value);
     if (brand === 'Number') {
       value = $__ToNumber(value);
     } else if (brand === 'String') {
       value = $__ToString(value);
     } else if (brand === 'Boolean') {
-      value = value.@@PrimitiveValue;
+      value = value.@@BooleanValue;
     }
   }
 
@@ -104,7 +104,7 @@ export function stringify(value, replacer, space){
   if ($__Type(replacer) === 'Object') {
     if (typeof replacer === 'function') {
       ReplacerFunction = replacer;
-    } else if (replacer.@@GetBuiltinBrand() === 'Array') {
+    } else if ($__GetBuiltinBrand(replacer) === 'Array') {
       let props = new Set;
 
       for (let value of replacer) {
@@ -114,9 +114,9 @@ export function stringify(value, replacer, space){
         if (type === 'String') {
           item = value;
         } else if (type === 'Number') {
-          item = value + '';
+          item = $__ToString(value);
         } else if (type === 'Object') {
-          let brand = value.@@GetBuiltinBrand();
+          let brand = $__GetBuiltinBrand(value);
           if (brand === 'String' || brand === 'Number') {
             item = $__ToString(value);
           }
@@ -132,7 +132,7 @@ export function stringify(value, replacer, space){
   }
 
   if ($__Type(space) === 'Object') {
-    space = space.@@PrimitiveValue;
+    space = $__ToString(space);
   }
 
   if ($__Type(space) === 'String') {
@@ -155,6 +155,6 @@ export function parse(source, reviver){
 
 
 export let JSON = {};
-JSON.@@extend({ stringify, parse });
-JSON.@@SetBuiltinBrand('BuiltinJSON');
-JSON.@@define(@toStringTag, 'JSON');
+extend(JSON, { stringify, parse });
+$__SetBuiltinBrand(JSON, 'BuiltinJSON');
+$__define(JSON, @@toStringTag, 'JSON');

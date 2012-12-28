@@ -12,6 +12,7 @@ function ensureCoercible(target, method){
 
 internalFunction(ensureCoercible);
 
+
 function ToHTML(tag, content, attrName, attrVal){
   const attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace($__ToString(attrVal), '"', '&quot;')+'"';
 
@@ -20,11 +21,13 @@ function ToHTML(tag, content, attrName, attrVal){
 
 internalFunction(ToHTML);
 
+
 function isRegExp(subject){
-  return subject !== null && typeof subject === 'object' && subject.@@GetBuiltinBrand() === 'RegExp';
+  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';
 }
 
 internalFunction(isRegExp);
+
 
 function stringIndexOf(string, search, position){
   const searchStr = $__ToString(search),
@@ -56,7 +59,7 @@ function stringMatch(string, regexp){
   }
 
   if (!regexp.global) {
-    return regexp.exec(string);
+    return $__RegExpExec(regexp, string);
   }
 
   const array = [];
@@ -67,7 +70,7 @@ function stringMatch(string, regexp){
   regexp.lastIndex = 0;
 
   while (lastMatch) {
-    let result = regexp.exec(string);
+    let result = $__RegExpExec(regexp, string);
     if (result === null) {
       lastMatch = false;
     } else {
@@ -216,19 +219,19 @@ export class String {
   repeat(count){
     let string = ensureCoercible(this, 'repeat'),
         factor = $__ToInteger(count),
-        o      = '';
+        result = '';
 
-    if (n <= 1 || n === Infinity || n === -Infinity) {
+    if (factor <= 1 || factor === Infinity || factor === -Infinity) {
       throw $__Exception('invalid_repeat_count', []);
     }
 
-    while (n > 0) {
-      (n & 1) && (o += string);
-      n >>= 1;
+    while (factor > 0) {
+      (factor & 1) && (result += string);
+      factor >>= 1;
       string += string;
     }
 
-    return o;
+    return result;
   }
 
   replace(search, replace){
@@ -334,8 +337,8 @@ export class String {
   toString(){
     if (typeof this === 'string') {
       return this;
-    } else if (this.@@GetBuiltinBrand() === 'String') {
-      return this.@@getInternal('PrimitiveValue');
+    } else if ($__GetBuiltinBrand(this) === 'String') {
+      return $__getInternal(this, 'PrimitiveValue');
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
   }
@@ -351,21 +354,14 @@ export class String {
   valueOf(){
     if (typeof this === 'string') {
       return this;
-    } else if (this.@@GetBuiltinBrand() === 'String') {
-      return this.@@getInternal('PrimitiveValue');
+    } else if ($__GetBuiltinBrand(this) === 'String') {
+      return $__getInternal(this, 'PrimitiveValue');
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
   }
 }
 
 builtinClass(String);
-
-String.prototype.@@DefineOwnProperty(@@PrimitiveValue, {
-  configurable: true,
-  enumerable: false,
-  get: $__GetPrimitiveValue,
-  set: $__SetPrimitiveValue
-});
 
 
 export function fromCharCode(...codeUnits){
@@ -379,4 +375,6 @@ export function fromCharCode(...codeUnits){
   return result;
 }
 
-String.@@extend({ fromCharCode });
+extend(String, { fromCharCode });
+
+

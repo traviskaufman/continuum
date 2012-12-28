@@ -205,7 +205,7 @@ export function max(...values){
   }
 }
 
-max.@@set('length', 2);
+$__set(max, 'length', 2);
 
 export function min(...values){
   const count = values.length;
@@ -240,7 +240,7 @@ export function min(...values){
   }
 }
 
-min.@@set('length', 2);
+$__set(min, 'length', 2);
 
 export function pow(x, y){
   return $__pow($__ToNumber(x), $__ToNumber(y));
@@ -294,14 +294,14 @@ export const Math = {
   min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc
 };
 
-Math.@@SetBuiltinBrand('BuiltinMath');
-Math.@@define(@toStringTag, 'Math');
+$__SetBuiltinBrand(Math, 'BuiltinMath');
+$__define(Math, @@toStringTag, 'Math');
 
 for (let k in Math) {
   if (typeof Math[k] === 'function') {
     builtinFunction(Math[k]);
-    Math.@@update(k, HIDDEN);
+    $__update(Math, k, HIDDEN);
   } else {
-    Math.@@update(k, FROZEN);
+    $__update(Math, k, FROZEN);
   }
 }

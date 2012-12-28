@@ -1,8 +1,8 @@
 function ensureWeakMap(o, p, name){
-  if (!o || typeof o !== 'object' || !o.@@hasInternal('WeakMapData')) {
+  if ($__Type(o) !== 'Object' || !$__hasInternal(o, 'WeakMapData')) {
     throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);
   }
-  if (typeof p === 'object' ? p === null : typeof p !== 'function') {
+  if ($__Type(p) !== 'Object') {
     throw $__Exception('invalid_weakmap_key', []);
   }
 }
@@ -45,7 +45,7 @@ var WeakMapPrototype = WeakMap.prototype;
 function weakmapCreate(target, iterable){
   target = $__ToObject(target);
 
-  if (target.@@hasInternal('WeakMapData')) {
+  if ($__hasInternal(target, 'WeakMapData')) {
     throw $__Exception('double_initialization', ['WeakMap']);
   }
 

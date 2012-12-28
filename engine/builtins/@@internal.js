@@ -1,93 +1,29 @@
-private @@Call,
-        @@Construct,
-        @@DefineOwnProperty,
-        @@Enumerate,
-        @@GetBuiltinBrand,
-        @@GetP,
-        @@GetProperty,
-        @@GetPrototype,
-        @@HasOwnProperty,
-        @@HasProperty,
-        @@IsExtensible,
-        @@PreventExtensions,
-        @@PrimitiveValue,
-        @@Put,
-        @@SetBuiltinBrand,
-        @@SetP,
-        @@SetPrototype,
-        @@GetOwnProperty;
+symbol @@toStringTag,
+       @@iterator;
 
-private @@define,
-        @@delete,
-        @@each,
-        @@get,
-        @@getInternal,
-        @@has,
-        @@hasInternal,
-        @@query,
-        @@set,
-        @@setInternal,
-        @@update;
+private @@BooleanValue;
 
-private @@extend;
+$__iterator    = @@iterator;
+$__toStringTag = @@toStringTag;
 
-symbol  @toStringTag,
-        @iterator;
+const StopIteration = $__StopIteration,
+      HIDDEN   = 6,
+      FROZEN   = 0,
+      Infinity = 1 / 0,
+      NaN      = +'NaN';
+
+let undefined;
 
 
-$__iterator = @iterator;
-$__toStringTag = @toStringTag;
+function extend(object, properties){
+  const keys = $__Enumerate(properties, false, false);
 
-var Genesis = $__Genesis;
-Genesis.@@Call              = $__Call;
-Genesis.@@Construct         = $__Construct;
-Genesis.@@DefineOwnProperty = $__DefineOwnProperty;
-Genesis.@@Enumerate         = $__Enumerate;
-Genesis.@@GetBuiltinBrand   = $__GetBuiltinBrand;
-Genesis.@@GetOwnProperty    = $__GetOwnProperty;
-Genesis.@@GetP              = $__GetP;
-Genesis.@@GetProperty       = $__GetProperty;
-Genesis.@@GetPrototype      = $__GetPrototype;
-Genesis.@@HasOwnProperty    = $__HasOwnProperty;
-Genesis.@@HasOwnProperty    = $__HasOwnProperty;
-Genesis.@@HasProperty       = $__HasProperty;
-Genesis.@@IsExtensible      = $__IsExtensible;
-Genesis.@@PreventExtensions = $__PreventExtensions;
-Genesis.@@Put               = $__Put;
-Genesis.@@SetBuiltinBrand   = $__SetBuiltinBrand;
-Genesis.@@SetP              = $__SetP;
-Genesis.@@SetPrototype      = $__SetPrototype;
+  let index = keys.length;
 
-Genesis.@@define            = $__define;
-Genesis.@@delete            = $__delete;
-Genesis.@@each              = $__each;
-Genesis.@@get               = $__get;
-Genesis.@@getInternal       = $__getInternal;
-Genesis.@@has               = $__has;
-Genesis.@@hasInternal       = $__hasInternal;
-Genesis.@@query             = $__query;
-Genesis.@@set               = $__set;
-Genesis.@@setInternal       = $__setInternal;
-Genesis.@@update            = $__update;
+  while (index--) {
+    const key  = keys[index],
+          desc = $__GetOwnProperty(properties, key);
 
-Genesis.@@extend            = extend;
-
-
-Genesis.@@each((key, value, attr) => {
-  if ($__Type(Genesis[key]) === 'Object') {
-    Genesis[key].@@set('name', key);
-    internalFunction(Genesis[key]);
-  }
-});
-
-
-function extend(properties){
-  var keys = properties.@@Enumerate(false, false),
-      i = keys.length;
-
-  while (i--) {
-    var key = keys[i];
-    var desc = properties.@@GetOwnProperty(key);
     desc.enumerable = false;
 
     if (typeof desc.value === 'number') {
@@ -96,26 +32,18 @@ function extend(properties){
       builtinFunction(desc.value);
     }
 
-    this.@@DefineOwnProperty(key, desc);
+    $__DefineOwnProperty(object, key, desc);
   }
-};
+}
 
-
-
-
-let HIDDEN = 6,
-    FROZEN = 0,
-    Infinity = 1 / 0,
-    NaN = +'NaN',
-    undefined;
 
 
 function internalFunction(func){
-  func.@@setInternal('InternalFunction', true);
-  func.@@setInternal('strict', false);
-  func.@@delete('prototype');
-  func.@@delete('caller');
-  func.@@delete('arguments');
+  $__setInternal(func, 'InternalFunction', true);
+  $__setInternal(func, 'strict', false);
+  $__delete(func, 'prototype');
+  $__delete(func, 'caller');
+  $__delete(func, 'arguments');
 }
 
 internalFunction(internalFunction);
@@ -129,25 +57,25 @@ function builtinClass(Ctor, brand){
 
   if (prototype) {
     if (!isSymbol) {
-      prototype.@@extend(Ctor.prototype);
+      extend(prototype, Ctor.prototype);
     }
-    Ctor.@@set('prototype', prototype);
+    $__set(Ctor, 'prototype', prototype);
   } else {
     $__SetIntrinsic(prototypeName, Ctor.prototype);
   }
 
-  Ctor.@@setInternal('BuiltinConstructor', true);
-  Ctor.@@setInternal('BuiltinFunction', true);
-  Ctor.@@setInternal('strict', false);
-  Ctor.@@update('prototype', FROZEN);
-  Ctor.@@set('length', 1);
-  Ctor.@@define('caller', null, 0);
-  Ctor.@@define('arguments', null, 0);
+  $__setInternal(Ctor, 'BuiltinConstructor', true);
+  $__setInternal(Ctor, 'BuiltinFunction', true);
+  $__setInternal(Ctor, 'strict', false);
+  $__update(Ctor, 'prototype', FROZEN);
+  $__set(Ctor, 'length', 1);
+  $__define(Ctor, 'caller', null, FROZEN);
+  $__define(Ctor, 'arguments', null, FROZEN);
 
   if (!isSymbol) {
     brand || (brand = 'Builtin'+Ctor.name);
-    Ctor.prototype.@@SetBuiltinBrand(brand);
-    Ctor.prototype.@@define(@toStringTag, Ctor.name);
+    $__SetBuiltinBrand(Ctor.prototype, brand);
+    $__define(Ctor.prototype, @@toStringTag, Ctor.name);
     hideEverything(Ctor);
   }
 }
@@ -157,11 +85,11 @@ internalFunction(builtinClass);
 
 
 function builtinFunction(func){
-  func.@@setInternal('BuiltinFunction', true);
-  func.@@delete('prototype');
-  func.@@update('name', FROZEN);
-  func.@@define('caller', null, 0);
-  func.@@define('arguments', null, 0);
+  $__setInternal(func, 'BuiltinFunction', true);
+  $__delete(func, 'prototype');
+  $__update(func, 'name', FROZEN);
+  $__define(func, 'caller', null, FROZEN);
+  $__define(func, 'arguments', null, FROZEN);
 }
 
 internalFunction(builtinFunction);
@@ -169,16 +97,17 @@ internalFunction(builtinFunction);
 
 
 function hideEverything(o){
-  var type = typeof o;
+  const type = typeof o;
   if (type === 'object' ? o === null : type !== 'function') {
     return o;
   }
 
-  var keys = o.@@Enumerate(false, true),
-      i = keys.length;
+  const keys = $__Enumerate(o, false, true);
 
-  while (i--) {
-    o.@@update(keys[i], typeof o[keys[i]] === 'number' ? FROZEN : HIDDEN);
+  let index = keys.length;
+
+  while (index--) {
+    $__update(o, keys[index], typeof o[keys[index]] === 'number' ? FROZEN : HIDDEN);
   }
 
   if (type === 'function') {
@@ -195,14 +124,13 @@ $__hideEverything = hideEverything;
 
 
 function ensureObject(o, name){
-  var type = typeof o;
+  const type = typeof o;
   if (type === 'object' ? o === null : type !== 'function') {
     throw $__Exception('called_on_non_object', [name]);
   }
 }
 
 internalFunction(ensureObject);
-
 
 
 function ensureDescriptor(o){
@@ -214,18 +142,16 @@ function ensureDescriptor(o){
 internalFunction(ensureDescriptor);
 
 
-
 function ensureArgs(o, name){
-  if (o == null || typeof o !== 'object' || typeof o.@@get('length') !== 'number') {
+  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {
     throw $__Exception('apply_wrong_args', []);
   }
 
-  var brand = o.@@GetBuiltinBrand();
+  const brand = $__GetBuiltinBrand(o);
   return brand === 'Array' || brand === 'Arguments' ? o : [...o];
 }
 
 internalFunction(ensureArgs);
-
 
 
 function ensureFunction(o, name){

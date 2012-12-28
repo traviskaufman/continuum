@@ -1,7 +1,7 @@
-export const iterator = @iterator;
+export const iterator = @@iterator;
 
 export class Iterator {
-  @iterator(){
+  @@iterator(){
     return this;
   }
 }
@@ -13,7 +13,7 @@ export function keys(obj){
   obj = $__ToObject(obj);
   return (function*(){
     for (let x in obj) {
-      if (obj.@@has(x)) {
+      if ($__has(obj, x)) {
         yield x;
       }
     }
@@ -27,7 +27,7 @@ export function values(obj){
   obj = $__ToObject(obj);
   return (function*(){
     for (let x in obj) {
-      if (obj.@@has(x)) {
+      if ($__has(obj, x)) {
         yield obj[x];
       }
     }
@@ -41,7 +41,7 @@ export function entries(obj){
   obj = $__ToObject(obj);
   return (function*(){
     for (let x in obj) {
-      if (obj.@@has(x)) {
+      if ($__has(obj, x)) {
         yield [x, obj[x]];
       }
     }

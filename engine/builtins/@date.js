@@ -1,17 +1,17 @@
 function getter(o, name){
-  if (o === null || typeof o !== 'object' || o.@@GetBuiltinBrand() !== 'Date') {
+  if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {
     throw $__Exception('not_generic', ['Date.prototype.'+name]);
   }
-  return $__CallBuiltin(o.@@getInternal('Date'), name);
+  return $__CallBuiltin($__getInternal(o, 'Date'), name);
 }
 
 internalFunction(getter);
 
 function setter(o, name, value){
-  if (o === null || typeof o !== 'object' || o.@@GetBuiltinBrand() !== 'Date') {
+  if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {
     throw $__Exception('not_generic', ['Date.prototype.'+name]);
   }
-  $__CallBuiltin(o.@@getInternal('Date'), name, [value]);
+  $__CallBuiltin($__getInternal(o, 'Date'), name, [value]);
 }
 
 internalFunction(setter);
@@ -168,4 +168,4 @@ export class Date {
 builtinClass(Date);
 
 export const now = $__now;
-Date.@@extend({ now });
+extend(Date, { now });

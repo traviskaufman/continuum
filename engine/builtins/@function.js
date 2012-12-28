@@ -1,5 +1,3 @@
-private @toString;
-
 export class Function {
   constructor(...args){
     return $__FunctionCreate(...args);
@@ -7,7 +5,7 @@ export class Function {
 
   apply(thisArg, args){
     ensureFunction(this, 'Function.prototype.apply');
-    return this.@@Call(thisArg, ensureArgs(args));
+    return $__Call(this, thisArg, ensureArgs(args));
   }
 
   bind(thisArg, ...args){
@@ -17,28 +15,28 @@ export class Function {
 
   call(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.call');
-    return this.@@Call(thisArg, args);
+    return $__Call(this, thisArg, args);
   }
 
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
-    return this.@toString();
+    return $__FunctionToString(this);
   }
 }
 
 builtinClass(Function);
 
-Function.prototype.@@define('name', '', 0);
-Function.prototype.@toString = $__FunctionToString;
+$__define(Function.prototype, 'name', '', FROZEN);
 
 
 
 export function apply(func, thisArg, args){
   ensureFunction(func, '@function.apply');
-  return func.@@Call(thisArg, ensureArgs(args));
+  return $__Call(func, thisArg, ensureArgs(args));
 }
 
 builtinFunction(apply);
+
 
 export function bind(func, thisArg, ...args){
   ensureFunction(func, '@function.bind');
@@ -47,10 +45,10 @@ export function bind(func, thisArg, ...args){
 
 builtinFunction(bind);
 
+
 export function call(func, thisArg, ...args){
   ensureFunction(func, '@function.call');
-  return func.@@Call(thisArg, args);
+  return $__Call(func, thisArg, args);
 }
 
 builtinFunction(call);
-

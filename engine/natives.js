@@ -114,51 +114,47 @@ var natives = (function(module){
     sqrt: Math.sqrt,
     tan: Math.tan,
     _Call: function(obj, args){
-      return obj.Call(args[0], $$CreateListFromArray(args[1]));
+      return args[0].Call(args[1], $$CreateListFromArray(args[2]));
     },
     _Construct: function(obj, args){
-      return obj.Construct($$CreateListFromArray(args[0]));
-    },
-    _GetPrimitiveValue: function(obj, args){
-      return obj.PrimitiveValue;
-    },
-    _SetPrimitiveValue: function(obj, args){
-      obj.PrimitiveValue = args[0];
+      return args[0].Construct($$CreateListFromArray(args[1]));
     },
     _GetBuiltinBrand: function(obj, args){
-      if (obj.BuiltinBrand) {
-        return obj.BuiltinBrand.name;
+      if (args[0].BuiltinBrand) {
+        return args[0].BuiltinBrand.name;
       }
     },
     _SetBuiltinBrand: function(obj, args){
-      var brand = BRANDS[args[0]];
+      var brand = BRANDS[args[1]];
       if (brand) {
-        obj.BuiltinBrand = brand;
-        return obj.BuiltinBrand.name;
+        args[0].BuiltinBrand = brand;
+        return args[0].BuiltinBrand.name;
       }
-      return $$ThrowException('unknown_builtin_brand')
+      return $$ThrowException('unknown_builtin_brand');
     },
     _HasProperty: function(obj, args){
-      return obj.HasProperty(args[0]);
+      return args[0].HasProperty(args[1]);
     },
     _IsExtensible: function(obj){
-      return obj.IsExtensible();
+      return args[0].IsExtensible();
     },
     _PreventExtensions: function(obj){
-      return obj.PreventExtensions();
+      return args[0].PreventExtensions();
     },
-    _GetPrototype: function(obj){
+    _GetPrototype: function(obj, args){
+      obj = args[0];
       do {
         obj = obj.GetInheritance();
       } while (obj && obj.HiddenPrototype)
       return obj;
     },
     _SetPrototype: function(obj, args){
+      obj = args[0];
       var proto = obj.Prototype;
       if (proto && proto.HiddenPrototype) {
         obj = proto;
       }
-      return obj.SetInheritance(args[0]);
+      return obj.SetInheritance(args[1]);
     },
     _TypedArrayCreate: function(obj, args){
       return new $TypedArray(args[0], args[1], args[2], args[3]);
@@ -191,64 +187,67 @@ var natives = (function(module){
       return obj.View['get'+args[0]](offset, !!args[2]);
     },
     _DefineOwnProperty: function(obj, args){
-      return obj.DefineOwnProperty(args[0], $$ToPropertyDescriptor(args[1]), false);
+      return args[0].DefineOwnProperty(args[1], $$ToPropertyDescriptor(args[2]), args[3]);
     },
     _Enumerate: function(obj, args){
-      return new $Array(obj.Enumerate(args[0], args[1]));
+      return new $Array(args[0].Enumerate(args[1], args[2]));
     },
     _GetProperty: function(obj, args){
-      return $$FromPropertyDescriptor(obj.GetProperty(args[0]));
+      return $$FromPropertyDescriptor(args[0].GetProperty(args[1]));
     },
     _GetOwnProperty: function(obj, args){
-      return $$FromPropertyDescriptor(obj.GetOwnProperty(args[0]));
+      return $$FromPropertyDescriptor(args[0].GetOwnProperty(args[1]));
     },
     _HasOwnProperty: function(obj, args){
-      return obj.HasOwnProperty(args[0]);
+      return args[0].HasOwnProperty(args[1]);
     },
     _SetP: function(obj, args){
-      return obj.SetP(args[2], args[0], args[1]);
+      return args[0].SetP(args[3], args[1], args[2]);
     },
     _GetP: function(obj, args){
-      return obj.GetP(args[1], args[0]);
+      return args[0].GetP(args[2], args[1]);
+    },
+    _Get: function(obj, args){
+      return args[0].Get(args[1]);
     },
     _Put: function(obj, args){
-      return obj.Put(args[0]);
+      return args[0].Put(args[1], args[2], args[3]);
     },
     _has: function(obj, args){
-      return obj.has(args[0]);
+      return args[0].has(args[1]);
     },
     _delete: function(obj, args){
-      return obj.remove(args[0]);
+      return args[0].remove(args[1]);
     },
     _set: function(obj, args){
-      return obj.set(args[0], args[1]);
+      return args[0].set(args[1], args[2]);
     },
     _get: function(obj, args){
-      return obj.get(args[0]);
+      return args[0].get(args[1]);
     },
     _define: function(obj, args){
-      obj.define(args[0], args[1], args.length === 3 ? args[2] : 6);
+      args[0].define(args[1], args[2], args.length === 3 ? args[3] : 6);
     },
     _query: function(obj, args){
-      return obj.query(args[0]);
+      return args[0].query(args[1]);
     },
     _update: function(obj, args){
-      return obj.update(args[0], args[1]);
+      return args[0].update(args[1], args[2]);
     },
     _each: function(obj, args){
-      var callback = args[0];
-      obj.each(function(prop){
+      var callback = args[1];
+      args[0].each(function(prop){
         callback.Call(obj, prop);
       });
     },
     _setInternal: function(obj, args){
-      obj[args[0]] = args[1];
+      args[0][args[1]] = args[2];
     },
     _getInternal: function(obj, args){
-      return obj[args[0]];
+      return args[0][args[1]];
     },
     _hasInternal: function(obj, args){
-      return args[0] in obj;
+      return args[1] in args[0];
     },
     _GetIntrinsic: function(obj, args){
       return require('./runtime').intrinsics[args[0]];
@@ -392,6 +391,7 @@ var natives = (function(module){
     },
 
     _FunctionToString: function(obj, args){
+      obj = args[0];
       if (obj.Proxy) {
         obj = obj.ProxyTarget;
       }
@@ -410,24 +410,24 @@ var natives = (function(module){
       return args[0].toString(args[1]);
     },
     _RegExpToString: function(obj, args){
-      return ''+obj.PrimitiveValue;
+      return ''+args[0].PrimitiveValue;
     },
     _RegExpExec: function(obj, args){
-      var result = obj.PrimitiveValue.exec(args[0]);
+      var result = args[0].PrimitiveValue.exec(args[1]);
       if (result) {
         var array = new $Array(result);
         array.set('index', result.index);
-        array.set('input', args[0]);
+        array.set('input', args[1]);
         return array;
       }
       return result;
     },
     _RegExpTest: function(obj, args){
-      return obj.PrimitiveValue.test(args[0]);
+      return args[0].PrimitiveValue.test(args[1]);
     },
     _CallBuiltin: function(obj, args){
-      var object = args[0],
-          prop = args[1],
+      var object  = args[0],
+          prop    = args[1],
           arglist = args[2];
 
       if (arglist) {

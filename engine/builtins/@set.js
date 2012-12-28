@@ -7,7 +7,7 @@ function ensureSet(o, name){
   if (type === 'object' ? o === null : type !== 'function') {
     throw $__Exception('called_on_non_object', [name]);
   }
-  var data = o.@@getInternal('SetData');
+  var data = $__getInternal(o, 'SetData');
   if (!data) {
     throw $__Exception('called_on_incompatible_object', [name]);
   }
@@ -32,7 +32,7 @@ class SetIterator extends Iterator {
       throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);
     }
 
-    if (!(this.@@has(@data) && this.@@has(@key))) {
+    if (!$__has(this, @data) || !$__has(this, @key)) {
       throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
@@ -52,8 +52,8 @@ export class Set {
   }
 
   get size(){
-    if (this && this.@@hasInternal('SetData')) {
-      return $__MapSize(this.@@getInternal('SetData'));
+    if (this && $__hasInternal(this, 'SetData')) {
+      return $__MapSize($__getInternal(this, 'SetData'));
     }
     return 0;
   }
@@ -81,7 +81,7 @@ export class Set {
 
 builtinClass(Set);
 const SetPrototype = Set.prototype;
-SetPrototype.@@define(@iterator, SetPrototype.values);
+$__define(SetPrototype, @@iterator, SetPrototype.values);
 
 
 
@@ -102,12 +102,12 @@ builtinFunction(setClear);
 function setCreate(target, iterable){
   target = $__ToObject(target);
 
-  if (target.@@hasInternal('SetData')) {
+  if ($__hasInternal(target, 'SetData')) {
     throw $__Exception('double_initialization', ['Set']);
   }
 
   const data = new Map;
-  target.@@setInternal('SetData', data);
+  $__setInternal(target, 'SetData', data);
 
   if (iterable !== undefined) {
     iterable = $__ToObject(iterable);

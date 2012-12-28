@@ -77,9 +77,9 @@ export class URIError extends Error {
 
 builtinClass(URIError, 'BuiltinError');
 
-const ErrorPrototype = Error.prototype,
-      EvalErrorPrototype = EvalError.prototype,
-      RangeErrorPrototype = RangeError.prototype,
+const ErrorPrototype          = Error.prototype,
+      EvalErrorPrototype      = EvalError.prototype,
+      RangeErrorPrototype     = RangeError.prototype,
       ReferenceErrorPrototype = ReferenceError.prototype,
-      SyntaxErrorPrototype = SyntaxError.prototype,
-      TypeErrorPrototype = TypeError.prototype;
+      SyntaxErrorPrototype    = SyntaxError.prototype,
+      TypeErrorPrototype      = TypeError.prototype;

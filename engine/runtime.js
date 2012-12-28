@@ -2157,7 +2157,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       _RegExpCreate: function(obj, args){
         var pattern = args[0],
-            flags = args[1];
+            flags   = args[1];
 
         if (typeof pattern === 'object') {
           pattern = pattern.PrimitiveValue;
@@ -2171,18 +2171,18 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-      EvaluateModule: function(source, name, callback, errback){
+      EvaluateModule: function(loader, source, name, callback, errback){
         if (!callback && !errback) {
           var result, thrown;
 
-          realm.evaluateModule(this, source, name,
+          realm.evaluateModule(loader, source, name,
             function(module){ result = module },
             function(error){ result = error; thrown = true; }
           );
 
           return thrown ? new AbruptCompletion('throw', result) : result;
         } else {
-          realm.evaluateModule(this, source, name, wrapFunction(callback), wrapFunction(errback));
+          realm.evaluateModule(loader, source, name, wrapFunction(callback), wrapFunction(errback));
         }
       },
       _ToModule: function(obj, args){
@@ -2191,12 +2191,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
         return new $Module(args[0], args[0].Enumerate(false, false));
       },
-      Fetch: function(name, callback){
-        var result = require('./builtins')[name];
+      _Fetch: function(obj, args){
+        var result = require('./builtins')[args[0]];
         if (!result) {
-          result = new $Error('Error', undefined, 'Unable to locate module "'+name+'"');
+          result = new $Error('Error', undefined, 'Unable to locate module "'+args[0]+'"');
         }
-        callback.Call(undefined, [result]);
+        args[1].Call(undefined, [result]);
       }
     });
 

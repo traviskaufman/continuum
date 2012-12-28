@@ -1,7 +1,7 @@
 // standard constants
-const NaN       = +'NaN';
-const Infinity  = 1 / 0;
-const undefined = void 0;
+const NaN       = +'NaN',
+      Infinity  = 1 / 0,
+      undefined = void 0;
 
 // standard functions
 import { escape,
@@ -67,7 +67,7 @@ import Iterator from '@iter';
 
 import console from '@console';
 
-let StopIteration = $__StopIteration
+const StopIteration = $__StopIteration
 
 
 

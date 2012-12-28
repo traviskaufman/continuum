@@ -8,7 +8,7 @@ export class Proxy {
 
 builtinClass(Proxy);
 
-Proxy.@@delete('prototype');
+$__delete(Proxy, 'prototype');
 
 export class Handler {
   getOwnPropertyDescriptor(target, name){
@@ -54,8 +54,8 @@ export class Handler {
   seal(target) {
     if (!this.preventExtensions(target)) return false;
 
-    var props = this.getOwnPropertyNames(target),
-        len = +props.length;
+    const props = this.getOwnPropertyNames(target),
+          len   = $__ToUint32(props.length);
 
     for (var i = 0; i < len; i++) {
       success = success && this.defineProperty(target, props[i], { configurable: false });
@@ -66,17 +66,17 @@ export class Handler {
   freeze(target){
     if (!this.preventExtensions(target)) return false;
 
-    var props = this.getOwnPropertyNames(target),
-        len = +props.length;
+    const props = this.getOwnPropertyNames(target),
+          len   = $__ToUint32(props.length);
 
     for (var i = 0; i < len; i++) {
-      var name = props[i],
-          desc = this.getOwnPropertyDescriptor(target, name);
+      const name = props[i];
+      let desc = this.getOwnPropertyDescriptor(target, name);
 
       if (desc) {
         desc = 'writable' in desc || 'value' in desc
-          ? { configurable: false, writable: false }
-          : { configurable: false };
+              ? { configurable: false, writable: false }
+              : { configurable: false };
         success = success && this.defineProperty(target, name, desc);
       }
     }
@@ -85,40 +85,42 @@ export class Handler {
   }
 
   isSealed(target){
-    var props = this.getOwnPropertyNames(target),
-        len = $__ToUint32(props.length);
+    const props = this.getOwnPropertyNames(target),
+          len   = $__ToUint32(props.length);
 
     for (var i = 0; i < len; i++) {
-      var desc = this.getOwnPropertyDescriptor(target, props[i]);
+      const desc = this.getOwnPropertyDescriptor(target, props[i]);
 
       if (desc && desc.configurable) {
         return false;
       }
     }
+
     return !this.isExtensible(target);
   }
 
   isFrozen(target){
-    var props = this.getOwnPropertyNames(target),
-        len = $__ToUint32(props.length);
+    const props = this.getOwnPropertyNames(target),
+          len   = $__ToUint32(props.length);
 
     for (var i = 0; i < len; i++) {
-      var desc = this.getOwnPropertyDescriptor(target, props[i]);
+      const desc = this.getOwnPropertyDescriptor(target, props[i]);
 
       if (desc.configurable || ('writable' in desc || 'value' in desc) && desc.writable) {
         return false;
       }
     }
+
     return !this.isExtensible(target);
   }
 
   has(target, name){
-    var desc = this.getOwnPropertyDescriptor(target, name);
+    const desc = this.getOwnPropertyDescriptor(target, name);
     if (desc !== undefined) {
       return true;
     }
 
-    var proto = target.@@GetPrototype();
+    const proto = $__GetPrototype(target);
     return proto === null ? false : this.has(proto, name);
   }
 
@@ -126,12 +128,11 @@ export class Handler {
     return this.getOwnPropertyDescriptor(target, name) !== undefined;
   }
 
-  get(target, name, receiver){
-    receiver = receiver || target;
+  get(target, name, receiver = target){
+    const desc = this.getOwnPropertyDescriptor(target, name);
 
-    var desc = this.getOwnPropertyDescriptor(target, name);
     if (desc === undefined) {
-      var proto = target.@@GetPrototype();
+      const proto = $__GetPrototype(target);
       return proto === null ? undefined : this.get(proto, name, receiver);
     }
 
@@ -139,44 +140,44 @@ export class Handler {
       return desc.value;
     }
 
-    var getter = desc.get;
-    return getter === undefined ? undefined : getter.@@Call(receiver, []);
+    const getter = desc.get;
+    return getter === undefined ? undefined : $__Call(getter, receiver, []);
   }
 
   set(target, name, value, receiver){
-    var ownDesc = this.getOwnPropertyDescriptor(target, name);
+    const ownDesc = this.getOwnPropertyDescriptor(target, name);
 
     if (ownDesc !== undefined) {
       if ('get' in ownDesc || 'set' in ownDesc) {
         var setter = ownDesc.set;
         if (setter === undefined) return false;
-        setter.@@Call(receiver, [value]);
+        $__Call(setter, receiver, [value]);
         return true;
       }
 
       if (ownDesc.writable === false) {
         return false;
       } else if (receiver === target) {
-        receiver.@@DefineOwnProperty(name, { value: value });
+        $__DefineOwnProperty(receiver, name, { value: value });
         return true;
       } else {
-        receiver.@@DefineOwnProperty(name, newDesc);
-        if (receiver.@@IsExtensible()) {
-          object.@@DefineOwnProperty(key, { writable: true,
-                                            enumerable: true,
-                                            configurable: true });
+        $__DefineOwnProperty(receiver, name, newDesc);
+        if ($__IsExtensible(receiver)) {
+          $__DefineOwnProperty(object, key, { writable: true,
+                                              enumerable: true,
+                                              configurable: true });
           return true;
         }
         return false;
       }
     }
 
-    var proto = target.@@GetPrototype();
+    const proto = $__GetPrototype(target);
     if (proto === null) {
-      if (receiver.@@IsExtensible()) {
-        receiver.@@DefineOwnProperty(key, { writable: true,
-                                            enumerable: true,
-                                            configurable: true });
+      if ($__IsExtensible(receiver)) {
+        $__DefineOwnProperty(receiver, key, { writable: true,
+                                              enumerable: true,
+                                              configurable: true });
         return true;
       }
       return false;
@@ -186,43 +187,44 @@ export class Handler {
   }
 
   enumerate(target){
-    var result = this.getOwnPropertyNames(target),
-        len = +result.length,
-        out = [];
+    const result = this.getOwnPropertyNames(target),
+          len    = $__ToUint32(result.length),
+          result = [];
 
     for (var i = 0; i < len; i++) {
-      var name = $__ToString(result[i]),
-          desc = this.getOwnPropertyDescriptor(name);
+      const name = $__ToString(result[i]),
+            desc = this.getOwnPropertyDescriptor(name);
 
       if (desc != null && !desc.enumerable) {
-        out.push(name);
+        result.push(name);
       }
     }
 
-    var proto = target.@@GetPrototype();
-    return proto === null ? out : out.concat(enumerate(proto));
+    var proto = $__GetPrototype(target);
+    return proto === null ? result : result.concat(enumerate(proto));
   }
 
   keys(target){
-    var result = this.getOwnPropertyNames(target),
-        len = +result.length,
-        result = [];
+    const result = this.getOwnPropertyNames(target),
+          len    = $__ToUint32(result.length);
+          result = [];
 
     for (var i = 0; i < len; i++) {
-      var name = $__ToString(result[i]),
-          desc = this.getOwnPropertyDescriptor(name);
+      const name = $__ToString(result[i]),
+            desc = this.getOwnPropertyDescriptor(name);
 
       if (desc != null && desc.enumerable) {
         result.push(name);
       }
     }
+
     return result;
   }
 
   construct(target, args) {
-    var proto = this.get(target, 'prototype', target),
-        instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},
-        result = this.apply(target, instance, args);
+    const proto    = this.get(target, 'prototype', target),
+          instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},
+          result   = this.apply(target, instance, args);
 
     return $__Type(result) === 'Object' ? result : instance;
   }
@@ -231,126 +233,154 @@ export class Handler {
 builtinClass(Handler);
 
 
+
 export function apply(target, thisArg, args){
-  ensureFunction(target, '@Reflect.apply');
-  return target.@@Call(thisArg, ensureArgs(args));
+  ensureFunction(target, '@reflect.apply');
+  return $__Call(target, thisArg, ensureArgs(args));
 }
+
 builtinFunction(apply);
 
+
 export function construct(target, args){
-  ensureFunction(target, '@Reflect.construct');
-  return target.@@Construct(ensureArgs(args));
+  ensureFunction(target, '@reflect.construct');
+  return $__Construct(target, ensureArgs(args));
 }
+
 builtinFunction(construct);
 
+
 export function defineProperty(target, name, desc){
-  ensureObject(target, '@Reflect.defineProperty');
+  ensureObject(target, '@reflect.defineProperty');
   ensureDescriptor(desc);
-  return target.@@DefineOwnProperty($__ToPropertyKey(name), desc);
+  return $__DefineOwnProperty(target, $__ToPropertyKey(name), desc);
 }
+
 builtinFunction(defineProperty);
 
+
 export function deleteProperty(target, name){
-  ensureObject(target, '@Reflect.deleteProperty');
-  return target.@@Delete($__ToPropertyKey(name), false);
+  ensureObject(target, '@reflect.deleteProperty');
+  return $__Delete(target, $__ToPropertyKey(name), false);
 }
+
 builtinFunction(deleteProperty);
 
+
 export function enumerate(target){
-  return $__ToObject(target).@@Enumerate(false, false);
+  return $__Enumerate($__ToObject(target), false, false);
 }
+
 builtinFunction(enumerate);
 
+
 export function freeze(target){
-  if ($__Type(target) !== 'Object' || !target.@@PreventExtensions()) {
+  if ($__Type(target) !== 'Object' || !$__PreventExtensions(target)) {
     return false;
   }
 
-  var props = target.@@Enumerate(false, false);
-      len = props.length
-      success = true;
+  const props = $__Enumerate(target, false, false),
+        len   = props.length;
+
+  letsuccess = true;
 
   for (var i = 0; i < len; i++) {
-    var desc = target.@@GetOwnProperty(props[i]),
-        attrs = 'writable' in desc || 'value' in desc
-          ? { configurable: false, writable: false }
-          : desc !== undefined
-            ? { configurable: false }
-            : null;
+    const desc = target.@@GetOwnProperty(props[i]),
+          attrs = 'writable' in desc || 'value' in desc
+            ? { configurable: false, writable: false }
+            : desc !== undefined
+              ? { configurable: false }
+              : null;
 
     if (attrs !== null) {
-      success = success && target.@@DefineOwnProperty(props[i], attrs);
+      success = success && $__DefineOwnProperty(target, props[i], attrs);
     }
   }
+
   return success;
 }
+
 builtinFunction(freeze);
+
 
 export function get(target, name, receiver){
   receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__ToObject(target).@@GetP($__ToPropertyKey(name), receiver);
+  return $__GetP($__ToObject(target), $__ToPropertyKey(name), receiver);
 }
+
 builtinFunction(get);
 
+
 export function getOwnPropertyDescriptor(target, name){
-  ensureObject(target, '@Reflect.getOwnPropertyDescriptor');
-  return target.@@GetOwnProperty($__ToPropertyKey(name));
+  ensureObject(target, '@reflect.getOwnPropertyDescriptor');
+  return $__GetOwnProperty(target, $__ToPropertyKey(name));
 }
+
 builtinFunction(getOwnPropertyDescriptor);
 
+
 export function getOwnPropertyNames(target){
-  ensureObject(target, '@Reflect.getOwnPropertyNames');
-  return target.@@Enumerate(false, false);
+  ensureObject(target, '@reflect.getOwnPropertyNames');
+  return $__Enumerate(target, false, false);
 }
+
 builtinFunction(getOwnPropertyNames);
 
+
 export function getPrototypeOf(target){
-  ensureObject(target, '@Reflect.getPrototypeOf');
-  return target.@@GetPrototype();
+  ensureObject(target, '@reflect.getPrototypeOf');
+  return $__GetPrototype(target);
 }
+
 builtinFunction(getPrototypeOf);
 
+
 export function has(target, name){
-  return $__ToObject(target).@@HasProperty($__ToPropertyKey(name));
+  return $__HasProperty($__ToObject(target), $__ToPropertyKey(name));
 }
+
 builtinFunction(has);
 
+
 export function hasOwn(target, name){
-  return $__ToObject(target).@@HasOwnProperty($__ToPropertyKey(name));
+  return $__HasOwnProperty($__ToObject(target), $__ToPropertyKey(name));
 }
+
 builtinFunction(hasOwn);
 
+
 export function isFrozen(target){
-  ensureObject(target, '@Reflect.isFrozen');
-  if (target.@@IsExtensible()) {
+  ensureObject(target, '@reflect.isFrozen');
+  if ($__IsExtensible(target)) {
     return false;
   }
 
-  var props = target.@@Enumerate(false, false);
+  const props = $__Enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = target.@@GetOwnProperty(props[i]);
-    if (desc) {
-      if (desc.configurable || 'writable' in desc && desc.writable) {
-        return false;
-      }
+    const desc = $__GetOwnProperty(target, props[i]);
+    if (desc && desc.configurable || 'writable' in desc && desc.writable) {
+      return false;
     }
   }
 
   return true;
 }
+
 builtinFunction(isFrozen);
 
+
 export function isSealed(target){
-  ensureObject(target, '@Reflect.isSealed');
-  if (target.@@IsExtensible()) {
+  ensureObject(target, '@reflect.isSealed');
+
+  if ($__IsExtensible(target)) {
     return false;
   }
 
-  var props = target.@@Enumerate(false, false);
+  const props = $__Enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = target.@@GetOwnProperty(props[i]);
+    const desc = $__GetOwnProperty(target, props[i]);
     if (desc && desc.configurable) {
       return false;
     }
@@ -358,43 +388,55 @@ export function isSealed(target){
 
   return true;
 }
+
 builtinFunction(isSealed);
 
+
 export function isExtensible(target){
-  ensureObject(target, '@Reflect.isExtensible');
-  return target.@@IsExtensible();
+  ensureObject(target, '@reflect.isExtensible');
+  return $__IsExtensible(target);
 }
+
 builtinFunction(isExtensible);
 
+
 export function keys(target){
-  ensureObject(target, '@Reflect.keys');
-  return target.@@Enumerate(false, true);
+  ensureObject(target, '@reflect.keys');
+  return $__Enumerate(target, false, true);
 }
+
 builtinFunction(keys);
 
+
 export function preventExtensions(target){
-  if ($__Type(target) !== 'Object') return false;
-  return target.@@PreventExtensions();
+  return $__Type(target) === 'Object' ? $__PreventExtensions(target) : false;
 }
+
 builtinFunction(preventExtensions);
+
 
 export function seal(target){
   if ($__Type(target) !== 'Object') return false;
-  var success = target.@@PreventExtensions();
+  let success = $__PreventExtensions(target);
   if (!success) return success;
 
-  var props = target.@@Enumerate(false, false),
-      len = props.length;
+  const props = $__Enumerate(target, false, false),
+        len   = props.length,
+        desc  = { configurable: false };
 
   for (var i = 0; i < len; i++) {
-    success = success && target.@@DefineOwnProperty(props[i], { configurable: false });
+    success = success && $__DefineOwnProperty(target, props[i], desc);
   }
+
   return success;
 }
+
 builtinFunction(seal);
+
 
 export function set(target, name, value, receiver){
   receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__ToObject(target).@@SetP($__ToPropertyKey(name), value, receiver);
+  return $__SetP($__ToObject(target), $__ToPropertyKey(name), value, receiver);
 }
+
 builtinFunction(set);

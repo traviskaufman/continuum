@@ -1,16 +1,15 @@
-export const
-  EPSILON           = 2.220446049250313e-16,
-  MAX_INTEGER       = 9007199254740992,
-  MAX_VALUE         = 1.7976931348623157e+308,
-  MIN_VALUE         = 5e-324,
-  NaN               = NaN,
-  NEGATIVE_INFINITY = -Infinity,
-  POSITIVE_INFINITY = Infinity;
+export const EPSILON           = 2.220446049250313e-16,
+             MAX_INTEGER       = 9007199254740992,
+             MAX_VALUE         = 1.7976931348623157e+308,
+             MIN_VALUE         = 5e-324,
+             NaN               = NaN,
+             NEGATIVE_INFINITY = -Infinity,
+             POSITIVE_INFINITY = Infinity;
 
 
 export class Number {
-  constructor(value){
-    value = arguments.length ? $__ToNumber(value) : 0;
+  constructor(...value){
+    value = value.length ? $__ToNumber(value[0]) : 0;
     return $__IsConstructCall() ? $__NumberCreate(value) : value;
   }
 
@@ -18,8 +17,8 @@ export class Number {
     radix = $__ToInteger(radix || 10);
     if (typeof this === 'number') {
       return $__NumberToString(this, radix);
-    } else if (this.@@GetBuiltinBrand() === 'Number') {
-      return $__NumberToString(this.@@getInternal('PrimitiveValue'), radix);
+    } else if ($__GetBuiltinBrand(this) === 'Number') {
+      return $__NumberToString($__getInternal(this, 'PrimitiveValue'), radix);
     }
     throw $__Exception('not_generic', ['Number.prototype.toString']);
   }
@@ -27,16 +26,14 @@ export class Number {
   valueOf(){
     if (typeof this === 'number') {
       return this;
+    } else if ($__GetBuiltinBrand(this) === 'Number') {
+      return $__getInternal(this, 'PrimitiveValue');
     }
-    if (this.@@GetBuiltinBrand() === 'Number') {
-      return this.@@getInternal('PrimitiveValue');
-    } else {
-      throw $__Exception('not_generic', ['Number.prototype.valueOf']);
-    }
+    throw $__Exception('not_generic', ['Number.prototype.valueOf']);
   }
 
   clz() {
-    var x = $__ToNumber(this);
+    let x = $__ToNumber(this);
     if (!x || !isFinite(x)) {
       return 32;
     } else {
@@ -73,7 +70,7 @@ export function toInteger(value){
   return (value / 1 || 0) | 0;
 }
 
-Number.@@extend({ isNaN, isFinite, isInteger, toInteger,
-                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,
-                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });
+extend(Number, { isNaN, isFinite, isInteger, toInteger,
+                 EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,
+                 NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });
 

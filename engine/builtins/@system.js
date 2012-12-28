@@ -17,10 +17,10 @@ class Request {
       translated = '"use strict";\n'+translated;
     }
 
-    loader.@evaluate(translated, this.@resolved, module => {
-      module.@@setInternal('loader', loader);
-      module.@@setInternal('resolved', this.@resolved);
-      module.@@setInternal('mrl', this.@mrl);
+    $__EvaluateModule(loader, translated, this.@resolved, module => {
+      $__setInternal(module, 'loader', loader);
+      $__setInternal(module, 'resolved', this.@resolved);
+      $__setInternal(module, 'mrl', this.@mrl);
       loader.@modules[this.@resolved] = module;
       (this.@callback)(module);
     }, msg => this.reject(msg));
@@ -46,7 +46,7 @@ class Request {
 }
 
 
-private @strict, @resolve, @modules, @translate, @fetch, @evaluate;
+private @strict, @resolve, @modules, @translate, @fetch;
 
 
 export class Loader {
@@ -92,57 +92,54 @@ export class Loader {
   }
 
   eval(src){
-    return this.@evaluate(src);
+    return $__EvaluateModule(this, src);
   }
 
   evalAsync(src, callback, errback){
-    this.@evaluate(src, callback, errback);
+    $__EvaluateModule(this, src, callback, errback);
   }
 
   get(mrl){
-    var canonical = (this.@resolve)(mrl, this.baseURL);
+    const canonical = (this.@resolve)(mrl, this.baseURL);
     return this.@modules[canonical];
   }
 
   set(mrl, mod){
-    let canonical = (this.@resolve)(mrl, this.baseURL);
+    const canonical = (this.@resolve)(mrl, this.baseURL);
 
     if (typeof canonical === 'string') {
       this.@modules[canonical] = mod;
     } else if ($__Type(canonical) === 'Object') {
-      for (var k in canonical) {
-        this.@modules[k] = canonical[k];
+      for (var key in canonical) {
+        this.@modules[key] = canonical[key];
       }
     }
   }
 
   defineBuiltins(object = this.global){
-    var desc = { configurable: true,
-                 enumerable: false,
-                 writable: true,
-                 value: undefined };
+    const desc = { configurable: true,
+                   enumerable: false,
+                   writable: true,
+                   value: undefined };
 
-    for (var k in std) {
-      desc.value = std[k];
-      object.@@DefineOwnProperty(k, desc);
+    for (var key in std) {
+      desc.value = std[key];
+      $__DefineOwnProperty(object, key, desc);
     }
 
     return object;
   }
 }
 
-Loader.prototype.@evaluate = $__EvaluateModule;
-
-
 export function Module(object, mrl){
   object = $__ToObject(object);
-  if (object.@@GetBuiltinBrand() === 'Module') {
+  if ($__GetBuiltinBrand(object) === 'Module') {
     return object;
   }
   var module = $__ToModule(object);
-  module.@@setInternal('loader', System);
-  module.@@setInternal('resolved', mrl || '');
-  module.@@setInternal('mrl', mrl || '');
+  $__setInternal(module, 'loader', System);
+  $__setInternal(module, 'resolved', mrl || '');
+  $__setInternal(module, 'mrl', mrl || '');
   return module;
 }
 
@@ -174,7 +171,7 @@ export var System = new Loader(null, {
 $__SetDefaultLoader(System);
 
 
-let internalLoader = $__internalLoader = new Loader(System, { global: this });
+const internalLoader = $__internalLoader = new Loader(System, { global: this });
 internalLoader.@strict = false;
 
 System.@modules['@system'] = internalLoader.@modules['@system'] = new Module({
@@ -183,14 +180,13 @@ System.@modules['@system'] = internalLoader.@modules['@system'] = new Module({
   Loader: Loader
 }, '@system');
 
-let std = internalLoader.eval(`
+const std = internalLoader.eval(`
   module std = '@std';
   export std;
 `).std;
 
-for (let k in internalLoader.@modules) {
-  System.@modules[k] = internalLoader.@modules[k];
+for (let name in internalLoader.@modules) {
+  System.@modules[name] = internalLoader.@modules[name];
 }
 
-std.@@each(key => $__global.@@define(key, std[key], $__Type(std[key]) === 'Object' ? HIDDEN : FROZEN));
-
+$__each(std, key => $__define($__global, key, std[key], $__Type(std[key]) === 'Object' ? HIDDEN : FROZEN));

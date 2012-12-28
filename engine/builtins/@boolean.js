@@ -1,26 +1,29 @@
 export class Boolean {
   constructor(value){
-    value = $__ToBoolean(value);
-    return $__IsConstructCall() ? $__BooleanCreate(value) : value;
+    if (!$__IsConstructCall()) {
+      return $__ToBoolean(value);
+    }
+    $__SetBuiltinBrand(this, 'BooleanWrapper');
+    this.@@BooleanValue = $__ToBoolean(value);
   }
 
   toString(){
-    var type = $__Type(this);
+    let type = $__Type(this);
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {
-      return this.@@PrimitiveValue ? 'true' : 'false';
+    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'Boolean') {
+      return this.@@BooleanValue ? 'true' : 'false';
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.toString']);
     }
   }
 
   valueOf(){
-    var type = $__Type(this);
+    let type = $__Type(this);
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && this.@@GetBuiltinBrand() === 'Boolean') {
-      return this.@@PrimitiveValue;
+    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'Boolean') {
+      return this.@@BooleanValue;
     } else {
       throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);
     }
@@ -28,10 +31,3 @@ export class Boolean {
 }
 
 builtinClass(Boolean);
-
-Boolean.prototype.@@DefineOwnProperty(@@PrimitiveValue, {
-  configurable: true,
-  enumerable: false,
-  get: $__GetPrimitiveValue,
-  set: $__SetPrimitiveValue
-});

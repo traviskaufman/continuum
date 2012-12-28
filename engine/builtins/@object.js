@@ -4,12 +4,12 @@ export class Object {
   }
 
   hasOwnProperty(key){
-    return $__ToObject(this).@@HasOwnProperty($__ToPropertyKey(key));
+    return $__HasOwnProperty($__ToObject(this), $__ToPropertyKey(key));
   }
 
   isPrototypeOf(object){
     while ($__Type(object) === 'Object') {
-      object = object.@@GetPrototype();
+      object = $__GetPrototype(object);
       if (object === this) {
         return true;
       }
@@ -18,7 +18,7 @@ export class Object {
   }
 
   propertyIsEnumerable(key){
-    return $__ToBoolean($__ToObject(this).@@query(key) & HIDDEN);
+    return $__ToBoolean($__query($__ToObject(this), key) & 1);
   }
 
   toLocaleString(){
@@ -31,7 +31,7 @@ export class Object {
     } else if (this === null) {
       return '[object Null]';
     }
-    return '[object ' + $__ToObject(this).@toStringTag + ']';
+    return '[object ' + $__ToObject(this).@@toStringTag + ']';
   }
 
   valueOf(){
@@ -47,9 +47,9 @@ $__ObjectToString = Object.prototype.toString;
 export function assign(target, source){
   ensureObject(target, 'Object.assign');
   source = $__ToObject(source);
-  for (let [i, key] of source.@@Enumerate(false, true)) {
-    let prop = source[key];
-    if (typeof prop === 'function' && prop.@@get('HomeObject')) {
+  for (let [i, key] of $__Enumerate(source, false, true)) {
+    const prop = source[key];
+    if (typeof prop === 'function' && $__get(prop, 'HomeObject')) {
       // TODO
     }
     target[key] = prop;
@@ -62,15 +62,15 @@ export function create(prototype, properties){
     throw $__Exception('proto_object_or_null', [])
   }
 
-  var object = $__ObjectCreate(prototype);
+  const object = $__ObjectCreate(prototype);
 
   if (properties !== undefined) {
     ensureDescriptor(properties);
 
     for (var key in properties) {
-      var desc = properties[key];
+      const desc = properties[key];
       ensureDescriptor(desc);
-      object.@@DefineOwnProperty(key, desc);
+      $__DefineOwnProperty(object, key, desc);
     }
   }
 
@@ -80,7 +80,7 @@ export function create(prototype, properties){
 export function defineProperty(object, key, property){
   ensureObject(object, 'Object.defineProperty');
   ensureDescriptor(property);
-  object.@@DefineOwnProperty($__ToPropertyKey(key), property);
+  $__DefineOwnProperty(object, $__ToPropertyKey(key), property);
   return object;
 }
 
@@ -89,9 +89,9 @@ export function defineProperties(object, properties){
   ensureDescriptor(properties);
 
   for (var key in properties) {
-    var desc = properties[key];
+    const desc = properties[key];
     ensureDescriptor(desc);
-    object.@@DefineOwnProperty(key, desc);
+    $__DefineOwnProperty(object, key, desc);
   }
 
   return object;
@@ -99,46 +99,46 @@ export function defineProperties(object, properties){
 
 export function freeze(object){
   ensureObject(object, 'Object.freeze');
-  var props = object.@@Enumerate(false, false);
+  const props = $__Enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = object.@@GetOwnProperty(props[i]);
+    const desc = $__GetOwnProperty(object, props[i]);
     if (desc.configurable) {
       desc.configurable = false;
       if ('writable' in desc) {
         desc.writable = false;
       }
-      object.@@DefineOwnProperty(props[i], desc);
+      $__DefineOwnProperty(object, props[i], desc);
     }
   }
 
-  object.@@PreventExtensions();
+  $__PreventExtensions(object);
   return object;
 }
 
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
-  return object.@@GetOwnProperty($__ToPropertyKey(key));
+  return $__GetOwnProperty(object, $__ToPropertyKey(key));
 }
 
 export function getOwnPropertyNames(object){
   ensureObject(object, 'Object.getOwnPropertyNames');
-  return object.@@Enumerate(false, false);
+  return $__Enumerate(object, false, false);
 }
 
 export function getPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getPropertyDescriptor');
-  return object.@@GetProperty($__ToPropertyKey(key));
+  return $__GetProperty(object, $__ToPropertyKey(key));
 }
 
 export function getPropertyNames(object){
   ensureObject(object, 'Object.getPropertyNames');
-  return object.@@Enumerate(true, false);
+  return $__Enumerate(object, true, false);
 }
 
 export function getPrototypeOf(object){
   ensureObject(object, 'Object.getPrototypeOf');
-  return object.@@GetPrototype();
+  return $__GetPrototype(object);
 }
 
 export function is(x, y){
@@ -151,19 +151,19 @@ export function isnt(x, y){
 
 export function isExtensible(object){
   ensureObject(object, 'Object.isExtensible');
-  return object.@@IsExtensible();
+  return $__IsExtensible(object);
 }
 
 export function isFrozen(object){
   ensureObject(object, 'Object.isFrozen');
-  if (object.@@IsExtensible()) {
+  if ($__IsExtensible(object)) {
     return false;
   }
 
-  var props = object.@@Enumerate(false, false);
+  const props = $__Enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = object.@@GetOwnProperty(props[i]);
+    const desc = $__GetOwnProperty(object, props[i]);
     if (desc && desc.configurable || 'writable' in desc && desc.writable) {
       return false;
     }
@@ -174,14 +174,14 @@ export function isFrozen(object){
 
 export function isSealed(object){
   ensureObject(object, 'Object.isSealed');
-  if (object.@@IsExtensible()) {
+  if ($__IsExtensible(object)) {
     return false;
   }
 
-  var props = object.@@Enumerate(false, false);
+  const props = $__Enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    var desc = object.@@GetOwnProperty(props[i]);
+    const desc = $__GetOwnProperty(object, props[i]);
     if (desc && desc.configurable) {
       return false;
     }
@@ -192,29 +192,35 @@ export function isSealed(object){
 
 export function keys(object){
   ensureObject(object, 'Object.keys');
-  return object.@@Enumerate(false, true);
+  return $__Enumerate(object, false, true);
 }
 
 export function preventExtensions(object){
   ensureObject(object, 'Object.preventExtensions');
-  object.@@PreventExtensions();
+  $__PreventExtensions(object);
   return object;
 }
 
 export function seal(object){
   ensureObject(object, 'Object.seal');
 
-  var desc = { configurable: false },
-      props = object.@@Enumerate(false, false);
+  const desc = { configurable: false },
+        props = $__Enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    object.@@DefineOwnProperty(props[i], desc);
+    $__DefineOwnProperty(object, props[i], desc);
   }
 
-  object.@@PreventExtensions();
+  $__PreventExtensions(object);
   return object;
 }
 
+
+function getObservers(object){
+  return $__getInternal($__GetNotifier(object), 'ChangeObservers');
+}
+
+internalFunction(getObservers);
 
 export function observe(object, callback){
   ensureObject(object, 'Object.observe');
@@ -223,10 +229,7 @@ export function observe(object, callback){
 
   }
 
-  var notifier = $__GetNotifier(object),
-      changeObservers = notifier.@@getInternal('ChangeObservers');
-
-  $__AddObserver(changeObservers, callback);
+  $__AddObserver(getObservers(object), callback);
   $__AddObserver($__ObserverCallbacks, callback);
   return object;
 }
@@ -234,11 +237,7 @@ export function observe(object, callback){
 export function unobserve(object, callback){
   ensureObject(object, 'Object.unobserve');
   ensureFunction(callback, 'Object.unobserve');
-
-  var notifier = $__GetNotifier(object),
-      changeObservers = notifier.@@getInternal('ChangeObservers');
-
-  $__RemoveObserver(changeObservers, callback);
+  $__RemoveObserver(getObservers(object), callback);
   return object;
 }
 
@@ -253,7 +252,7 @@ export function getNotifier(object){
 }
 
 
-Object.@@extend({ assign, create, defineProperty, defineProperties, deliverChangeRecords,
+extend(Object, { assign, create, defineProperty, defineProperties, deliverChangeRecords,
   freeze, getNotifier, getOwnPropertyDescriptor, getOwnPropertyNames, getPropertyDescriptor,
   getPropertyNames, getPrototypeOf, is, isnt, isExtensible, isFrozen, isSealed, keys, observe,
   preventExtensions, seal, unobserve
@@ -263,7 +262,7 @@ Object.@@extend({ assign, create, defineProperty, defineProperties, deliverChang
 
 export function isPrototypeOf(object, prototype){
   while (prototype) {
-    prototype = prototype.@@GetPrototype();
+    prototype = $__GetPrototype(prototype);
     if (prototype === object) {
       return true;
     }
@@ -275,15 +274,14 @@ builtinFunction(isPrototypeOf);
 
 
 export function hasOwnProperty(object, key){
-  return $__ToObject(object).@@HasOwnProperty($__ToPropertyKeys(key));
+  return $__HasOwnProperty($__ToObject(object), $__ToPropertyKeys(key));
 }
 
 builtinFunction(hasOwnProperty);
 
 
 export function propertyIsEnumerable(object, key){
-  return !!($__ToObject(object).@@query(key) & 1);
+  return $__ToBoolean($__query($__ToObject(object), key) & 1);
 }
 
 builtinFunction(propertyIsEnumerable);
-

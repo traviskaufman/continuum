@@ -1,5 +1,5 @@
-$__global.@@define(@toStringTag, 'global');
-$__StopIteration.@@define(@toStringTag, 'StopIteration');
+$__define($__global, @@toStringTag, 'global');
+$__define($__StopIteration, @@toStringTag, 'StopIteration');
 
 
 export function decodeURI(value){
@@ -39,8 +39,8 @@ builtinFunction(escape);
 
 export function eval(source){}
 builtinFunction(eval);
-eval.@@setInternal('Call', $__eval.@@getInternal('Call'));
-eval.@@setInternal('Construct', $__eval.@@getInternal('Construct'));
+$__setInternal(eval, 'Call', $__getInternal($__eval, 'Call'));
+$__setInternal(eval, 'Construct', $__getInternal($__eval, 'Construct'));
 
 
 export function isFinite(number){
