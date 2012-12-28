@@ -343,22 +343,15 @@ export class Array {
           result = [];
 
     start = $__ToInteger(start);
-    end = $__ToInteger(end);
-
     if (start < 0) {
-      start += len;
-      if (start < 0) {
-        start = 0;
-      }
+      start = max(len + start, 0);
     }
 
+    end = $__ToInteger(end);
     if (end < 0) {
-      end += len;
-      if (end < 0) {
-        return result;
-      }
-    } else if (end >= len) {
-      end = len;
+      end = max(len + end, 0);
+    } else {
+      end = min(end, len);
     }
 
     if (start < end) {
@@ -564,15 +557,13 @@ export class Array {
   values(){
     return new ArrayIterator(this, 'value');
   }
-
-  @iterator(){
-    return new ArrayIterator(this, 'key+value');
-  }
 }
 
 builtinClass(Array);
+const ArrayPrototype = Array.prototype;
+ArrayPrototype.@@define(@iterator, ArrayPrototype.values);
 
-['push'].forEach(name => Array.prototype[name].@@set('length', 1));
+['push'].forEach(name => ArrayPrototype[name].@@set('length', 1));
 
 
 export function isArray(array){
