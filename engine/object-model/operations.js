@@ -317,17 +317,16 @@ var operations = (function(exports){
 
 
   function $$SpreadArguments(precedingArgs, spread){
-    if (typeof spread !== 'object') {
-      return $$ThrowException('spread_non_object');
-    }
+    var obj = $$ToObject(spread);
+    if (obj && obj.Abrupt) return obj;
 
-    var offset = precedingArgs.length,
-        len = $$ToUint32(spread.Get('length'));
-
+    var len = $$ToUint32(obj.Get('length'));
     if (len && len.Abrupt) return len;
 
+    var offset = precedingArgs.length;
+
     for (var i=0; i < len; i++) {
-      var value = spread.Get(i);
+      var value = obj.Get(i);
       if (value && value.Abrupt) return value;
       precedingArgs[i + offset] = value;
     }
@@ -356,26 +355,29 @@ var operations = (function(exports){
   exports.$$SpreadInitialization = $$SpreadInitialization;
 
 
-  function $$SpreadDestructuring(context, target, index){
+  function $$SpreadDestructuring(context, spread, index){
     var array = new $Array(0);
+
     if (target == null) {
       return array;
     }
-    if (typeof target !== 'object') {
-      return $$ThrowException('spread_non_object', typeof target);
-    }
 
-    var len = $$ToUint32(target.Get('length'));
+    var obj = $$ToObject(spread);
+    if (obj && obj.Abrupt) return obj;
+
+    var len = $$ToUint32(obj.Get('length'));
     if (len && len.Abrupt) return len;
 
     var count = len - index;
+
     for (var i=0; i < count; i++) {
-      var value = target.Get(index + i);
+      var value = obj.Get(index + i);
       if (value && value.Abrupt) return value;
       array.set(i+'', value);
     }
 
     array.define('length', i, _CW);
+
     return array;
   }
 
