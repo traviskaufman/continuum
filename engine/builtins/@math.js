@@ -173,41 +173,71 @@ export function log2(x){
 }
 
 export function max(...values){
-  var i = values.length,
-      maximum = -Infinity,
-      current;
+  const count = values.length;
 
-  while (i--) {
-    current = +values[i];
-    if (current !== current) {
+  if (count === 0) {
+    return -Infinity;
+  } else if (count === 1) {
+    return $__ToNumber(values[0]);
+  } else if (count === 2) {
+    const x = $__ToNumber(values[0]),
+          y = $__ToNumber(values[1]);
+
+    if (x !== x || y !== y) {
       return NaN;
     }
-    if (current > maximum) {
-      maximum = current;
-    }
-  }
+    return x > y ? x : y;
+  } else {
+    let index   = count,
+        maximum = -Infinity;
 
-  return maximum;
+    while (index--) {
+      const current = $__ToNumber(values[index]);
+
+      if (current !== current) {
+        return NaN;
+      } else if (current > maximum) {
+        maximum = current;
+      }
+    }
+
+    return maximum;
+  }
 }
 
 max.@@set('length', 2);
 
 export function min(...values){
-  var i = values.length,
-      minimum = Infinity,
-      current;
+  const count = values.length;
 
-  while (i--) {
-    current = $__ToNumber(values[i]);
-    if (current !== current) {
+  if (count === 0) {
+    return Infinity;
+  } else if (count === 1) {
+    return $__ToNumber(values[0]);
+  } else if (count === 2) {
+    const x = $__ToNumber(values[0]),
+          y = $__ToNumber(values[1]);
+
+    if (x !== x || y !== y) {
       return NaN;
     }
-    if (current < minimum) {
-      minimum = current;
-    }
-  }
+    return x < y ? x : y;
+  } else {
+    let index   = count,
+        minimum = Infinity;
 
-  return minimum;
+    while (index--) {
+      const current = $__ToNumber(values[index]);
+
+      if (current !== current) {
+        return NaN;
+      } else if (current < minimum) {
+        minimum = current;
+      }
+    }
+
+    return minimum;
+  }
 }
 
 min.@@set('length', 2);
