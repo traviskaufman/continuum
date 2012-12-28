@@ -102,15 +102,13 @@ export class Map {
     ensureMap(this, 'values');
     return new MapIterator('value');
   }
-
-  @iterator(){
-    ensureMap(this, '@iterator');
-    return new MapIterator(this, 'key+value');
-  }
 }
+
 
 builtinClass(Map);
 const MapPrototype = Map.prototype;
+MapPrototype.@@define(@iterator, MapPrototype.entries);
+
 
 
 function mapClear(map){
