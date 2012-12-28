@@ -83,8 +83,8 @@ export class Map {
     return $__MapHas(this, key);
   }
 
-  items(){
-    ensureMap(this, 'items');
+  entries(){
+    ensureMap(this, 'entries');
     return new MapIterator('key+value');
   }
 
