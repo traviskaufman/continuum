@@ -27,14 +27,7 @@ export class Number {
     if (typeof this === 'number') {
       return this;
     } else if ($__GetBuiltinBrand(this) === 'Number') {
-      return this.@@NumberValue
-    value = value.length ? $__ToNumber(value[0]) : 0;
-    if (!$__IsConstructCall()) {
-      return value;
-    }
-    $__SetBuiltinBrand(this, 'NumberWrapper');
-    this.@@NumberValue = value;;
-    }
+      return this.@@NumberValue;
     throw $__Exception('not_generic', ['Number.prototype.valueOf']);
   }
 
