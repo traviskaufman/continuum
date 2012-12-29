@@ -132,30 +132,6 @@ var natives = (function(module){
       }
       return $$ThrowException('unknown_builtin_brand');
     },
-    _HasProperty: function(obj, args){
-      return args[0].HasProperty(args[1]);
-    },
-    _IsExtensible: function(obj){
-      return args[0].IsExtensible();
-    },
-    _PreventExtensions: function(obj){
-      return args[0].PreventExtensions();
-    },
-    _GetPrototype: function(obj, args){
-      obj = args[0];
-      do {
-        obj = obj.GetInheritance();
-      } while (obj && obj.HiddenPrototype)
-      return obj;
-    },
-    _SetPrototype: function(obj, args){
-      obj = args[0];
-      var proto = obj.Prototype;
-      if (proto && proto.HiddenPrototype) {
-        obj = proto;
-      }
-      return obj.SetInheritance(args[1]);
-    },
     _TypedArrayCreate: function(obj, args){
       return new $TypedArray(args[0], args[1], args[2], args[3]);
     },
@@ -186,6 +162,27 @@ var natives = (function(module){
 
       return obj.View['get'+args[0]](offset, !!args[2]);
     },
+    _GetPrototype: function(obj, args){
+      obj = args[0];
+      do {
+        obj = obj.GetInheritance();
+      } while (obj && obj.HiddenPrototype)
+      return obj;
+    },
+    _SetPrototype: function(obj, args){
+      obj = args[0];
+      var proto = obj.Prototype;
+      if (proto && proto.HiddenPrototype) {
+        obj = proto;
+      }
+      return obj.SetInheritance(args[1]);
+    },
+    _IsExtensible: function(obj){
+      return args[0].IsExtensible();
+    },
+    _PreventExtensions: function(obj){
+      return args[0].PreventExtensions();
+    },
     _DefineOwnProperty: function(obj, args){
       return args[0].DefineOwnProperty(args[1], $$ToPropertyDescriptor(args[2]), args[3]);
     },
@@ -197,6 +194,9 @@ var natives = (function(module){
     },
     _GetOwnProperty: function(obj, args){
       return $$FromPropertyDescriptor(args[0].GetOwnProperty(args[1]));
+    },
+    _HasProperty: function(obj, args){
+      return args[0].HasProperty(args[1]);
     },
     _HasOwnProperty: function(obj, args){
       return args[0].HasOwnProperty(args[1]);
