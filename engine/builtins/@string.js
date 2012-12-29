@@ -363,6 +363,7 @@ export class String {
 
 builtinClass(String);
 String.prototype.@@StringValue = '';
+$__define(String.prototype, 'length', 0, FROZEN);
 
 
 export function fromCharCode(...codeUnits){
