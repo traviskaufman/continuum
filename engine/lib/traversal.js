@@ -20,12 +20,13 @@ var traversal = (function(exports){
       StopIteration  = iteration.StopIteration,
       uid            = utility.uid,
       toArray        = functions.toArray,
-      fname          = functions.fname;
+      fname          = functions.fname,
+      call           = functions.call;
 
 
   var _hasOwn = {}.hasOwnProperty;
 
-  function clone(o, hidden){
+  exports.clone = function clone(o, hidden){
     function recurse(from, to, key){
       try {
         var val = from[key];
@@ -66,8 +67,7 @@ var traversal = (function(exports){
     });
 
     return out;
-  }
-  exports.clone = clone;
+  };
 
   // this function runs extremely hot
   var walk = exports.walk = (function(){
@@ -325,16 +325,37 @@ var traversal = (function(exports){
   })();
 
 
-  function createVisitor(handlers){
+  exports.createVisitor = function createVisitor(handlers){
     return new Visitor(handlers);
-  }
-  exports.createVisitor = createVisitor;
+  };
 
 
-  function visit(node, handlers){
+  exports.visit = function visit(node, handlers){
     return new Visitor(handlers).visit(node);
-  }
-  exports.visit = visit;
+  };
+
+
+  exports.jsonify = function jsonify(object, key){
+    key || (key = '');
+
+    if (!isObject(object)) {
+      return object;
+    }
+
+    if (typeof object.toJSON === 'function') {
+      return jsonify(object.toJSON(key), key);
+    }
+
+    var result = object instanceof Array ? [] : {};
+    each(object, function(value, key){
+      if (value && typeof value.toJSON === 'function') {
+        value = value.toJSON(key);
+      }
+      result[key] = value;
+    });
+
+    return result;
+  };
 
 
   return exports;

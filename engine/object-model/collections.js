@@ -1,14 +1,16 @@
 var collections = (function(exports){
   "use strict";
-  var objects   = require('../lib/objects');
+  var objects   = require('../lib/objects'),
+      traversal = require('../lib/traversal'),
+      utility   = require('../lib/utility');
 
   var Hash    = objects.Hash,
       create  = objects.create,
       define  = objects.define,
       inherit = objects.inherit,
       hasOwn  = objects.hasOwn,
-      tag     = require('../lib/utility').tag;
-
+      jsonify = traversal.jsonify,
+      tag     = utility.tag;
 
   exports.MapData = (function(){
     function LinkedItem(key, next){
@@ -22,8 +24,8 @@ var collections = (function(exports){
       function unlink(){
         this.next.previous = this.previous;
         this.previous.next = this.next;
-        this.next = this.previous = this.data = this.key = null;
-        return this.data;
+        this.next = this.previous = this.value = this.key = null;
+        return this.value;
       }
     ]);
 
@@ -42,6 +44,15 @@ var collections = (function(exports){
     });
 
     define(MapData.prototype, [
+      function toJSON(key){
+        var entries = [];
+        this.forEach(function(value, key){
+          console.log(value, key);
+          entries.push([jsonify(key), jsonify(value)]);
+        });
+        return { type: 'MapData',
+                 entries: entries };
+      },
       function reset(){
         this.size = 0;
         this.numbers = [];
@@ -57,11 +68,13 @@ var collections = (function(exports){
         return result;
       },
       function forEach(callback, context){
-        var item = this.guard.next;
+        var item  = this.guard.next,
+            index = 0;
+
         context = context || this;
 
         while (item !== this.guard) {
-          callback.call(context, item.value, item.key);
+          callback.call(context, item.value, item.key, this);
           item = item.next;
         }
       },
@@ -73,7 +86,7 @@ var collections = (function(exports){
           if (item.key !== null && typeof item.key === 'object') {
             delete item.key.storage[this.id];
           }
-          item.next = item.previous = item.data = item.key = null;
+          item.next = item.previous = item.value = item.key = null;
           item = next;
         }
 
