@@ -262,34 +262,41 @@ var descriptors = (function(exports){
       var field = descFields[i];
       if (obj.HasProperty(field)) {
         var result = fields[field] = obj.Get(field);
-        if (result && result !== true && result.Abrupt) return result;
+        if (result && result.Abrupt) return result;
       }
-    }
-
-    if (fields.get ? !fields.get.Call : fields.get !== undefined) {
-      return $$ThrowException('getter_must_be_callable', [typeof fields.get]);
-    }
-
-    if (fields.set ? !fields.set.Call : fields.set !== undefined) {
-      return $$ThrowException('setter_must_be_callable', [typeof fields.set]);
     }
 
     if ('get' in fields || 'set' in fields) {
       if ('value' in fields || 'writable' in fields) {
         return $$ThrowException('value_and_accessor', [fields]);
       }
-      var desc = new EmptyDataDescriptor;
-      if ('get' in fields) desc.Get = fields.get;
-      if ('set' in fields) desc.Set = fields.set;
-    } else if ('value' in fields || 'writable' in fields) {
+
       var desc = new EmptyAccessorDescriptor;
+
+      if ('get' in fields) {
+        var getter = desc.Get = fields.get;
+        if (getter ? !getter.Call : getter !== undefined) {
+          return $$ThrowException('getter_must_be_callable', [typeof getter]);
+        }
+      }
+
+      if ('set' in fields) {
+        var setter = desc.Set = fields.set;
+        if (setter ? !setter.Call : setter !== undefined) {
+          return $$ThrowException('setter_must_be_callable', [typeof setter]);
+        }
+      }
+    } else if ('value' in fields || 'writable' in fields) {
+      var desc = new EmptyDataDescriptor;
       if ('value' in fields) desc.Value = fields.value;
       if ('writable' in fields) desc.Writable = fields.writable;
     } else {
-      var desc = new PropertyDescriptor;
+      var desc = new EmptyDataDescriptor;
     }
+
     if ('enumerable' in fields) desc.Enumerable = fields.enumerable;
     if ('configurable' in fields) desc.Configurable = fields.configurable;
+
     return desc;
   }
 
@@ -300,7 +307,7 @@ var descriptors = (function(exports){
     var obj = new $Object;
     for (var i=0, v; i < 6; i++) {
       if (descProps[i] in desc) {
-        obj.set(descFields[i], desc[descProps[i]]);
+        obj.define(descFields[i], desc[descProps[i]], ECW);
       }
     }
     return obj;
@@ -333,11 +340,11 @@ var descriptors = (function(exports){
 
 
   function $$CopyAttributes(from, to){
-    var props = from.Enumerate(true, false);
+    var props = from.Enumerate(true, true);
     for (var i=0; i < props.length; i++) {
       var field = props[i];
       if (!(field in standardFields)) {
-        to.define(field, from.Get(field), ECW);
+        to.set(field, from.Get(field));
       }
     }
   }

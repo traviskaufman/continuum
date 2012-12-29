@@ -143,11 +143,11 @@ var $Object = (function(exports){
   exports.$$OrdinaryDefineOwnProperty = $$OrdinaryDefineOwnProperty;
 
 
-  function $$IsCompatableDescriptor(extensible, desc, current){
+  function $$IsCompatibleDescriptor(extensible, desc, current){
     return $$ValidateAndApplyPropertyDescriptor(undefined, undefined, extensible, desc, current);
   }
 
-  exports.$$IsCompatableDescriptor = $$IsCompatableDescriptor;
+  exports.$$IsCompatibleDescriptor = $$IsCompatibleDescriptor;
 
 
   function $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current){

@@ -931,11 +931,16 @@ var debug = (function(exports){
 
   var MirrorProxy = (function(){
     function MirrorProxy(subject){
+      if (subject.__introspected) {
+        return subject.__introspected;
+      }
+      subject.__introspected = this;
       this.subject = subject;
       if ('Call' in subject) {
         this.type = 'function';
       }
       this.target = introspect(subject.ProxyTarget);
+      this.cache = new Hash;
       this.kind = this.target.kind;
       if (this.kind === 'Scope' || this.kind === 'Global') {
         this.kind = 'Object';
@@ -1015,21 +1020,19 @@ var debug = (function(exports){
         return result;
       },
       function query(key){
-        return descToAttrs(this.subject.GetOwnProperty(key));
-      },
-      function getOwnDescriptor(key){
-        var desc = this.subject.GetOwnProperty(key);
-        var out =  {};
-        for (var k in desc) {
-          out[k.toLowerCase()] = desc[k];
+        var prop = this.describe(key);
+        if (prop) {
+          return prop[2];
         }
-        return out;
       },
       function get(key){
-        return introspect(this.subject.Get(key));
+        return introspect(this.getValue(key));
       },
       function getValue(key){
-        return this.subject.Get(key);
+        var prop = key in this.cache ? this.cache[key] : this.describe(key);
+        if (prop) {
+          return prop[1];
+        }
       },
       function hasOwn(key){
         return this.subject.HasOwnProperty(key);
@@ -1037,27 +1040,50 @@ var debug = (function(exports){
       function has(key){
         return this.subject.HasProperty(key);
       },
+      function scheduleReset(){
+        if (!this.resetScheduled) {
+          this.resetScheduled = true;
+          var self = this;
+          setTimeout(function(){
+            self.enumerated = false;
+            self.resetScheduled = false;
+            self.cache = new Hash;
+          }, 15);
+        }
+      },
       function describe(key){
-        var desc = this.subject.GetOwnProperty(key);
-        if (desc) {
-          if ('Get' in desc || 'Set' in desc) {
-            var val = { Get: desc.Get, Set: desc.Set };
+        if (key in this.cache) {
+          return this.cache[key];
+        }
+        if (key !== '__proto__') {
+          var desc = this.subject.GetOwnProperty(key);
+          this.scheduleReset();
+          if (desc) {
+            if ('Get' in desc || 'Set' in desc) {
+              var val = { Get: desc.Get, Set: desc.Set };
+            } else {
+              var val = desc.Value;
+            }
+            this.cache[key] = [key, val, descToAttrs(desc)];
           } else {
-            var val = desc.Value;
+            this.cache[key] = undefined;
           }
-          return [key, val, descToAttrs(desc)];
+          return this.cache[key];
         }
       },
       function ownAttrs(props){
+        if (this.enumerated) {
+          return this.cache;
+        }
+        this.enumerated = true;
+
         var keys = this.subject.Enumerate(false, false);
 
-        props || (props = new Hash);
-
         for (var i=0; i < keys.length; i++) {
-          props[keys[i]] = this.describe(keys[i]);
+          this.describe(keys[i]);
         }
 
-        return props;
+        return this.cache;
       }
     ]);
 

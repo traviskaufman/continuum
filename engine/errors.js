@@ -18,7 +18,7 @@ var errors = (function(errors, messages, exports){
           argNames.push(str);
         src += '+'+str;
       } else {
-        src += '+'+'"'+str.replace(/["\\\n]/g, '\\$0')+'"';
+        src += '+"'+str.replace(/["\\\n]/g, '\\$0')+'"';
       }
     }
 
@@ -144,11 +144,12 @@ var errors = (function(errors, messages, exports){
     put_property_or_throw          : ["$0", " cannot assign to read only property '", "$1", "'"],
     strict_poison_pill             : ["'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"],
     object_not_extensible          : ["Can't add property ", "$0", ", object is not extensible"],
-    proxy_prototype_inconsistent        : ["cannot report a prototype value that is inconsistent with target prototype value"],
-    proxy_extensibility_inconsistent    : ["cannot report a non-extensible object as extensible or vice versa"],
-    proxy_configurability_inconsistent  : ["cannot report innacurate configurability for property '", "$0"],
-    proxy_enumerate_properties          : ["enumerate trap failed to include non-configurable enumerable property '", "$0", "'"],
+    proxy_prototype_inconsistent        : ["Cannot report a prototype value that is inconsistent with target prototype value"],
+    proxy_extensibility_inconsistent    : ["Cannot report a non-extensible object as extensible or vice versa"],
+    proxy_configurability_inconsistent  : ["Cannot report innacurate configurability for property '", "$0"],
+    proxy_enumerate_properties          : ["Enumerate trap failed to include non-configurable enumerable property '", "$0", "'"],
     proxy_non_callable_trap             : ["Proxy trap for ", "$0", " is not a function"],
+    proxy_incompatible_descriptor       : ["Proxy trap ", "$0", " returned an incompatible descriptor"],
     proxy_inconsistent                  : ["Proxy trap ", "$0", " returned an invalid value for a non-configurable property"],
     proxy_non_extensible                : ["Proxy trap ", "$0", " returned an invalid value for a non-extensible object"],
     proxy_duplicate                     : ["Proxy trap ", "$0", " returned duplicate property"],

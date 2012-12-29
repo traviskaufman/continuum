@@ -10,6 +10,12 @@ builtinClass(Proxy);
 
 $__delete(Proxy, 'prototype');
 
+const normal = {
+  writable: true,
+  enumerable: true,
+  configurable: true
+};
+
 export class Handler {
   getOwnPropertyDescriptor(target, name){
     //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
@@ -116,7 +122,7 @@ export class Handler {
 
   has(target, name){
     const desc = this.getOwnPropertyDescriptor(target, name);
-    if (desc !== undefined) {
+    if (desc) {
       return true;
     }
 
@@ -144,46 +150,43 @@ export class Handler {
     return getter === undefined ? undefined : $__Call(getter, receiver, []);
   }
 
-  set(target, name, value, receiver){
+  set(target, name, value, receiver) {
     const ownDesc = this.getOwnPropertyDescriptor(target, name);
 
     if (ownDesc !== undefined) {
       if ('get' in ownDesc || 'set' in ownDesc) {
-        var setter = ownDesc.set;
-        if (setter === undefined) return false;
+        const setter = ownDesc.set;
+        if (setter === undefined) {
+          return false;
+        }
         $__Call(setter, receiver, [value]);
         return true;
-      }
-
-      if (ownDesc.writable === false) {
+      } else if (ownDesc.writable === false) {
         return false;
       } else if (receiver === target) {
         $__DefineOwnProperty(receiver, name, { value: value });
         return true;
-      } else {
-        $__DefineOwnProperty(receiver, name, newDesc);
-        if ($__IsExtensible(receiver)) {
-          $__DefineOwnProperty(object, key, { writable: true,
-                                              enumerable: true,
-                                              configurable: true });
-          return true;
-        }
+      } else if (!$__IsExtensible(receiver)) {
         return false;
       }
+      normal.value = value;
+      $__DefineOwnProperty(receiver, name, normal);
+      normal.value = undefined;
+      return true;
     }
 
     const proto = $__GetPrototype(target);
     if (proto === null) {
-      if ($__IsExtensible(receiver)) {
-        $__DefineOwnProperty(receiver, key, { writable: true,
-                                              enumerable: true,
-                                              configurable: true });
-        return true;
+      if (!$__IsExtensible(receiver)) {
+        return false;
       }
-      return false;
+      normal.value = value;
+      $__DefineOwnProperty(receiver, name, normal);
+      normal.value = undefined;
+      return true;
     }
 
-    return this.set(proto, name, value, receiver);
+    return $__SetP(proto, name, value, receiver);
   }
 
   enumerate(target){
@@ -195,7 +198,7 @@ export class Handler {
       const name = $__ToString(result[i]),
             desc = this.getOwnPropertyDescriptor(name);
 
-      if (desc != null && !desc.enumerable) {
+      if (desc != null && desc.enumerable) {
         result.push(name);
       }
     }
@@ -268,7 +271,7 @@ builtinFunction(deleteProperty);
 
 
 export function enumerate(target){
-  return $__Enumerate($__ToObject(target), false, false);
+  return $__Enumerate($__ToObject(target), true, true);
 }
 
 builtinFunction(enumerate);

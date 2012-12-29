@@ -191,10 +191,10 @@ var natives = (function(module){
       }
       return obj.SetInheritance(args[1]);
     },
-    _IsExtensible: function(obj){
+    _IsExtensible: function(obj, args){
       return args[0].IsExtensible();
     },
-    _PreventExtensions: function(obj){
+    _PreventExtensions: function(obj, args){
       return args[0].PreventExtensions();
     },
     _DefineOwnProperty: function(obj, args){
