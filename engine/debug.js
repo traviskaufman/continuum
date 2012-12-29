@@ -455,6 +455,9 @@ var debug = (function(exports){
     }, [
       function primitiveValue(){
         return this.subject.getPrimitiveValue();
+      },
+      function label(){
+        return this.kind+'('+this.subject.getPrimitiveValue()+')';
       }
     ]);
 
@@ -743,7 +746,10 @@ var debug = (function(exports){
     inherit(MirrorString, MirrorPrimitiveWrapper,{
       kind: 'String'
     }, [
-      MirrorArray.prototype.list
+      MirrorArray.prototype.list,
+      function label(){
+        return this.kind+'("'+this.subject.getPrimitiveValue()+'")';
+      }
     ]);
 
     return MirrorString;
