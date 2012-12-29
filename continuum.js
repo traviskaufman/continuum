@@ -10874,7 +10874,8 @@ exports.assembler = (function(exports){
       GET();
       isSuper ? SUPER_ELEMENT() : ELEMENT();
     } else {
-      isSuper ? SUPER_MEMBER() : MEMBER(symbol(node.property));
+      var prop = symbol(node.property);
+      isSuper ? SUPER_MEMBER(prop) : MEMBER(prop);
     }
   }
 
@@ -11692,13 +11693,13 @@ exports.descriptors = (function(exports){
 
 
   function $$ToCompletePropertyDescriptor(obj){
-    var desc = ToPropertyDescriptor(obj);
+    var desc = $$ToPropertyDescriptor(obj);
     if (desc && desc.Abrupt) return desc;
 
-    if (desc.isDataDescriptor) {
+    if ('Value' in desc || 'Writable' in desc) {
       'Value' in desc    || (desc.Value = undefined);
       'Writable' in desc || (desc.Writable = false);
-    } else if (desc.isAccessorDescriptor) {
+    } else if ('Get' in desc || 'Set' in desc) {
       'Get' in desc || (desc.Get = undefined);
       'Set' in desc || (desc.Set = undefined);
     } else {
@@ -11726,7 +11727,6 @@ exports.descriptors = (function(exports){
 
   exports.$$CopyAttributes = $$CopyAttributes;
 
-
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
 
@@ -11735,7 +11735,8 @@ exports.collections = (function(exports){
   "use strict";
   var objects   = require('../lib/objects'),
       traversal = require('../lib/traversal'),
-      utility   = require('../lib/utility');
+      utility   = require('../lib/utility'),
+      constants = require('../lib/constants');
 
   var Hash    = objects.Hash,
       create  = objects.create,
@@ -11743,7 +11744,8 @@ exports.collections = (function(exports){
       inherit = objects.inherit,
       hasOwn  = objects.hasOwn,
       jsonify = traversal.jsonify,
-      tag     = utility.tag;
+      tag     = utility.tag,
+      Empty   = constants.Empty;
 
   exports.MapData = (function(){
     function LinkedItem(key, next){
@@ -14473,29 +14475,30 @@ exports.$Proxy = (function(module){
   "use strict";
   var objects     = require('../lib/objects'),
       errors      = require('../errors'),
+      constants   = require('./constants'),
       operators   = require('./operators'),
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
       $Object     = require('./$Object').$Object,
       $Array      = require('./$Array');
 
-  var inherit = objects.inherit,
-      is      = objects.is,
-      define  = objects.define,
-      $$ToPropertyDescriptor                   = descriptors.$$ToPropertyDescriptor,
-      $$FromGenericPropertyDescriptor          = descriptors.$$FromGenericPropertyDescriptor,
-      $$NormalizeAndCompletePropertyDescriptor = descriptors.$$NormalizeAndCompletePropertyDescriptor,
-      $$CopyAttributes                         = descriptors.$$CopyAttributes,
-      $$IsDataDescriptor                       = descriptors.$$IsDataDescriptor,
-      $$IsAccessorDescriptor                   = descriptors.$$IsAccessorDescriptor,
-      $$ThrowException                         = errors.$$ThrowException,
-      $$ToBoolean                              = operators.$$ToBoolean,
-      $$ToString                               = operators.$$ToString,
-      $$ToUint32                               = operators.$$ToUint32,
-      $$IsCallable                             = operations.$$IsCallable,
-      $$GetMethod                              = operations.$$GetMethod,
-      $$CreateListFromArray                    = operations.$$CreateListFromArray,
-      $$IsCompatibleDescriptor                 = operations.$$IsCompatibleDescriptor;
+  var inherit     = objects.inherit,
+      is          = objects.is,
+      define      = objects.define,
+      isUndefined = constants.isUndefined,
+      $$ToPropertyDescriptor          = descriptors.$$ToPropertyDescriptor,
+      $$FromGenericPropertyDescriptor = descriptors.$$FromGenericPropertyDescriptor,
+      $$CopyAttributes                = descriptors.$$CopyAttributes,
+      $$IsDataDescriptor              = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor          = descriptors.$$IsAccessorDescriptor,
+      $$ThrowException                = errors.$$ThrowException,
+      $$ToBoolean                     = operators.$$ToBoolean,
+      $$ToString                      = operators.$$ToString,
+      $$ToUint32                      = operators.$$ToUint32,
+      $$IsCallable                    = operations.$$IsCallable,
+      $$GetMethod                     = operations.$$GetMethod,
+      $$CreateListFromArray           = operations.$$CreateListFromArray,
+      $$IsCompatibleDescriptor        = operations.$$IsCompatibleDescriptor;
 
 
 
@@ -14549,7 +14552,10 @@ exports.$Proxy = (function(module){
       var trapResult = trap.Call(handler, [target, key]);
       if (trapResult && trapResult.Abrupt) return trapResult;
 
-      var desc = $$NormalizeAndCompletePropertyDescriptor(trapResult);
+      if (trapResult) {
+        var desc = $$ToCompletePropertyDescriptor($$FromPropertyDescriptor(object));
+        $$CopyAttributes(trapResult, desc);
+      }
 
       var targetDesc = target.GetOwnProperty(key);
       if (targetDesc && targetDesc.Abrupt) return targetDesc;
@@ -14568,7 +14574,7 @@ exports.$Proxy = (function(module){
         return $$ThrowException('proxy_extensibility_inconsistent');
       } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(desc))) {
         return $$ThrowException('proxy_incompatible_descriptor');
-      } else if (!$$ToBoolean(desc.Get('configurable')) && targetDesc === undefined || targetDesc.Configurable) {
+      } else if (desc !== undefined && !$$ToBoolean(desc.Get('configurable')) && targetDesc && targetDesc.Configurable) {
         return $$ThrowException('proxy_configurability_inconsistent')
       }
 
@@ -14576,22 +14582,45 @@ exports.$Proxy = (function(module){
     }
   }
 
-  var HasInstance;
+
+  var proto = require('../lib/utility').uid();
+
+  function checkDuplicates(array){
+    var seen = new Hash;
+
+    for (var i=0; i < array.length; i++) {
+      var element = array[i] === '__proto__' ? proto : array[i];
+      if (element in seen) {
+        return $$ThrowException('proxy_duplicate', type);
+      }
+      seen[element] = true;
+    }
+
+    return seen;
+  }
+
+  function getHasInstance(){
+    var HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
+    getHasInstance = function(){
+      return HasInstance;
+    };
+    return HasInstance;
+  }
 
   function $Proxy(target, handler){
     this.ProxyHandler = handler;
     this.ProxyTarget = target;
     this.BuiltinBrand = target.BuiltinBrand;
-    if ('Call' in target) {
-      if (!HasInstance) {
-        HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
-      }
-      this.HasInstance = HasInstance;
+
+    if (target.Call) {
       this.Call = ProxyCall;
+      this.HasInstance = getHasInstance();
       this.Construct = ProxyConstruct;
     }
-    if ('PrimitiveValue' in target) {
-      this.PrimitiveValue = target.PrimitiveValue;
+
+    if (target.getPrimitiveValue) {
+      this.getPrimitiveValue = ProxyGetPrimitiveValue;
+      this.setPrimitiveValue = ProxySetPrimitiveValue;
     }
   }
 
@@ -14750,7 +14779,7 @@ exports.$Proxy = (function(module){
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
-        if (desc !== undefined && targetDesc.Configurable === false) {
+        if (targetDesc !== undefined && targetDesc.Configurable === false) {
           return $$ThrowException('proxy_inconsistent', 'has');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
           return $$ThrowException('proxy_non_extensible', 'has');
@@ -14774,7 +14803,7 @@ exports.$Proxy = (function(module){
         var targetDesc = this.ProxyTarget.GetOwnProperty(key);
         if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
-        if (desc !== undefined && targetDesc.Configurable === false) {
+        if (targetDesc !== undefined && targetDesc.Configurable === false) {
           return $$ThrowException('proxy_inconsistent', 'delete');
         } else if (!this.ProxyTarget.IsExtensible() && targetDesc !== undefined) {
           return $$ThrowException('proxy_non_extensible', 'delete');
@@ -14807,44 +14836,46 @@ exports.$Proxy = (function(module){
         return $$ThrowException('proxy_non_object_result', type);
       }
 
-      var len = $$ToUint32(trapResult.Get('length'));
-      if (len && len.Abrupt) return len;
+      if (trapResult.array) {
+        var array = trapResult.array;
+      } else {
+        var len = $$ToUint32(trapResult.Get('length'));
+        if (len && len.Abrupt) return len;
 
-      var array = [],
-          seen = new Hash;
+        var array = new Array(len);
 
-      for (var i = 0; i < len; i++) {
-        var element = $$ToString(trapResult.Get(''+i));
-        if (element && element.Abrupt) return element;
+        for (var i = 0; i < len; i++) {
+          var element = $$ToPropertyKey(trapResult.Get(i+''));
+          if (element && element.Abrupt) return element;
 
-        if (element in seen) {
-          return $$ThrowException('proxy_duplicate', type);
+          if (!includePrototype && !this.ProxyTarget.IsExtensible() && !this.ProxyTarget.HasOwnProperty(element)) {
+            return $$ThrowException('proxy_non_extensible', type);
+          }
+
+          array[i] = element;
         }
-        seen[element] = true;
-
-        if (!includePrototype && !this.ProxyTarget.IsExtensible() && !this.ProxyTarget.HasOwnProperty(element)) {
-          return $$ThrowException('proxy_non_extensible', type);
-        }
-
-        array[i] = element;
       }
+
+      var seen = checkDuplicates(array);
+      if (seen.Abrupt) return seen;
 
       var props = this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable);
       if (props && props.Abrupt) return props;
 
-      var len = props.length;
-
-      for (var i=0; i < len; i++) {
-        if (!(props[i] in seen)) {
+      for (var i=0; i < props.length; i++) {
+        var element = props[i] === '__proto__' ? proto : props[i];
+        if (!(element in seen)) {
           var targetDesc = this.ProxyTarget.GetOwnProperty(props[i]);
           if (targetDesc && targetDesc.Abrupt) return targetDesc;
 
-          if (targetDesc && !targetDesc.Configurable) {
-            return $$ThrowException('proxy_inconsistent', type);
-          }
+          if (targetDesc) {
+            if (!targetDesc.Configurable) {
+              return $$ThrowException('proxy_inconsistent', type);
+            }
 
-          if (targetDesc && !this.ProxyTarget.IsExtensible()) {
-            return $$ThrowException('proxy_non_extensible', type);
+            if (!this.ProxyTarget.IsExtensible()) {
+              return $$ThrowException('proxy_non_extensible', type);
+            }
           }
         }
       }
@@ -14873,6 +14904,14 @@ exports.$Proxy = (function(module){
     }
 
     return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $Array(args)]);
+  }
+
+  function ProxyGetPrimitiveValue(){
+    return this.ProxyTarget.getPrimitiveValue();
+  }
+
+  function ProxySetPrimitiveValue(value){
+    return this.ProxyTarget.setPrimitiveValue(value);
   }
 
   return module.exports = $Proxy;
@@ -21589,7 +21628,7 @@ exports.builtins["@iter"] = "export const iterator = @@iterator;\n\nexport class
 
 exports.builtins["@json"] = "let ReplacerFunction, PropertyList, stack, indent, gap;\n\nfunction J(value){\n  if (stack.has(value)) {\n    throw $__Exception('circular_structure', []);\n  }\n\n  const stepback = indent,\n        partial = [];\n\n  var brackets;\n\n  indent += gap;\n  stack.add(value);\n\n  if ($__GetBuiltinBrand(value) === 'Array') {\n    brackets = ['[', ']'];\n\n    for (var i=0, len = value.length; i < len; i++) {\n      var prop = Str(i, value);\n      partial[i] = prop === undefined ? 'null' : prop;\n    }\n  } else {\n    var keys = PropertyList || $__Enumerate(value, false, true),\n        colon = gap ? ': ' : ':';\n\n    brackets = ['{', '}'];\n\n    for (var i=0, len=keys.length; i < len; i++) {\n      var prop = Str(keys[i], value);\n      if (prop !== undefined) {\n        partial.push($__Quote(keys[i]) + colon + prop);\n      }\n    }\n  }\n\n  var final;\n  if (!partial.length) {\n    final = brackets[0] + brackets[1];\n  } else if (!gap) {\n    final = brackets[0] + partial.join(',') + brackets[1];\n  } else {\n    final = brackets[0] + '\\n' + indent + partial.join(',\\n' + indent) + '\\n' + stepback + brackets[1];\n  }\n  stack.delete(value);\n  indent = stepback;\n  return final;\n}\n\ninternalFunction(J);\n\nfunction Str(key, holder){\n  var value = holder[key];\n  if ($__Type(value) === 'Object') {\n    var toJSON = value.toJSON;\n    if (typeof toJSON === 'function') {\n      value = $__Call(toJSON, value, [key]);\n    }\n  }\n\n  if (ReplacerFunction) {\n    value = $__Call(ReplacerFunction, holder, [key, value]);\n  }\n\n  if ($__Type(value) === 'Object') {\n    var brand = $__GetBuiltinBrand(value);\n    if (brand === 'Number') {\n      value = $__ToNumber(value);\n    } else if (brand === 'String') {\n      value = $__ToString(value);\n    } else if (brand === 'Boolean') {\n      value = value.@@BooleanValue;\n    }\n  }\n\n\n  if (value === null) {\n    return 'null';\n  } else if (value === true) {\n    return 'true';\n  } else if (value === false) {\n    return 'false';\n  }\n\n  var type = typeof value;\n  if (type === 'string') {\n    return $__Quote(value);\n  } else if (type === 'number') {\n    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;\n  } else if (type === 'object') {\n    return J(value);\n  }\n\n}\n\ninternalFunction(Str);\n\nexport function stringify(value, replacer, space){\n  ReplacerFunction = undefined;\n  PropertyList = undefined;\n  stack = new Set;\n  indent = '';\n\n  if ($__Type(replacer) === 'Object') {\n    if (typeof replacer === 'function') {\n      ReplacerFunction = replacer;\n    } else if ($__GetBuiltinBrand(replacer) === 'Array') {\n      let props = new Set;\n\n      for (let value of replacer) {\n        var item,\n            type = $__Type(value);\n\n        if (type === 'String') {\n          item = value;\n        } else if (type === 'Number') {\n          item = $__ToString(value);\n        } else if (type === 'Object') {\n          let brand = $__GetBuiltinBrand(value);\n          if (brand === 'String' || brand === 'Number') {\n            item = $__ToString(value);\n          }\n        }\n\n        if (item !== undefined) {\n          props.add(item);\n        }\n      }\n\n      PropertyList = [...props];\n    }\n  }\n\n  if ($__Type(space) === 'Object') {\n    space = $__ToString(space);\n  }\n\n  if ($__Type(space) === 'String') {\n    gap = $__StringSlice(space, 0, 10);\n  } else if ($__Type(space) === 'Number') {\n    space |= 0;\n    space = space > 10 ? 10 : space < 1 ? 0 : space\n    gap = ' '.repeat(space);\n  } else {\n    gap = '';\n  }\n\n  return Str('', { '': value });\n}\n\nexport function parse(source, reviver){\n  return $__JSONParse(source, reviver);\n}\n\n\n\nexport let JSON = {};\nextend(JSON, { stringify, parse });\n$__SetBuiltinBrand(JSON, 'BuiltinJSON');\n$__define(JSON, @@toStringTag, 'JSON');\n";
 
-exports.builtins["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {\n    throw $__Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;\n    return mapCreate(map, iterable);\n  }\n\n  get size(){\n    if (this && $__hasInternal(this, 'MapData')) {\n      return $__MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    return $__MapClear(this, key);\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  entries(){\n    ensureMap(this, 'entries');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    return $__MapSet(this, key, value);\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n}\n\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n$__define(MapPrototype, @@iterator, MapPrototype.entries);\n\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  return $__MapClear(map);\n}\n\nbuiltinFunction(mapClear);\n\nfunction mapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map']);\n  }\n\n  $__MapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(mapCreate);\n\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $__MapDelete(map, key);\n}\n\nbuiltinFunction(mapDelete);\n\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $__MapGet(map, key);\n}\n\nbuiltinFunction(mapGet);\n\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $__MapHas(map, key);\n}\n\nbuiltinFunction(mapHas);\n\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));\n}\n\nbuiltinFunction(mapIterate);\n\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  return $__MapSet(map, key, value);\n}\n\nbuiltinFunction(mapSet);\n\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $__MapSize(map);\n}\n\nbuiltinFunction(mapSize);\n\n\nexport const clear   = mapClear,\n             create  = mapCreate,\n           //delete  = mapDelete, TODO: fix exporting reserved names\n             get     = mapGet,\n             has     = mapHas,\n             iterate = mapIterate,\n             set     = mapSet,\n             size    = mapSize;\n";
+exports.builtins["@map"] = "import Iterator from '@iter';\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {\n    throw $__Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n    if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;\n    return mapCreate(map, iterable);\n  }\n\n  get size(){\n    if (this && $__hasInternal(this, 'MapData')) {\n      return $__MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    $__MapClear(this, key);\n    return this;\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  entries(){\n    ensureMap(this, 'entries');\n    return new MapIterator('key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator('key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    $__MapSet(this, key, value);\n    return this;\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator('value');\n  }\n}\n\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n$__define(MapPrototype, @@iterator, MapPrototype.entries);\n\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  $__MapClear(map);\n  return map;\n}\n\nbuiltinFunction(mapClear);\n\nfunction mapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map']);\n  }\n\n  $__MapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(mapCreate);\n\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $__MapDelete(map, key);\n}\n\nbuiltinFunction(mapDelete);\n\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $__MapGet(map, key);\n}\n\nbuiltinFunction(mapGet);\n\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $__MapHas(map, key);\n}\n\nbuiltinFunction(mapHas);\n\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));\n}\n\nbuiltinFunction(mapIterate);\n\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  $__MapSet(map, key, value);\n  return map;\n}\n\nbuiltinFunction(mapSet);\n\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $__MapSize(map);\n}\n\nbuiltinFunction(mapSize);\n\n\nexport const clear   = mapClear,\n             create  = mapCreate,\n           //delete  = mapDelete, TODO: fix exporting reserved names\n             get     = mapGet,\n             has     = mapHas,\n             iterate = mapIterate,\n             set     = mapSet,\n             size    = mapSize;\n";
 
 exports.builtins["@math"] = "export const E       = 2.718281828459045,\n             LN10    = 2.302585092994046,\n             LN2     = 0.6931471805599453,\n             LOG10E  = 0.4342944819032518,\n             LOG2E   = 1.4426950408889634,\n             PI      = 3.141592653589793,\n             SQRT1_2 = 0.7071067811865476,\n             SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== -Infinity\n      && value !== Infinity;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  var i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  }\n  return ($__exp(x) + $__exp(-x)) / 2;\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function max(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return -Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x > y ? x : y;\n  } else {\n    let index   = count,\n        maximum = -Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current > maximum) {\n        maximum = current;\n      }\n    }\n\n    return maximum;\n  }\n}\n\n$__set(max, 'length', 2);\n\nexport function min(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x < y ? x : y;\n  } else {\n    let index   = count,\n        minimum = Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current < minimum) {\n        minimum = current;\n      }\n    }\n\n    return minimum;\n  }\n}\n\n$__set(min, 'length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\n$__SetBuiltinBrand(Math, 'BuiltinMath');\n$__define(Math, @@toStringTag, 'Math');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    $__update(Math, k, HIDDEN);\n  } else {\n    $__update(Math, k, FROZEN);\n  }\n}\n";
 
@@ -21603,7 +21642,7 @@ exports.builtins["@reflect"] = "export class Proxy {\n  constructor(target, hand
 
 exports.builtins["@regexp"] = "export class RegExp {\n  constructor(pattern, flags){\n    if ($__IsConstructCall()) {\n      if (pattern === undefined) {\n        pattern = '';\n      } else if (typeof pattern === 'string') {\n      } else if (pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {\n        if (flags !== undefined) {\n          throw $__Exception('regexp_flags', []);\n        }\n      } else {\n        pattern = $__ToString(pattern);\n      }\n      return $__RegExpCreate(pattern, flags);\n    } else {\n      if (flags === undefined && pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {\n        return pattern;\n      }\n      return $__RegExpCreate(pattern, flags);\n    }\n  }\n\n  exec(string){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpExec(this, $__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.exec']);\n  }\n\n  test(string){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpTest(this, $__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.test']);\n  }\n\n  toString(){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpToString(this);\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.toString']);\n  }\n}\n\nbuiltinClass(RegExp);\n\n\nexport function exec(regexp, string){\n  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {\n    return $__RegExpExec(regexp, $__ToString(string));\n  }\n  throw $__Exception('not_generic', ['@regexp.exec']);\n}\n\nbuiltinFunction(exec);\n\n\nexport function test(regexp, string){\n  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {\n    return $__RegExpTest(regexp, [$__ToString(string)]);\n  }\n  throw $__Exception('not_generic', ['@regexp.test']);\n}\n\nbuiltinFunction(test);\n";
 
-exports.builtins["@set"] = "import Map from '@map';\nimport Iterator from '@iter';\n\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = $__getInternal(o, 'SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\ninternalFunction(ensureSet);\n\n\n\nclass SetIterator extends Iterator {\n  private @data, // Set\n          @key;  // SetNextKey\n\n  constructor(set){\n    this.@data = ensureSet($__ToObject(set), 'SetIterator');\n    this.@key  = $__MapSigil();\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n\n    if (!$__has(this, @data) || !$__has(this, @key)) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n\n    return this.@key = $__MapNext(this.@data, this.@key)[0];\n  }\n}\n\nbuiltinClass(SetIterator);\n\n\n\n\nexport class Set {\n  constructor(iterable){\n    var set = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : this;\n    return setCreate(set, iterable);\n  }\n\n  get size(){\n    if (this && $__hasInternal(this, 'SetData')) {\n      return $__MapSize($__getInternal(this, 'SetData'));\n    }\n    return 0;\n  }\n\n  clear(){\n    return $__MapClear(ensureSet(this, 'clear'));\n  }\n\n  add(value){\n    return $__MapSet(ensureSet(this, 'add'), value, value);\n  }\n\n  has(value){\n    return $__MapHas(ensureSet(this, 'has'), value);\n  }\n\n  delete(value){\n    return $__MapDelete(ensureSet(this, 'delete'), value);\n  }\n\n  values(){\n    return new SetIterator(this);\n  }\n}\n\nbuiltinClass(Set);\nconst SetPrototype = Set.prototype;\n$__define(SetPrototype, @@iterator, SetPrototype.values);\n\n\n\nfunction setAdd(set, value){\n  return $__MapSet(ensureSet(set, '@set.add'), value, value);\n}\n\nbuiltinFunction(setAdd);\n\n\nfunction setClear(set){\n  return $__MapClear(ensureSet(set, '@set.clear'));\n}\n\nbuiltinFunction(setClear);\n\n\nfunction setCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  const data = new Map;\n  $__setInternal(target, 'SetData', data);\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    for (var [key, value] of iterable) {\n      $__MapSet(data, value, true);\n    }\n  }\n\n  return target;\n}\n\nbuiltinFunction(setCreate);\n\n\nfunction setDelete(set, value){\n  return $__MapDelete(ensureSet(set, '@set.delete'), value);\n}\n\nbuiltinFunction(setDelete);\n\n\nfunction setHas(set, value){\n  return $__MapHas(ensureSet(set, '@set.has'), value);\n}\n\nbuiltinFunction(setHas);\n\n\nfunction setSize(set){\n  return $__MapSize(ensureMap(set, '@set.size'));\n}\n\nbuiltinFunction(setSize);\n\n\nfunction setIterate(set){\n  return new SetIterator(set);\n}\n\nbuiltinFunction(setIterate);\n\n\nexport const add     = setAdd,\n             clear   = setClear,\n             create  = setCreate,\n           //delete  = setDelete, TODO: fix exporting reserved names\n             has     = setHas,\n             iterate = setIterate,\n             size    = setSize;\n";
+exports.builtins["@set"] = "import Map from '@map';\nimport Iterator from '@iter';\n\n\nfunction ensureSet(o, name){\n  var type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n  var data = $__getInternal(o, 'SetData');\n  if (!data) {\n    throw $__Exception('called_on_incompatible_object', [name]);\n  }\n  return data;\n}\n\ninternalFunction(ensureSet);\n\n\n\nclass SetIterator extends Iterator {\n  private @data, // Set\n          @key;  // SetNextKey\n\n  constructor(set){\n    this.@data = ensureSet($__ToObject(set), 'SetIterator');\n    this.@key  = $__MapSigil();\n  }\n\n  next(){\n    if (!$__IsObject(this)) {\n      throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);\n    }\n\n    if (!$__has(this, @data) || !$__has(this, @key)) {\n      throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);\n    }\n\n    return this.@key = $__MapNext(this.@data, this.@key)[0];\n  }\n}\n\nbuiltinClass(SetIterator);\n\n\n\n\nexport class Set {\n  constructor(iterable){\n    var set = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : this;\n    return setCreate(set, iterable);\n  }\n\n  get size(){\n    if (this && $__hasInternal(this, 'SetData')) {\n      return $__MapSize($__getInternal(this, 'SetData'));\n    }\n    return 0;\n  }\n\n  clear(){\n    $__MapClear(ensureSet(this, 'clear'));\n    return this;\n  }\n\n  add(value){\n    $__MapSet(ensureSet(this, 'add'), value, value);\n    return this;\n  }\n\n  has(value){\n    return $__MapHas(ensureSet(this, 'has'), value);\n  }\n\n  delete(value){\n    return $__MapDelete(ensureSet(this, 'delete'), value);\n  }\n\n  values(){\n    return new SetIterator(this);\n  }\n}\n\nbuiltinClass(Set);\nconst SetPrototype = Set.prototype;\n$__define(SetPrototype, @@iterator, SetPrototype.values);\n\n\n\nfunction setAdd(set, value){\n  $__MapSet(ensureSet(set, '@set.add'), value, value);\n  return set;\n}\n\nbuiltinFunction(setAdd);\n\n\nfunction setClear(set){\n  $__MapClear(ensureSet(set, '@set.clear'));\n  return set;\n}\n\nbuiltinFunction(setClear);\n\n\nfunction setCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'SetData')) {\n    throw $__Exception('double_initialization', ['Set']);\n  }\n\n  const data = new Map;\n  $__setInternal(target, 'SetData', data);\n\n  if (iterable !== undefined) {\n    iterable = $__ToObject(iterable);\n    for (var [key, value] of iterable) {\n      $__MapSet(data, value, true);\n    }\n  }\n\n  return target;\n}\n\nbuiltinFunction(setCreate);\n\n\nfunction setDelete(set, value){\n  return $__MapDelete(ensureSet(set, '@set.delete'), value);\n}\n\nbuiltinFunction(setDelete);\n\n\nfunction setHas(set, value){\n  return $__MapHas(ensureSet(set, '@set.has'), value);\n}\n\nbuiltinFunction(setHas);\n\n\nfunction setSize(set){\n  return $__MapSize(ensureMap(set, '@set.size'));\n}\n\nbuiltinFunction(setSize);\n\n\nfunction setIterate(set){\n  return new SetIterator(set);\n}\n\nbuiltinFunction(setIterate);\n\n\nexport const add     = setAdd,\n             clear   = setClear,\n             create  = setCreate,\n           //delete  = setDelete, TODO: fix exporting reserved names\n             has     = setHas,\n             iterate = setIterate,\n             size    = setSize;\n";
 
 exports.builtins["@std"] = "// standard constants\nconst NaN       = +'NaN',\n      Infinity  = 1 / 0,\n      undefined = void 0;\n\n// standard functions\nimport { escape,\n         decodeURI,\n         decodeURIComponent,\n         encodeURI,\n         encodeURIComponent,\n         eval,\n         isFinite,\n         isNaN,\n         parseFloat,\n         parseInt,\n         unescape } from '@globals';\n\n\nimport { clearInterval,\n         clearTimeout,\n         setInterval,\n         setTimeout } from '@timers';\n\n// standard types\nimport Array    from '@array';\nimport Boolean  from '@boolean';\nimport Date     from '@date';\nimport Function from '@function';\nimport Map      from '@map';\nimport Number   from '@number';\nimport Object   from '@object';\nimport Proxy    from '@reflect';\nimport RegExp   from '@regexp';\nimport Set      from '@set';\nimport String   from '@string';\nimport WeakMap  from '@weakmap';\n\n\n\n// standard errors\nimport { Error,\n         EvalError,\n         RangeError,\n         ReferenceError,\n         SyntaxError,\n         TypeError,\n         URIError } from '@error';\n\nimport { ArrayBuffer,\n         DataView,\n         Float32Array,\n         Float64Array,\n         Int16Array,\n         Int32Array,\n         Int8Array,\n         Uint16Array,\n         Uint32Array,\n         Uint8Array } from '@typed-arrays';\n\n// standard pseudo-modules\nimport JSON from '@json';\nimport Math from '@math';\n\nimport Symbol from '@symbol';\nimport Iterator from '@iter';\n\nimport console from '@console';\n\nconst StopIteration = $__StopIteration\n\n\n\nexport Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,\n       Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,\n       ArrayBuffer, DataView, Float32Array, Float64Array, Int16Array,\n       Int32Array, Int8Array, Uint16Array, Uint32Array, Uint8Array,\n       clearInterval, clearTimeout, decodeURI, decodeURIComponent, escape, encodeURI, encodeURIComponent,\n       eval, isFinite, isNaN, parseFloat, parseInt, setInterval, setTimeout, unescape,\n       console, StopIteration, JSON, Math,\n       NaN, Infinity, undefined;\n";
 
@@ -21617,7 +21656,7 @@ exports.builtins["@timers"] = "export function clearInterval(id){\n  id = $__ToI
 
 exports.builtins["@typed-arrays"] = "\n\nfunction wrappingClamp(number, min, max){\n  if (number < min) {\n    number += max;\n  }\n  return number < min ? min : number > max ? max : number;\n}\n\ninternalFunction(wrappingClamp);\n\n\nfunction createArrayBuffer(nativeBuffer, byteLength){\n  var buffer = $__ObjectCreate(ArrayBufferPrototype);\n  $__define(buffer, 'byteLength', byteLength, 0);\n  $__setInternal(buffer, 'NativeBuffer', nativeBuffer);\n  $__setInternal(buffer, 'ConstructorName', 'ArrayBuffer');\n  $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');\n  return buffer;\n}\n\ninternalFunction(createArrayBuffer);\n\n\nfunction createTypedArray(Type, buffer, byteOffset, length){\n  if (typeof buffer === 'number') {\n    length = $__ToUint32(buffer);\n    var byteLength = length * Type.BYTES_PER_ELEMENT;\n    byteOffset = 0;\n    buffer = new ArrayBuffer(byteLength);\n    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n  } else {\n    buffer = $__ToObject(buffer);\n\n    if ($__GetBuiltinBrand(buffer) === 'ArrayBuffer') {\n      byteOffset = $__ToUint32(byteOffset);\n      if (byteOffset % Type.BYTES_PER_ELEMENT) {\n        throw $__Exception('buffer_unaligned_offset', [Type.name]);\n      }\n\n      var bufferLength = buffer.byteLength,\n          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;\n\n      if (byteOffset + byteLength > bufferLength) {\n        throw $__Exception('buffer_out_of_bounds', [Type.name]);\n      }\n\n      length = byteLength / Type.BYTES_PER_ELEMENT;\n\n      if ($__ToInteger(length) !== length) {\n        throw $__Exception('buffer_unaligned_length', [Type.name]);\n      }\n\n      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n    } else {\n      length = $__ToUint32(buffer.length);\n      var byteLength = length * Type.BYTES_PER_ELEMENT;\n      byteOffset = 0;\n      buffer = new ArrayBuffer(length);\n\n      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);\n\n      for (var i=0; i < length; i++) {\n        typedArray[i] = buffer[i];\n      }\n\n      return typedArray;\n    }\n  }\n}\n\ninternalFunction(createTypedArray);\n\n\nfunction set(Type, instance, array, offset){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);\n  }\n\n  offset = $__ToUint32(offset);\n  array = $__ToObject(array);\n  var srcLength = $__ToUint32(array.length),\n      targetLength = instance.length;\n\n  if (srcLength + offset > targetLength) {\n    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);\n  }\n\n  var temp = new Type(srcLength),\n      k = 0;\n\n  while (k < srcLength) {\n    temp[k] = array[k];\n  }\n\n  k = offset;\n  while (k < targetLength) {\n    instance[k] = temp[k - offset];\n  }\n}\n\ninternalFunction(set);\n\n\nfunction subarray(Type, instance, begin, end){\n  if ($__GetBuiltinBrand(instance) !== Type.name) {\n    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);\n  }\n\n  var srcLength = instance.length;\n\n  begin = $__ToInt32(begin);\n  end = end === undefined ? srcLength : $__ToInt32(end);\n\n  begin = wrappingClamp(begin, 0, srcLength);\n  end = wrappingClamp(end, 0, srcLength);\n\n  if (end < begin) {\n    [begin, end] = [end, begin];\n  }\n\n  return new Type(instance.buffer, instance.byteOffset + begin * Type.BYTES_PER_ELEMENT, end - begin);\n}\n\ninternalFunction(subarray);\n\n\nexport class ArrayBuffer {\n  constructor(byteLength){\n    byteLength = $__ToUint32(byteLength);\n    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);\n  }\n\n  slice(begin = 0, end = this.byteLength){\n    var sourceBuffer = $__ToObject(this),\n        sourceNativeBuffer = $__getInternal(sourceBuffer, 'NativeBuffer');\n\n    if (!sourceNativeBuffer) {\n      throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);\n    }\n\n    var byteLength = sourceBuffer.byteLength;\n    begin = wrappingClamp($__ToInt32(begin), 0, byteLength);\n    end = wrappingClamp($__ToInt32(end), 0, byteLength);\n\n    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);\n  }\n}\n\nbuiltinClass(ArrayBuffer);\nconst ArrayBufferPrototype = ArrayBuffer.prototype;\n\nprivate @get, @set;\n\nexport class DataView {\n  constructor(buffer, byteOffset = 0, byteLength = buffer.byteLength - byteOffset){\n    buffer = $__ToObject(buffer);\n    if ($__GetBuiltinBrand(buffer) !== 'ArrayBuffer') {\n      throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);\n    }\n\n    byteOffset = $__ToUint32(byteOffset);\n    byteLength = $__ToUint32(byteLength);\n\n    if (byteOffset + byteLength > buffer.byteLength) {\n      throw $__Exception('buffer_out_of_bounds', ['DataView']);\n    }\n\n    $__define(this, 'byteLength', byteLength, 1);\n    $__define(this, 'byteOffset', byteOffset, 1);\n    $__define(this, 'buffer', buffer, 1);\n    $__setInternal(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));\n    $__SetBuiltinBrand(this, 'BuiltinDataView');\n  }\n  getUint8(byteOffset){\n    return this.@get('Uint8', byteOffset);\n  }\n  getUint16(byteOffset, littleEndian){\n    return this.@get('Uint16', byteOffset, littleEndian);\n  }\n  getUint32(byteOffset, littleEndian){\n    return this.@get('Uint32', byteOffset, littleEndian);\n  }\n  getInt8(byteOffset){\n    return this.@get('Int8', byteOffset);\n  }\n  getInt16(byteOffset, littleEndian){\n    return this.@get('Int16', byteOffset, littleEndian);\n  }\n  getInt32(byteOffset, littleEndian){\n    return this.@get('Int32', byteOffset, littleEndian);\n  }\n  getFloat32(byteOffset, littleEndian){\n    return this.@get('Float32', byteOffset, littleEndian);\n  }\n  getFloat64(byteOffset, littleEndian){\n    return this.@get('Float64', byteOffset, littleEndian);\n  }\n  setUint8(byteOffset, value){\n    return this.@set('Uint8', byteOffset, value);\n  }\n  setUint16(byteOffset, value, littleEndian){\n    return this.@set('Uint16', byteOffset, value, littleEndian);\n  }\n  setUint32(byteOffset, value, littleEndian){\n    return this.@set('Uint32', byteOffset, value, littleEndian);\n  }\n  setInt8(byteOffset, value){\n    return this.@set('Int8', byteOffset, value);\n  }\n  setInt16(byteOffset, value, littleEndian){\n    return this.@set('Int16', byteOffset, value, littleEndian);\n  }\n  setInt32(byteOffset, value, littleEndian){\n    return this.@set('Int32', byteOffset, value, littleEndian);\n  }\n  setFloat32(byteOffset, value, littleEndian){\n    return this.@set('Float32', byteOffset, value, littleEndian);\n  }\n  setFloat64(byteOffset, value, littleEndian){\n    return this.@set('Float64', byteOffset, value, littleEndian);\n  }\n}\n\nbuiltinClass(DataView);\nDataView.prototype.@get = $__DataViewGet\nDataView.prototype.@set = $__DataViewSet\n\n\n\nexport class Float64Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float64Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float64Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float64Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Float64Array);\n$__define(Float64Array, 'BYTES_PER_ELEMENT', 8, FROZEN);\n\n\nexport class Float32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Float32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Float32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Float32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Float32Array);\n$__define(Float32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);\n\n\nexport class Int32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int32Array);\n$__define(Int32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);\n\n\nexport class Int16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int16Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int16Array);\n$__define(Int16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);\n\n\nexport class Int8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Int8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Int8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Int8Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Int8Array);\n$__define(Int8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);\n\n\nexport class Uint32Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint32Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint32Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint32Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint32Array);\n$__define(Uint32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);\n\n\nexport class Uint16Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint16Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint16Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint16Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint16Array);\n$__define(Uint16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);\n\n\nexport class Uint8Array {\n  constructor(buffer, byteOffset, length) {\n    return createTypedArray(Uint8Array, buffer, byteOffset, length);\n  }\n  set(array, offset) {\n    return set(Uint8Array, this, array, offset);\n  }\n  subarray(begin, end) {\n    return subarray(Uint8Array, this, begin, end);\n  }\n}\n\nbuiltinClass(Uint8Array);\n$__define(Uint8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);\n";
 
-exports.builtins["@weakmap"] = "function ensureWeakMap(o, p, name){\n  if ($__Type(o) !== 'Object' || !$__hasInternal(o, 'WeakMapData')) {\n    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);\n  }\n  if ($__Type(p) !== 'Object') {\n    throw $__Exception('invalid_weakmap_key', []);\n  }\n}\n\n\nexport class WeakMap {\n  constructor(iterable){\n    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;\n    return weakmapCreate(map, iterable);\n  }\n\n  delete(key){\n    ensureWeakMap(this, key, 'delete');\n    return $__WeakMapDelete(this, key);\n  }\n\n  get(key){\n    ensureWeakMap(this, key, 'get');\n    return $__WeakMapGet(this, key);\n  }\n\n  has(key){\n    ensureWeakMap(this, key, 'has');\n    return $__WeakMapHas(this, key);\n  }\n\n  set(key, value){\n    ensureWeakMap(this, key, 'set');\n    return $__WeakMapSet(this, key, value);\n  }\n}\n\nbuiltinClass(WeakMap);\n\nvar WeakMapPrototype = WeakMap.prototype;\n\n\n\n\nfunction weakmapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'WeakMapData')) {\n    throw $__Exception('double_initialization', ['WeakMap']);\n  }\n\n  $__WeakMapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(weakmapCreate);\n\n\nfunction weakmapDelete(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.delete');\n  return $__WeakMapDelete(weakmap, key);\n}\n\nbuiltinFunction(weakmapDelete);\n\n\nfunction weakmapGet(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.get');\n  return $__WeakMapGet(weakmap, key);\n}\n\nbuiltinFunction(weakmapGet);\n\n\nfunction weakmapHas(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.has');\n  return $__WeakMapHas(weakmap, key);\n}\n\nbuiltinFunction(weakmapHas);\n\n\nfunction weakmapSet(weakmap, key, value){\n  ensureWeakMap(weakmap, key, '@weakmap.set');\n  return $__WeakMapSet(weakmap, key, value);\n}\n\nbuiltinFunction(weakmapSet);\n\n\nexport const create  = weakmapCreate,\n           //delete  = weakmapDelete, TODO: fix exporting reserved names\n             get     = weakmapGet,\n             has     = weakmapHas,\n             set     = weakmapSet;\n";
+exports.builtins["@weakmap"] = "function ensureWeakMap(o, p, name){\n  if ($__Type(o) !== 'Object' || !$__hasInternal(o, 'WeakMapData')) {\n    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);\n  }\n  if ($__Type(p) !== 'Object') {\n    throw $__Exception('invalid_weakmap_key', []);\n  }\n}\n\n\nexport class WeakMap {\n  constructor(iterable){\n    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;\n    return weakmapCreate(map, iterable);\n  }\n\n  delete(key){\n    ensureWeakMap(this, key, 'delete');\n    return $__WeakMapDelete(this, key);\n  }\n\n  get(key){\n    ensureWeakMap(this, key, 'get');\n    return $__WeakMapGet(this, key);\n  }\n\n  has(key){\n    ensureWeakMap(this, key, 'has');\n    $__WeakMapHas(this, key);\n  }\n\n  set(key, value){\n    ensureWeakMap(this, key, 'set');\n    $__WeakMapSet(this, key, value);\n    return this;\n  }\n}\n\nbuiltinClass(WeakMap);\n\nvar WeakMapPrototype = WeakMap.prototype;\n\n\n\n\nfunction weakmapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'WeakMapData')) {\n    throw $__Exception('double_initialization', ['WeakMap']);\n  }\n\n  $__WeakMapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(weakmapCreate);\n\n\nfunction weakmapDelete(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.delete');\n  return $__WeakMapDelete(weakmap, key);\n}\n\nbuiltinFunction(weakmapDelete);\n\n\nfunction weakmapGet(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.get');\n  return $__WeakMapGet(weakmap, key);\n}\n\nbuiltinFunction(weakmapGet);\n\n\nfunction weakmapHas(weakmap, key){\n  ensureWeakMap(weakmap, key, '@weakmap.has');\n  return $__WeakMapHas(weakmap, key);\n}\n\nbuiltinFunction(weakmapHas);\n\n\nfunction weakmapSet(weakmap, key, value){\n  ensureWeakMap(weakmap, key, '@weakmap.set');\n  $__WeakMapSet(weakmap, key, value);\n  return weakmap;\n}\n\nbuiltinFunction(weakmapSet);\n\n\nexport const create  = weakmapCreate,\n           //delete  = weakmapDelete, TODO: fix exporting reserved names\n             get     = weakmapGet,\n             has     = weakmapHas,\n             set     = weakmapSet;\n";
 
 
 
