@@ -2,7 +2,8 @@ var collections = (function(exports){
   "use strict";
   var objects   = require('../lib/objects'),
       traversal = require('../lib/traversal'),
-      utility   = require('../lib/utility');
+      utility   = require('../lib/utility'),
+      constants = require('../lib/constants');
 
   var Hash    = objects.Hash,
       create  = objects.create,
@@ -10,7 +11,8 @@ var collections = (function(exports){
       inherit = objects.inherit,
       hasOwn  = objects.hasOwn,
       jsonify = traversal.jsonify,
-      tag     = utility.tag;
+      tag     = utility.tag,
+      Empty   = constants.Empty;
 
   exports.MapData = (function(){
     function LinkedItem(key, next){
