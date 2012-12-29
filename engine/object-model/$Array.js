@@ -8,11 +8,11 @@ var $Array = (function(module){
       PropertyList = require('../lib/PropertyList'),
       $Object      = require('./$Object').$Object;
 
-  var inherit        = objects.inherit,
-      define         = objects.define,
-      copy           = objects.copy,
-      Hash           = objects.Hash,
-      tag            = utility.tag,
+  var inherit          = objects.inherit,
+      define           = objects.define,
+      copy             = objects.copy,
+      Hash             = objects.Hash,
+      tag              = utility.tag,
       $$IsArrayIndex   = operations.$$IsArrayIndex,
       $$ThrowException = errors.$$ThrowException,
       $$ToBoolean      = operators.$$ToBoolean,
