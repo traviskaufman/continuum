@@ -8643,6 +8643,50 @@ exports.constants = (function(exports){
 
   exports.AST = new Constants(ownKeys(require('esprima').Syntax));
 
+  function Undetectable(value){
+    this.value = value;
+  }
+
+  define(Undetectable.prototype, {
+    undetectable: true
+  }, [
+    function toString(){
+      return 'undefined';
+    },
+    function valueOf(){
+      return NaN;
+    },
+    function DefaultValue(hint){
+      return hint === 'String' ? 'undefined' : NaN;
+    }
+  ]);
+
+  exports.Undetectable = Undetectable;
+
+  function isUndetectable(value){
+    return value instanceof Undetectable;
+  }
+
+  exports.isUndetectable = isUndetectable;
+
+  function isUndefined(value){
+    return value === undefined || value instanceof Undetectable;
+  }
+
+  exports.isUndefined = isUndefined;
+
+  function isNullish(value){
+    return value == null || value instanceof Undetectable;
+  }
+
+  exports.isNullish = isNullish;
+
+  function isFalsey(value){
+    return !value || value instanceof Undetectable;
+  }
+
+  exports.isFalsey = isFalsey;
+
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
 
@@ -11901,22 +11945,27 @@ exports.collections = (function(exports){
 
 exports.operators = (function(exports){
   "use strict";
-  var $$ThrowException = require('../errors').$$ThrowException;
+  var constants = require('../constants'),
+      $$ThrowException = require('../errors').$$ThrowException;
 
-  var SYMBOLS       = require('../constants').SYMBOLS,
-      Break         = SYMBOLS.Break,
-      Pause         = SYMBOLS.Pause,
-      Throw         = SYMBOLS.Throw,
-      Empty         = SYMBOLS.Empty,
-      Resume        = SYMBOLS.Resume,
-      Return        = SYMBOLS.Return,
-      Abrupt        = SYMBOLS.Abrupt,
-      Builtin       = SYMBOLS.Builtin,
-      Continue      = SYMBOLS.Continue,
-      Reference     = SYMBOLS.Reference,
-      Completion    = SYMBOLS.Completion,
-      Uninitialized = SYMBOLS.Uninitialized,
-      BuiltinSymbol  = require('../constants').BRANDS.BuiltinSymbol;
+  var SYMBOLS        = constants.SYMBOLS,
+      Break          = SYMBOLS.Break,
+      Pause          = SYMBOLS.Pause,
+      Throw          = SYMBOLS.Throw,
+      Empty          = SYMBOLS.Empty,
+      Resume         = SYMBOLS.Resume,
+      Return         = SYMBOLS.Return,
+      Abrupt         = SYMBOLS.Abrupt,
+      Builtin        = SYMBOLS.Builtin,
+      Continue       = SYMBOLS.Continue,
+      Reference      = SYMBOLS.Reference,
+      Completion     = SYMBOLS.Completion,
+      Uninitialized  = SYMBOLS.Uninitialized,
+      BuiltinSymbol  = constants.BRANDS.BuiltinSymbol,
+      isFalsey       = constants.isFalsey,
+      isNullish      = constants.isNullish,
+      isUndefined    = constants.isUndefined,
+      isUndetectable = constants.isUndetectable;
 
 
   function $$HasPrimitiveBase(v){
@@ -11930,10 +11979,10 @@ exports.operators = (function(exports){
   // ## $$GetValue
 
   function $$GetValue(v){
-    if (!v || !v.Reference || v.Abrupt) return v;
+    if (isFalsey(v) || !v.Reference || v.Abrupt) return v;
     var base = v.base;
 
-    if (base == null) {
+    if (isNullish(base)) {
       return $$ThrowException('not_defined', [v.name]);
     } else {
       var type = typeof base;
@@ -11964,8 +12013,8 @@ exports.operators = (function(exports){
   // ## $$PutValue
 
   function $$PutValue(v, w){
-    if (!v) {
-      return $$ThrowException('non_object_property_store', ['undefined', 'undefined']);
+    if (isFalsey(v)) {
+      return $$ThrowException('non_object_property_store', [TYPEOF(v), TYPEOF(w)]);
     } else if (v.Abrupt) {
       return v;
     } else if (!v.Reference) {
@@ -11976,7 +12025,7 @@ exports.operators = (function(exports){
 
     var base = v.base;
 
-    if (base === undefined) {
+    if (isUndefined(base)) {
       if (v.strict) {
         return $$ThrowException('not_defined', [v.name, base]);
       }
@@ -12000,13 +12049,13 @@ exports.operators = (function(exports){
   // ## GetThisValue
 
   function $$GetThisValue(v){
-    if (!v || v.Abrupt || !v.Reference) {
+    if (isFalsey(v) || v.Abrupt || !v.Reference) {
       return v;
     }
 
     var base = v.base;
 
-    if (base === undefined) {
+    if (isUndefined(base)) {
       return $$ThrowException('non_object_property_load', [v.name, base]);
     }
 
@@ -12052,7 +12101,7 @@ exports.operators = (function(exports){
 
 
   function $$ToPrimitive(argument, hint){
-    if (argument && typeof argument === 'object' && !argument.Abrupt) {
+    if (argument && argument.DefaultValue) {
       return $$ToPrimitive(argument.DefaultValue(hint), hint);
     }
     return argument;
@@ -12062,13 +12111,13 @@ exports.operators = (function(exports){
 
   function $$ToBoolean(argument){
     if (argument && argument.Completion) return argument;
-    return !!argument;
+    return !isFalsey(argument);
   }
   exports.$$ToBoolean = $$ToBoolean;
 
 
   function $$ToNumber(argument){
-    if (argument !== null && typeof argument === 'object') {
+    if (!isFalsey(argument) && typeof argument === 'object') {
       if (argument.Abrupt) return argument;
       return $$ToNumber($$ToPrimitive(argument, 'Number'));
     }
@@ -12125,7 +12174,9 @@ exports.operators = (function(exports){
   // ## $$ToPropertyKey
 
   function $$ToPropertyKey(argument){
-    if (!argument) return argument + '';
+    if (isFalsey(argument)) {
+      return argument + '';
+    }
     var type = typeof argument;
     if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
@@ -12147,6 +12198,8 @@ exports.operators = (function(exports){
           return 'null';
         } else if (argument.Abrupt) {
           return argument;
+        } else if (isUndetectable(argument)) {
+          return 'undefined';
         }
         return $$ToString($$ToPrimitive(argument, 'String'));
     }
@@ -12304,7 +12357,7 @@ exports.operators = (function(exports){
       var result = COMPARE(rval, lval, left);
       if (result && result.Abrupt) return result;
 
-      if (result === undefined) {
+      if (isUndefined(result)) {
         return false;
       }
       return left ? !result : result;
@@ -12313,8 +12366,8 @@ exports.operators = (function(exports){
 
 
   function INSTANCE_OF(lval, rval) {
-    if (rval === null || typeof rval !== 'object' || !('HasInstance' in rval)) {
-      return $$ThrowException('instanceof_function_expected', [typeof rval]);
+    if (!rval || !rval.HasInstance) {
+      return $$ThrowException('instanceof_function_expected', [TYPEOF(rval)]);
     }
 
     return rval.HasInstance(lval);
@@ -12327,14 +12380,21 @@ exports.operators = (function(exports){
   function EQUAL(lval, rval) {
     if (lval && lval.Abrupt) return lval;
     if (rval && rval.Abrupt) return rval;
-    return lval === rval;
+    if (lval === rval) {
+      return true;
+    }
+    if (lval === undefined) {
+      return isUndetectable(rval);
+    }
+    if (rval === undefined) {
+      return isUndetectable(lval);
+    }
+    return false;
   }
   exports.EQUAL = EQUAL;
 
   function NOT_EQUAL(lval, rval){
-    if (lval && lval.Abrupt) return lval;
-    if (rval && rval.Abrupt) return rval;
-    return lval !== rval;
+    return !EQUAL(lval, rval);
   }
   exports.NOT_EQUAL = NOT_EQUAL;
 
@@ -12346,12 +12406,12 @@ exports.operators = (function(exports){
     var ltype = typeof lval,
         rtype = typeof rval;
 
-    if (ltype === rtype) {
+    if (isNullish(lval)) {
+      return isNullish(rval);
+    } else if (isNullish(rval)) {
+      return isNullish(lval);
+    } else if (ltype === rtype) {
       return EQUAL(lval, rval);
-    } else if (lval == null) {
-      return rval == null;
-    } else if (rval == null) {
-      return lval == null;
     } else if (ltype === 'number' || rtype === 'string') {
       return EQUIVALENT(lval, $$ToNumber(rval));
     } else if (ltype === 'string' || rtype === 'number') {
@@ -12399,7 +12459,7 @@ exports.operators = (function(exports){
         if (val.Abrupt) return val;
 
         if (val.Reference) {
-          if (val.base === undefined) {
+          if (isUndefined(val.base)) {
             return 'undefined';
           }
           return TYPEOF($$GetValue(val));
@@ -12408,6 +12468,11 @@ exports.operators = (function(exports){
         if ('Call' in val) {
           return 'function';
         }
+
+        if (isUndetectable(val)) {
+          return 'undefined';
+        }
+
         return 'object';
       }
   }
@@ -12427,7 +12492,7 @@ exports.operators = (function(exports){
     exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
   }(function(convert, finalize){
     return function(ref){
-      if (!ref || typeof ref !== 'object') {
+      if (isFalsey(ref) || typeof ref !== 'object') {
         return finalize(ref);
       }
 
@@ -12439,12 +12504,12 @@ exports.operators = (function(exports){
 
 
   function DELETE(ref){
-    if (!ref || !ref.Reference) {
+    if (isFalsey(ref) || !ref.Reference) {
       return true;
     }
 
     var base = ref.base;
-    if (base === undefined) {
+    if (isUndefined(base)) {
       if (ref.strict) {
         return $$ThrowException('strict_delete_property', [ref.name, base]);
       }
@@ -12466,8 +12531,8 @@ exports.operators = (function(exports){
 
 
   function IN(lval, rval) {
-    if (rval === null || typeof rval !== 'object') {
-      return $$ThrowException('invalid_in_operator_use', [lval, typeof rval]);
+    if (!rval || !rval.HasProperty) {
+      return $$ThrowException('invalid_in_operator_use', [lval, TYPEOF(rval)]);
     }
 
     lval = $$ToPropertyKey(lval);
@@ -12842,7 +12907,11 @@ exports.operations = (function(exports){
       constants    = require('../constants'),
       MapData      = require('./collections').MapData;
 
-  var BRANDS = constants.BRANDS,
+  var BRANDS                 = constants.BRANDS,
+      isFalsey               = constants.isFalsey,
+      isNullish              = constants.isNullish,
+      isUndefined            = constants.isUndefined,
+      isUndetectable         = constants.isUndetectable,
       is                     = objects.is,
       create                 = objects.create,
       define                 = objects.define,
@@ -12944,7 +13013,7 @@ exports.operations = (function(exports){
 
 
   function $$GetIdentifierReference(lex, name, strict){
-    if (lex == null) {
+    if (isNullish(lex)) {
       return new Reference(undefined, name, strict);
     } else if (lex.HasBinding(name)) {
       return new Reference(lex, name, strict);
@@ -13012,8 +13081,9 @@ exports.operations = (function(exports){
   function $$GetThisEnvironment(context){
     var env = context.LexicalEnvironment;
     while (env) {
-      if (env.HasThisBinding())
+      if (env.HasThisBinding()) {
         return env;
+      }
       env = env.outer;
     }
   }
@@ -13089,7 +13159,7 @@ exports.operations = (function(exports){
 
   function $$GetMethod(object, key){
     var func = object.GetP(object, key);
-    if (func !== undefined && !$$IsCallable(func)) {
+    if (!isUndefined(func) && !$$IsCallable(func)) {
       return $$ThrowException('called_non_callable', [key]);
     }
     return func;
@@ -13107,7 +13177,7 @@ exports.operations = (function(exports){
     var func = $$GetMethod(object, key);
     if (func && func.Abrupt) return func;
 
-    if (func === undefined) {
+    if (isUndefined(func)) {
       return $$ThrowException('property_not_function', [key, object.BuiltinBrand]);
     }
 
@@ -13191,7 +13261,7 @@ exports.operations = (function(exports){
   function $$SpreadDestructuring(context, spread, index){
     var array = new $Array(0);
 
-    if (target == null) {
+    if (isNullish(target)) {
       return array;
     }
 
@@ -15087,9 +15157,12 @@ exports.natives = (function(module){
       operations  = require('./object-model/operations'),
       descriptors = require('./object-model/descriptors'),
       collections = require('./object-model/collections'),
-      BRANDS      = require('./constants').BRANDS;
+      constants   = require('./constants');
 
-  var inherit                   = objects.inherit,
+  var BRANDS                    = constants.BRANDS,
+      Undetectable              = constants.Undetectable,
+      isUndetectable            = constants.isUndetectable,
+      inherit                   = objects.inherit,
       define                    = objects.define,
       isObject                  = objects.isObject,
       create                    = objects.create,
@@ -15189,6 +15262,17 @@ exports.natives = (function(module){
     sin: Math.sin,
     sqrt: Math.sqrt,
     tan: Math.tan,
+    _createUndetectable: function(obj, args){
+      return new Undetectable(args[0]);
+    },
+    _unwrapUndetectable: function(obj, args){
+      if (isUndetectable(args[0])) {
+        return args[0].value;
+      }
+    },
+    _isUndetectable: function(obj, args){
+      return isUndetectable(args[0]);
+    },
     _Call: function(obj, args){
       return args[0].Call(args[1], $$CreateListFromArray(args[2]));
     },
@@ -19685,21 +19769,23 @@ exports.debug = (function(exports){
   var objects   = require('./lib/objects'),
       iteration = require('./lib/iteration'),
       utility   = require('./lib/utility'),
+      constants = require('./constants'),
       runtime   = require('./runtime');
 
-  var isObject   = objects.isObject,
-      inherit    = objects.inherit,
-      create     = objects.create,
-      define     = objects.define,
-      assign     = objects.assign,
-      properties = objects.properties,
-      hasOwn     = objects.hasOwn,
-      getBrandOf = objects.getBrandOf,
-      Hash       = objects.Hash,
-      each       = iteration.each,
-      quotes     = utility.quotes,
-      uid        = utility.uid,
-      realm      = runtime.activeRealm;
+  var isUndetectable = constants.isUndetectanle,
+      isObject       = objects.isObject,
+      inherit        = objects.inherit,
+      create         = objects.create,
+      define         = objects.define,
+      assign         = objects.assign,
+      properties     = objects.properties,
+      hasOwn         = objects.hasOwn,
+      getBrandOf     = objects.getBrandOf,
+      Hash           = objects.Hash,
+      each           = iteration.each,
+      quotes         = utility.quotes,
+      uid            = utility.uid,
+      realm          = runtime.activeRealm;
 
   var ENUMERABLE   = 0x01,
       CONFIGURABLE = 0x02,
@@ -21443,6 +21529,7 @@ exports.index = (function(exports){
     introspect: debug.introspect,
     createInterceptor: createInterceptor,
     brainTransplant: brainTransplant,
+    isUndetectable: constants.isUndetectable,
     utility: assignAll({}, [
       require('./lib/functions'),
       require('./lib/iteration'),
@@ -21474,9 +21561,9 @@ exports.builtins["@array"] = "import Iterator from '@iter';\nimport { Set, add, 
 
 exports.builtins["@boolean"] = "export class Boolean {\n  constructor(value){\n    value = $__ToBoolean(value);\n    return $__IsConstructCall() ? $__BooleanCreate(value) : value;\n  }\n\n  toString(){\n    let type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'Boolean') {\n      return this.@@BooleanValue ? 'true' : 'false';\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    let type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'Boolean') {\n      return this.@@BooleanValue;\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Boolean);\n\nBoolean.prototype.@@BooleanValue = false;\n";
 
-exports.builtins["@console"] = "import now from '@date';\nimport Map from '@map';\n\nfunction join(values){\n  var text = '';\n  for (var i=0; i < values.length; i++) {\n    text += values[i];\n  }\n  return text;\n}\n\n\n\nexport class Console {\n  private @output, @timers, @write, @writeln;\n\n  constructor(output){\n    this.@output = output;\n    this.@timers = new Map;\n  }\n\n  @write(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', '' + value, '' + color);\n  }\n\n  @writeln(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', value + '\\n', '' + color);\n  }\n\n  assert(expression, ...values){\n    if (!expression) {\n      values = join(values);\n      this.@writeln(values);\n      throw new Error('Assertion failed: '+values);\n    }\n  }\n\n  clear(){\n    this.@output.signal('clear');\n  }\n\n  count(title){\n    // TODO\n  }\n\n  debug(){\n    this.@writeln(join(values));\n  }\n\n  dir(object){\n    this.@output.signal('inspect', object);\n  }\n\n  dirxml(){\n    // TODO\n  }\n\n  error(...values){\n    this.@writeln('× '+join(values), '#f04');\n  }\n\n  group(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group');\n  }\n\n  groupCollapsed(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group-collapsed');\n  }\n\n  groupEnd(){\n    this.@output.signal('group-end');\n  }\n\n  info(...values){\n    this.@writeln('† '+join(values), '#09f');\n  }\n\n  log(...values){\n    this.@writeln('» '+join(values));\n  }\n\n  profile(){\n    // TODO\n  }\n\n  profileEnd(){\n    // TODO\n  }\n\n  table(data, columns){\n    // TODO\n  }\n\n  time(name){\n    this.@timers[name] = now();\n  }\n\n  timeEnd(name){\n    if (this.@timers.has(name)) {\n      var duration = now() - this.@timers.get(name);\n      this.@writeln(name + ': ' + duration + 'ms');\n    }\n  }\n\n  timeStamp(name){\n    this.@writeln(name + ': ' + now());\n  }\n\n  trace(error){\n    // TODO\n  }\n\n  warn(...values){\n    this.@writeln('! '+join(values), '#ff6');\n  }\n}\n\n\nexport let console = new Console({ signal: $__Signal });\n";
+exports.builtins["@console"] = "import now from '@date';\nimport Map from '@map';\n\nfunction join(values){\n  var text = '';\n  for (var i=0; i < values.length; i++) {\n    text += values[i];\n  }\n  return text;\n}\n\nconst QUIET = $__createUndetectable('quiet');\n\n\nexport class Console {\n  private @output, @timers, @write, @writeln;\n\n  constructor(output){\n    this.@output = output;\n    this.@timers = new Map;\n  }\n\n  @write(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', '' + value, '' + color);\n  }\n\n  @writeln(value, color){\n    color || (color = '#fff');\n    this.@output.signal('write', value + '\\n', '' + color);\n  }\n\n  assert(expression, ...values){\n    if (!expression) {\n      values = join(values);\n      this.@writeln(values);\n      throw new Error('Assertion failed: '+values);\n    }\n    return QUIET;\n  }\n\n  clear(){\n    this.@output.signal('clear');\n    return QUIET;\n  }\n\n  count(title){\n    // TODO\n  }\n\n  debug(...values){\n    this.@writeln(join(values));\n    return QUIET;\n  }\n\n  dir(object){\n    this.@output.signal('inspect', object, true);\n    return QUIET;\n  }\n\n  dirxml(){\n    // TODO\n  }\n\n  error(...values){\n    this.@writeln('× '+join(values), '#f04');\n    return QUIET;\n  }\n\n  group(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group');\n  }\n\n  groupCollapsed(...values){\n    this.@writeln('» '+join(values));\n    this.@output.signal('group-collapsed');\n  }\n\n  groupEnd(){\n    this.@output.signal('group-end');\n  }\n\n  info(...values){\n    this.@writeln('† '+join(values), '#09f');\n    return QUIET;\n  }\n\n  log(...values){\n    values.forEach(value => this.@output.signal('inspect', value));\n    return QUIET;\n  }\n\n  profile(){\n    // TODO\n  }\n\n  profileEnd(){\n    // TODO\n  }\n\n  table(data, columns){\n    // TODO\n  }\n\n  time(name){\n    this.@timers[name] = now();\n    return QUIET;\n  }\n\n  timeEnd(name){\n    if (this.@timers.has(name)) {\n      var duration = now() - this.@timers.get(name);\n      this.@writeln(name + ': ' + duration + 'ms');\n    }\n    return QUIET;\n  }\n\n  timeStamp(name){\n    this.@writeln(name + ': ' + now());\n    return QUIET;\n  }\n\n  trace(error){\n    // TODO\n  }\n\n  warn(...values){\n    this.@writeln('! '+join(values), '#ff6');\n    return QUIET;\n  }\n}\n\n\nexport let console = new Console({ signal: $__Signal });\n";
 
-exports.builtins["@continuum"] = "export let\n  promoteClass = $__promoteClass,\n  getHook = $__getHook,\n  hasHook = $__hasHook,\n  setHook = $__setHook,\n  removeHook = $__removeHook;\n";
+exports.builtins["@continuum"] = "export const promoteClass       = $__promoteClass,\n             getHook            = $__getHook,\n             hasHook            = $__hasHook,\n             setHook            = $__setHook,\n             removeHook         = $__removeHook,\n             createUndetectable = $__createUndetectable,\n             unwrapUndetectable = $__unwrapUndetectable,\n             isUndetectable     = $__isUndetectable;\n";
 
 exports.builtins["@date"] = "function getter(o, name){\n  if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {\n    throw $__Exception('not_generic', ['Date.prototype.'+name]);\n  }\n  return $__CallBuiltin(this.@@DateValue, name);\n}\n\ninternalFunction(getter);\n\nfunction setter(o, name, value){\n  if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {\n    throw $__Exception('not_generic', ['Date.prototype.'+name]);\n  }\n  $__CallBuiltin(this.@@DateValue, name, [value]);\n}\n\ninternalFunction(setter);\n\nexport class Date {\n  constructor(...values){\n    return $__DateCreate(...values);\n  }\n\n  getDate(){\n    return getter(this, 'getDate');\n  }\n  getDay(){\n    return getter(this, 'getDay');\n  }\n  getFullYear(){\n    return getter(this, 'getFullYear');\n  }\n  getHours(){\n    return getter(this, 'getHours');\n  }\n  getMilliseconds(){\n    return getter(this, 'getMilliseconds');\n  }\n  getMinutes(){\n    return getter(this, 'getMinutes');\n  }\n  getMonth(){\n    return getter(this, 'getMonth');\n  }\n  getSeconds(){\n    return getter(this, 'getSeconds');\n  }\n  getTime(){\n    return getter(this, 'getTime');\n  }\n  getTimezoneOffset(){\n    return getter(this, 'getTimezoneOffset');\n  }\n  getYear(){\n    return getter(this, 'getYear');\n  }\n\n  getUTCDate(){\n    return getter(this, 'getUTCDate');\n  }\n  getUTCDay(){\n    return getter(this, 'getUTCDay');\n  }\n  getUTCFullYear(){\n    return getter(this, 'getUTCFullYear');\n  }\n  getUTCHours(){\n    return getter(this, 'getUTCHours');\n  }\n  getUTCMilliseconds(){\n    return getter(this, 'getUTCMilliseconds');\n  }\n  getUTCMinutes(){\n    return getter(this, 'getUTCMinutes');\n  }\n  getUTCMonth(){\n    return getter(this, 'getUTCMonth');\n  }\n  getUTCSeconds(){\n    return getter(this, 'getUTCSeconds');\n  }\n\n  setDate(date){\n    setter(this, 'setDate', date);\n  }\n  setFullYear(year){\n    setter(this, 'setFullYear', year);\n  }\n  setHours(hours){\n    setter(this, 'setHours', hours);\n  }\n  setMilliseconds(milliseconds){\n    setter(this, 'setMilliseconds', milliseconds);\n  }\n  setMinutes(minutes){\n    setter(this, 'setMinutes', minutes);\n  }\n  setMonth(month){\n    setter(this, 'setMonth', month);\n  }\n  setSeconds(seconds){\n    setter(this, 'setSeconds', seconds);\n  }\n  setTime(time){\n    setter(this, 'setTime', time);\n  }\n  setYear(year){\n    setter(this, 'setYear', year);\n  }\n\n  setUTCDate(date){\n    setter(this, 'setUTCDate', date);\n  }\n  setUTCFullYear(year){\n    setter(this, 'setUTCFullYear', year);\n  }\n  setUTCHours(hours){\n    setter(this, 'setUTCHours', hours);\n  }\n  setUTCMilliseconds(milliseconds){\n    setter(this, 'setUTCMilliseconds', milliseconds);\n  }\n  setUTCMinutes(minutes){\n    setter(this, 'setUTCMinutes', minutes);\n  }\n  setUTCMonth(month){\n    setter(this, 'setUTCMonth', month);\n  }\n  setUTCSeconds(seconds){\n    setter(this, 'setUTCSeconds', seconds);\n  }\n\n  toDateString(){\n    return getter(this, 'toDateString');\n  }\n  toGMTString(){\n    return getter(this, 'toGMTString');\n  }\n  toISOString(){\n    return getter(this, 'toISOString');\n  }\n  toJSON(){\n    return getter(this, 'toJSON');\n  }\n  toLocaleDateString(){\n    return getter(this, 'toLocaleDateString');\n  }\n  toLocaleString(){\n    return getter(this, 'toLocaleString');\n  }\n  toLocaleTimeString(){\n    return getter(this, 'toLocaleTimeString');\n  }\n  toString(){\n    return getter(this, 'toString');\n  }\n  toTimeString(){\n    return getter(this, 'toTimeString');\n  }\n  toUTCString(){\n    return getter(this, 'toUTCString');\n  }\n  valueOf(){\n    return getter(this, 'valueOf');\n  }\n}\n\nbuiltinClass(Date);\n\nexport const now = $__now;\nextend(Date, { now });\n";
 
@@ -21508,7 +21595,7 @@ exports.builtins["@set"] = "import Map from '@map';\nimport Iterator from '@iter
 
 exports.builtins["@std"] = "// standard constants\nconst NaN       = +'NaN',\n      Infinity  = 1 / 0,\n      undefined = void 0;\n\n// standard functions\nimport { escape,\n         decodeURI,\n         decodeURIComponent,\n         encodeURI,\n         encodeURIComponent,\n         eval,\n         isFinite,\n         isNaN,\n         parseFloat,\n         parseInt,\n         unescape } from '@globals';\n\n\nimport { clearInterval,\n         clearTimeout,\n         setInterval,\n         setTimeout } from '@timers';\n\n// standard types\nimport Array    from '@array';\nimport Boolean  from '@boolean';\nimport Date     from '@date';\nimport Function from '@function';\nimport Map      from '@map';\nimport Number   from '@number';\nimport Object   from '@object';\nimport Proxy    from '@reflect';\nimport RegExp   from '@regexp';\nimport Set      from '@set';\nimport String   from '@string';\nimport WeakMap  from '@weakmap';\n\n\n\n// standard errors\nimport { Error,\n         EvalError,\n         RangeError,\n         ReferenceError,\n         SyntaxError,\n         TypeError,\n         URIError } from '@error';\n\nimport { ArrayBuffer,\n         DataView,\n         Float32Array,\n         Float64Array,\n         Int16Array,\n         Int32Array,\n         Int8Array,\n         Uint16Array,\n         Uint32Array,\n         Uint8Array } from '@typed-arrays';\n\n// standard pseudo-modules\nimport JSON from '@json';\nimport Math from '@math';\n\nimport Symbol from '@symbol';\nimport Iterator from '@iter';\n\nimport console from '@console';\n\nconst StopIteration = $__StopIteration\n\n\n\nexport Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,\n       Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,\n       ArrayBuffer, DataView, Float32Array, Float64Array, Int16Array,\n       Int32Array, Int8Array, Uint16Array, Uint32Array, Uint8Array,\n       clearInterval, clearTimeout, decodeURI, decodeURIComponent, escape, encodeURI, encodeURIComponent,\n       eval, isFinite, isNaN, parseFloat, parseInt, setInterval, setTimeout, unescape,\n       console, StopIteration, JSON, Math,\n       NaN, Infinity, undefined;\n";
 
-exports.builtins["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp from '@regexp';\n\n\n\nfunction ensureCoercible(target, method){\n  if (target === null || target === undefined) {\n    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);\n  }\n  return $__ToString(target);\n}\n\ninternalFunction(ensureCoercible);\n\n\nfunction ToHTML(tag, content, attrName, attrVal){\n  const attr = attrName === undefined ? '' : ' '+attrName+'=\"'+$__StringReplace($__ToString(attrVal), '\"', '&quot;')+'\"';\n\n  return '<'+tag+attr+'>'+content+'</'+tag+'>';\n}\n\ninternalFunction(ToHTML);\n\n\nfunction isRegExp(subject){\n  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';\n}\n\ninternalFunction(isRegExp);\n\n\nfunction stringIndexOf(string, search, position){\n  const searchStr = $__ToString(search),\n        pos       = $__ToInteger(position),\n        len       = string.length,\n        searchLen = searchStr.length,\n        maxLen    = len - searchLen;\n\n  let index = pos > 0 ? pos < len ? pos : len : 0;\n\n  while (index < maxLen) {\n    let offset = 0;\n    while (offset < searchLen && searchStr[offset] === string[index + offset]) {\n      if (offset++ === searchLen - 1) {\n        return index;\n      }\n    }\n  }\n\n  return -1;\n}\n\ninternalFunction(stringIndexOf);\n\n\nfunction stringMatch(string, regexp){\n  if (!isRegExp(regexp)) {\n    regexp = new RegExp(regexp);\n  }\n\n  if (!regexp.global) {\n    return $__RegExpExec(regexp, string);\n  }\n\n  const array = [];\n  let previous  = 0,\n      index     = 0,\n      lastMatch = true;\n\n  regexp.lastIndex = 0;\n\n  while (lastMatch) {\n    let result = $__RegExpExec(regexp, string);\n    if (result === null) {\n      lastMatch = false;\n    } else {\n      let thisIndex = regexp.lastIndex;\n      if (thisIndex === lastIndex) {\n        previous = regexp.lastIndex = thisIndex + 1;\n      } else {\n        previous = thisIndex;\n      }\n      array[index++] = result[0];\n    }\n  }\n\n  return index === 0 ? null : array;\n}\n\ninternalFunction(stringMatch);\n\n\nfunction useHost(value, method){\n  return $__CallBuiltin(ensureCoercible(value, method), method);\n}\n\ninternalFunction(useHost);\n\n\n\nexport class String {\n  constructor(...string){\n    const str = string.length ? $__ToString(string[0]) : '';\n\n    return $__IsConstructCall() ? $__StringCreate(str) : str;\n  }\n\n  anchor(name){\n    return ToHTML('a', ensureCoercible(this, 'anchor'), 'name', name);\n  }\n\n  big(){\n    return ToHTML('big', ensureCoercible(this, 'big'));\n  }\n\n  blink(){\n    return ToHTML('blink', ensureCoercible(this, 'blink'));\n  }\n\n  bold(){\n    return ToHTML('b', ensureCoercible(this, 'bold'));\n  }\n\n  fixed(){\n    return ToHTML('fixed', ensureCoercible(this, 'fixed'));\n  }\n\n  fontcolor(color){\n    return ToHTML('font', ensureCoercible(this, 'fontcolor'), 'color', color);\n  }\n\n  fontsize(size){\n    return ToHTML('font', ensureCoercible(this, 'fontsize'), 'size', size);\n  }\n\n  italics(){\n    return ToHTML('i', ensureCoercible(this, 'italics'));\n  }\n\n  link(href){\n    return ToHTML('a', ensureCoercible(this, 'link'), 'href', href);\n  }\n\n  small(){\n    return ToHTML('small', ensureCoercible(this, 'small'));\n  }\n\n  strike(){\n    return ToHTML('s', ensureCoercible(this, 'strike'));\n  }\n\n  sub(){\n    return ToHTML('sub', ensureCoercible(this, 'sub'));\n  }\n\n  sup(){\n    return ToHTML('sup', ensureCoercible(this, 'sup'));\n  }\n\n  charAt(position){\n    const string = ensureCoercible(this, 'charAt');\n\n    position = $__ToInteger(position);\n\n    return position < 0 || position >= string.length ? '' : string[position];\n  }\n\n  charCodeAt(position){\n    const string = ensureCoercible(this, 'charCodeAt');\n\n    position = $__ToInteger(position);\n\n    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);\n  }\n\n  concat(...args){\n    let string = ensureCoercible(this, 'concat');\n\n    for (var i=0; i < args.length; i++) {\n      string += $__ToString(args[i]);\n    }\n\n    return string;\n  }\n\n  indexOf(searchString, position = 0){\n    return stringIndexOf(ensureCoercible(this, 'indexOf'), searchString, position);\n  }\n\n  lastIndexOf(searchString, position = Infinity){\n    const string    = ensureCoercible(this, 'lastIndexOf'),\n          search    = $__ToString(searchString),\n          len       = string.length,\n          searchLen = searchString.length,\n          pos       = $__ToInteger(position) - searchLen;\n\n    let index = pos > 0 ? pos < len ? pos : len : 0;\n\n    while (index--) {\n      let offset = 0;\n      while (offset < searchLen && searchString[offset] === string[index + offset]) {\n        if (++offset === searchLen) {\n          return index;\n        }\n      }\n    }\n\n    return -1;\n  }\n\n  localeCompare(){\n    // TODO\n  }\n\n  match(regexp){\n    return stringMatch(ensureCoercible(this, 'match'), regexp);\n  }\n\n  repeat(count){\n    let string = ensureCoercible(this, 'repeat'),\n        factor = $__ToInteger(count),\n        result = '';\n\n    if (factor <= 1 || factor === Infinity || factor === -Infinity) {\n      throw $__Exception('invalid_repeat_count', []);\n    }\n\n    while (factor > 0) {\n      (factor & 1) && (result += string);\n      factor >>= 1;\n      string += string;\n    }\n\n    return result;\n  }\n\n  replace(search, replace){\n    const string = ensureCoercible(this, 'replace');\n\n    if (typeof replace === 'function') {\n      let match, count;\n      if (isRegExp(search)) {\n        match = stringMatch(string, search);\n        count = matches.length;\n      } else {\n        match = stringIndexOf(string, $__ToString(search));\n        count = 1;\n      }\n      //TODO\n    } else {\n      replace = $__ToString(replace);\n      if (!isRegExp(search)) {\n        search = $__ToString(search);\n      }\n\n      return $__StringReplace(string, search, replace);\n    }\n  }\n\n  search(regexp){\n    const string = ensureCoercible(this, 'search');\n\n    if (!isRegExp(regexp)) {\n      regexp = new RegExp(regexp);\n    }\n\n    return $__StringSearch(string, regexp);\n  }\n\n  slice(start = 0, end = this.length){\n    const string = ensureCoercible(this, 'slice');\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    return $__StringSlice(string, start, end);\n  }\n\n  split(separator, limit = MAX_INTEGER - 1){\n    const string = ensureCoercible(this, 'split');\n\n    limit = $__ToInteger(limit);\n    separator = isRegExp(separator) ? separator : $__ToString(separator);\n\n    return $__StringSplit(string, separator, limit);\n  }\n\n  substr(start = 0, length = Infinity){\n    const string = ensureCoercible(this, 'substr'),\n          chars  = string.length;\n\n    start = $__ToInteger(start);\n    length = $__ToInteger(length);\n\n    if (start < 0) {\n      start += chars;\n      if (start < 0) start = 0;\n    }\n    if (length < 0) {\n      length = 0;\n    }\n    if (length > chars - start) {\n      length = chars - start;\n    }\n\n    return length <= 0 ? '' : $__StringSlice(string, start, start + length);\n  }\n\n  substring(start = 0, end = this.length){\n    const string = ensureCoercible(this, 'substring'),\n          len    = string.length;\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    start = start > 0 ? start < len ? start : len : 0;\n    end = end > 0 ? end < len ? end : len : 0;\n\n    const from = start < end ? start : end,\n          to = start > end ? start : end;\n\n    return $__StringSlice(string, from, to);\n  }\n\n  toLocaleLowerCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLocaleLowerCase'), 'toLocaleLowerCase');\n  }\n\n  toLocaleUpperCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLocaleUpperCase'), 'toLocaleUpperCase');\n  }\n\n  toLowerCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLowerCase'), 'toLowerCase');\n  }\n\n  toString(){\n    if (typeof this === 'string') {\n      return this;\n    } else if ($__GetBuiltinBrand(this) === 'String') {\n      return this.@@StringValue;\n    }\n    throw $__Exception('not_generic', ['String.prototype.toString']);\n  }\n\n  toUpperCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toUpperCase'), 'toUpperCase');\n  }\n\n  trim(){\n    return $__StringTrim(ensureCoercible(this, 'trim'));\n  }\n\n  valueOf(){\n    if (typeof this === 'string') {\n      return this;\n    } else if ($__GetBuiltinBrand(this) === 'String') {\n      return this.@@StringValue;\n    }\n    throw $__Exception('not_generic', ['String.prototype.toString']);\n  }\n}\n\nbuiltinClass(String);\nString.prototype.@@StringValue = '';\n\n\nexport function fromCharCode(...codeUnits){\n  const length = codeUnits.length;\n  let result = '';\n\n  for (var i=0; i < length; i++) {\n    result += $__FromCharCode($__ToUint16(codeUnits[i]));\n  }\n\n  return result;\n}\n\nextend(String, { fromCharCode });\n\n\n";
+exports.builtins["@string"] = "import MAX_INTEGER from '@number';\nimport RegExp from '@regexp';\n\n\n\nfunction ensureCoercible(target, method){\n  if (target === null || target === undefined) {\n    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);\n  }\n  return $__ToString(target);\n}\n\ninternalFunction(ensureCoercible);\n\n\nfunction ToHTML(tag, content, attrName, attrVal){\n  const attr = attrName === undefined ? '' : ' '+attrName+'=\"'+$__StringReplace($__ToString(attrVal), '\"', '&quot;')+'\"';\n\n  return '<'+tag+attr+'>'+content+'</'+tag+'>';\n}\n\ninternalFunction(ToHTML);\n\n\nfunction isRegExp(subject){\n  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';\n}\n\ninternalFunction(isRegExp);\n\n\nfunction stringIndexOf(string, search, position){\n  const searchStr = $__ToString(search),\n        pos       = $__ToInteger(position),\n        len       = string.length,\n        searchLen = searchStr.length,\n        maxLen    = len - searchLen;\n\n  let index = pos > 0 ? pos < len ? pos : len : 0;\n\n  while (index < maxLen) {\n    let offset = 0;\n    while (offset < searchLen && searchStr[offset] === string[index + offset]) {\n      if (offset++ === searchLen - 1) {\n        return index;\n      }\n    }\n  }\n\n  return -1;\n}\n\ninternalFunction(stringIndexOf);\n\n\nfunction stringMatch(string, regexp){\n  if (!isRegExp(regexp)) {\n    regexp = new RegExp(regexp);\n  }\n\n  if (!regexp.global) {\n    return $__RegExpExec(regexp, string);\n  }\n\n  const array = [];\n  let previous  = 0,\n      index     = 0,\n      lastMatch = true;\n\n  regexp.lastIndex = 0;\n\n  while (lastMatch) {\n    let result = $__RegExpExec(regexp, string);\n    if (result === null) {\n      lastMatch = false;\n    } else {\n      let thisIndex = regexp.lastIndex;\n      if (thisIndex === lastIndex) {\n        previous = regexp.lastIndex = thisIndex + 1;\n      } else {\n        previous = thisIndex;\n      }\n      array[index++] = result[0];\n    }\n  }\n\n  return index === 0 ? null : array;\n}\n\ninternalFunction(stringMatch);\n\n\nfunction useHost(value, method){\n  return $__CallBuiltin(ensureCoercible(value, method), method);\n}\n\ninternalFunction(useHost);\n\n\n\nexport class String {\n  constructor(...string){\n    const str = string.length ? $__ToString(string[0]) : '';\n\n    return $__IsConstructCall() ? $__StringCreate(str) : str;\n  }\n\n  anchor(name){\n    return ToHTML('a', ensureCoercible(this, 'anchor'), 'name', name);\n  }\n\n  big(){\n    return ToHTML('big', ensureCoercible(this, 'big'));\n  }\n\n  blink(){\n    return ToHTML('blink', ensureCoercible(this, 'blink'));\n  }\n\n  bold(){\n    return ToHTML('b', ensureCoercible(this, 'bold'));\n  }\n\n  fixed(){\n    return ToHTML('fixed', ensureCoercible(this, 'fixed'));\n  }\n\n  fontcolor(color){\n    return ToHTML('font', ensureCoercible(this, 'fontcolor'), 'color', color);\n  }\n\n  fontsize(size){\n    return ToHTML('font', ensureCoercible(this, 'fontsize'), 'size', size);\n  }\n\n  italics(){\n    return ToHTML('i', ensureCoercible(this, 'italics'));\n  }\n\n  link(href){\n    return ToHTML('a', ensureCoercible(this, 'link'), 'href', href);\n  }\n\n  small(){\n    return ToHTML('small', ensureCoercible(this, 'small'));\n  }\n\n  strike(){\n    return ToHTML('s', ensureCoercible(this, 'strike'));\n  }\n\n  sub(){\n    return ToHTML('sub', ensureCoercible(this, 'sub'));\n  }\n\n  sup(){\n    return ToHTML('sup', ensureCoercible(this, 'sup'));\n  }\n\n  charAt(position){\n    const string = ensureCoercible(this, 'charAt');\n\n    position = $__ToInteger(position);\n\n    return position < 0 || position >= string.length ? '' : string[position];\n  }\n\n  charCodeAt(position){\n    const string = ensureCoercible(this, 'charCodeAt');\n\n    position = $__ToInteger(position);\n\n    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);\n  }\n\n  concat(...args){\n    let string = ensureCoercible(this, 'concat');\n\n    for (var i=0; i < args.length; i++) {\n      string += $__ToString(args[i]);\n    }\n\n    return string;\n  }\n\n  indexOf(searchString, position = 0){\n    return stringIndexOf(ensureCoercible(this, 'indexOf'), searchString, position);\n  }\n\n  lastIndexOf(searchString, position = Infinity){\n    const string    = ensureCoercible(this, 'lastIndexOf'),\n          search    = $__ToString(searchString),\n          len       = string.length,\n          searchLen = searchString.length,\n          pos       = $__ToInteger(position) - searchLen;\n\n    let index = pos > 0 ? pos < len ? pos : len : 0;\n\n    while (index--) {\n      let offset = 0;\n      while (offset < searchLen && searchString[offset] === string[index + offset]) {\n        if (++offset === searchLen) {\n          return index;\n        }\n      }\n    }\n\n    return -1;\n  }\n\n  localeCompare(){\n    // TODO\n  }\n\n  match(regexp){\n    return stringMatch(ensureCoercible(this, 'match'), regexp);\n  }\n\n  repeat(count){\n    let string = ensureCoercible(this, 'repeat'),\n        factor = $__ToInteger(count),\n        result = '';\n\n    if (factor <= 1 || factor === Infinity || factor === -Infinity) {\n      throw $__Exception('invalid_repeat_count', []);\n    }\n\n    while (factor > 0) {\n      (factor & 1) && (result += string);\n      factor >>= 1;\n      string += string;\n    }\n\n    return result;\n  }\n\n  replace(search, replace){\n    const string = ensureCoercible(this, 'replace');\n\n    if (typeof replace === 'function') {\n      let match, count;\n      if (isRegExp(search)) {\n        match = stringMatch(string, search);\n        count = matches.length;\n      } else {\n        match = stringIndexOf(string, $__ToString(search));\n        count = 1;\n      }\n      //TODO\n    } else {\n      replace = $__ToString(replace);\n      if (!isRegExp(search)) {\n        search = $__ToString(search);\n      }\n\n      return $__StringReplace(string, search, replace);\n    }\n  }\n\n  search(regexp){\n    const string = ensureCoercible(this, 'search');\n\n    if (!isRegExp(regexp)) {\n      regexp = new RegExp(regexp);\n    }\n\n    return $__StringSearch(string, regexp);\n  }\n\n  slice(start = 0, end = this.length){\n    const string = ensureCoercible(this, 'slice');\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    return $__StringSlice(string, start, end);\n  }\n\n  split(separator, limit = MAX_INTEGER - 1){\n    const string = ensureCoercible(this, 'split');\n\n    limit = $__ToInteger(limit);\n    separator = isRegExp(separator) ? separator : $__ToString(separator);\n\n    return $__StringSplit(string, separator, limit);\n  }\n\n  substr(start = 0, length = Infinity){\n    const string = ensureCoercible(this, 'substr'),\n          chars  = string.length;\n\n    start = $__ToInteger(start);\n    length = $__ToInteger(length);\n\n    if (start < 0) {\n      start += chars;\n      if (start < 0) start = 0;\n    }\n    if (length < 0) {\n      length = 0;\n    }\n    if (length > chars - start) {\n      length = chars - start;\n    }\n\n    return length <= 0 ? '' : $__StringSlice(string, start, start + length);\n  }\n\n  substring(start = 0, end = this.length){\n    const string = ensureCoercible(this, 'substring'),\n          len    = string.length;\n\n    start = $__ToInteger(start);\n    end = $__ToInteger(end);\n\n    start = start > 0 ? start < len ? start : len : 0;\n    end = end > 0 ? end < len ? end : len : 0;\n\n    const from = start < end ? start : end,\n          to = start > end ? start : end;\n\n    return $__StringSlice(string, from, to);\n  }\n\n  toLocaleLowerCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLocaleLowerCase'), 'toLocaleLowerCase');\n  }\n\n  toLocaleUpperCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLocaleUpperCase'), 'toLocaleUpperCase');\n  }\n\n  toLowerCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toLowerCase'), 'toLowerCase');\n  }\n\n  toString(){\n    if (typeof this === 'string') {\n      return this;\n    } else if ($__GetBuiltinBrand(this) === 'String') {\n      return this.@@StringValue;\n    }\n    throw $__Exception('not_generic', ['String.prototype.toString']);\n  }\n\n  toUpperCase(){\n    return $__CallBuiltin(ensureCoercible(this, 'toUpperCase'), 'toUpperCase');\n  }\n\n  trim(){\n    return $__StringTrim(ensureCoercible(this, 'trim'));\n  }\n\n  valueOf(){\n    if (typeof this === 'string') {\n      return this;\n    } else if ($__GetBuiltinBrand(this) === 'String') {\n      return this.@@StringValue;\n    }\n    throw $__Exception('not_generic', ['String.prototype.toString']);\n  }\n}\n\nbuiltinClass(String);\nString.prototype.@@StringValue = '';\n$__define(String.prototype, 'length', 0, FROZEN);\n\n\nexport function fromCharCode(...codeUnits){\n  const length = codeUnits.length;\n  let result = '';\n\n  for (var i=0; i < length; i++) {\n    result += $__FromCharCode($__ToUint16(codeUnits[i]));\n  }\n\n  return result;\n}\n\nextend(String, { fromCharCode });\n\n\n";
 
 exports.builtins["@symbol"] = "export class Symbol {\n  constructor(name, isPublic){\n    if (name == null) {\n      throw $__Exception('unnamed_symbol', []);\n    }\n    return $__SymbolCreate(name, !!isPublic);\n  }\n}\n\nbuiltinClass(Symbol);\n";
 
