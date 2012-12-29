@@ -59,11 +59,13 @@ export class Set {
   }
 
   clear(){
-    return $__MapClear(ensureSet(this, 'clear'));
+    $__MapClear(ensureSet(this, 'clear'));
+    return this;
   }
 
   add(value){
-    return $__MapSet(ensureSet(this, 'add'), value, value);
+    $__MapSet(ensureSet(this, 'add'), value, value);
+    return this;
   }
 
   has(value){
@@ -86,14 +88,16 @@ $__define(SetPrototype, @@iterator, SetPrototype.values);
 
 
 function setAdd(set, value){
-  return $__MapSet(ensureSet(set, '@set.add'), value, value);
+  $__MapSet(ensureSet(set, '@set.add'), value, value);
+  return set;
 }
 
 builtinFunction(setAdd);
 
 
 function setClear(set){
-  return $__MapClear(ensureSet(set, '@set.clear'));
+  $__MapClear(ensureSet(set, '@set.clear'));
+  return set;
 }
 
 builtinFunction(setClear);

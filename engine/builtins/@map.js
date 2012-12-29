@@ -65,7 +65,8 @@ export class Map {
 
   clear(){
     ensureMap(this, 'clear');
-    return $__MapClear(this, key);
+    $__MapClear(this, key);
+    return this;
   }
 
   delete(key){
@@ -95,7 +96,8 @@ export class Map {
 
   set(key, value){
     ensureMap(this, 'set');
-    return $__MapSet(this, key, value);
+    $__MapSet(this, key, value);
+    return this;
   }
 
   values(){
@@ -113,7 +115,8 @@ $__define(MapPrototype, @@iterator, MapPrototype.entries);
 
 function mapClear(map){
   ensureMap(map, '@map.clear');
-  return $__MapClear(map);
+  $__MapClear(map);
+  return map;
 }
 
 builtinFunction(mapClear);
@@ -166,7 +169,8 @@ builtinFunction(mapIterate);
 
 function mapSet(map, key, value){
   ensureMap(map, '@map.set');
-  return $__MapSet(map, key, value);
+  $__MapSet(map, key, value);
+  return map;
 }
 
 builtinFunction(mapSet);

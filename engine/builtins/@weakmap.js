@@ -26,12 +26,13 @@ export class WeakMap {
 
   has(key){
     ensureWeakMap(this, key, 'has');
-    return $__WeakMapHas(this, key);
+    $__WeakMapHas(this, key);
   }
 
   set(key, value){
     ensureWeakMap(this, key, 'set');
-    return $__WeakMapSet(this, key, value);
+    $__WeakMapSet(this, key, value);
+    return this;
   }
 }
 
@@ -82,7 +83,8 @@ builtinFunction(weakmapHas);
 
 function weakmapSet(weakmap, key, value){
   ensureWeakMap(weakmap, key, '@weakmap.set');
-  return $__WeakMapSet(weakmap, key, value);
+  $__WeakMapSet(weakmap, key, value);
+  return weakmap;
 }
 
 builtinFunction(weakmapSet);
