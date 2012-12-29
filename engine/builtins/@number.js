@@ -28,6 +28,7 @@ export class Number {
       return this;
     } else if ($__GetBuiltinBrand(this) === 'Number') {
       return this.@@NumberValue;
+    }
     throw $__Exception('not_generic', ['Number.prototype.valueOf']);
   }
 
