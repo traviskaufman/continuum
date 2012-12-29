@@ -310,13 +310,13 @@ var descriptors = (function(exports){
 
 
   function $$ToCompletePropertyDescriptor(obj){
-    var desc = ToPropertyDescriptor(obj);
+    var desc = $$ToPropertyDescriptor(obj);
     if (desc && desc.Abrupt) return desc;
 
-    if (desc.isDataDescriptor) {
+    if ('Value' in desc || 'Writable' in desc) {
       'Value' in desc    || (desc.Value = undefined);
       'Writable' in desc || (desc.Writable = false);
-    } else if (desc.isAccessorDescriptor) {
+    } else if ('Get' in desc || 'Set' in desc) {
       'Get' in desc || (desc.Get = undefined);
       'Set' in desc || (desc.Set = undefined);
     } else {
@@ -343,7 +343,6 @@ var descriptors = (function(exports){
   }
 
   exports.$$CopyAttributes = $$CopyAttributes;
-
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
