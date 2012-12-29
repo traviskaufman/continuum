@@ -19553,6 +19553,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         });
 
         ExecutionContext.push(ctx);
+        script.thunk || (script.thunk = new Thunk(script.bytecode));
         var result = run(realm, script.thunk, script.bytecode);
         context === ctx && ExecutionContext.pop();
 
