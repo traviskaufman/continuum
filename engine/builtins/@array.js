@@ -1,6 +1,6 @@
 import Iterator from '@iter';
 import { Set, add, has } from '@set';
-import { min, max } from '@math';
+import { min, max, floor } from '@math';
 
 const arrays = new Set;
 
@@ -77,7 +77,6 @@ function truncate(value, shift){
 }
 
 internalFunction(truncate);
-
 
 
 
@@ -358,20 +357,29 @@ export class Array {
           len    = $__ToUint32(array.length),
           middle = floor(len / 2);
 
-    let lower = 0;
-    while (lower !== middle) {
+    let lower = -1;
+    while (++lower !== middle) {
       const upper       = len - lower - 1,
             lowerP      = $__ToString(lower),
             upperP      = $__ToString(upper),
             lowerValue  = array[lowerP],
-            upperValue  = array[upperP],
-            lowerExists = lowerP in array,
-            upperExists = upperP in array;
+            upperValue  = array[upperP];
 
-      if (lowerExists && upperExists) {
-        $__Put(array, lowerP, upperValue, true);
+      if (upperP in array) {
+        PutPropertyOrThrow(array, lowerP, upperValue, 'Array.prototype.reverse');
+        if (lowerP in array) {
+          PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');
+        } else {
+          DeletePropertyOrThrow(array, upperP, 'Array.prototype.reverse');
+        }
+      } else if (lowerP in array) {
+        PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');
+      } else {
+        DeletePropertyOrThrow(array, lowerP, 'Array.prototype.reverse');
       }
     }
+
+    return array;
   }
 
   slice(start = 0, end = this.length){
@@ -417,14 +425,14 @@ export class Array {
 
     do {
       if (oldIndex in array) {
-        array[newIndex] = array[oldIndex];
-      } else if (!delete array[newIndex]) {
-        throw $__Exception('delete_array_index', ['Array.prototype.shift', newIndex]);
+        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.shift');
+      } else {
+        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.shift');
       }
       newIndex++;
     } while (++oldIndex < len)
 
-    array.length = len - 1;
+    PutPropertyOrThrow(array, 'length', len - 1, 'Array.prototype.shift');
     return result;
   }
 
@@ -543,12 +551,12 @@ export class Array {
         let from = index + start;
 
         if (from in array) {
-          result[index] = array[from];
+          PutPropertyOrThrow(result, index, array[from], 'Array.prototype.splice');
         }
         index++;
       } while (index < deleteCount)
 
-      result.length = deleteCount;
+      PutPropertyOrThrow(result, 'length', deleteCount, 'Array.prototype.splice');
     }
 
     const count = len - deleteCount;
@@ -561,9 +569,9 @@ export class Array {
             to   = index + itemCount;
 
         if (from in array) {
-          array[to] = array[from];
-        } else if (!delete array[to]) {
-          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);
+          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');
+        } else {
+          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');
         }
         index++;
       }
@@ -575,9 +583,9 @@ export class Array {
             to   = index + itemCount - 1;
 
         if (from in array) {
-          array[to] = array[from];
-        } else if (!delete array[to]) {
-          throw $__Exception('delete_array_index', ['Array.prototype.splice', to]);
+          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');
+        } else {
+          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');
         }
 
         index--;
@@ -589,11 +597,11 @@ export class Array {
           index     = start;
 
       do {
-        array[index++] = items[itemIndex++];
+        PutPropertyOrThrow(array, index++, items[itemIndex++], 'Array.prototype.splice');
       } while (itemIndex < itemCount)
     }
 
-    array.length = len - deleteCount + itemCount;
+    PutPropertyOrThrow(array, 'length', len - deleteCount + itemCount, 'Array.prototype.splice');
 
     return result;
   }
@@ -635,15 +643,15 @@ export class Array {
   }
 
   unshift(...values){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length),
+    const array  = $__ToObject(this),
+          len    = $__ToUint32(array.length),
           newLen = len + values.length;
 
     if (len === newLen) {
       return newLen;
     }
 
-    array.length = newLen;
+    PutPropertyOrThrow(array, 'length', newLen, 'Array.prototype.unshift');
 
     let oldIndex = len,
         newIndex = newLen;
@@ -651,14 +659,14 @@ export class Array {
     while (oldIndex-- > 0) {
       newIndex--;
       if (oldIndex in array) {
-        array[newIndex] = array[oldIndex];
-      } else if (!delete array[newIndex]) {
-        throw $__Exception('delete_array_index', ['Array.prototype.unshift', newIndex]);
+        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.unshift');
+      } else {
+        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.unshift');
       }
     }
 
     while (newIndex-- > 0) {
-      array[newIndex] = values[newIndex];
+      PutPropertyOrThrow(array, newIndex, values[newIndex], 'Array.prototype.unshift');
     }
 
     return newLen;
