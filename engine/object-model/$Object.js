@@ -412,6 +412,7 @@ var $Object = (function(exports){
       if (!this.SetP(this, key, value) && strict) {
         return $$ThrowException('strict_cannot_assign', [key]);
       }
+      return true;
     },
     function GetP(receiver, key){
       var prop = this.describe(key);
