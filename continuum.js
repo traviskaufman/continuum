@@ -8722,7 +8722,7 @@ exports.errors = (function(errors, messages, exports){
           argNames.push(str);
         src += '+'+str;
       } else {
-        src += '+'+'"'+str.replace(/["\\\n]/g, '\\$0')+'"';
+        src += '+"'+str.replace(/["\\\n]/g, '\\$0')+'"';
       }
     }
 
@@ -8848,11 +8848,12 @@ exports.errors = (function(errors, messages, exports){
     put_property_or_throw          : ["$0", " cannot assign to read only property '", "$1", "'"],
     strict_poison_pill             : ["'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them"],
     object_not_extensible          : ["Can't add property ", "$0", ", object is not extensible"],
-    proxy_prototype_inconsistent        : ["cannot report a prototype value that is inconsistent with target prototype value"],
-    proxy_extensibility_inconsistent    : ["cannot report a non-extensible object as extensible or vice versa"],
-    proxy_configurability_inconsistent  : ["cannot report innacurate configurability for property '", "$0"],
-    proxy_enumerate_properties          : ["enumerate trap failed to include non-configurable enumerable property '", "$0", "'"],
+    proxy_prototype_inconsistent        : ["Cannot report a prototype value that is inconsistent with target prototype value"],
+    proxy_extensibility_inconsistent    : ["Cannot report a non-extensible object as extensible or vice versa"],
+    proxy_configurability_inconsistent  : ["Cannot report innacurate configurability for property '", "$0"],
+    proxy_enumerate_properties          : ["Enumerate trap failed to include non-configurable enumerable property '", "$0", "'"],
     proxy_non_callable_trap             : ["Proxy trap for ", "$0", " is not a function"],
+    proxy_incompatible_descriptor       : ["Proxy trap ", "$0", " returned an incompatible descriptor"],
     proxy_inconsistent                  : ["Proxy trap ", "$0", " returned an invalid value for a non-configurable property"],
     proxy_non_extensible                : ["Proxy trap ", "$0", " returned an invalid value for a non-extensible object"],
     proxy_duplicate                     : ["Proxy trap ", "$0", " returned duplicate property"],
@@ -11645,34 +11646,41 @@ exports.descriptors = (function(exports){
       var field = descFields[i];
       if (obj.HasProperty(field)) {
         var result = fields[field] = obj.Get(field);
-        if (result && result !== true && result.Abrupt) return result;
+        if (result && result.Abrupt) return result;
       }
-    }
-
-    if (fields.get ? !fields.get.Call : fields.get !== undefined) {
-      return $$ThrowException('getter_must_be_callable', [typeof fields.get]);
-    }
-
-    if (fields.set ? !fields.set.Call : fields.set !== undefined) {
-      return $$ThrowException('setter_must_be_callable', [typeof fields.set]);
     }
 
     if ('get' in fields || 'set' in fields) {
       if ('value' in fields || 'writable' in fields) {
         return $$ThrowException('value_and_accessor', [fields]);
       }
-      var desc = new EmptyDataDescriptor;
-      if ('get' in fields) desc.Get = fields.get;
-      if ('set' in fields) desc.Set = fields.set;
-    } else if ('value' in fields || 'writable' in fields) {
+
       var desc = new EmptyAccessorDescriptor;
+
+      if ('get' in fields) {
+        var getter = desc.Get = fields.get;
+        if (getter ? !getter.Call : getter !== undefined) {
+          return $$ThrowException('getter_must_be_callable', [typeof getter]);
+        }
+      }
+
+      if ('set' in fields) {
+        var setter = desc.Set = fields.set;
+        if (setter ? !setter.Call : setter !== undefined) {
+          return $$ThrowException('setter_must_be_callable', [typeof setter]);
+        }
+      }
+    } else if ('value' in fields || 'writable' in fields) {
+      var desc = new EmptyDataDescriptor;
       if ('value' in fields) desc.Value = fields.value;
       if ('writable' in fields) desc.Writable = fields.writable;
     } else {
-      var desc = new PropertyDescriptor;
+      var desc = new EmptyDataDescriptor;
     }
+
     if ('enumerable' in fields) desc.Enumerable = fields.enumerable;
     if ('configurable' in fields) desc.Configurable = fields.configurable;
+
     return desc;
   }
 
@@ -11683,7 +11691,7 @@ exports.descriptors = (function(exports){
     var obj = new $Object;
     for (var i=0, v; i < 6; i++) {
       if (descProps[i] in desc) {
-        obj.set(descFields[i], desc[descProps[i]]);
+        obj.define(descFields[i], desc[descProps[i]], ECW);
       }
     }
     return obj;
@@ -11716,11 +11724,11 @@ exports.descriptors = (function(exports){
 
 
   function $$CopyAttributes(from, to){
-    var props = from.Enumerate(true, false);
+    var props = from.Enumerate(true, true);
     for (var i=0; i < props.length; i++) {
       var field = props[i];
       if (!(field in standardFields)) {
-        to.define(field, from.Get(field), ECW);
+        to.set(field, from.Get(field));
       }
     }
   }
@@ -13611,11 +13619,11 @@ exports.$Object = (function(exports){
   exports.$$OrdinaryDefineOwnProperty = $$OrdinaryDefineOwnProperty;
 
 
-  function $$IsCompatableDescriptor(extensible, desc, current){
+  function $$IsCompatibleDescriptor(extensible, desc, current){
     return $$ValidateAndApplyPropertyDescriptor(undefined, undefined, extensible, desc, current);
   }
 
-  exports.$$IsCompatableDescriptor = $$IsCompatableDescriptor;
+  exports.$$IsCompatibleDescriptor = $$IsCompatibleDescriptor;
 
 
   function $$ValidateAndApplyPropertyDescriptor(object, key, extensible, desc, current){
@@ -14479,26 +14487,30 @@ exports.$Proxy = (function(module){
       operators   = require('./operators'),
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
-      $Object     = require('./$Object').$Object,
+      $$Object    = require('./$Object'),
       $Array      = require('./$Array');
 
   var inherit     = objects.inherit,
       is          = objects.is,
       define      = objects.define,
+      Hash        = objects.Hash,
       isUndefined = constants.isUndefined,
-      $$ToPropertyDescriptor          = descriptors.$$ToPropertyDescriptor,
-      $$FromGenericPropertyDescriptor = descriptors.$$FromGenericPropertyDescriptor,
+      $Object     = $$Object.$Object,
+      $$IsCompatibleDescriptor        = $$Object.$$IsCompatibleDescriptor,
       $$CopyAttributes                = descriptors.$$CopyAttributes,
-      $$IsDataDescriptor              = descriptors.$$IsDataDescriptor,
+      $$FromGenericPropertyDescriptor = descriptors.$$FromGenericPropertyDescriptor,
+      $$FromPropertyDescriptor        = descriptors.$$FromPropertyDescriptor,
       $$IsAccessorDescriptor          = descriptors.$$IsAccessorDescriptor,
+      $$IsDataDescriptor              = descriptors.$$IsDataDescriptor,
+      $$ToCompletePropertyDescriptor  = descriptors.$$ToCompletePropertyDescriptor,
+      $$ToPropertyDescriptor          = descriptors.$$ToPropertyDescriptor,
       $$ThrowException                = errors.$$ThrowException,
       $$ToBoolean                     = operators.$$ToBoolean,
       $$ToString                      = operators.$$ToString,
       $$ToUint32                      = operators.$$ToUint32,
       $$IsCallable                    = operations.$$IsCallable,
       $$GetMethod                     = operations.$$GetMethod,
-      $$CreateListFromArray           = operations.$$CreateListFromArray,
-      $$IsCompatibleDescriptor        = operations.$$IsCompatibleDescriptor;
+      $$CreateListFromArray           = operations.$$CreateListFromArray;
 
 
 
@@ -14524,15 +14536,15 @@ exports.$Proxy = (function(module){
           extensible = target.IsExtensible();
 
       if (!extensible && targetDesc === undefined) {
-        return $$ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(normalizedDesc))) {
-        return $$ThrowException('proxy_incompatible_descriptor');
+        return $$ThrowException('proxy_extensibility_inconsistent', ['defineProperty']);
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, normalizedDesc)) {
+        return $$ThrowException('proxy_incompatible_descriptor', ['defineProperty']);
       } else if (!normalizedDesc.Configurable) {
         if (targetDesc === undefined || targetDesc.Configurable) {
-          return $$ThrowException('proxy_configurability_inconsistent')
+          return $$ThrowException('proxy_configurability_inconsistent', ['defineProperty']);
         }
       } else if (strict) {
-        return $$ThrowException('strict_property_redefinition');
+        return $$ThrowException('strict_property_redefinition', ['defineProperty']);
       }
       return false;
     }
@@ -14553,8 +14565,9 @@ exports.$Proxy = (function(module){
       if (trapResult && trapResult.Abrupt) return trapResult;
 
       if (trapResult) {
-        var desc = $$ToCompletePropertyDescriptor($$FromPropertyDescriptor(object));
-        $$CopyAttributes(trapResult, desc);
+        var desc = $$ToCompletePropertyDescriptor(trapResult);
+        desc.Origin = new $Object;
+        $$CopyAttributes(trapResult, desc.Origin);
       }
 
       var targetDesc = target.GetOwnProperty(key);
@@ -14562,20 +14575,20 @@ exports.$Proxy = (function(module){
 
       if (desc === undefined && targetDesc !== undefined) {
         if (!targetDesc.Configurable) {
-          return $$ThrowException('proxy_configurability_inconsistent');
+          return $$ThrowException('proxy_configurability_inconsistent', ['getOwnPropertyDescriptor']);
         } else if (!target.IsExtensible()) {
-          return $$ThrowException('proxy_extensibility_inconsistent');
+          return $$ThrowException('proxy_extensibility_inconsistent', ['getOwnPropertyDescriptor']);
         }
         return;
       }
 
       var extensible = target.IsExtensible();
       if (!extensible && targetDesc === undefined) {
-        return $$ThrowException('proxy_extensibility_inconsistent');
-      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, $$ToPropertyDescriptor(desc))) {
-        return $$ThrowException('proxy_incompatible_descriptor');
-      } else if (desc !== undefined && !$$ToBoolean(desc.Get('configurable')) && targetDesc && targetDesc.Configurable) {
-        return $$ThrowException('proxy_configurability_inconsistent')
+        return $$ThrowException('proxy_extensibility_inconsistent', ['getOwnPropertyDescriptor']);
+      } else if (targetDesc !== undefined && !$$IsCompatibleDescriptor(extensible, targetDesc, desc)) {
+        return $$ThrowException('proxy_incompatible_descriptor', ['getOwnPropertyDescriptor']);
+      } else if (desc !== undefined && !desc.Configurable && targetDesc !== undefined && targetDesc.Configurable) {
+        return $$ThrowException('proxy_configurability_inconsistent', ['getOwnPropertyDescriptor'])
       }
 
       return desc;
@@ -14585,7 +14598,7 @@ exports.$Proxy = (function(module){
 
   var proto = require('../lib/utility').uid();
 
-  function checkDuplicates(array){
+  function checkDuplicates(array, type){
     var seen = new Hash;
 
     for (var i=0; i < array.length; i++) {
@@ -14656,7 +14669,7 @@ exports.$Proxy = (function(module){
       }
 
       var proxyIsExtensible = $$ToBoolean(trap.Call(this.ProxyHandler, [this.ProxyTarget]));
-      if (trapResult && trapResult.Abrupt) return trapResult;
+      if (proxyIsExtensible && proxyIsExtensible.Abrupt) return proxyIsExtensible;
 
       var targetIsExtensible = this.ProxyTarget.IsExtensible();
       if (targetIsExtensible && targetIsExtensible.Abrupt) return targetIsExtensible;
@@ -14856,7 +14869,7 @@ exports.$Proxy = (function(module){
         }
       }
 
-      var seen = checkDuplicates(array);
+      var seen = checkDuplicates(array, type);
       if (seen.Abrupt) return seen;
 
       var props = this.ProxyTarget.Enumerate(includePrototype, onlyEnumerable);
@@ -15387,10 +15400,10 @@ exports.natives = (function(module){
       }
       return obj.SetInheritance(args[1]);
     },
-    _IsExtensible: function(obj){
+    _IsExtensible: function(obj, args){
       return args[0].IsExtensible();
     },
-    _PreventExtensions: function(obj){
+    _PreventExtensions: function(obj, args){
       return args[0].PreventExtensions();
     },
     _DefineOwnProperty: function(obj, args){
@@ -20748,11 +20761,16 @@ exports.debug = (function(exports){
 
   var MirrorProxy = (function(){
     function MirrorProxy(subject){
+      if (subject.__introspected) {
+        return subject.__introspected;
+      }
+      subject.__introspected = this;
       this.subject = subject;
       if ('Call' in subject) {
         this.type = 'function';
       }
       this.target = introspect(subject.ProxyTarget);
+      this.cache = new Hash;
       this.kind = this.target.kind;
       if (this.kind === 'Scope' || this.kind === 'Global') {
         this.kind = 'Object';
@@ -20832,21 +20850,19 @@ exports.debug = (function(exports){
         return result;
       },
       function query(key){
-        return descToAttrs(this.subject.GetOwnProperty(key));
-      },
-      function getOwnDescriptor(key){
-        var desc = this.subject.GetOwnProperty(key);
-        var out =  {};
-        for (var k in desc) {
-          out[k.toLowerCase()] = desc[k];
+        var prop = this.describe(key);
+        if (prop) {
+          return prop[2];
         }
-        return out;
       },
       function get(key){
-        return introspect(this.subject.Get(key));
+        return introspect(this.getValue(key));
       },
       function getValue(key){
-        return this.subject.Get(key);
+        var prop = key in this.cache ? this.cache[key] : this.describe(key);
+        if (prop) {
+          return prop[1];
+        }
       },
       function hasOwn(key){
         return this.subject.HasOwnProperty(key);
@@ -20854,27 +20870,50 @@ exports.debug = (function(exports){
       function has(key){
         return this.subject.HasProperty(key);
       },
+      function scheduleReset(){
+        if (!this.resetScheduled) {
+          this.resetScheduled = true;
+          var self = this;
+          setTimeout(function(){
+            self.enumerated = false;
+            self.resetScheduled = false;
+            self.cache = new Hash;
+          }, 15);
+        }
+      },
       function describe(key){
-        var desc = this.subject.GetOwnProperty(key);
-        if (desc) {
-          if ('Get' in desc || 'Set' in desc) {
-            var val = { Get: desc.Get, Set: desc.Set };
+        if (key in this.cache) {
+          return this.cache[key];
+        }
+        if (key !== '__proto__') {
+          var desc = this.subject.GetOwnProperty(key);
+          this.scheduleReset();
+          if (desc) {
+            if ('Get' in desc || 'Set' in desc) {
+              var val = { Get: desc.Get, Set: desc.Set };
+            } else {
+              var val = desc.Value;
+            }
+            this.cache[key] = [key, val, descToAttrs(desc)];
           } else {
-            var val = desc.Value;
+            this.cache[key] = undefined;
           }
-          return [key, val, descToAttrs(desc)];
+          return this.cache[key];
         }
       },
       function ownAttrs(props){
+        if (this.enumerated) {
+          return this.cache;
+        }
+        this.enumerated = true;
+
         var keys = this.subject.Enumerate(false, false);
 
-        props || (props = new Hash);
-
         for (var i=0; i < keys.length; i++) {
-          props[keys[i]] = this.describe(keys[i]);
+          this.describe(keys[i]);
         }
 
-        return props;
+        return this.cache;
       }
     ]);
 
@@ -21638,7 +21677,7 @@ exports.builtins["@object"] = "export class Object {\n  constructor(value){\n   
 
 exports.builtins["@parser"] = "\nexport function parse(src, { loc, range, raw, tokens, comment, source, tolerant } = { source: null }){\n  return $__parse(src, loc, range, raw, tokens, comment, tolerant, source);\n}\n\nexport class Position {\n  constructor(line = 1, column = 0){\n    this.line = line;\n    this.column = column;\n  }\n}\n\nexport class SourceLocation {\n  constructor(start, end){\n    this.start = new Position(start);\n    this.end = new Position(end);\n  }\n}\n\nexport class ASTNode {\n  private @type;\n  constructor(type) {\n    this.type = type;\n  }\n  get type() {\n    return this.@type;\n  }\n  set type(val) {\n    this.@type = val;\n  }\n}\n\nexport class ASTNodeList {\n  private @nodes;\n  constructor(...nodes) {\n    return index(this, nodes, @nodes);\n  }\n}\n\nexport class Expression extends ASTNode {}\nexport class Pattern extends ASTNode {}\nexport class Statement extends ASTNode {}\nexport class Declaration extends Statement {}\n\nexport class ArrayExpression extends Expression {\n  private @elements;\n  constructor(elements) {\n    this.elements = elements;\n  }\n  get elements() {\n    return this.@elements;\n  }\n  set elements(nodelist) {\n    this.@elements = nodelist;\n  }\n}\n\nexport class ArrayPattern extends Pattern {\n  private @elements;\n  constructor(elements) {\n    this.elements = elements;\n  }\n  get elements() {\n    return this.@elements;\n  }\n  set elements(nodelist) {\n    this.@elements = nodelist;\n  }\n}\n\nexport class ArrowFunctionExpression extends Expression {\n  private @params, @body, @defaults, @rest, @generator;\n  constructor(params, body, defaults, rest, generator) {\n    this.params = params;\n    this.body = body;\n    this.defaults = defaults;\n    this.rest = rest;\n    this.generator = generator;\n  }\n  get params() {\n    return this.@params;\n  }\n  set params(nodelist) {\n    this.@params = nodelist;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get defaults() {\n    return this.@defaults;\n  }\n  set defaults(nodelist) {\n    this.@defaults = nodelist;\n  }\n  get rest() {\n    return this.@rest;\n  }\n  set rest(node) {\n    this.@rest = node;\n  }\n  get generator() {\n    return this.@generator;\n  }\n  set generator(val) {\n    this.@generator = val;\n  }\n}\n\nexport class AssignmentExpression extends Expression {\n  private @left, @right, @operator;\n  constructor(left, right, operator) {\n    this.left = left;\n    this.right = right;\n    this.operator = operator;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get operator() {\n    return this.@operator;\n  }\n  set operator(val) {\n    this.@operator = val;\n  }\n}\n\nexport class AtSymbol extends Expression {\n  private @name, @internal;\n  constructor(name, internal) {\n    this.name = name;\n    this.internal = internal;\n  }\n  get name() {\n    return this.@name;\n  }\n  set name(val) {\n    this.@name = val;\n  }\n  get internal() {\n    return this.@internal;\n  }\n  set internal(val) {\n    this.@internal = val;\n  }\n}\n\nexport class BlockStatement extends Statement {\n  private @body;\n  constructor(body) {\n    this.body = body;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(nodelist) {\n    this.@body = nodelist;\n  }\n}\n\nexport class BinaryExpression extends Expression {\n  private @left, @right, @operator;\n  constructor(left, right, operator) {\n    this.left = left;\n    this.right = right;\n    this.operator = operator;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get operator() {\n    return this.@operator;\n  }\n  set operator(val) {\n    this.@operator = val;\n  }\n}\n\nexport class BreakStatement extends Statement {\n  private @label;\n  constructor(label) {\n    this.label = label;\n  }\n  get label() {\n    return this.@label;\n  }\n  set label(val) {\n    this.@label = val;\n  }\n}\n\nexport class CallExpression extends Expression {\n  private @callee, @args;\n  constructor(callee, args) {\n    this.callee = callee;\n    this.args = args;\n  }\n  get callee() {\n    return this.@callee;\n  }\n  set callee(node) {\n    this.@callee = node;\n  }\n  get args() {\n    return this.@args;\n  }\n  set args(nodelist) {\n    this.@args = nodelist;\n  }\n}\n\nexport class CatchClause extends ASTNode {\n  private @param, @body;\n  constructor(param, body) {\n    this.param = param;\n    this.body = body;\n  }\n  get param() {\n    return this.@param;\n  }\n  set param(node) {\n    this.@param = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class ConditionalExpression extends Expression {\n  private @test, @consequent, @alternate;\n  constructor(test, consequent, alternate) {\n    this.test = test;\n    this.consequent = consequent;\n    this.alternate = alternate;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n  get consequent() {\n    return this.@consequent;\n  }\n  set consequent(node) {\n    this.@consequent = node;\n  }\n  get alternate() {\n    return this.@alternate;\n  }\n  set alternate(node) {\n    this.@alternate = node;\n  }\n}\n\nexport class ClassBody extends ASTNode {\n  private @body;\n  constructor(body) {\n    this.body = body;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(nodelist) {\n    this.@body = nodelist;\n  }\n}\n\nexport class ClassDeclaration extends Declaration {\n  private @id, @body, @superClass;\n  constructor(id, body, superClass) {\n    this.id = id;\n    this.body = body;\n    this.superClass = superClass;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get superClass() {\n    return this.@superClass;\n  }\n  set superClass(node) {\n    this.@superClass = node;\n  }\n}\n\nexport class ClassExpression extends Expression {\n  private @id, @body, @superClass;\n  constructor(id, body, superClass) {\n    this.id = id;\n    this.body = body;\n    this.superClass = superClass;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get superClass() {\n    return this.@superClass;\n  }\n  set superClass(node) {\n    this.@superClass = node;\n  }\n}\n\nexport class ContinueStatement extends Statement {\n  private @label;\n  constructor(label) {\n    this.label = label;\n  }\n  get label() {\n    return this.@label;\n  }\n  set label(val) {\n    this.@label = val;\n  }\n}\n\nexport class ComprehensionBlock extends ASTNode {\n  private @left, @right, @body;\n  constructor(left, right, body) {\n    this.left = left;\n    this.right = right;\n    this.body = body;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class ComprehensionExpression extends Expression {\n  private @filter, @blocks, @body;\n  constructor(filter, blocks, body) {\n    this.filter = filter;\n    this.blocks = blocks;\n    this.body = body;\n  }\n  get filter() {\n    return this.@filter;\n  }\n  set filter(node) {\n    this.@filter = node;\n  }\n  get blocks() {\n    return this.@blocks;\n  }\n  set blocks(nodelist) {\n    this.@blocks = nodelist;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class DoWhileStatement extends Statement {\n  private @body, @test;\n  constructor(body, test) {\n    this.body = body;\n    this.test = test;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n}\n\nexport class DebuggerStatement extends Statement {\n}\n\nexport class EmptyStatement extends Statement {\n}\n\nexport class ExportDeclaration extends Statement {\n  private @specifiers, @declaration;\n  constructor(specifiers, declaration) {\n    this.specifiers = specifiers;\n    this.declaration = declaration;\n  }\n  get specifiers() {\n    return this.@specifiers;\n  }\n  set specifiers(nodelist) {\n    this.@specifiers = nodelist;\n  }\n  get declaration() {\n    return this.@declaration;\n  }\n  set declaration(node) {\n    this.@declaration = node;\n  }\n}\n\nexport class ExportSpecifier extends ASTNode {\n  private @id, @from;\n  constructor(id, from) {\n    this.id = id;\n    this.from = from;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get from() {\n    return this.@from;\n  }\n  set from(node) {\n    this.@from = node;\n  }\n}\n\nexport class ExportSpecifierSet extends ASTNode {\n  private @specifiers;\n  constructor(specifiers) {\n    this.specifiers = specifiers;\n  }\n  get specifiers() {\n    return this.@specifiers;\n  }\n  set specifiers(node) {\n    this.@specifiers = node;\n  }\n}\n\nexport class ExpressionStatement extends Statement {\n  private @expression;\n  constructor(expression) {\n    this.expression = expression;\n  }\n  get expression() {\n    return this.@expression;\n  }\n  set expression(node) {\n    this.@expression = node;\n  }\n}\n\nexport class ForStatement extends Statement {\n  private @init, @test, @update, @body;\n  constructor(init, test, update, body) {\n    this.init = init;\n    this.test = test;\n    this.update = update;\n    this.body = body;\n  }\n  get init() {\n    return this.@init;\n  }\n  set init(node) {\n    this.@init = node;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n  get update() {\n    return this.@update;\n  }\n  set update(node) {\n    this.@update = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class ForInStatement extends Statement {\n  private @left, @right, @body;\n  constructor(left, right, body) {\n    this.left = left;\n    this.right = right;\n    this.body = body;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class ForOfStatement extends Statement {\n  private @left, @right, @body;\n  constructor(left, right, body) {\n    this.left = left;\n    this.right = right;\n    this.body = body;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class FunctionDeclaration extends Declaration {\n  private @id, @params, @body, @defaults, @rest, @generator;\n  constructor(id, params, body, defaults, rest, generator) {\n    this.id = id;\n    this.params = params;\n    this.body = body;\n    this.defaults = defaults;\n    this.rest = rest;\n    this.generator = generator;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get params() {\n    return this.@params;\n  }\n  set params(nodelist) {\n    this.@params = nodelist;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get defaults() {\n    return this.@defaults;\n  }\n  set defaults(nodelist) {\n    this.@defaults = nodelist;\n  }\n  get rest() {\n    return this.@rest;\n  }\n  set rest(node) {\n    this.@rest = node;\n  }\n  get generator() {\n    return this.@generator;\n  }\n  set generator(val) {\n    this.@generator = val;\n  }\n}\n\nexport class FunctionExpression extends Expression {\n  private @id, @params, @body, @defaults, @rest, @generator;\n  constructor(id, params, body, defaults, rest, generator) {\n    this.id = id;\n    this.params = params;\n    this.body = body;\n    this.defaults = defaults;\n    this.rest = rest;\n    this.generator = generator;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get params() {\n    return this.@params;\n  }\n  set params(nodelist) {\n    this.@params = nodelist;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get defaults() {\n    return this.@defaults;\n  }\n  set defaults(nodelist) {\n    this.@defaults = nodelist;\n  }\n  get rest() {\n    return this.@rest;\n  }\n  set rest(node) {\n    this.@rest = node;\n  }\n  get generator() {\n    return this.@generator;\n  }\n  set generator(val) {\n    this.@generator = val;\n  }\n}\n\nexport class Glob extends ASTNode {\n}\n\nexport class Identifier extends Expression {\n  private @name;\n  constructor(name) {\n    this.name = name;\n  }\n  get name() {\n    return this.@name;\n  }\n  set name(val) {\n    this.@name = val;\n  }\n}\n\nexport class IfStatement extends Statement {\n  private @test, @consequent, @alternate;\n  constructor(test, consequent, alternate) {\n    this.test = test;\n    this.consequent = consequent;\n    this.alternate = alternate;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n  get consequent() {\n    return this.@consequent;\n  }\n  set consequent(node) {\n    this.@consequent = node;\n  }\n  get alternate() {\n    return this.@alternate;\n  }\n  set alternate(node) {\n    this.@alternate = node;\n  }\n}\n\nexport class ImportDeclaration extends Statement {\n  private @specifiers, @from;\n  constructor(specifiers, from) {\n    this.specifiers = specifiers;\n    this.from = from;\n  }\n  get specifiers() {\n    return this.@specifiers;\n  }\n  set specifiers(nodelist) {\n    this.@specifiers = nodelist;\n  }\n  get from() {\n    return this.@from;\n  }\n  set from(node) {\n    this.@from = node;\n  }\n}\n\nexport class ImportSpecifier extends ASTNode {\n  private @id, @from;\n  constructor(id, from) {\n    this.id = id;\n    this.from = from;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get from() {\n    return this.@from;\n  }\n  set from(node) {\n    this.@from = node;\n  }\n}\n\nexport class Literal extends Expression {\n  private @value;\n  constructor(value) {\n    this.value = value;\n  }\n  get value() {\n    return this.@value;\n  }\n  set value(val) {\n    this.@value = val;\n  }\n}\n\nexport class LabeledStatement extends Statement {\n  private @label, @body;\n  constructor(label, body) {\n    this.label = label;\n    this.body = body;\n  }\n  get label() {\n    return this.@label;\n  }\n  set label(val) {\n    this.@label = val;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class LogicalExpression extends Expression {\n  private @left, @right, @operator;\n  constructor(left, right, operator) {\n    this.left = left;\n    this.right = right;\n    this.operator = operator;\n  }\n  get left() {\n    return this.@left;\n  }\n  set left(node) {\n    this.@left = node;\n  }\n  get right() {\n    return this.@right;\n  }\n  set right(node) {\n    this.@right = node;\n  }\n  get operator() {\n    return this.@operator;\n  }\n  set operator(val) {\n    this.@operator = val;\n  }\n}\n\nexport class MemberExpression extends Expression {\n  private @object, @property, @computed;\n  constructor(object, property, computed) {\n    this.object = object;\n    this.property = property;\n    this.computed = computed;\n  }\n  get object() {\n    return this.@object;\n  }\n  set object(node) {\n    this.@object = node;\n  }\n  get property() {\n    return this.@property;\n  }\n  set property(node) {\n    this.@property = node;\n  }\n  get computed() {\n    return this.@computed;\n  }\n  set computed(val) {\n    this.@computed = val;\n  }\n}\n\nexport class MethodDefinition extends ASTNode {\n  private @key, @value, @kind;\n  constructor(key, value, kind) {\n    this.key = key;\n    this.value = value;\n    this.kind = kind;\n  }\n  get key() {\n    return this.@key;\n  }\n  set key(node) {\n    this.@key = node;\n  }\n  get value() {\n    return this.@value;\n  }\n  set value(node) {\n    this.@value = node;\n  }\n  get kind() {\n    return this.@kind;\n  }\n  set kind(val) {\n    this.@kind = val;\n  }\n}\n\nexport class ModuleDeclaration extends Declaration {\n  private @id, @body, @from;\n  constructor(id, body, from) {\n    this.id = id;\n    this.body = body;\n    this.from = from;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n  get from() {\n    return this.@from;\n  }\n  set from(node) {\n    this.@from = node;\n  }\n}\n\nexport class NewExpression extends Expression {\n  private @callee, @args;\n  constructor(callee, args) {\n    this.callee = callee;\n    this.args = args;\n  }\n  get callee() {\n    return this.@callee;\n  }\n  set callee(node) {\n    this.@callee = node;\n  }\n  get args() {\n    return this.@args;\n  }\n  set args(nodelist) {\n    this.@args = nodelist;\n  }\n}\n\nexport class ObjectExpression extends Expression {\n  private @properties;\n  constructor(properties) {\n    this.properties = properties;\n  }\n  get properties() {\n    return this.@properties;\n  }\n  set properties(nodelist) {\n    this.@properties = nodelist;\n  }\n}\n\nexport class ObjectPattern extends Pattern {\n  private @properties;\n  constructor(properties) {\n    this.properties = properties;\n  }\n  get properties() {\n    return this.@properties;\n  }\n  set properties(nodelist) {\n    this.@properties = nodelist;\n  }\n}\n\nexport class Path extends ASTNode {\n  private @body;\n  constructor(body) {\n    this.body = body;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(nodelist) {\n    this.@body = nodelist;\n  }\n}\n\nexport class Program extends ASTNode {\n  private @body;\n  constructor(body) {\n    this.body = body;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(nodelist) {\n    this.@body = nodelist;\n  }\n}\n\nexport class Property extends ASTNode {\n  private @key, @value, @kind, @method, @shorthand;\n  constructor(key, value, kind, method, shorthand) {\n    this.key = key;\n    this.value = value;\n    this.kind = kind;\n    this.method = method;\n    this.shorthand = shorthand;\n  }\n  get key() {\n    return this.@key;\n  }\n  set key(node) {\n    this.@key = node;\n  }\n  get value() {\n    return this.@value;\n  }\n  set value(node) {\n    this.@value = node;\n  }\n  get kind() {\n    return this.@kind;\n  }\n  set kind(val) {\n    this.@kind = val;\n  }\n  get method() {\n    return this.@method;\n  }\n  set method(val) {\n    this.@method = val;\n  }\n  get shorthand() {\n    return this.@shorthand;\n  }\n  set shorthand(val) {\n    this.@shorthand = val;\n  }\n}\n\nexport class ReturnStatement extends Statement {\n  private @arg;\n  constructor(arg) {\n    this.arg = arg;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n}\n\nexport class SequenceExpression extends Expression {\n  private @expressions;\n  constructor(expressions) {\n    this.expressions = expressions;\n  }\n  get expressions() {\n    return this.@expressions;\n  }\n  set expressions(nodelist) {\n    this.@expressions = nodelist;\n  }\n}\n\nexport class SpreadElement extends ASTNode {\n  private @arg;\n  constructor(arg) {\n    this.arg = arg;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n}\n\nexport class SwitchStatement extends Statement {\n  private @descriminant, @cases;\n  constructor(descriminant, cases) {\n    this.descriminant = descriminant;\n    this.cases = cases;\n  }\n  get descriminant() {\n    return this.@descriminant;\n  }\n  set descriminant(node) {\n    this.@descriminant = node;\n  }\n  get cases() {\n    return this.@cases;\n  }\n  set cases(nodelist) {\n    this.@cases = nodelist;\n  }\n}\n\nexport class SwitchCase extends ASTNode {\n  private @test, @consequent;\n  constructor(test, consequent) {\n    this.test = test;\n    this.consequent = consequent;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n  get consequent() {\n    return this.@consequent;\n  }\n  set consequent(nodelist) {\n    this.@consequent = nodelist;\n  }\n}\n\nexport class SymbolDeclaration extends Declaration {\n  private @declarations, @kind;\n  constructor(declarations, kind) {\n    this.declarations = declarations;\n    this.kind = kind;\n  }\n  get declarations() {\n    return this.@declarations;\n  }\n  set declarations(nodelist) {\n    this.@declarations = nodelist;\n  }\n  get kind() {\n    return this.@kind;\n  }\n  set kind(val) {\n    this.@kind = val;\n  }\n}\n\nexport class SymbolDeclarator extends ASTNode {\n  private @id, @init;\n  constructor(id, init) {\n    this.id = id;\n    this.init = init;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get init() {\n    return this.@init;\n  }\n  set init(node) {\n    this.@init = node;\n  }\n}\n\nexport class TaggedTemplateExpression extends Expression {\n  private @tag, @template;\n  constructor(tag, template) {\n    this.tag = tag;\n    this.template = template;\n  }\n  get tag() {\n    return this.@tag;\n  }\n  set tag(node) {\n    this.@tag = node;\n  }\n  get template() {\n    return this.@template;\n  }\n  set template(node) {\n    this.@template = node;\n  }\n}\n\nexport class TemplateElement extends ASTNode {\n  private @value, @tail;\n  constructor(value, tail) {\n    this.value = value;\n    this.tail = tail;\n  }\n  get value() {\n    return this.@value;\n  }\n  set value(val) {\n    this.@value = val;\n  }\n  get tail() {\n    return this.@tail;\n  }\n  set tail(val) {\n    this.@tail = val;\n  }\n}\n\nexport class TemplateLiteral extends Expression {\n  private @elements, @expressions;\n  constructor(elements, expressions) {\n    this.elements = elements;\n    this.expressions = expressions;\n  }\n  get elements() {\n    return this.@elements;\n  }\n  set elements(nodelist) {\n    this.@elements = nodelist;\n  }\n  get expressions() {\n    return this.@expressions;\n  }\n  set expressions(nodelist) {\n    this.@expressions = nodelist;\n  }\n}\n\nexport class ThisExpression extends Expression {\n}\n\nexport class ThrowStatement extends Statement {\n  private @arg;\n  constructor(arg) {\n    this.arg = arg;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n}\n\nexport class TryStatement extends Statement {\n  private @block, @handlers, @finalizer;\n  constructor(block, handlers, finalizer) {\n    this.block = block;\n    this.handlers = handlers;\n    this.finalizer = finalizer;\n  }\n  get block() {\n    return this.@block;\n  }\n  set block(node) {\n    this.@block = node;\n  }\n  get handlers() {\n    return this.@handlers;\n  }\n  set handlers(nodelist) {\n    this.@handlers = nodelist;\n  }\n  get finalizer() {\n    return this.@finalizer;\n  }\n  set finalizer(node) {\n    this.@finalizer = node;\n  }\n}\n\nexport class UnaryExpression extends Expression {\n  private @arg, @operator;\n  constructor(arg, operator) {\n    this.arg = arg;\n    this.operator = operator;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n  get operator() {\n    return this.@operator;\n  }\n  set operator(val) {\n    this.@operator = val;\n  }\n}\n\nexport class UpdateExpression extends Expression {\n  private @arg, @operator, @prefix;\n  constructor(arg, operator, prefix) {\n    this.arg = arg;\n    this.operator = operator;\n    this.prefix = prefix;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n  get operator() {\n    return this.@operator;\n  }\n  set operator(val) {\n    this.@operator = val;\n  }\n  get prefix() {\n    return this.@prefix;\n  }\n  set prefix(val) {\n    this.@prefix = val;\n  }\n}\n\nexport class VariableDeclaration extends Declaration {\n  private @declarations, @kind;\n  constructor(declarations, kind) {\n    this.declarations = declarations;\n    this.kind = kind;\n  }\n  get declarations() {\n    return this.@declarations;\n  }\n  set declarations(nodelist) {\n    this.@declarations = nodelist;\n  }\n  get kind() {\n    return this.@kind;\n  }\n  set kind(val) {\n    this.@kind = val;\n  }\n}\n\nexport class VariableDeclarator extends ASTNode {\n  private @id, @init;\n  constructor(id, init) {\n    this.id = id;\n    this.init = init;\n  }\n  get id() {\n    return this.@id;\n  }\n  set id(node) {\n    this.@id = node;\n  }\n  get init() {\n    return this.@init;\n  }\n  set init(node) {\n    this.@init = node;\n  }\n}\n\nexport class WhileStatement extends Statement {\n  private @test, @body;\n  constructor(test, body) {\n    this.test = test;\n    this.body = body;\n  }\n  get test() {\n    return this.@test;\n  }\n  set test(node) {\n    this.@test = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class WithStatement extends Statement {\n  private @object, @body;\n  constructor(object, body) {\n    this.object = object;\n    this.body = body;\n  }\n  get object() {\n    return this.@object;\n  }\n  set object(node) {\n    this.@object = node;\n  }\n  get body() {\n    return this.@body;\n  }\n  set body(node) {\n    this.@body = node;\n  }\n}\n\nexport class YieldExpression extends Expression {\n  private @arg;\n  constructor(arg) {\n    this.arg = arg;\n  }\n  get arg() {\n    return this.@arg;\n  }\n  set arg(node) {\n    this.@arg = node;\n  }\n}\n";
 
-exports.builtins["@reflect"] = "export class Proxy {\n  constructor(target, handler){\n    ensureObject(target, 'Proxy');\n    ensureObject(handler, 'Proxy');\n    return $__ProxyCreate(target, handler);\n  }\n}\n\nbuiltinClass(Proxy);\n\n$__delete(Proxy, 'prototype');\n\nexport class Handler {\n  getOwnPropertyDescriptor(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);\n    return getOwnPropertyDescriptor(target, name);\n  }\n\n  getOwnPropertyNames(target){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);\n    return getOwnPropertyNames(target);\n  }\n\n  getPrototypeOf(target){\n    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);\n    return getPrototypeOf(target);\n  }\n\n  defineProperty(target, name, desc){\n    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);\n    return defineProperty(target, name, desc);\n  }\n\n  deleteProperty(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);\n    return deleteProperty(target, name);\n  }\n\n  preventExtensions(target){\n    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);\n    return preventExtensions(target);\n  }\n\n  isExtensible(target){\n    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);\n    return isExtensible(target);\n  }\n\n  apply(target, thisArg, args){\n    //throw $__Exception('missing_fundamental_trap', ['apply']);\n    return apply(target, thisArg, args);\n  }\n\n  seal(target) {\n    if (!this.preventExtensions(target)) return false;\n\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      success = success && this.defineProperty(target, props[i], { configurable: false });\n    }\n    return success;\n  }\n\n  freeze(target){\n    if (!this.preventExtensions(target)) return false;\n\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const name = props[i];\n      let desc = this.getOwnPropertyDescriptor(target, name);\n\n      if (desc) {\n        desc = 'writable' in desc || 'value' in desc\n              ? { configurable: false, writable: false }\n              : { configurable: false };\n        success = success && this.defineProperty(target, name, desc);\n      }\n    }\n\n    return success;\n  }\n\n  isSealed(target){\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc && desc.configurable) {\n        return false;\n      }\n    }\n\n    return !this.isExtensible(target);\n  }\n\n  isFrozen(target){\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc.configurable || ('writable' in desc || 'value' in desc) && desc.writable) {\n        return false;\n      }\n    }\n\n    return !this.isExtensible(target);\n  }\n\n  has(target, name){\n    const desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc !== undefined) {\n      return true;\n    }\n\n    const proto = $__GetPrototype(target);\n    return proto === null ? false : this.has(proto, name);\n  }\n\n  hasOwn(target, name){\n    return this.getOwnPropertyDescriptor(target, name) !== undefined;\n  }\n\n  get(target, name, receiver = target){\n    const desc = this.getOwnPropertyDescriptor(target, name);\n\n    if (desc === undefined) {\n      const proto = $__GetPrototype(target);\n      return proto === null ? undefined : this.get(proto, name, receiver);\n    }\n\n    if ('writable' in desc || 'value' in desc) {\n      return desc.value;\n    }\n\n    const getter = desc.get;\n    return getter === undefined ? undefined : $__Call(getter, receiver, []);\n  }\n\n  set(target, name, value, receiver){\n    const ownDesc = this.getOwnPropertyDescriptor(target, name);\n\n    if (ownDesc !== undefined) {\n      if ('get' in ownDesc || 'set' in ownDesc) {\n        var setter = ownDesc.set;\n        if (setter === undefined) return false;\n        $__Call(setter, receiver, [value]);\n        return true;\n      }\n\n      if (ownDesc.writable === false) {\n        return false;\n      } else if (receiver === target) {\n        $__DefineOwnProperty(receiver, name, { value: value });\n        return true;\n      } else {\n        $__DefineOwnProperty(receiver, name, newDesc);\n        if ($__IsExtensible(receiver)) {\n          $__DefineOwnProperty(object, key, { writable: true,\n                                              enumerable: true,\n                                              configurable: true });\n          return true;\n        }\n        return false;\n      }\n    }\n\n    const proto = $__GetPrototype(target);\n    if (proto === null) {\n      if ($__IsExtensible(receiver)) {\n        $__DefineOwnProperty(receiver, key, { writable: true,\n                                              enumerable: true,\n                                              configurable: true });\n        return true;\n      }\n      return false;\n    }\n\n    return this.set(proto, name, value, receiver);\n  }\n\n  enumerate(target){\n    const result = this.getOwnPropertyNames(target),\n          len    = $__ToUint32(result.length),\n          result = [];\n\n    for (var i = 0; i < len; i++) {\n      const name = $__ToString(result[i]),\n            desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && !desc.enumerable) {\n        result.push(name);\n      }\n    }\n\n    var proto = $__GetPrototype(target);\n    return proto === null ? result : result.concat(enumerate(proto));\n  }\n\n  keys(target){\n    const result = this.getOwnPropertyNames(target),\n          len    = $__ToUint32(result.length);\n          result = [];\n\n    for (var i = 0; i < len; i++) {\n      const name = $__ToString(result[i]),\n            desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && desc.enumerable) {\n        result.push(name);\n      }\n    }\n\n    return result;\n  }\n\n  construct(target, args) {\n    const proto    = this.get(target, 'prototype', target),\n          instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},\n          result   = this.apply(target, instance, args);\n\n    return $__Type(result) === 'Object' ? result : instance;\n  }\n}\n\nbuiltinClass(Handler);\n\n\n\nexport function apply(target, thisArg, args){\n  ensureFunction(target, '@reflect.apply');\n  return $__Call(target, thisArg, ensureArgs(args));\n}\n\nbuiltinFunction(apply);\n\n\nexport function construct(target, args){\n  ensureFunction(target, '@reflect.construct');\n  return $__Construct(target, ensureArgs(args));\n}\n\nbuiltinFunction(construct);\n\n\nexport function defineProperty(target, name, desc){\n  ensureObject(target, '@reflect.defineProperty');\n  ensureDescriptor(desc);\n  return $__DefineOwnProperty(target, $__ToPropertyKey(name), desc);\n}\n\nbuiltinFunction(defineProperty);\n\n\nexport function deleteProperty(target, name){\n  ensureObject(target, '@reflect.deleteProperty');\n  return $__Delete(target, $__ToPropertyKey(name), false);\n}\n\nbuiltinFunction(deleteProperty);\n\n\nexport function enumerate(target){\n  return $__Enumerate($__ToObject(target), false, false);\n}\n\nbuiltinFunction(enumerate);\n\n\nexport function freeze(target){\n  if ($__Type(target) !== 'Object' || !$__PreventExtensions(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false),\n        len   = props.length;\n\n  letsuccess = true;\n\n  for (var i = 0; i < len; i++) {\n    const desc = target.@@GetOwnProperty(props[i]),\n          attrs = 'writable' in desc || 'value' in desc\n            ? { configurable: false, writable: false }\n            : desc !== undefined\n              ? { configurable: false }\n              : null;\n\n    if (attrs !== null) {\n      success = success && $__DefineOwnProperty(target, props[i], attrs);\n    }\n  }\n\n  return success;\n}\n\nbuiltinFunction(freeze);\n\n\nexport function get(target, name, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__GetP($__ToObject(target), $__ToPropertyKey(name), receiver);\n}\n\nbuiltinFunction(get);\n\n\nexport function getOwnPropertyDescriptor(target, name){\n  ensureObject(target, '@reflect.getOwnPropertyDescriptor');\n  return $__GetOwnProperty(target, $__ToPropertyKey(name));\n}\n\nbuiltinFunction(getOwnPropertyDescriptor);\n\n\nexport function getOwnPropertyNames(target){\n  ensureObject(target, '@reflect.getOwnPropertyNames');\n  return $__Enumerate(target, false, false);\n}\n\nbuiltinFunction(getOwnPropertyNames);\n\n\nexport function getPrototypeOf(target){\n  ensureObject(target, '@reflect.getPrototypeOf');\n  return $__GetPrototype(target);\n}\n\nbuiltinFunction(getPrototypeOf);\n\n\nexport function has(target, name){\n  return $__HasProperty($__ToObject(target), $__ToPropertyKey(name));\n}\n\nbuiltinFunction(has);\n\n\nexport function hasOwn(target, name){\n  return $__HasOwnProperty($__ToObject(target), $__ToPropertyKey(name));\n}\n\nbuiltinFunction(hasOwn);\n\n\nexport function isFrozen(target){\n  ensureObject(target, '@reflect.isFrozen');\n  if ($__IsExtensible(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false);\n\n  for (var i=0; i < props.length; i++) {\n    const desc = $__GetOwnProperty(target, props[i]);\n    if (desc && desc.configurable || 'writable' in desc && desc.writable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nbuiltinFunction(isFrozen);\n\n\nexport function isSealed(target){\n  ensureObject(target, '@reflect.isSealed');\n\n  if ($__IsExtensible(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false);\n\n  for (var i=0; i < props.length; i++) {\n    const desc = $__GetOwnProperty(target, props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nbuiltinFunction(isSealed);\n\n\nexport function isExtensible(target){\n  ensureObject(target, '@reflect.isExtensible');\n  return $__IsExtensible(target);\n}\n\nbuiltinFunction(isExtensible);\n\n\nexport function keys(target){\n  ensureObject(target, '@reflect.keys');\n  return $__Enumerate(target, false, true);\n}\n\nbuiltinFunction(keys);\n\n\nexport function preventExtensions(target){\n  return $__Type(target) === 'Object' ? $__PreventExtensions(target) : false;\n}\n\nbuiltinFunction(preventExtensions);\n\n\nexport function seal(target){\n  if ($__Type(target) !== 'Object') return false;\n  let success = $__PreventExtensions(target);\n  if (!success) return success;\n\n  const props = $__Enumerate(target, false, false),\n        len   = props.length,\n        desc  = { configurable: false };\n\n  for (var i = 0; i < len; i++) {\n    success = success && $__DefineOwnProperty(target, props[i], desc);\n  }\n\n  return success;\n}\n\nbuiltinFunction(seal);\n\n\nexport function set(target, name, value, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__SetP($__ToObject(target), $__ToPropertyKey(name), value, receiver);\n}\n\nbuiltinFunction(set);\n";
+exports.builtins["@reflect"] = "export class Proxy {\n  constructor(target, handler){\n    ensureObject(target, 'Proxy');\n    ensureObject(handler, 'Proxy');\n    return $__ProxyCreate(target, handler);\n  }\n}\n\nbuiltinClass(Proxy);\n\n$__delete(Proxy, 'prototype');\n\nconst normal = {\n  writable: true,\n  enumerable: true,\n  configurable: true\n};\n\nexport class Handler {\n  getOwnPropertyDescriptor(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);\n    return getOwnPropertyDescriptor(target, name);\n  }\n\n  getOwnPropertyNames(target){\n    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);\n    return getOwnPropertyNames(target);\n  }\n\n  getPrototypeOf(target){\n    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);\n    return getPrototypeOf(target);\n  }\n\n  defineProperty(target, name, desc){\n    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);\n    return defineProperty(target, name, desc);\n  }\n\n  deleteProperty(target, name){\n    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);\n    return deleteProperty(target, name);\n  }\n\n  preventExtensions(target){\n    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);\n    return preventExtensions(target);\n  }\n\n  isExtensible(target){\n    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);\n    return isExtensible(target);\n  }\n\n  apply(target, thisArg, args){\n    //throw $__Exception('missing_fundamental_trap', ['apply']);\n    return apply(target, thisArg, args);\n  }\n\n  seal(target) {\n    if (!this.preventExtensions(target)) return false;\n\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      success = success && this.defineProperty(target, props[i], { configurable: false });\n    }\n    return success;\n  }\n\n  freeze(target){\n    if (!this.preventExtensions(target)) return false;\n\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const name = props[i];\n      let desc = this.getOwnPropertyDescriptor(target, name);\n\n      if (desc) {\n        desc = 'writable' in desc || 'value' in desc\n              ? { configurable: false, writable: false }\n              : { configurable: false };\n        success = success && this.defineProperty(target, name, desc);\n      }\n    }\n\n    return success;\n  }\n\n  isSealed(target){\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc && desc.configurable) {\n        return false;\n      }\n    }\n\n    return !this.isExtensible(target);\n  }\n\n  isFrozen(target){\n    const props = this.getOwnPropertyNames(target),\n          len   = $__ToUint32(props.length);\n\n    for (var i = 0; i < len; i++) {\n      const desc = this.getOwnPropertyDescriptor(target, props[i]);\n\n      if (desc.configurable || ('writable' in desc || 'value' in desc) && desc.writable) {\n        return false;\n      }\n    }\n\n    return !this.isExtensible(target);\n  }\n\n  has(target, name){\n    const desc = this.getOwnPropertyDescriptor(target, name);\n    if (desc) {\n      return true;\n    }\n\n    const proto = $__GetPrototype(target);\n    return proto === null ? false : this.has(proto, name);\n  }\n\n  hasOwn(target, name){\n    return this.getOwnPropertyDescriptor(target, name) !== undefined;\n  }\n\n  get(target, name, receiver = target){\n    const desc = this.getOwnPropertyDescriptor(target, name);\n\n    if (desc === undefined) {\n      const proto = $__GetPrototype(target);\n      return proto === null ? undefined : this.get(proto, name, receiver);\n    }\n\n    if ('writable' in desc || 'value' in desc) {\n      return desc.value;\n    }\n\n    const getter = desc.get;\n    return getter === undefined ? undefined : $__Call(getter, receiver, []);\n  }\n\n  set(target, name, value, receiver) {\n    const ownDesc = this.getOwnPropertyDescriptor(target, name);\n\n    if (ownDesc !== undefined) {\n      if ('get' in ownDesc || 'set' in ownDesc) {\n        const setter = ownDesc.set;\n        if (setter === undefined) {\n          return false;\n        }\n        $__Call(setter, receiver, [value]);\n        return true;\n      } else if (ownDesc.writable === false) {\n        return false;\n      } else if (receiver === target) {\n        $__DefineOwnProperty(receiver, name, { value: value });\n        return true;\n      } else if (!$__IsExtensible(receiver)) {\n        return false;\n      }\n      normal.value = value;\n      $__DefineOwnProperty(receiver, name, normal);\n      normal.value = undefined;\n      return true;\n    }\n\n    const proto = $__GetPrototype(target);\n    if (proto === null) {\n      if (!$__IsExtensible(receiver)) {\n        return false;\n      }\n      normal.value = value;\n      $__DefineOwnProperty(receiver, name, normal);\n      normal.value = undefined;\n      return true;\n    }\n\n    return $__SetP(proto, name, value, receiver);\n  }\n\n  enumerate(target){\n    const result = this.getOwnPropertyNames(target),\n          len    = $__ToUint32(result.length),\n          result = [];\n\n    for (var i = 0; i < len; i++) {\n      const name = $__ToString(result[i]),\n            desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && desc.enumerable) {\n        result.push(name);\n      }\n    }\n\n    var proto = $__GetPrototype(target);\n    return proto === null ? result : result.concat(enumerate(proto));\n  }\n\n  keys(target){\n    const result = this.getOwnPropertyNames(target),\n          len    = $__ToUint32(result.length);\n          result = [];\n\n    for (var i = 0; i < len; i++) {\n      const name = $__ToString(result[i]),\n            desc = this.getOwnPropertyDescriptor(name);\n\n      if (desc != null && desc.enumerable) {\n        result.push(name);\n      }\n    }\n\n    return result;\n  }\n\n  construct(target, args) {\n    const proto    = this.get(target, 'prototype', target),\n          instance = $__Type(proto) === 'Object' ? $__ObjectCreate(proto) : {},\n          result   = this.apply(target, instance, args);\n\n    return $__Type(result) === 'Object' ? result : instance;\n  }\n}\n\nbuiltinClass(Handler);\n\n\n\nexport function apply(target, thisArg, args){\n  ensureFunction(target, '@reflect.apply');\n  return $__Call(target, thisArg, ensureArgs(args));\n}\n\nbuiltinFunction(apply);\n\n\nexport function construct(target, args){\n  ensureFunction(target, '@reflect.construct');\n  return $__Construct(target, ensureArgs(args));\n}\n\nbuiltinFunction(construct);\n\n\nexport function defineProperty(target, name, desc){\n  ensureObject(target, '@reflect.defineProperty');\n  ensureDescriptor(desc);\n  return $__DefineOwnProperty(target, $__ToPropertyKey(name), desc);\n}\n\nbuiltinFunction(defineProperty);\n\n\nexport function deleteProperty(target, name){\n  ensureObject(target, '@reflect.deleteProperty');\n  return $__Delete(target, $__ToPropertyKey(name), false);\n}\n\nbuiltinFunction(deleteProperty);\n\n\nexport function enumerate(target){\n  return $__Enumerate($__ToObject(target), true, true);\n}\n\nbuiltinFunction(enumerate);\n\n\nexport function freeze(target){\n  if ($__Type(target) !== 'Object' || !$__PreventExtensions(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false),\n        len   = props.length;\n\n  letsuccess = true;\n\n  for (var i = 0; i < len; i++) {\n    const desc = target.@@GetOwnProperty(props[i]),\n          attrs = 'writable' in desc || 'value' in desc\n            ? { configurable: false, writable: false }\n            : desc !== undefined\n              ? { configurable: false }\n              : null;\n\n    if (attrs !== null) {\n      success = success && $__DefineOwnProperty(target, props[i], attrs);\n    }\n  }\n\n  return success;\n}\n\nbuiltinFunction(freeze);\n\n\nexport function get(target, name, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__GetP($__ToObject(target), $__ToPropertyKey(name), receiver);\n}\n\nbuiltinFunction(get);\n\n\nexport function getOwnPropertyDescriptor(target, name){\n  ensureObject(target, '@reflect.getOwnPropertyDescriptor');\n  return $__GetOwnProperty(target, $__ToPropertyKey(name));\n}\n\nbuiltinFunction(getOwnPropertyDescriptor);\n\n\nexport function getOwnPropertyNames(target){\n  ensureObject(target, '@reflect.getOwnPropertyNames');\n  return $__Enumerate(target, false, false);\n}\n\nbuiltinFunction(getOwnPropertyNames);\n\n\nexport function getPrototypeOf(target){\n  ensureObject(target, '@reflect.getPrototypeOf');\n  return $__GetPrototype(target);\n}\n\nbuiltinFunction(getPrototypeOf);\n\n\nexport function has(target, name){\n  return $__HasProperty($__ToObject(target), $__ToPropertyKey(name));\n}\n\nbuiltinFunction(has);\n\n\nexport function hasOwn(target, name){\n  return $__HasOwnProperty($__ToObject(target), $__ToPropertyKey(name));\n}\n\nbuiltinFunction(hasOwn);\n\n\nexport function isFrozen(target){\n  ensureObject(target, '@reflect.isFrozen');\n  if ($__IsExtensible(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false);\n\n  for (var i=0; i < props.length; i++) {\n    const desc = $__GetOwnProperty(target, props[i]);\n    if (desc && desc.configurable || 'writable' in desc && desc.writable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nbuiltinFunction(isFrozen);\n\n\nexport function isSealed(target){\n  ensureObject(target, '@reflect.isSealed');\n\n  if ($__IsExtensible(target)) {\n    return false;\n  }\n\n  const props = $__Enumerate(target, false, false);\n\n  for (var i=0; i < props.length; i++) {\n    const desc = $__GetOwnProperty(target, props[i]);\n    if (desc && desc.configurable) {\n      return false;\n    }\n  }\n\n  return true;\n}\n\nbuiltinFunction(isSealed);\n\n\nexport function isExtensible(target){\n  ensureObject(target, '@reflect.isExtensible');\n  return $__IsExtensible(target);\n}\n\nbuiltinFunction(isExtensible);\n\n\nexport function keys(target){\n  ensureObject(target, '@reflect.keys');\n  return $__Enumerate(target, false, true);\n}\n\nbuiltinFunction(keys);\n\n\nexport function preventExtensions(target){\n  return $__Type(target) === 'Object' ? $__PreventExtensions(target) : false;\n}\n\nbuiltinFunction(preventExtensions);\n\n\nexport function seal(target){\n  if ($__Type(target) !== 'Object') return false;\n  let success = $__PreventExtensions(target);\n  if (!success) return success;\n\n  const props = $__Enumerate(target, false, false),\n        len   = props.length,\n        desc  = { configurable: false };\n\n  for (var i = 0; i < len; i++) {\n    success = success && $__DefineOwnProperty(target, props[i], desc);\n  }\n\n  return success;\n}\n\nbuiltinFunction(seal);\n\n\nexport function set(target, name, value, receiver){\n  receiver = receiver === undefined ? receiver : $__ToObject(receiver);\n  return $__SetP($__ToObject(target), $__ToPropertyKey(name), value, receiver);\n}\n\nbuiltinFunction(set);\n";
 
 exports.builtins["@regexp"] = "export class RegExp {\n  constructor(pattern, flags){\n    if ($__IsConstructCall()) {\n      if (pattern === undefined) {\n        pattern = '';\n      } else if (typeof pattern === 'string') {\n      } else if (pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {\n        if (flags !== undefined) {\n          throw $__Exception('regexp_flags', []);\n        }\n      } else {\n        pattern = $__ToString(pattern);\n      }\n      return $__RegExpCreate(pattern, flags);\n    } else {\n      if (flags === undefined && pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {\n        return pattern;\n      }\n      return $__RegExpCreate(pattern, flags);\n    }\n  }\n\n  exec(string){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpExec(this, $__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.exec']);\n  }\n\n  test(string){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpTest(this, $__ToString(string));\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.test']);\n  }\n\n  toString(){\n    if ($__GetBuiltinBrand(this) === 'RegExp') {\n      return $__RegExpToString(this);\n    }\n    throw $__Exception('not_generic', ['RegExp.prototype.toString']);\n  }\n}\n\nbuiltinClass(RegExp);\n\n\nexport function exec(regexp, string){\n  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {\n    return $__RegExpExec(regexp, $__ToString(string));\n  }\n  throw $__Exception('not_generic', ['@regexp.exec']);\n}\n\nbuiltinFunction(exec);\n\n\nexport function test(regexp, string){\n  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {\n    return $__RegExpTest(regexp, [$__ToString(string)]);\n  }\n  throw $__Exception('not_generic', ['@regexp.test']);\n}\n\nbuiltinFunction(test);\n";
 
