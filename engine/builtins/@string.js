@@ -338,7 +338,7 @@ export class String {
     if (typeof this === 'string') {
       return this;
     } else if ($__GetBuiltinBrand(this) === 'String') {
-      return $__getInternal(this, 'PrimitiveValue');
+      return this.@@StringValue;
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
   }
@@ -355,13 +355,14 @@ export class String {
     if (typeof this === 'string') {
       return this;
     } else if ($__GetBuiltinBrand(this) === 'String') {
-      return $__getInternal(this, 'PrimitiveValue');
+      return this.@@StringValue;
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
   }
 }
 
 builtinClass(String);
+String.prototype.@@StringValue = '';
 
 
 export function fromCharCode(...codeUnits){

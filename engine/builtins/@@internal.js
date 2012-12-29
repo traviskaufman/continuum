@@ -1,10 +1,17 @@
 symbol @@toStringTag,
        @@iterator;
 
-private @@BooleanValue;
+private @@BooleanValue,
+        @@StringValue,
+        @@NumberValue,
+        @@DateValue;
 
-$__iterator    = @@iterator;
-$__toStringTag = @@toStringTag;
+$__iterator     = @@iterator;
+$__toStringTag  = @@toStringTag;
+$__BooleanValue = @@BooleanValue;
+$__StringValue  = @@StringValue;
+$__NumberValue  = @@NumberValue;
+$__DateValue    = @@DateValue;
 
 const StopIteration = $__StopIteration,
       HIDDEN   = 6,

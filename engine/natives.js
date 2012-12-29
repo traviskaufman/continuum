@@ -440,13 +440,13 @@ var natives = (function(module){
     },
     StringReplace: function(str, search, replace){
       if (typeof search !== 'string') {
-        search = search.PrimitiveValue;
+        search = search.getPrimitiveValue();
       }
       return str.replace(search, replace);
     },
     StringSplit: function(str, separator, limit){
       if (typeof separator !== 'string') {
-        separator = separator.PrimitiveValue;
+        separator = separator.getPrimitiveValue();
       }
       return new $Array(str.split(separator, limit));
     },

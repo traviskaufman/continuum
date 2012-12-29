@@ -2,7 +2,7 @@ function getter(o, name){
   if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {
     throw $__Exception('not_generic', ['Date.prototype.'+name]);
   }
-  return $__CallBuiltin($__getInternal(o, 'Date'), name);
+  return $__CallBuiltin(this.@@DateValue, name);
 }
 
 internalFunction(getter);
@@ -11,7 +11,7 @@ function setter(o, name, value){
   if (o === null || typeof o !== 'object' || $__GetBuiltinBrand(o) !== 'Date') {
     throw $__Exception('not_generic', ['Date.prototype.'+name]);
   }
-  $__CallBuiltin($__getInternal(o, 'Date'), name, [value]);
+  $__CallBuiltin(this.@@DateValue, name, [value]);
 }
 
 internalFunction(setter);

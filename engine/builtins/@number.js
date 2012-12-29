@@ -18,7 +18,7 @@ export class Number {
     if (typeof this === 'number') {
       return $__NumberToString(this, radix);
     } else if ($__GetBuiltinBrand(this) === 'Number') {
-      return $__NumberToString($__getInternal(this, 'PrimitiveValue'), radix);
+      return $__NumberToString(this.@@NumberValue, radix);
     }
     throw $__Exception('not_generic', ['Number.prototype.toString']);
   }
@@ -27,7 +27,13 @@ export class Number {
     if (typeof this === 'number') {
       return this;
     } else if ($__GetBuiltinBrand(this) === 'Number') {
-      return $__getInternal(this, 'PrimitiveValue');
+      return this.@@NumberValue
+    value = value.length ? $__ToNumber(value[0]) : 0;
+    if (!$__IsConstructCall()) {
+      return value;
+    }
+    $__SetBuiltinBrand(this, 'NumberWrapper');
+    this.@@NumberValue = value;;
     }
     throw $__Exception('not_generic', ['Number.prototype.valueOf']);
   }
@@ -45,6 +51,8 @@ export class Number {
 }
 
 builtinClass(Number);
+
+Number.prototype.@@NumberValue = 0;
 
 
 export function isNaN(number){

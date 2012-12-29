@@ -710,13 +710,20 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Date = (function(){
     function $Date(value){
       $Object.call(this, intrinsics.DateProto);
-      this.Date = value;
+      this.setPrimitiveValue(value);
     }
 
     inherit($Date, $Object, {
       BuiltinBrand: BRANDS.BuiltinDate,
       type: '$Date'
-    });
+    }, [
+      function getPrimitiveValue(){
+        return this.get(this.Realm.intrinsics.DateValue);
+      },
+      function setPrimitiveValue(value){
+        return this.set(this.Realm.intrinsics.DateValue, value);
+      }
+    ]);
 
     return $Date;
   })();
@@ -730,52 +737,60 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $String = (function(){
     function $String(value){
       $Object.call(this, intrinsics.StringProto);
-      this.PrimitiveValue = value;
+      this.setPrimitiveValue(value);
       this.define('length', value.length, ___);
     }
 
+    var ObjectGet = $Object.prototype.get;
+
     inherit($String, $Object, {
       BuiltinBrand: BRANDS.StringWrapper,
-      PrimitiveValue: undefined,
       type: '$String'
     }, [
+      function getPrimitiveValue(){
+        return ObjectGet.call(this, this.Realm.intrinsics.StringValue) || '';
+      },
+      function setPrimitiveValue(value){
+        return this.set(this.Realm.intrinsics.StringValue, value);
+      },
+
       function each(callback){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         for (var i=0; i < str.length; i++) {
           callback([i+'', str[i], E__]);
         }
         $Object.prototype.each.call(this, callback);
       },
       function has(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return true;
         }
         return $Object.prototype.has.call(this, key);
       },
       function get(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return str[key];
         }
         return $Object.prototype.get.call(this, key);
       },
       function query(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return E__;
         }
         return $Object.prototype.query.call(this, key);
       },
       function describe(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return [key, str[key], E__];
         }
         return $Object.prototype.describe.call(this, key);
       },
       function GetOwnProperty(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return new StringIndex(str[key]);
         }
@@ -786,15 +801,16 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function Get(key){
-        var str = this.PrimitiveValue;
+        var str = this.getPrimitiveValue();
         if (key < str.length && key >= 0) {
           return str[key];
         }
         return this.GetP(this, key);
       },
       function Enumerate(includePrototype, onlyEnumerable){
+        var str = this.getPrimitiveValue();
         var props = $Object.prototype.Enumerate.call(this, includePrototype, onlyEnumerable);
-        return unique(numbers(this.PrimitiveValue.length).concat(props));
+        return unique(numbers(str.length).concat(props));
       }
     ]);
 
@@ -809,14 +825,20 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Number = (function(){
     function $Number(value){
       $Object.call(this, intrinsics.NumberProto);
-      this.PrimitiveValue = value;
+      this.setPrimitiveValue(value);
     }
 
     inherit($Number, $Object, {
       BuiltinBrand: BRANDS.NumberWrapper,
-      PrimitiveValue: undefined,
       type: '$Number'
-    });
+    }, [
+      function getPrimitiveValue(){
+        return this.get(this.Realm.intrinsics.NumberValue);
+      },
+      function setPrimitiveValue(value){
+        return this.set(this.Realm.intrinsics.NumberValue, value);
+      }
+    ]);
 
     return $Number;
   })();
@@ -829,14 +851,20 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Boolean = (function(){
     function $Boolean(value){
       $Object.call(this, intrinsics.BooleanProto);
-      this.PrimitiveValue = value;
+      this.setPrimitiveValue(value);
     }
 
     inherit($Boolean, $Object, {
       BuiltinBrand: BRANDS.BooleanWrapper,
-      PrimitiveValue: undefined,
       type: '$Boolean'
-    });
+    }, [
+      function getPrimitiveValue(){
+        return this.get(this.Realm.intrinsics.BooleanValue);
+      },
+      function setPrimitiveValue(value){
+        return this.set(this.Realm.intrinsics.BooleanValue, value);
+      }
+    ]);
 
     return $Boolean;
   })();
@@ -1815,11 +1843,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     var primitives = {
-      Date   : Date.prototype,
-      RegExp : RegExp.prototype,
-      String : '',
-      Number : 0,
-      Boolean: false
+      RegExp: RegExp.prototype,
     };
 
     function Intrinsics(realm){
@@ -2477,6 +2501,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       function init(){
         initialize(self, function(){
+          intrinsics.DateProto.set(intrinsics.DateValue, Date.prototype);
           deactivate(self);
           self.scripts = [];
           self.state = 'idle';

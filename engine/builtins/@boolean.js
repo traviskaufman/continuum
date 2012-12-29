@@ -1,10 +1,7 @@
 export class Boolean {
   constructor(value){
-    if (!$__IsConstructCall()) {
-      return $__ToBoolean(value);
-    }
-    $__SetBuiltinBrand(this, 'BooleanWrapper');
-    this.@@BooleanValue = $__ToBoolean(value);
+    value = $__ToBoolean(value);
+    return $__IsConstructCall() ? $__BooleanCreate(value) : value;
   }
 
   toString(){
@@ -31,3 +28,5 @@ export class Boolean {
 }
 
 builtinClass(Boolean);
+
+Boolean.prototype.@@BooleanValue = false;
