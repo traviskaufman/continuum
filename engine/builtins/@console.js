@@ -9,6 +9,7 @@ function join(values){
   return text;
 }
 
+const QUIET = $__createUndetectable('quiet');
 
 
 export class Console {
@@ -35,22 +36,26 @@ export class Console {
       this.@writeln(values);
       throw new Error('Assertion failed: '+values);
     }
+    return QUIET;
   }
 
   clear(){
     this.@output.signal('clear');
+    return QUIET;
   }
 
   count(title){
     // TODO
   }
 
-  debug(){
+  debug(...values){
     this.@writeln(join(values));
+    return QUIET;
   }
 
   dir(object){
-    this.@output.signal('inspect', object);
+    this.@output.signal('inspect', object, true);
+    return QUIET;
   }
 
   dirxml(){
@@ -59,6 +64,7 @@ export class Console {
 
   error(...values){
     this.@writeln('× '+join(values), '#f04');
+    return QUIET;
   }
 
   group(...values){
@@ -77,10 +83,12 @@ export class Console {
 
   info(...values){
     this.@writeln('† '+join(values), '#09f');
+    return QUIET;
   }
 
   log(...values){
-    this.@writeln('» '+join(values));
+    values.forEach(value => this.@output.signal('inspect', value));
+    return QUIET;
   }
 
   profile(){
@@ -97,6 +105,7 @@ export class Console {
 
   time(name){
     this.@timers[name] = now();
+    return QUIET;
   }
 
   timeEnd(name){
@@ -104,10 +113,12 @@ export class Console {
       var duration = now() - this.@timers.get(name);
       this.@writeln(name + ': ' + duration + 'ms');
     }
+    return QUIET;
   }
 
   timeStamp(name){
     this.@writeln(name + ': ' + now());
+    return QUIET;
   }
 
   trace(error){
@@ -116,6 +127,7 @@ export class Console {
 
   warn(...values){
     this.@writeln('! '+join(values), '#ff6');
+    return QUIET;
   }
 }
 

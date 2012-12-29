@@ -7,6 +7,7 @@ var utility          = continuum.utility,
     fname            = utility.fname,
     hasOwn           = utility.hasOwn,
     define           = utility.define,
+    each             = utility.each,
     safeDefine       = utility.safeDefine,
     isObject         = utility.isObject,
     isExtensible     = utility.isExtensible,
@@ -17,6 +18,7 @@ var utility          = continuum.utility,
     defineProperty   = utility.defineProperty,
     block            = continuum.block,
     createPanel      = continuum.createPanel,
+    isUndetectable   = continuum.isUndetectable,
     render           = continuum.render,
     _                = continuum._;
 
@@ -78,9 +80,11 @@ void function(){
   main.splitter.right(0);
 }();
 
+var results = [];
 
 function inspect(o){
   var tree = inspector.append(createPanel('result', render('normal', o)));
+  results.push(tree);
   inspector.element.scrollTop = inspector.element.scrollHeight;
   inspector.refresh();
   return tree;
@@ -104,10 +108,22 @@ var realm = window.realm = continuum.createRealmAsync();
 //realm.debugBuiltins = true;
 realm.on('throw', inspect);
 realm.on('write', stdout.write, stdout);
-realm.on('clear', stdout.clear, stdout);
+realm.on('clear', function(){
+  each(results, function(result){
+    result.remove();
+  });
+});
+
 realm.on('backspace', stdout.backspace, stdout);
-realm.on('inspect', function(obj){
-  inspect(obj).expand();
+realm.on('inspect', function(obj, expand){
+  var tree = inspect(obj);
+  if (expand) {
+    tree.expand();
+    setTimeout(function(){
+      inspector.element.scrollTop = inspector.element.scrollHeight;
+      inspector.refresh();
+    }, 1);
+  }
 });
 
 realm.on('debug', function(sp, stack){
@@ -135,7 +151,11 @@ realm.on('ready', function(){
   }
 
   inspect(realm.evaluate('this')).expand();
-  realm.on('complete', inspect);
+  realm.on('complete', function(completion){
+    if (!isUndetectable(completion) || completion.value !== 'quiet') {
+      inspect(completion);
+    }
+  });
 
   setTimeout(function(){
     realm.on('op', function(op, tos){
