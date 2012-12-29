@@ -1,13 +1,6 @@
 import now from '@date';
 import Map from '@map';
-
-function join(values){
-  var text = '';
-  for (var i=0; i < values.length; i++) {
-    text += values[i];
-  }
-  return text;
-}
+import Error from '@error';
 
 const QUIET = $__createUndetectable('quiet');
 
@@ -20,19 +13,17 @@ export class Console {
     this.@timers = new Map;
   }
 
-  @write(value, color){
-    color || (color = '#fff');
-    this.@output.signal('write', '' + value, '' + color);
+  @write(value, color = '#fff'){
+    this.@output.signal('write', $__ToString(value), $__ToString(color));
   }
 
-  @writeln(value, color){
-    color || (color = '#fff');
-    this.@output.signal('write', value + '\n', '' + color);
+  @writeln(value, color = '#fff'){
+    this.@output.signal('write', value + '\n', $__ToString(color));
   }
 
   assert(expression, ...values){
     if (!expression) {
-      values = join(values);
+      values = values.join('');
       this.@writeln(values);
       throw new Error('Assertion failed: '+values);
     }
@@ -49,7 +40,7 @@ export class Console {
   }
 
   debug(...values){
-    this.@writeln(join(values));
+    this.@writeln(values.join(''));
     return QUIET;
   }
 
@@ -63,17 +54,17 @@ export class Console {
   }
 
   error(...values){
-    this.@writeln('× '+join(values), '#f04');
+    this.@writeln('× '+values.join(''), '#f04');
     return QUIET;
   }
 
   group(...values){
-    this.@writeln('» '+join(values));
+    this.@writeln('» '+values.join(''));
     this.@output.signal('group');
   }
 
   groupCollapsed(...values){
-    this.@writeln('» '+join(values));
+    this.@writeln('» '+values.join(''));
     this.@output.signal('group-collapsed');
   }
 
@@ -82,7 +73,7 @@ export class Console {
   }
 
   info(...values){
-    this.@writeln('† '+join(values), '#09f');
+    this.@writeln('† '+values.join(''), '#09f');
     return QUIET;
   }
 
@@ -110,7 +101,7 @@ export class Console {
 
   timeEnd(name){
     if (this.@timers.has(name)) {
-      var duration = now() - this.@timers.get(name);
+      const duration = now() - this.@timers.get(name);
       this.@writeln(name + ': ' + duration + 'ms');
     }
     return QUIET;
@@ -126,10 +117,10 @@ export class Console {
   }
 
   warn(...values){
-    this.@writeln('! '+join(values), '#ff6');
+    this.@writeln('! '+values.join(''), '#ff6');
     return QUIET;
   }
 }
 
 
-export let console = new Console({ signal: $__Signal });
+export const console = new Console({ signal: $__Signal });
