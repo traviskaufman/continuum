@@ -15300,7 +15300,7 @@ exports.natives = (function(module){
       return args[0].get(args[1]);
     },
     _define: function(obj, args){
-      args[0].define(args[1], args[2], args.length === 3 ? args[3] : 6);
+      args[0].define(args[1], args[2], args.length === 4 ? args[3] : 6);
     },
     _query: function(obj, args){
       return args[0].query(args[1]);
