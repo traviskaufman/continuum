@@ -673,48 +673,8 @@ builtinClass(Array);
 const ArrayPrototype = Array.prototype;
 $__define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 
-//['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
+['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
 
-/*
-1. Let O be the result of calling ToObject passing the this value as the argument.
-2. ReturnIfAbrupt(O).
-3. Let lenVal be the result of Get(O, "length").
-4. Let len be ToUint32(lenVal).
-5. ReturnIfAbrupt(len).
-6. Let middle be floor(len/2).
-7. Let lower be 0.
-8. Repeat, while lower !== middle
-  a. Let upper be len- lower -1.
-  b. Let upperP be ToString(upper).
-  c. Let lowerP be ToString(lower).
-  d. Let lowerValue be the result of Get(O, lowerP).
-  e. ReturnIfAbrupt(lowerValue).
-  f. Let upperValue be the result of Get(O, upper).
-  g. ReturnIfAbrupt(upperValue).
-  h. Let lowerExists be the result of HasProperty(O, lowerP).
-  i. ReturnIfAbrupt(lowerExists).
-  j. Let upperExists be the result of HasProperty(O, upperP).
-  k. ReturnIfAbrupt(upperExists).
-  l. If lowerExists is true and upperExists is true, then
-    i. Let putStatus be the result of Put(O, lowerP, upperValue, true).
-    ii. ReturnIfAbrupt(putStatus).
-    iii. Let putStatus be the result of Put(O, upperP, lowerValue, true).
-    iv. ReturnIfAbrupt(putStatus).
-  m. Else if lowerExists is false and upperExists is true, then
-    i. Let putStatus be the result of Put(O, lowerP, upperValue, true).
-    ii. ReturnIfAbrupt(putStatus).
-    iii. Let deleteStatus be the result of DeletePropertyOrThrow (O, upperP).
-    iv. ReturnIfAbrupt(deleteStatus).
-  n. Else if lowerExists is true and upperExists is false, then
-    i. Let deleteStatus be the result of DeletePropertyOrThrow (O, lowerP).
-    ii. ReturnIfAbrupt(deleteStatus).
-    iii. Let putStatus be the result of Put(O, upperP, lowerValue, true).
-    iv. ReturnIfAbrupt(putStatus).
-  o. Else both lowerExists and upperExists are false,
-  i. No action is required.
-  p. Increase lower by 1.
-9. Return O .
-*/
 export function isArray(array){
   return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'Array' : false;
 }
