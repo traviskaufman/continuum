@@ -11,9 +11,12 @@ var natives = (function(module){
       operations  = require('./object-model/operations'),
       descriptors = require('./object-model/descriptors'),
       collections = require('./object-model/collections'),
-      BRANDS      = require('./constants').BRANDS;
+      constants   = require('./constants');
 
-  var inherit                   = objects.inherit,
+  var BRANDS                    = constants.BRANDS,
+      Undetectable              = constants.Undetectable,
+      isUndetectable            = constants.isUndetectable,
+      inherit                   = objects.inherit,
       define                    = objects.define,
       isObject                  = objects.isObject,
       create                    = objects.create,
@@ -113,6 +116,17 @@ var natives = (function(module){
     sin: Math.sin,
     sqrt: Math.sqrt,
     tan: Math.tan,
+    _createUndetectable: function(obj, args){
+      return new Undetectable(args[0]);
+    },
+    _unwrapUndetectable: function(obj, args){
+      if (isUndetectable(args[0])) {
+        return args[0].value;
+      }
+    },
+    _isUndetectable: function(obj, args){
+      return isUndetectable(args[0]);
+    },
     _Call: function(obj, args){
       return args[0].Call(args[1], $$CreateListFromArray(args[2]));
     },

@@ -9,7 +9,11 @@ var operations = (function(exports){
       constants    = require('../constants'),
       MapData      = require('./collections').MapData;
 
-  var BRANDS = constants.BRANDS,
+  var BRANDS                 = constants.BRANDS,
+      isFalsey               = constants.isFalsey,
+      isNullish              = constants.isNullish,
+      isUndefined            = constants.isUndefined,
+      isUndetectable         = constants.isUndetectable,
       is                     = objects.is,
       create                 = objects.create,
       define                 = objects.define,
@@ -111,7 +115,7 @@ var operations = (function(exports){
 
 
   function $$GetIdentifierReference(lex, name, strict){
-    if (lex == null) {
+    if (isNullish(lex)) {
       return new Reference(undefined, name, strict);
     } else if (lex.HasBinding(name)) {
       return new Reference(lex, name, strict);
@@ -179,8 +183,9 @@ var operations = (function(exports){
   function $$GetThisEnvironment(context){
     var env = context.LexicalEnvironment;
     while (env) {
-      if (env.HasThisBinding())
+      if (env.HasThisBinding()) {
         return env;
+      }
       env = env.outer;
     }
   }
@@ -256,7 +261,7 @@ var operations = (function(exports){
 
   function $$GetMethod(object, key){
     var func = object.GetP(object, key);
-    if (func !== undefined && !$$IsCallable(func)) {
+    if (!isUndefined(func) && !$$IsCallable(func)) {
       return $$ThrowException('called_non_callable', [key]);
     }
     return func;
@@ -274,7 +279,7 @@ var operations = (function(exports){
     var func = $$GetMethod(object, key);
     if (func && func.Abrupt) return func;
 
-    if (func === undefined) {
+    if (isUndefined(func)) {
       return $$ThrowException('property_not_function', [key, object.BuiltinBrand]);
     }
 
@@ -358,7 +363,7 @@ var operations = (function(exports){
   function $$SpreadDestructuring(context, spread, index){
     var array = new $Array(0);
 
-    if (target == null) {
+    if (isNullish(target)) {
       return array;
     }
 

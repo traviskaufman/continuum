@@ -302,6 +302,7 @@ var index = (function(exports){
     introspect: debug.introspect,
     createInterceptor: createInterceptor,
     brainTransplant: brainTransplant,
+    isUndetectable: constants.isUndetectable,
     utility: assignAll({}, [
       require('./lib/functions'),
       require('./lib/iteration'),

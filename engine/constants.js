@@ -146,5 +146,49 @@ var constants = (function(exports){
 
   exports.AST = new Constants(ownKeys(require('esprima').Syntax));
 
+  function Undetectable(value){
+    this.value = value;
+  }
+
+  define(Undetectable.prototype, {
+    undetectable: true
+  }, [
+    function toString(){
+      return 'undefined';
+    },
+    function valueOf(){
+      return NaN;
+    },
+    function DefaultValue(hint){
+      return hint === 'String' ? 'undefined' : NaN;
+    }
+  ]);
+
+  exports.Undetectable = Undetectable;
+
+  function isUndetectable(value){
+    return value instanceof Undetectable;
+  }
+
+  exports.isUndetectable = isUndetectable;
+
+  function isUndefined(value){
+    return value === undefined || value instanceof Undetectable;
+  }
+
+  exports.isUndefined = isUndefined;
+
+  function isNullish(value){
+    return value == null || value instanceof Undetectable;
+  }
+
+  exports.isNullish = isNullish;
+
+  function isFalsey(value){
+    return !value || value instanceof Undetectable;
+  }
+
+  exports.isFalsey = isFalsey;
+
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});

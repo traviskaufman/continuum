@@ -1,21 +1,26 @@
 var operators = (function(exports){
   "use strict";
-  var $$ThrowException = require('../errors').$$ThrowException;
+  var constants = require('../constants'),
+      $$ThrowException = require('../errors').$$ThrowException;
 
-  var SYMBOLS       = require('../constants').SYMBOLS,
-      Break         = SYMBOLS.Break,
-      Pause         = SYMBOLS.Pause,
-      Throw         = SYMBOLS.Throw,
-      Empty         = SYMBOLS.Empty,
-      Resume        = SYMBOLS.Resume,
-      Return        = SYMBOLS.Return,
-      Abrupt        = SYMBOLS.Abrupt,
-      Builtin       = SYMBOLS.Builtin,
-      Continue      = SYMBOLS.Continue,
-      Reference     = SYMBOLS.Reference,
-      Completion    = SYMBOLS.Completion,
-      Uninitialized = SYMBOLS.Uninitialized,
-      BuiltinSymbol  = require('../constants').BRANDS.BuiltinSymbol;
+  var SYMBOLS        = constants.SYMBOLS,
+      Break          = SYMBOLS.Break,
+      Pause          = SYMBOLS.Pause,
+      Throw          = SYMBOLS.Throw,
+      Empty          = SYMBOLS.Empty,
+      Resume         = SYMBOLS.Resume,
+      Return         = SYMBOLS.Return,
+      Abrupt         = SYMBOLS.Abrupt,
+      Builtin        = SYMBOLS.Builtin,
+      Continue       = SYMBOLS.Continue,
+      Reference      = SYMBOLS.Reference,
+      Completion     = SYMBOLS.Completion,
+      Uninitialized  = SYMBOLS.Uninitialized,
+      BuiltinSymbol  = constants.BRANDS.BuiltinSymbol,
+      isFalsey       = constants.isFalsey,
+      isNullish      = constants.isNullish,
+      isUndefined    = constants.isUndefined,
+      isUndetectable = constants.isUndetectable;
 
 
   function $$HasPrimitiveBase(v){
@@ -29,10 +34,10 @@ var operators = (function(exports){
   // ## $$GetValue
 
   function $$GetValue(v){
-    if (!v || !v.Reference || v.Abrupt) return v;
+    if (isFalsey(v) || !v.Reference || v.Abrupt) return v;
     var base = v.base;
 
-    if (base == null) {
+    if (isNullish(base)) {
       return $$ThrowException('not_defined', [v.name]);
     } else {
       var type = typeof base;
@@ -63,8 +68,8 @@ var operators = (function(exports){
   // ## $$PutValue
 
   function $$PutValue(v, w){
-    if (!v) {
-      return $$ThrowException('non_object_property_store', ['undefined', 'undefined']);
+    if (isFalsey(v)) {
+      return $$ThrowException('non_object_property_store', [TYPEOF(v), TYPEOF(w)]);
     } else if (v.Abrupt) {
       return v;
     } else if (!v.Reference) {
@@ -75,7 +80,7 @@ var operators = (function(exports){
 
     var base = v.base;
 
-    if (base === undefined) {
+    if (isUndefined(base)) {
       if (v.strict) {
         return $$ThrowException('not_defined', [v.name, base]);
       }
@@ -99,13 +104,13 @@ var operators = (function(exports){
   // ## GetThisValue
 
   function $$GetThisValue(v){
-    if (!v || v.Abrupt || !v.Reference) {
+    if (isFalsey(v) || v.Abrupt || !v.Reference) {
       return v;
     }
 
     var base = v.base;
 
-    if (base === undefined) {
+    if (isUndefined(base)) {
       return $$ThrowException('non_object_property_load', [v.name, base]);
     }
 
@@ -151,7 +156,7 @@ var operators = (function(exports){
 
 
   function $$ToPrimitive(argument, hint){
-    if (argument && typeof argument === 'object' && !argument.Abrupt) {
+    if (argument && argument.DefaultValue) {
       return $$ToPrimitive(argument.DefaultValue(hint), hint);
     }
     return argument;
@@ -161,13 +166,13 @@ var operators = (function(exports){
 
   function $$ToBoolean(argument){
     if (argument && argument.Completion) return argument;
-    return !!argument;
+    return !isFalsey(argument);
   }
   exports.$$ToBoolean = $$ToBoolean;
 
 
   function $$ToNumber(argument){
-    if (argument !== null && typeof argument === 'object') {
+    if (!isFalsey(argument) && typeof argument === 'object') {
       if (argument.Abrupt) return argument;
       return $$ToNumber($$ToPrimitive(argument, 'Number'));
     }
@@ -224,7 +229,9 @@ var operators = (function(exports){
   // ## $$ToPropertyKey
 
   function $$ToPropertyKey(argument){
-    if (!argument) return argument + '';
+    if (isFalsey(argument)) {
+      return argument + '';
+    }
     var type = typeof argument;
     if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
       return argument;
@@ -246,6 +253,8 @@ var operators = (function(exports){
           return 'null';
         } else if (argument.Abrupt) {
           return argument;
+        } else if (isUndetectable(argument)) {
+          return 'undefined';
         }
         return $$ToString($$ToPrimitive(argument, 'String'));
     }
@@ -403,7 +412,7 @@ var operators = (function(exports){
       var result = COMPARE(rval, lval, left);
       if (result && result.Abrupt) return result;
 
-      if (result === undefined) {
+      if (isUndefined(result)) {
         return false;
       }
       return left ? !result : result;
@@ -412,8 +421,8 @@ var operators = (function(exports){
 
 
   function INSTANCE_OF(lval, rval) {
-    if (rval === null || typeof rval !== 'object' || !('HasInstance' in rval)) {
-      return $$ThrowException('instanceof_function_expected', [typeof rval]);
+    if (!rval || !rval.HasInstance) {
+      return $$ThrowException('instanceof_function_expected', [TYPEOF(rval)]);
     }
 
     return rval.HasInstance(lval);
@@ -426,14 +435,21 @@ var operators = (function(exports){
   function EQUAL(lval, rval) {
     if (lval && lval.Abrupt) return lval;
     if (rval && rval.Abrupt) return rval;
-    return lval === rval;
+    if (lval === rval) {
+      return true;
+    }
+    if (lval === undefined) {
+      return isUndetectable(rval);
+    }
+    if (rval === undefined) {
+      return isUndetectable(lval);
+    }
+    return false;
   }
   exports.EQUAL = EQUAL;
 
   function NOT_EQUAL(lval, rval){
-    if (lval && lval.Abrupt) return lval;
-    if (rval && rval.Abrupt) return rval;
-    return lval !== rval;
+    return !EQUAL(lval, rval);
   }
   exports.NOT_EQUAL = NOT_EQUAL;
 
@@ -445,12 +461,12 @@ var operators = (function(exports){
     var ltype = typeof lval,
         rtype = typeof rval;
 
-    if (ltype === rtype) {
+    if (isNullish(lval)) {
+      return isNullish(rval);
+    } else if (isNullish(rval)) {
+      return isNullish(lval);
+    } else if (ltype === rtype) {
       return EQUAL(lval, rval);
-    } else if (lval == null) {
-      return rval == null;
-    } else if (rval == null) {
-      return lval == null;
     } else if (ltype === 'number' || rtype === 'string') {
       return EQUIVALENT(lval, $$ToNumber(rval));
     } else if (ltype === 'string' || rtype === 'number') {
@@ -498,7 +514,7 @@ var operators = (function(exports){
         if (val.Abrupt) return val;
 
         if (val.Reference) {
-          if (val.base === undefined) {
+          if (isUndefined(val.base)) {
             return 'undefined';
           }
           return TYPEOF($$GetValue(val));
@@ -507,6 +523,11 @@ var operators = (function(exports){
         if ('Call' in val) {
           return 'function';
         }
+
+        if (isUndetectable(val)) {
+          return 'undefined';
+        }
+
         return 'object';
       }
   }
@@ -526,7 +547,7 @@ var operators = (function(exports){
     exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
   }(function(convert, finalize){
     return function(ref){
-      if (!ref || typeof ref !== 'object') {
+      if (isFalsey(ref) || typeof ref !== 'object') {
         return finalize(ref);
       }
 
@@ -538,12 +559,12 @@ var operators = (function(exports){
 
 
   function DELETE(ref){
-    if (!ref || !ref.Reference) {
+    if (isFalsey(ref) || !ref.Reference) {
       return true;
     }
 
     var base = ref.base;
-    if (base === undefined) {
+    if (isUndefined(base)) {
       if (ref.strict) {
         return $$ThrowException('strict_delete_property', [ref.name, base]);
       }
@@ -565,8 +586,8 @@ var operators = (function(exports){
 
 
   function IN(lval, rval) {
-    if (rval === null || typeof rval !== 'object') {
-      return $$ThrowException('invalid_in_operator_use', [lval, typeof rval]);
+    if (!rval || !rval.HasProperty) {
+      return $$ThrowException('invalid_in_operator_use', [lval, TYPEOF(rval)]);
     }
 
     lval = $$ToPropertyKey(lval);
