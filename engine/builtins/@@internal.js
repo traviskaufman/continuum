@@ -170,3 +170,22 @@ function ensureCallback(o, name){
 }
 
 internalFunction(ensureCallback);
+
+
+function PutPropertyOrThrow(object, key, value, name){
+  if (!$__Put(object, key, value)) {
+    throw $__Exception('put_property_or_throw', [name, key]);
+  }
+}
+
+internalFunction(PutPropertyOrThrow);
+
+
+function DeletePropertyOrThrow(object, key, name){
+  if (!$__Delete(object, key)) {
+    throw $__Exception('delete_property_or_throw', [name, key]);
+  }
+}
+
+internalFunction(DeletePropertyOrThrow);
+
