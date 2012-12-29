@@ -1934,7 +1934,8 @@ var assembler = (function(exports){
       GET();
       isSuper ? SUPER_ELEMENT() : ELEMENT();
     } else {
-      isSuper ? SUPER_MEMBER() : MEMBER(symbol(node.property));
+      var prop = symbol(node.property);
+      isSuper ? SUPER_MEMBER(prop) : MEMBER(prop);
     }
   }
 
