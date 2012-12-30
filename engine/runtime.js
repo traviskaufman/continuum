@@ -65,6 +65,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       Value                    = descriptors.Value,
       Accessor                 = descriptors.Accessor,
       ArgAccessor              = descriptors.ArgAccessor,
+      DataDescriptor           = descriptors.DataDescriptor,
       $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
       $$FromPropertyDescriptor = descriptors.$$FromPropertyDescriptor,
       $$ToPropertyDescriptor   = descriptors.$$ToPropertyDescriptor;
@@ -204,7 +205,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   function $$TopLevelDeclarationInstantiation(code){
     var env = context.VariableEnvironment,
         configurable = code.scopeType === 'eval',
-        decls = code.lexDecls;
+        decls = code.LexicalDeclarations;
 
     var desc = configurable ? mutable : immutable;
 
@@ -226,8 +227,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    for (var i=0; i < code.varDecls.length; i++) {
-      var name = code.varDecls[i];
+    for (var i=0; i < code.VarDeclaredNames.length; i++) {
+      var name = code.VarDeclaredNames[i];
       if (!env.HasBinding(name)) {
         env.CreateMutableBinding(name, configurable);
         env.SetMutableBinding(name, undefined, code.flags.strict);
@@ -381,6 +382,118 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
+  // ###############
+  // ### $Symbol ###
+  // ###############
+
+  var $Symbol = (function(){
+    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
+        prefix = uid();
+
+    function $Symbol(name, isPublic){
+      this.Name = name;
+      this.Private = !isPublic;
+      tag(this);
+      this.gensym = prefix+this.id;
+    }
+
+    inherit($Symbol, $Object, {
+      BuiltinBrand: BRANDS.BuiltinSymbol,
+      Extensible: false,
+      Private: true,
+      Name: null,
+      type: '$Symbol'
+    }, [
+      function toString(){
+        return this.gensym;
+      },
+      function GetInheritance(){
+        return null;
+      },
+      function SetInheritance(v){
+        return false;
+      },
+      function IsExtensible(){
+        return false;
+      },
+      function PreventExtensions(){},
+      function HasOwnProperty(){
+        return false;
+      },
+      function GetOwnProperty(){},
+      function GetP(receiver, key){
+        if (key === 'toString') {
+          return intrinsics.ObjectToString;
+        }
+      },
+      function SetP(receiver, key, value){
+        return false;
+      },
+      function Delete(key){
+        return true;
+      },
+      function DefineOwnProperty(key, desc){
+        return false;
+      },
+      function enumerator(){
+        return iterator;
+      },
+      function Keys(){
+        return [];
+      },
+      function OwnPropertyKeys(){
+        return [];
+      },
+      function Enumerate(){
+        return []
+      },
+      function Freeze(){
+        return true;
+      },
+      function Seal(){
+        return true;
+      },
+      function IsFrozen(){
+        return true;
+      },
+      function IsSealed(){
+        return true;
+      },
+      function DefaultValue(){
+        return '[object Symbol]';
+      }
+    ]);
+
+    return $Symbol;
+  })();
+
+  var addWellKnownSymbol = exports.addWellKnownSymbol = (function(){
+    var symbols = exports.wellKnownSymbols = new Hash;
+
+    function $WellKnownSymbol(name){
+      $Symbol.call(this, '@'+name, true);
+    }
+
+    natives.set('getWellKnownSymbol', function(name){
+      return symbols[name];
+    });
+
+    inherit($WellKnownSymbol, $Symbol);
+
+    return function addWellKnownSymbol(name){
+      return symbols[name] = new $WellKnownSymbol(name);
+    };
+  })();
+
+
+  var toStringTag  = addWellKnownSymbol('toStringTag'),
+      iterator     = addWellKnownSymbol('iterator'),
+      //create       = addWellKnownSymbol('create'),
+      BooleanValue = addWellKnownSymbol('BooleanValue'),
+      StringValue  = addWellKnownSymbol('StringValue'),
+      NumberValue  = addWellKnownSymbol('NumberValue'),
+      DateValue    = addWellKnownSymbol('DateValue'),
+      BuiltinBrand = addWellKnownSymbol('BuiltinBrand');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -483,7 +596,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (prototype && prototype.Abrupt) return prototype;
 
         var instance = typeof prototype === 'object' ? new $Object(prototype) : new $Object;
-        if (this.BuiltinConstructor) {
+        if (prototype && this.BuiltinConstructor) {
           instance.BuiltinBrand = prototype.BuiltinBrand;
         }
 
@@ -718,10 +831,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Date'
     }, [
       function getPrimitiveValue(){
-        return this.get(this.Realm.intrinsics.DateValue);
+        return this.get(DateValue);
       },
       function setPrimitiveValue(value){
-        return this.set(this.Realm.intrinsics.DateValue, value);
+        return this.set(DateValue, value);
       }
     ]);
 
@@ -748,10 +861,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$String'
     }, [
       function getPrimitiveValue(){
-        return ObjectGet.call(this, this.Realm.intrinsics.StringValue) || '';
+        return ObjectGet.call(this, StringValue) || '';
       },
       function setPrimitiveValue(value){
-        return this.set(this.Realm.intrinsics.StringValue, value);
+        return this.set(StringValue, value);
       },
 
       function each(callback){
@@ -833,10 +946,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Number'
     }, [
       function getPrimitiveValue(){
-        return this.get(this.Realm.intrinsics.NumberValue);
+        return this.get(NumberValue);
       },
       function setPrimitiveValue(value){
-        return this.set(this.Realm.intrinsics.NumberValue, value);
+        return this.set(NumberValue, value);
       }
     ]);
 
@@ -859,10 +972,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Boolean'
     }, [
       function getPrimitiveValue(){
-        return this.get(this.Realm.intrinsics.BooleanValue);
+        return this.get(BooleanValue);
       },
       function setPrimitiveValue(value){
-        return this.set(this.Realm.intrinsics.BooleanValue, value);
+        return this.set(BooleanValue, value);
       }
     ]);
 
@@ -1005,91 +1118,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $RegExp;
   })();
 
-
-  // ###############
-  // ### $Symbol ###
-  // ###############
-
-  var $Symbol = (function(){
-    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
-        prefix = uid();
-
-    function $Symbol(name, isPublic){
-      $Object.call(this, intrinsics.SymbolProto);
-      this.Name = name;
-      this.Private = !isPublic;
-      this.gensym = prefix+this.id;
-    }
-
-    inherit($Symbol, $Object, {
-      BuiltinBrand: BRANDS.BuiltinSymbol,
-      Extensible: false,
-      Private: true,
-      Name: null,
-      type: '$Symbol'
-    }, [
-      function toString(){
-        return this.gensym;
-      },
-      function GetInheritance(){
-        return null;
-      },
-      function SetInheritance(v){
-        return false;
-      },
-      function IsExtensible(){
-        return false;
-      },
-      function PreventExtensions(){},
-      function HasOwnProperty(){
-        return false;
-      },
-      function GetOwnProperty(){},
-      function GetP(receiver, key){
-        if (key === 'toString') {
-          return intrinsics.ObjectToString;
-        }
-      },
-      function SetP(receiver, key, value){
-        return false;
-      },
-      function Delete(key){
-        return true;
-      },
-      function DefineOwnProperty(key, desc){
-        return false;
-      },
-      function enumerator(){
-        return iterator;
-      },
-      function Keys(){
-        return [];
-      },
-      function OwnPropertyKeys(){
-        return [];
-      },
-      function Enumerate(){
-        return []
-      },
-      function Freeze(){
-        return true;
-      },
-      function Seal(){
-        return true;
-      },
-      function IsFrozen(){
-        return true;
-      },
-      function IsSealed(){
-        return true;
-      },
-      function DefaultValue(){
-        return '[object Symbol]';
-      }
-    ]);
-
-    return $Symbol;
-  })();
 
 
   // ##################
@@ -1519,7 +1547,8 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$GetTemplateCallSite = operations.$$GetTemplateCallSite;
 
     var strictUnfound = new Hash,
-        unfound = new Hash;
+        unfound       = new Hash,
+        globalDesc    = new DataDescriptor(undefined, ECW);
 
 
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
@@ -1660,6 +1689,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else {
           return new $MappedArguments(args, env, params, func);
         }
+      },
+      function hasOwnGlobal(name){
+        return this.Realm.global.HasOwnProperty(name);
+      },
+      function getOwnGlobal(name){
+        return this.Realm.global.GetOwnProperty(name);
+      },
+      function putOwnGlobal(name, value, configurable){
+        globalDesc.Configurable = !!configurable;
+        globalDesc.Value = value;
+        var result = this.Realm.global.DefineOwnProperty(name, globalDesc, true);
+        globalDesc.Value = undefined;
+        return result;
       },
       function createArray(len){
         return new $Array(len);
@@ -2352,13 +2394,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
 
         each(code.imports, function(imported){
-          if (imported.specifiers && imported.specifiers.code) {
-            var code = imported.specifiers.code,
-                sandbox = createSandbox(global, loader);
+          if (imported.code) {
+            var sandbox = createSandbox(global, loader);
 
-            runScript(sandbox, { bytecode: code }, function(){
-              var module = new $Module(sandbox.globalEnv, code.exportedNames);
-              module.mrl = code.name;
+            runScript(sandbox, { bytecode: imported.code }, function(){
+              var module = new $Module(sandbox.globalEnv, imported.code.exportedNames);
+              module.mrl = imported.code.name;
               callback.Call(null, [module]);
             }, errback.Call);
           } else {
@@ -2495,17 +2536,21 @@ var runtime = (function(GLOBAL, exports, undefined){
             value = item[1],
             name  = key[0] === '_' ? key.slice(1) : key;
 
-        intrinsics[name] = new $NativeFunction({
-          unwrapped: key[0] === '_',
-          length   : value.length,
-          name     : name,
-          call     : value
-        });
+        if (typeof value === 'function') {
+          intrinsics[name] = new $NativeFunction({
+            unwrapped: key[0] === '_',
+            length   : value.length,
+            name     : name,
+            call     : value
+          });
+        } else {
+          intrinsics[name] = value;
+        }
       });
 
       function init(){
         initialize(self, function(){
-          intrinsics.DateProto.set(intrinsics.DateValue, Date.prototype);
+          intrinsics.DateProto.setPrimitiveValue(Date.prototype);
           deactivate(self);
           self.scripts = [];
           self.state = 'idle';

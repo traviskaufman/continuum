@@ -1,17 +1,11 @@
-symbol @@toStringTag,
-       @@iterator;
-
-private @@BooleanValue,
-        @@StringValue,
-        @@NumberValue,
-        @@DateValue;
-
-$__iterator     = @@iterator;
-$__toStringTag  = @@toStringTag;
-$__BooleanValue = @@BooleanValue;
-$__StringValue  = @@StringValue;
-$__NumberValue  = @@NumberValue;
-$__DateValue    = @@DateValue;
+private @@toStringTag  = $__getWellKnownSymbol('toStringTag'),
+        @@iterator     = $__getWellKnownSymbol('iterator'),
+        @@create       = $__getWellKnownSymbol('create'),
+        @@BooleanValue = $__getWellKnownSymbol('BooleanValue'),
+        @@StringValue  = $__getWellKnownSymbol('StringValue'),
+        @@NumberValue  = $__getWellKnownSymbol('NumberValue'),
+        @@DateValue    = $__getWellKnownSymbol('DateValue'),
+        @@BuiltinBrand = $__getWellKnownSymbol('BuiltinBrand');
 
 const StopIteration = $__StopIteration,
       HIDDEN   = 6,
@@ -43,6 +37,7 @@ function extend(object, properties){
   }
 }
 
+$__extend = extend;
 
 
 function internalFunction(func){
