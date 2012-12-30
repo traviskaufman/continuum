@@ -301,7 +301,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(intrinsics.toStringTag, brand);
+      proto.define(toStringTag, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -349,8 +349,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iterator = $$Invoke(intrinsics.iterator, iterable);
-      if (iterator && iterator.Abrupt) return iterator;
+      var iter = $$Invoke(iterator, iterable);
+      if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
       if (adder && adder.Abrupt) return adder;
@@ -360,7 +360,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       var next;
-      while (next = $$ToObject($$Invoke('next', iterator))) {
+      while (next = $$ToObject($$Invoke('next', iter))) {
         if ($$IsStopIteration(next)) {
           return object;
         }
@@ -387,7 +387,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
+    var iter = new (require('./object-model/$Object').$Enumerator)([]),
         prefix = uid();
 
     function $Symbol(name, isPublic){
@@ -436,7 +436,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return false;
       },
       function enumerator(){
-        return iterator;
+        return iter;
       },
       function Keys(){
         return [];
@@ -734,11 +734,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.thunk = thunk;
 
       var self = this;
-      setFunction(this, intrinsics.iterator, function(){ return self });
-      setFunction(this, 'next',  function(){ return self.Send() });
-      setFunction(this, 'close', function(){ return self.Close() });
-      setFunction(this, 'send',  function(v){ return self.Send(v) });
-      setFunction(this, 'throw', function(v){ return self.Throw(v) });
+      setFunction(this, iterator, function(){ return self });
+      setFunction(this, 'next',   function(){ return self.Send() });
+      setFunction(this, 'close',  function(){ return self.Close() });
+      setFunction(this, 'send',   function(v){ return self.Send(v) });
+      setFunction(this, 'throw',  function(v){ return self.Throw(v) });
     }
 
     inherit($Generator, $Object, {
