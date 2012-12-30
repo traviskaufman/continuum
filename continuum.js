@@ -7944,6 +7944,9 @@ exports.PropertyList = (function(module){
       }
     },
     function set(key, value){
+      if (key == null) {
+        throw new TypeError('Provided null or undefined key to PropertyList#set');
+      }
       var name = '$'+key,
           index = this.hash[name];
 
@@ -7977,6 +7980,10 @@ exports.PropertyList = (function(module){
     },
     (function(){
       return function define(key, value, attr){
+        if (key == null) {
+          throw new TypeError('Provided null or undefined key to PropertyList#define');
+        }
+
         var name = '$'+key,
             index = this.hash[name];
 
@@ -8010,6 +8017,10 @@ exports.PropertyList = (function(module){
       return this.hash['$'+key] !== undefined;
     },
     function setProperty(prop){
+      if (prop[0] == null) {
+        throw new TypeError('Provided null or undefined key to PropertyList#setProperty');
+      }
+
       var name = '$'+prop[0],
           index = this.hash[name];
 
@@ -17694,7 +17705,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(intrinsics.toStringTag, brand);
+      proto.define(toStringTag, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -17742,8 +17753,8 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iterator = $$Invoke(intrinsics.iterator, iterable);
-      if (iterator && iterator.Abrupt) return iterator;
+      var iter = $$Invoke(iterator, iterable);
+      if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
       if (adder && adder.Abrupt) return adder;
@@ -17753,7 +17764,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       var next;
-      while (next = $$ToObject($$Invoke('next', iterator))) {
+      while (next = $$ToObject($$Invoke('next', iter))) {
         if ($$IsStopIteration(next)) {
           return object;
         }
@@ -17780,7 +17791,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   // ###############
 
   var $Symbol = (function(){
-    var iterator = new (require('./object-model/$Object').$Enumerator)([]),
+    var iter = new (require('./object-model/$Object').$Enumerator)([]),
         prefix = uid();
 
     function $Symbol(name, isPublic){
@@ -17829,7 +17840,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return false;
       },
       function enumerator(){
-        return iterator;
+        return iter;
       },
       function Keys(){
         return [];
@@ -18127,11 +18138,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.thunk = thunk;
 
       var self = this;
-      setFunction(this, intrinsics.iterator, function(){ return self });
-      setFunction(this, 'next',  function(){ return self.Send() });
-      setFunction(this, 'close', function(){ return self.Close() });
-      setFunction(this, 'send',  function(v){ return self.Send(v) });
-      setFunction(this, 'throw', function(v){ return self.Throw(v) });
+      setFunction(this, iterator, function(){ return self });
+      setFunction(this, 'next',   function(){ return self.Send() });
+      setFunction(this, 'close',  function(){ return self.Close() });
+      setFunction(this, 'send',   function(v){ return self.Send(v) });
+      setFunction(this, 'throw',  function(v){ return self.Throw(v) });
     }
 
     inherit($Generator, $Object, {
@@ -20458,7 +20469,7 @@ exports.debug = (function(exports){
 
         for (var k in props) {
           var prop = props[k];
-          if (hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
+          if (prop[0] != null && hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
             keys.push(prop[0]);
           }
         }
@@ -20494,7 +20505,7 @@ exports.debug = (function(exports){
 
         for (var k in props) {
           var prop = props[k];
-          if (hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
+          if (prop[0] != null && hidden || !prop[0].Private && (prop[2] & ENUMERABLE)) {
             if (prop[0] >= 0 && prop[0] < len) {
               indexes.push(prop[0]);
             } else {
