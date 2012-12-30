@@ -2164,6 +2164,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       _DateCreate: function(obj, args){
         return new $Date(applyNew(Date, args));
       },
+      _ErrorCreate: function(obj, args){
+        return new $Error(args[0], undefined, args[1]);
+      },
       _NumberCreate: function(obj, args){
         return new $Number(args[0]);
       },

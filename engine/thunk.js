@@ -61,6 +61,22 @@ var thunk = (function(exports){
   var log = false;
 
 
+  function setOrigin(obj, filename, kind){
+    if (filename) {
+      obj.set('filename', filename);
+    }
+    if (kind) {
+      obj.set('kind', kind);
+    }
+  }
+
+  function setCode(obj, loc, code){
+    var line = code.split('\n')[loc.start.line - 1];
+    var pad = new Array(loc.start.column).join('-') + '^';
+    obj.set('line', loc.start.line);
+    obj.set('column', loc.start.column);
+    obj.set('code', line + '\n' + pad);
+  }
 
   function instructions(ops, opcodes){
     var out = [],
@@ -159,14 +175,14 @@ var thunk = (function(exports){
 
 
       if (error) {
-        if (error.value && error.value.setCode) {
+        if (error.value && error.value.set) {
           var range = code.ops[ip].range,
               loc = code.ops[ip].loc;
 
           if (!error.value.hasLocation) {
             error.value.hasLocation = true;
-            error.value.setCode(loc, code.source);
-            error.value.setOrigin(code.filename, code.displayName || code.name);
+            setCode(error.value, loc, code.source);
+            setOrigin(error.value, code.filename, code.displayName || code.name);
           }
 
           if (stacktrace) {
