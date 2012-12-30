@@ -116,6 +116,8 @@ export function freeze(object){
   return object;
 }
 
+$__freeze = freeze;
+
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
   return $__GetOwnProperty(object, $__ToPropertyKey(key));

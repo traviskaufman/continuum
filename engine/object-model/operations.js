@@ -398,22 +398,22 @@ var operations = (function(exports){
       return context.Realm.templates[template.id];
     }
 
-    var count = template.length,
-        site = new $Array(count),
-        raw = new $Array(count);
+    var cooked = [],
+        raw = [];
 
-    for (var i=0; i < count; i++) {
-      site.define(i+'', template[i].cooked, E__);
-      raw.define(i+'', template[i].raw, E__);
-    }
+    each(template, function(item, index){
+      cooked[index] = item.cooked;
+      raw[index] = item.raw;
+    });
 
-    site.define('length', count, ___);
-    raw.define('length', count, ___);
-    site.define('raw', raw, ___);
-    site.PreventExtensions(false);
-    raw.PreventExtensions(false);
-    realm.templates[template.id] = site;
-    return site;
+    var cookedObj = new $Array(cooked),
+        rawObj = new $Array(raw);
+
+    cookedObj.set('raw', rawObj);
+    intrinsics.freeze.Call(undefined, [cookedObj]);
+    intrinsics.freeze.Call(undefined, [rawObj]);
+    realm.templates[template.id] = cookedObj;
+    return cookedObj;
   }
 
   exports.$$GetTemplateCallSite = $$GetTemplateCallSite;
