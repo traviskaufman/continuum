@@ -232,6 +232,25 @@ var assembler = (function(exports){
     }
 
     inherit(Directives, Array, [
+      function toJSON(){
+        return this.map(function(op){
+          return op.toJSON ? op.toJSON() : null;
+        });
+      },
+      Array.prototype.forEach || function forEach(callback, context){
+        context || (context = this);
+        for (var i=0; i < this.length; i++) {
+          callback.call(context, this[i], i, this);
+        }
+      },
+      Array.prototype.map || function map(callback, context){
+        var result = [];
+        context || (context = this);
+        for (var i=0; i < this.length; i++) {
+          result[i] = callback.call(context, this[i], i, this);
+        }
+        return result;
+      },
       function inspect(){
         var space = new Array((''+this.length).length + 1).join(' ');
         return this.map(function(op, i){
@@ -251,6 +270,19 @@ var assembler = (function(exports){
       }
 
       define(Directive.prototype, [
+        function toJSON(){
+          var out = {
+            op: this.op.name,
+            range: this.range
+          };
+
+          for (var i=0; i < this.op.params; i++) {
+            var item = this[i];
+            out[i] = item && item.toJSON ? item.toJSON() : item;
+          }
+
+          return out;
+        },
         function inspect(){
           var out = [];
           for (var i=0; i < this.op.params; i++) {
@@ -416,7 +448,9 @@ var assembler = (function(exports){
       this.methods = [];
       this.symbols = [[], []];
       this.scope = scope.create('normal', context.currentScope);
-      this.name && this.scope.varDeclare(this.name);
+      if (node.type === 'ClassExpression' && this.name) {
+         this.scope.varDeclare(this.name);
+       }
 
       each(node.body.body, function(node){
         if (node.type === 'SymbolDeclaration') {
@@ -527,6 +561,7 @@ var assembler = (function(exports){
         this.varNames = new Hash;
         this.lexNames = new Hash;
         this.outer = outer;
+        //this.children = [];
       }
 
       define(Scope.prototype, {
@@ -562,6 +597,7 @@ var assembler = (function(exports){
       function BlockScope(outer){
         this.lexNames = new Hash;
         this.outer = outer;
+        //this.children = [];
       }
 
       inherit(BlockScope, Scope, {
@@ -614,8 +650,7 @@ var assembler = (function(exports){
 
       inherit(EvalScope, Scope, {
         type: 'eval'
-      }, [
-      ]);
+      });
 
       return EvalScope;
     })();
@@ -631,7 +666,11 @@ var assembler = (function(exports){
       },
       (function(){
         return function create(type, outer){
-          return new types[type](outer);
+          var child = new types[type](outer);
+          if (outer) {
+            //outer.children.push(child);
+          }
+          return child;
         };
       })()
     ]);
@@ -869,10 +908,13 @@ var assembler = (function(exports){
       ModuleDeclaration: true
     });
 
-    function Import(origin, name, specifiers){
+    function Import(origin, name, specifiers, node){
       this.origin = origin;
       this.name = name;
       this.specifiers = specifiers;
+      if (node) {
+        node.imported = this;
+      }
     }
 
     var handlers = {
@@ -904,7 +946,8 @@ var assembler = (function(exports){
       each(decls, function(decl, i){
         if (decl.body) {
           var origin = name = decl.id.name;
-          var specifiers = decl;
+          var code = decl;
+
         } else {
           var origin = handlers[decl.from.type](decl.from);
 
@@ -923,7 +966,7 @@ var assembler = (function(exports){
           }
         }
 
-        imported.push(new Import(origin, name, specifiers));
+        imported.push(new Import(origin, name, specifiers, code));
       });
 
       return imported;
@@ -1943,9 +1986,9 @@ var assembler = (function(exports){
 
   function ModuleDeclaration(node){
     if (node.body) {
-      node.code = new Code(node, null, 'normal', 'module');
-      node.code.path = context.code.path.concat(node.id.name);
-      context.queue(node.code);
+      var code = node.imported.code = new Code(node, null, 'normal', 'module');
+      code.path = context.code.path.concat(node.id.name);
+      context.queue(code);
     }
   }
 
