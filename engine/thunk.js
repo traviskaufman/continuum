@@ -130,14 +130,16 @@ var thunk = (function(exports){
 
   function Thunk(code, instrumented){
 
-    var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE,
-      CLASS_DECL, CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP,
-      ELEMENT, ENUM, EXTENSIBLE, EVAL, FLIP, FUNCTION, GET, HAS_BINDING, INC, INDEX, INTERNAL_MEMBER, ITERATE,
-      JUMP, JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET,
-      LITERAL, LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, REF, REFSYMBOL,
-      REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG, SPREAD_ARRAY,
-      STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT, UNARY, UNDEFINED,
-      UPDATE, VAR, WITH, YIELD];
+    var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE, CLASS_DECL,
+    CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP, ELEMENT, ENUM, EXTENSIBLE, EVAL,
+    FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
+    JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
+    LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
+    REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
+    SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
+
+
 
 
     var thunk = this,
@@ -492,6 +494,43 @@ var thunk = (function(exports){
 
     function HAS_BINDING(){
       stack[sp++] = context.hasBinding(ops[ip][0]);
+      return cmds[++ip];
+    }
+
+    function GET_GLOBAL(){
+      var result = context.getOwnGlobal(ops[ip][0]);
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
+      return cmds[++ip];
+    }
+
+    function HAS_GLOBAL(){
+      var result = context.hasOwnGlobal(ops[ip][0]);
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
+      return cmds[++ip];
+    }
+
+    function PUT_GLOBAL(){
+      var val    = stack[--sp],
+          result = context.putOwnGlobal(ops[ip][0], val, ops[ip][1]);
+
+      if (result && result.Abrupt) {
+        error = result;
+        return unwind;
+      }
+
+      stack[sp++] = result;
       return cmds[++ip];
     }
 

@@ -149,7 +149,9 @@ var assembler = (function(exports){
       FLIP             = new StandardOpCode(1, 'FLIP'),
       FUNCTION         = new StandardOpCode(3, 'FUNCTION'),
       GET              = new StandardOpCode(0, 'GET'),
+      GET_GLOBAL       = new InternedOpCode(1, 'GET_GLOBAL'),
       HAS_BINDING      = new StandardOpCode(1, 'HAS_BINDING'),
+      HAS_GLOBAL       = new InternedOpCode(1, 'HAS_GLOBAL'),
       INC              = new StandardOpCode(0, 'INC'),
       INDEX            = new StandardOpCode(1, 'INDEX'),
       INTERNAL_MEMBER  = new InternedOpCode(1, 'INTERNAL_MEMBER'),
@@ -180,6 +182,7 @@ var assembler = (function(exports){
       PROPERTY         = new InternedOpCode(1, 'PROPERTY'),
       PROTO            = new StandardOpCode(0, 'PROTO'),
       PUT              = new StandardOpCode(0, 'PUT'),
+      PUT_GLOBAL       = new StandardOpCode(2, 'PUT_GLOBAL'),
       REF              = new InternedOpCode(1, 'REF'),
       REFSYMBOL        = new InternedOpCode(1, 'REFSYMBOL'),
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
@@ -396,8 +399,12 @@ var assembler = (function(exports){
       this.scopeType = scopeType;
       this.lexicalType = lexicalType || 'normal';
       this.flags.usesSuper = referencesSuper(this.body);
-      this.lexDecls = lexDecls(body);
-      this.varDecls = [];
+
+      this.LexicalDeclarations = lexDecls(body);
+      this.VarScopedDeclarations = varDecls(body);
+      this.LexicallyDeclaredNames = [];
+      this.VarDeclaredNames = [];
+
       this.flags.strict = strict || (context.code && context.code.flags.strict) || isStrict(node);
       if (scopeType === 'module') {
         this.exportedNames = getExports(this.body);
@@ -828,9 +835,9 @@ var assembler = (function(exports){
   })();
 
   var varDecls = (function(){
-    var VarScopedDeclarations = collector({
+    var variableDeclarations = collector({
       VariableDeclaration: function(node){
-        if (node.type === 'var') {
+        if (node.kind === 'var') {
           return node;
         }
       },
@@ -850,7 +857,7 @@ var assembler = (function(exports){
     });
 
     return function varDecls(node){
-      var decls = VarScopedDeclarations(node);
+      var decls = variableDeclarations(node);
       each(node.body, function(statement){
         if (statement.type === 'FunctionDeclaration') {
           decls.push(statement);
@@ -1313,6 +1320,15 @@ var assembler = (function(exports){
     adjust(jump);
   }
 
+  function initFunctionDecl(decl){
+    pushNode(decl);
+    FunctionDeclaration(decl);
+    FUNCTION(false, decl.id.name, decl.code);
+    VAR(decl.id.name);
+    POP();
+    popNode();
+  }
+
   function bindingDestructuring(node){
     pushNode(node);
     if (node.type === 'Identifier') {
@@ -1351,17 +1367,66 @@ var assembler = (function(exports){
     };
   })();
 
+  function TopLevelDeclarationInstantiation(code){
+    var configurable = code.scopeType === 'eval',
+        functions = new Hash;
+
+    pushNode(code.body);
+
+    each(code.VarScopedDeclarations, function(decl){
+      if (decl.type === 'FunctionDeclaration') {
+        pushNode(decl);
+        var name = decl.id.name;
+        functions[name] = true;
+        HAS_BINDING(name);
+        var jump = JTRUE(0);
+        BINDING(name, configurable);
+        var jump2 = JUMP(0);
+        adjust(jump);
+        HAS_GLOBAL(name);
+        var jump3 = JTRUE(0);
+        UNDEFINED();
+        PUT_GLOBAL(name, configurable);
+        adjust(jump2);
+        adjust(jump3);
+        FunctionDeclaration(decl);
+        FUNCTION(false, decl.id.name, decl.code);
+        VAR(decl.id.name);
+        POP();
+        popNode();
+      } else {
+        each(decl.boundNames, function(name){
+          HAS_BINDING(name);
+          var jump = JFALSE(0);
+          BINDING(name);
+          UNDEFINED();
+          VAR(name);
+          var jump2 = JUMP(0);
+          adjust(jump);
+          HAS_GLOBAL(name);
+          var jump3 = JTRUE(0);
+          UNDEFINED();
+          PUT_GLOBAL(name, configurable);
+          adjust(jump2);
+          adjust(jump3);
+        });
+      }
+    });
+
+    popNode();
+  }
+
 
   function FunctionDeclarationInstantiation(code){
     pushNode(code.body);
-    var varDeclarations = varDecls(code.body),
-        len = varDeclarations.length,
-        argumentsObjectNotNeeded = false,
+    var decls  = code.VarScopedDeclarations,
+        len    = decls.length,
         strict = code.strict,
-        funcs = [];
+        funcs  = [],
+        noArgs = true;
 
     while (len--) {
-      var decl = varDeclarations[len];
+      var decl = decls[len];
       pushNode(decl);
       if (decl.type === 'FunctionDeclaration') {
         funcs.push(decl);
@@ -1369,7 +1434,7 @@ var assembler = (function(exports){
         decl.boundNames || (decl.boundNames = boundNames(decl));
         var name = decl.boundNames[0];
         if (name === 'arguments') {
-          argumentsObjectNotNeeded = true;
+          noArgs = true;
         }
         HAS_BINDING(name);
         var jump = JTRUE(0);
@@ -1381,22 +1446,15 @@ var assembler = (function(exports){
 
     each(code.params, bindingDestructuring);
 
-    //if (!argumentsObjectNotNeeded) {
+    //if (!noArgs) {
       BINDING('arguments', strict);
     //}
 
-    each(code.varDecls, createBindingIfNew);
+    each(code.VarDeclaredNames, createBindingIfNew);
 
     initLexicalDecls(code.body);
 
-    each(funcs, function(decl){
-      pushNode(decl);
-      FunctionDeclaration(decl);
-      FUNCTION(false, decl.id.name, decl.code);
-      VAR(decl.id.name);
-      POP();
-      popNode();
-    });
+    each(funcs, initFunctionDecl);
 
     pushNode(code.params);
     ARGUMENTS();
@@ -1438,7 +1496,7 @@ var assembler = (function(exports){
       POP();
     }
 
-    if (!argumentsObjectNotNeeded) {
+    if (!noArgs) {
       VAR('arguments');
     }
     popNode();
@@ -2250,7 +2308,7 @@ var assembler = (function(exports){
 
     each(node.declarations, function(item){
       if (node.kind === 'var') {
-        pushAll(context.code.varDecls, boundNames(item.id));
+        pushAll(context.code.VarDeclaredNames, boundNames(item.id));
       }
 
       if (item.init) {
