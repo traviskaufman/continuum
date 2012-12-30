@@ -280,7 +280,7 @@ var operators = (function(exports){
     };
   });
 
-  var MUL, DIV, MOD, SUB, BIT_OR, BIT_AND;
+  var MUL, DIV, MOD, SUB, BIT_OR, BIT_AND, BIT_XOR;
   void function(makeMathOp){
     exports.MUL     = MUL     = makeMathOp(function(l, r){ return l * r });
     exports.DIV     = DIV     = makeMathOp(function(l, r){ return l / r });
@@ -288,6 +288,7 @@ var operators = (function(exports){
     exports.SUB     = SUB     = makeMathOp(function(l, r){ return l - r });
     exports.BIT_AND = BIT_AND = makeMathOp(function(l, r){ return l & r });
     exports.BIT_OR  = BIT_OR  = makeMathOp(function(l, r){ return l | r });
+    exports.BIT_XOR = BIT_XOR = makeMathOp(function(l, r){ return l ^ r });
   }(function(finalize){
     return function(lval, rval) {
       lval = $$ToNumber(lval);
