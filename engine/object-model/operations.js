@@ -209,7 +209,7 @@ var operations = (function(exports){
 
   function $$IsCallable(argument){
     if (argument && argument.Abrupt) return argument;
-    return argument && typeof argument === 'object' ? 'Call' in argument : false;
+    return !!(argument && typeof argument === 'object' ? argument.Call : false);
   }
 
   exports.$$IsCallable = $$IsCallable;
@@ -217,7 +217,7 @@ var operations = (function(exports){
 
   function $$IsConstructor(argument){
     if (argument && argument.Abrupt) return argument;
-    return argument && typeof argument === 'object' ? 'Construct' in argument : false;
+    return !!(argument && typeof argument === 'object' ? argument.Construct : false);
   }
 
   exports.$$IsConstructor = $$IsConstructor;
