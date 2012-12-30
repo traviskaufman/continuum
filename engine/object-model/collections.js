@@ -3,7 +3,7 @@ var collections = (function(exports){
   var objects   = require('../lib/objects'),
       traversal = require('../lib/traversal'),
       utility   = require('../lib/utility'),
-      constants = require('../lib/constants');
+      constants = require('../constants');
 
   var Hash    = objects.Hash,
       create  = objects.create,

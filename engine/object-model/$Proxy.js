@@ -2,7 +2,7 @@ var $Proxy = (function(module){
   "use strict";
   var objects     = require('../lib/objects'),
       errors      = require('../errors'),
-      constants   = require('./constants'),
+      constants   = require('../constants'),
       operators   = require('./operators'),
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
