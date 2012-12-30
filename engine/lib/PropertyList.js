@@ -55,6 +55,9 @@ var PropertyList = (function(module){
       }
     },
     function set(key, value){
+      if (key == null) {
+        throw new TypeError('Provided null or undefined key to PropertyList#set');
+      }
       var name = '$'+key,
           index = this.hash[name];
 
@@ -88,6 +91,10 @@ var PropertyList = (function(module){
     },
     (function(){
       return function define(key, value, attr){
+        if (key == null) {
+          throw new TypeError('Provided null or undefined key to PropertyList#define');
+        }
+
         var name = '$'+key,
             index = this.hash[name];
 
@@ -121,6 +128,10 @@ var PropertyList = (function(module){
       return this.hash['$'+key] !== undefined;
     },
     function setProperty(prop){
+      if (prop[0] == null) {
+        throw new TypeError('Provided null or undefined key to PropertyList#setProperty');
+      }
+
       var name = '$'+prop[0],
           index = this.hash[name];
 

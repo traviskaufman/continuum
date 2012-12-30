@@ -527,7 +527,7 @@ var $Object = (function(exports){
       } else {
         this.each(function(prop){
           var key = prop[0];
-          if (!(key == null  || key in seen || key.Private)) {
+          if (!(key in seen || key.Private)) {
             props.push(key);
             seen[key] = true;
           }
