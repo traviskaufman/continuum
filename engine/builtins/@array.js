@@ -209,7 +209,7 @@ export class Array {
     }
     add(arrays, array);
 
-    const sep = $__ToString(separator.length ? separator[0] : ','),
+    const sep = separator.length ? $__ToString(separator[0]) : ',',
           len = $__ToUint32(array.length);
 
     if (len === 0) {
@@ -220,7 +220,7 @@ export class Array {
         index  = 0;
 
     while (++index < len) {
-      result += index in array ? ',' + $__ToString(array[index]) : ',';
+      result += index in array ? sep + $__ToString(array[index]) : sep;
     }
 
     arrays.delete(array);
