@@ -131,6 +131,64 @@ var iteration = (function(exports){
   exports.each = each;
 
 
+  function filter(o, callback, context){
+    if (!o) return;
+    if (context === undefined) {
+      if (typeof o === 'object' && 'length' in o) {
+        var out = [];
+
+        for (var i=0; i < o.length; i++) {
+          var value = o[i];
+
+          if (callback(value, i, o)) {
+            out.push(value);
+          }
+        }
+      } else if (isObject(o)) {
+        var keys = ownKeys(o),
+            out  = {};
+
+        for (var i=0; i < keys.length; i++) {
+          var key = keys[i],
+              value = o[key];
+
+          if (callback(value, key, o)) {
+            out[key] = value;
+          }
+        }
+      }
+    } else {
+      if (typeof o === 'object' && 'length' in o) {
+        var out = [];
+
+        for (var i=0; i < o.length; i++) {
+          var value = o[i];
+
+          if (callback.call(context, o[i], i, o)) {
+            out.push(value);
+          }
+        }
+      } else if (isObject(o)) {
+        var keys = ownKeys(o),
+            out  = {};
+
+        for (var i=0; i < keys.length; i++) {
+          var key   = keys[i],
+              value = o[key];
+
+          if (callback.call(context, value, key, o)) {
+            out[key] = value;
+          }
+        }
+      }
+    }
+
+    return out;
+  }
+
+  exports.filter = filter;
+
+
   function map(o, callback, context){
     if (context === undefined) {
       if (typeof o === 'object' && 'length' in o) {
