@@ -1496,9 +1496,7 @@ var assembler = (function(exports){
       POP();
     }
 
-    if (!noArgs) {
-      VAR('arguments');
-    }
+    VAR('arguments');
     popNode();
     popNode();
   }
