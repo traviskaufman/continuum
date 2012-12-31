@@ -10,16 +10,14 @@ builtinClass(Proxy);
 
 $__delete(Proxy, 'prototype');
 
-const normal = {
-  writable: true,
-  enumerable: true,
-  configurable: true
-};
+const normal = { writable: true,
+                 enumerable: true,
+                 configurable: true };
 
 export class Handler {
-  getOwnPropertyDescriptor(target, name){
+  getOwnPropertyDescriptor(target, propertyKey){
     //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
-    return getOwnPropertyDescriptor(target, name);
+    return getOwnPropertyDescriptor(target, propertyKey);
   }
 
   getOwnPropertyNames(target){
@@ -32,14 +30,19 @@ export class Handler {
     return getPrototypeOf(target);
   }
 
-  defineProperty(target, name, desc){
-    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);
-    return defineProperty(target, name, desc);
+  setPrototypeOf(target, proto){
+    //throw $__Exception('missing_fundamental_trap', ['setPrototypeOf']);
+    return setPrototypeOf(target, proto);
   }
 
-  deleteProperty(target, name){
+  defineProperty(target, propertyKey, desc){
+    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);
+    return defineProperty(target, propertyKey, desc);
+  }
+
+  deleteProperty(target, propertyKey){
     //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);
-    return deleteProperty(target, name);
+    return deleteProperty(target, propertyKey);
   }
 
   preventExtensions(target){
@@ -76,14 +79,14 @@ export class Handler {
           len   = $__ToUint32(props.length);
 
     for (var i = 0; i < len; i++) {
-      const name = props[i];
-      let desc = this.getOwnPropertyDescriptor(target, name);
+      const propertyKey = props[i];
+      let desc = this.getOwnPropertyDescriptor(target, propertyKey);
 
       if (desc) {
         desc = 'writable' in desc || 'value' in desc
               ? { configurable: false, writable: false }
               : { configurable: false };
-        success = success && this.defineProperty(target, name, desc);
+        success = success && this.defineProperty(target, propertyKey, desc);
       }
     }
 
@@ -120,26 +123,26 @@ export class Handler {
     return !this.isExtensible(target);
   }
 
-  has(target, name){
-    const desc = this.getOwnPropertyDescriptor(target, name);
+  has(target, propertyKey){
+    const desc = this.getOwnPropertyDescriptor(target, propertyKey);
     if (desc) {
       return true;
     }
 
-    const proto = $__GetPrototype(target);
-    return proto === null ? false : this.has(proto, name);
+    const proto = $__GetInheritance(target);
+    return proto === null ? false : this.has(proto, propertyKey);
   }
 
-  hasOwn(target, name){
-    return this.getOwnPropertyDescriptor(target, name) !== undefined;
+  hasOwn(target, propertyKey){
+    return this.getOwnPropertyDescriptor(target, propertyKey) !== undefined;
   }
 
-  get(target, name, receiver = target){
-    const desc = this.getOwnPropertyDescriptor(target, name);
+  get(target, propertyKey, receiver = target){
+    const desc = this.getOwnPropertyDescriptor(target, propertyKey);
 
     if (desc === undefined) {
-      const proto = $__GetPrototype(target);
-      return proto === null ? undefined : this.get(proto, name, receiver);
+      const proto = $__GetInheritance(target);
+      return proto === null ? undefined : this.get(proto, propertyKey, receiver);
     }
 
     if ('writable' in desc || 'value' in desc) {
@@ -150,8 +153,8 @@ export class Handler {
     return getter === undefined ? undefined : $__Call(getter, receiver, []);
   }
 
-  set(target, name, value, receiver) {
-    const ownDesc = this.getOwnPropertyDescriptor(target, name);
+  set(target, propertyKey, value, receiver) {
+    const ownDesc = this.getOwnPropertyDescriptor(target, propertyKey);
 
     if (ownDesc !== undefined) {
       if ('get' in ownDesc || 'set' in ownDesc) {
@@ -164,29 +167,29 @@ export class Handler {
       } else if (ownDesc.writable === false) {
         return false;
       } else if (receiver === target) {
-        $__DefineOwnProperty(receiver, name, { value: value });
+        $__DefineOwnProperty(receiver, propertyKey, { value: value });
         return true;
       } else if (!$__IsExtensible(receiver)) {
         return false;
       }
       normal.value = value;
-      $__DefineOwnProperty(receiver, name, normal);
+      $__DefineOwnProperty(receiver, propertyKey, normal);
       normal.value = undefined;
       return true;
     }
 
-    const proto = $__GetPrototype(target);
+    const proto = $__GetInheritance(target);
     if (proto === null) {
       if (!$__IsExtensible(receiver)) {
         return false;
       }
       normal.value = value;
-      $__DefineOwnProperty(receiver, name, normal);
+      $__DefineOwnProperty(receiver, propertyKey, normal);
       normal.value = undefined;
       return true;
     }
 
-    return $__SetP(proto, name, value, receiver);
+    return this.set(proto, propertyKey, value, receiver);
   }
 
   enumerate(target){
@@ -195,15 +198,15 @@ export class Handler {
           result = [];
 
     for (var i = 0; i < len; i++) {
-      const name = $__ToString(result[i]),
-            desc = this.getOwnPropertyDescriptor(name);
+      const propertyKey = $__ToString(result[i]),
+            desc = this.getOwnPropertyDescriptor(propertyKey);
 
       if (desc != null && desc.enumerable) {
-        result.push(name);
+        result.push(propertyKey);
       }
     }
 
-    var proto = $__GetPrototype(target);
+    var proto = $__GetInheritance(target);
     return proto === null ? result : result.concat(enumerate(proto));
   }
 
@@ -213,11 +216,11 @@ export class Handler {
           result = [];
 
     for (var i = 0; i < len; i++) {
-      const name = $__ToString(result[i]),
-            desc = this.getOwnPropertyDescriptor(name);
+      const propertyKey = $__ToString(result[i]),
+            desc = this.getOwnPropertyDescriptor(propertyKey);
 
       if (desc != null && desc.enumerable) {
-        result.push(name);
+        result.push(propertyKey);
       }
     }
 
@@ -253,18 +256,18 @@ export function construct(target, args){
 builtinFunction(construct);
 
 
-export function defineProperty(target, name, desc){
+export function defineProperty(target, propertyKey, attributes){
   ensureObject(target, '@reflect.defineProperty');
-  ensureDescriptor(desc);
-  return $__DefineOwnProperty(target, $__ToPropertyKey(name), desc);
+  ensureDescriptor(attributes);
+  return $__DefineOwnProperty(target, $__ToPropertyKey(propertyKey), attributes);
 }
 
 builtinFunction(defineProperty);
 
 
-export function deleteProperty(target, name){
+export function deleteProperty(target, propertyKey){
   ensureObject(target, '@reflect.deleteProperty');
-  return $__Delete(target, $__ToPropertyKey(name), false);
+  return $__Delete(target, $__ToPropertyKey(propertyKey), false);
 }
 
 builtinFunction(deleteProperty);
@@ -306,17 +309,16 @@ export function freeze(target){
 builtinFunction(freeze);
 
 
-export function get(target, name, receiver){
-  receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__GetP($__ToObject(target), $__ToPropertyKey(name), receiver);
+export function get(target, propertyKey, receiver = target){
+  return $__GetP($__ToObject(target), $__ToPropertyKey(propertyKey), $__ToObject(receiver));
 }
 
 builtinFunction(get);
 
 
-export function getOwnPropertyDescriptor(target, name){
+export function getOwnPropertyDescriptor(target, propertyKey){
   ensureObject(target, '@reflect.getOwnPropertyDescriptor');
-  return $__GetOwnProperty(target, $__ToPropertyKey(name));
+  return $__GetOwnProperty(target, $__ToPropertyKey(propertyKey));
 }
 
 builtinFunction(getOwnPropertyDescriptor);
@@ -330,23 +332,37 @@ export function getOwnPropertyNames(target){
 builtinFunction(getOwnPropertyNames);
 
 
+export function ownKeys(target){
+  ensureObject(target, '@reflect.ownKeys');
+  // TODO implement OwnPropertyKeys
+  //return $__OwnPropertyKeys(target, false, false);
+}
+
+builtinFunction(getOwnPropertyNames);
+
 export function getPrototypeOf(target){
   ensureObject(target, '@reflect.getPrototypeOf');
-  return $__GetPrototype(target);
+  return $__GetInheritance(target);
+}
+
+export function setPrototypeOf(target, proto){
+  ensureObject(target, '@reflect.setPrototypeOf');
+  ensureProto(proto, '@reflect.setPrototypeOf');
+  return $__SetInheritance(target, proto);
 }
 
 builtinFunction(getPrototypeOf);
 
 
-export function has(target, name){
-  return $__HasProperty($__ToObject(target), $__ToPropertyKey(name));
+export function has(target, propertyKey){
+  return $__HasProperty($__ToObject(target), $__ToPropertyKey(propertyKey));
 }
 
 builtinFunction(has);
 
 
-export function hasOwn(target, name){
-  return $__HasOwnProperty($__ToObject(target), $__ToPropertyKey(name));
+export function hasOwn(target, propertyKey){
+  return $__HasOwnProperty($__ToObject(target), $__ToPropertyKey(propertyKey));
 }
 
 builtinFunction(hasOwn);
@@ -437,9 +453,8 @@ export function seal(target){
 builtinFunction(seal);
 
 
-export function set(target, name, value, receiver){
-  receiver = receiver === undefined ? receiver : $__ToObject(receiver);
-  return $__SetP($__ToObject(target), $__ToPropertyKey(name), value, receiver);
+export function set(target, propertyKey, value, receiver = target){
+  return $__SetP($__ToObject(target), $__ToPropertyKey(propertyKey), value, $__ToObject(receiver));
 }
 
 builtinFunction(set);

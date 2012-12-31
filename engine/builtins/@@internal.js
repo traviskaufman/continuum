@@ -174,6 +174,15 @@ function ensureCallback(o, name){
 internalFunction(ensureCallback);
 
 
+function ensureProto(proto){
+  if (proto !== null && $__Type(proto) !== 'Object') {
+    throw $__Exception('proto_object_or_null', [])
+  }
+}
+
+internalFunction(ensureProto);
+
+
 function PutPropertyOrThrow(object, key, value, name){
   if (!$__Put(object, key, value)) {
     throw $__Exception('put_property_or_throw', [name, key]);

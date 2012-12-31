@@ -176,14 +176,14 @@ var natives = (function(module){
 
       return obj.View['get'+args[0]](offset, !!args[2]);
     },
-    _GetPrototype: function(obj, args){
+    _GetInheritance: function(obj, args){
       obj = args[0];
       do {
         obj = obj.GetInheritance();
       } while (obj && obj.HiddenPrototype)
       return obj;
     },
-    _SetPrototype: function(obj, args){
+    _SetInheritance: function(obj, args){
       obj = args[0];
       var proto = obj.Prototype;
       if (proto && proto.HiddenPrototype) {

@@ -9,7 +9,7 @@ export class Object {
 
   isPrototypeOf(object){
     while ($__Type(object) === 'Object') {
-      object = $__GetPrototype(object);
+      object = $__GetInheritance(object);
       if (object === this) {
         return true;
       }
@@ -57,12 +57,9 @@ export function assign(target, source){
   return target;
 }
 
-export function create(prototype, properties){
-  if (prototype !== null && $__Type(prototype) !== 'Object') {
-    throw $__Exception('proto_object_or_null', [])
-  }
-
-  const object = $__ObjectCreate(prototype);
+export function create(proto, properties){
+  ensureProto(proto, 'Object.create');
+  const object = $__ObjectCreate(proto);
 
   if (properties !== undefined) {
     ensureDescriptor(properties);
@@ -140,7 +137,7 @@ export function getPropertyNames(object){
 
 export function getPrototypeOf(object){
   ensureObject(object, 'Object.getPrototypeOf');
-  return $__GetPrototype(object);
+  return $__GetInheritance(object);
 }
 
 export function is(x, y){
@@ -264,7 +261,7 @@ extend(Object, { assign, create, defineProperty, defineProperties, deliverChange
 
 export function isPrototypeOf(object, prototype){
   while (prototype) {
-    prototype = $__GetPrototype(prototype);
+    prototype = $__GetInheritance(prototype);
     if (prototype === object) {
       return true;
     }
