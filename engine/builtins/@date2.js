@@ -617,7 +617,7 @@ export class Date {
   // ### 15.9.5.5 Date.prototype.toLocaleString ###
   // ##############################################
   toLocaleString(){
-    return toLocaleDateString(this)+' '+toLocaleTimeString(this);
+    return `${toLocaleDateString(this)} ${toLocaleTimeString(this)}`;
   }
   // ##################################################
   // ### 15.9.5.6 Date.prototype.toLocaleDateString ###
@@ -880,7 +880,7 @@ export class Date {
     const toISO = obj.toISOString;
 
     if (!IsCallable(toISO)) {
-      throw $$Exception('called_non_callable', ['toISOString']);
+      throw $$Exception('called_non_callable', ['Date.prototype.toISOString']);
     }
 
     return $$Call(toISO, obj, []);
