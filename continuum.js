@@ -13387,7 +13387,7 @@ exports.operations = (function(exports){
     if (func && func.Abrupt) return func;
 
     if (isUndefined(func)) {
-      return $$ThrowException('property_not_function', [key, object.BuiltinBrand]);
+      return $$ThrowException('property_not_function', [key]);
     }
 
     return func.Call(receiver, args || emptyArgs);
@@ -13662,15 +13662,159 @@ exports.operations = (function(exports){
 })(typeof module !== 'undefined' ? exports : {});
 
 
+exports.$Symbol = (function(exports){
+  var objects = require('../lib/objects'),
+      utility = require('../lib/utility');
+
+  var inherit = objects.inherit,
+      define  = objects.define,
+      Hash    = objects.Hash,
+      tag     = utility.tag,
+      uid     = utility.uid;
+
+
+  // ###############
+  // ### $Symbol ###
+  // ###############
+
+  var $Symbol = exports.$Symbol = (function(){
+    var prefix = uid();
+
+    function $Symbol(name, isPublic){
+      this.Name = name;
+      this.Private = !isPublic;
+      tag(this);
+      this.gensym = prefix+this.id;
+    }
+
+    define($Symbol.prototype, {
+      BuiltinBrand: require('../constants').BRANDS.BuiltinSymbol,
+      Extensible: false,
+      Private: true,
+      Name: null,
+      type: '$Symbol'
+    });
+
+    define($Symbol.prototype, [
+      function each(){},
+      function get(){},
+      function set(){},
+      function describe(){},
+      function remove(){},
+      function has(){
+        return false;
+      },
+      function toString(){
+        return this.gensym;
+      },
+      function GetInheritance(){
+        return null;
+      },
+      function SetInheritance(v){
+        return false;
+      },
+      function IsExtensible(){
+        return false;
+      },
+      function PreventExtensions(){},
+      function HasOwnProperty(){
+        return false;
+      },
+      function GetOwnProperty(){},
+      function GetP(receiver, key){
+        if (key === 'toString') {
+          return receiver.Realm.intrinsics.ObjectToString;
+        }
+      },
+      function SetP(receiver, key, value){
+        return false;
+      },
+      function Delete(key){
+        return true;
+      },
+      function DefineOwnProperty(key, desc){
+        return false;
+      },
+      function enumerator(){
+        var iter = new (require('./$Object').$Enumerator)([]);
+        define($Symbol.prototype, function enumerator(){
+          return iter;
+        });
+        return iter;
+      },
+      function Keys(){
+        return [];
+      },
+      function OwnPropertyKeys(){
+        return [];
+      },
+      function Enumerate(){
+        return []
+      },
+      function Freeze(){
+        return true;
+      },
+      function Seal(){
+        return true;
+      },
+      function IsFrozen(){
+        return true;
+      },
+      function IsSealed(){
+        return true;
+      },
+      function DefaultValue(){
+        return '[object Symbol]';
+      }
+    ]);
+
+    return $Symbol;
+  })();
+
+  var $WellKnownSymbol = exports.$WellKnownSymbol = (function(){
+    var symbols = exports.wellKnownSymbols = new Hash;
+
+    function $WellKnownSymbol(name){
+      $Symbol.call(this, '@'+name, true);
+    }
+
+    inherit($WellKnownSymbol, $Symbol);
+
+
+    function addWellKnownSymbol(name){
+      return symbols[name] = new $WellKnownSymbol(name);
+    }
+
+    exports.addWellKnownSymbol = addWellKnownSymbol;
+
+    addWellKnownSymbol('toStringTag');
+    addWellKnownSymbol('iterator');
+    addWellKnownSymbol('hasInstance');
+    addWellKnownSymbol('create');
+    addWellKnownSymbol('BooleanValue');
+    addWellKnownSymbol('StringValue');
+    addWellKnownSymbol('NumberValue');
+    addWellKnownSymbol('DateValue');
+    addWellKnownSymbol('ToPrimitive');
+
+    return $WellKnownSymbol;
+  })();
+
+
+  return exports;
+})(typeof module !== 'undefined' ? exports : {});
+
+
 exports.$Object = (function(exports){
-  var objects      = require('../lib/objects'),
-      errors       = require('../errors'),
-      constants    = require('../constants'),
-      operators    = require('./operators'),
-      descriptors  = require('./descriptors'),
-      operations   = require('./operations'),
-      PropertyList = require('../lib/PropertyList'),
-      utility      = require('../lib/utility');
+  var objects        = require('../lib/objects'),
+      errors         = require('../errors'),
+      constants      = require('../constants'),
+      operators      = require('./operators'),
+      descriptors    = require('./descriptors'),
+      operations     = require('./operations'),
+      PropertyList   = require('../lib/PropertyList'),
+      utility        = require('../lib/utility'),
+      iteratorSymbol = require('./$Symbol').wellKnownSymbols.iterator;
 
   var inherit = objects.inherit,
       define  = objects.define,
@@ -13679,24 +13823,24 @@ exports.$Object = (function(exports){
       is      = objects.is,
       Hash    = objects.Hash,
       tag     = utility.tag,
-      AccessorDescriptor = descriptors.AccessorDescriptor,
-      DataDescriptor     = descriptors.DataDescriptor,
-      Accessor           = descriptors.Accessor,
-      Value              = descriptors.Value,
-      $$IsDataDescriptor          = descriptors.$$IsDataDescriptor,
-      $$IsAccessorDescriptor      = descriptors.$$IsAccessorDescriptor,
-      $$IsEmptyDescriptor         = descriptors.$$IsEmptyDescriptor,
-      $$IsEquivalentDescriptor    = descriptors.$$IsEquivalentDescriptor,
-      $$IsGenericDescriptor       = descriptors.$$IsGenericDescriptor,
-      $$ThrowException            = errors.$$ThrowException,
-      $$ToBoolean                 = operators.$$ToBoolean,
-      $$ToString                  = operators.$$ToString,
-      $$ToUint32                  = operators.$$ToUint32,
-      $$IsCallable                = operations.$$IsCallable,
-      $$Invoke                    = operations.$$Invoke,
-      $$ThrowStopIteration        = operations.$$ThrowStopIteration,
-      $$CreateChangeRecord        = operations.$$CreateChangeRecord,
-      $$EnqueueChangeRecord       = operations.$$EnqueueChangeRecord;
+      AccessorDescriptor       = descriptors.AccessorDescriptor,
+      DataDescriptor           = descriptors.DataDescriptor,
+      Accessor                 = descriptors.Accessor,
+      Value                    = descriptors.Value,
+      $$IsDataDescriptor       = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
+      $$IsEmptyDescriptor      = descriptors.$$IsEmptyDescriptor,
+      $$IsEquivalentDescriptor = descriptors.$$IsEquivalentDescriptor,
+      $$IsGenericDescriptor    = descriptors.$$IsGenericDescriptor,
+      $$ThrowException         = errors.$$ThrowException,
+      $$ToBoolean              = operators.$$ToBoolean,
+      $$ToString               = operators.$$ToString,
+      $$ToUint32               = operators.$$ToUint32,
+      $$IsCallable             = operations.$$IsCallable,
+      $$Invoke                 = operations.$$Invoke,
+      $$ThrowStopIteration     = operations.$$ThrowStopIteration,
+      $$CreateChangeRecord     = operations.$$CreateChangeRecord,
+      $$EnqueueChangeRecord    = operations.$$EnqueueChangeRecord;
 
   var E = 0x1,
       C = 0x2,
@@ -14171,7 +14315,7 @@ exports.$Object = (function(exports){
       }
     },
     function Iterate(){
-      return $$Invoke(intrinsics.iterator, this, []);
+      return $$Invoke(this, iteratorSymbol);
     },
     function enumerator(){
       return new $Enumerator(this.Enumerate(true, true));
@@ -14291,45 +14435,6 @@ exports.$Object = (function(exports){
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
-
-/*
-  function SetP(receiver, key, value){
-    var desc = $$OrdinaryGetOwnProperty(this, key);
-    if (desc && desc.Abrupt) return desc;
-
-    if (desc === undefined) {
-      var parent = this.GetInheritance();
-      if (parent && parent.Abrupt) return parent;
-
-      if (parent) {
-        return parent.SetP(receiver, key, value);
-      } else if ($$Type(receiver) !== 'Object') {
-        return false;
-      }
-      return $$CreateOwnDataProperty(receiver, key, value);
-    }
-
-    if ($$IsDataDescriptor(desc)) {
-      if (!desc.Writable) {
-        return false;
-      } else if (this === receiver) {
-        return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
-      } else if ($$Type(receiver) !== 'Object') {
-        return false;
-      }
-      return $$CreateOwnDataProperty(receiver, key, value);
-    } else if ($$IsAccessorDescriptor(desc)) {
-      var setter = desc.Set;
-      if ($$IsCallable(setter)) {
-        var setterResult = setter.Call(receiver, [value]);
-        if (setterResult && setterResult.Abrupt) return setterResult;
-
-        return true;
-      }
-      return false;
-    }
-  }
-*/
 
 
 exports.$Array = (function(module){
@@ -15397,18 +15502,19 @@ exports.$TypedArray = (function(module){
 
 exports.natives = (function(module){
   "use strict";
-  var objects     = require('./lib/objects'),
-      Stack       = require('./lib/Stack'),
-      buffers     = require('./lib/buffers'),
-      errors      = require('./errors'),
-      $Array      = require('./object-model/$Array'),
-      $Object     = require('./object-model/$Object').$Object,
-      $TypedArray = require('./object-model/$TypedArray'),
-      operators   = require('./object-model/operators'),
-      operations  = require('./object-model/operations'),
-      descriptors = require('./object-model/descriptors'),
-      collections = require('./object-model/collections'),
-      constants   = require('./constants');
+  var objects          = require('./lib/objects'),
+      Stack            = require('./lib/Stack'),
+      buffers          = require('./lib/buffers'),
+      errors           = require('./errors'),
+      $Array           = require('./object-model/$Array'),
+      $Object          = require('./object-model/$Object').$Object,
+      $TypedArray      = require('./object-model/$TypedArray'),
+      operators        = require('./object-model/operators'),
+      operations       = require('./object-model/operations'),
+      descriptors      = require('./object-model/descriptors'),
+      collections      = require('./object-model/collections'),
+      constants        = require('./constants'),
+      wellKnownSymbols = require('./object-model/$Symbol').wellKnownSymbols;
 
   var BRANDS                    = constants.BRANDS,
       Undetectable              = constants.Undetectable,
@@ -15688,6 +15794,9 @@ exports.natives = (function(module){
     _now: Date.now || function(){ return +new Date },
     _SetDefaultLoader: function(obj, args){
       require('./runtime').realm.loader = args[0];
+    },
+    _getWellKnownSymbol: function(_, args){
+      return wellKnownSymbols[args[0]];
     },
     _promoteClass: function(obj, args){
       var ctor = args[0],
@@ -17482,6 +17591,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       environments = require('./object-model/environments'),
       operations   = require('./object-model/operations'),
       descriptors  = require('./object-model/descriptors'),
+      $Symbol      = require('./object-model/$Symbol').$Symbol,
       $Object      = require('./object-model/$Object').$Object,
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
@@ -17555,6 +17665,17 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Builtin       = SYMBOLS.Builtin,
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
+
+  var wellKnownSymbols   = require('./object-model/$Symbol').wellKnownSymbols,
+      toStringTagSymbol  = wellKnownSymbols.toStringTag,
+      iteratorSymbol     = wellKnownSymbols.iterator,
+      hasInstanceSymbol  = wellKnownSymbols.hasInstance,
+      createSymbol       = wellKnownSymbols.create,
+      BooleanValueSymbol = wellKnownSymbols.BooleanValue,
+      StringValueSymbol  = wellKnownSymbols.StringValue,
+      NumberValue        = wellKnownSymbols.NumberValue,
+      DateValueSymbol    = wellKnownSymbols.DateValue,
+      ToPrimitiveSymbol  = wellKnownSymbols.ToPrimitive;
 
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
@@ -17850,131 +17971,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     };
   }
 
-
-
-  // ###############
-  // ### $Symbol ###
-  // ###############
-
-  var $Symbol = (function(){
-    var iter = new (require('./object-model/$Object').$Enumerator)([]),
-        prefix = uid();
-
-    function $Symbol(name, isPublic){
-      this.Name = name;
-      this.Private = !isPublic;
-      tag(this);
-      this.gensym = prefix+this.id;
-    }
-
-    inherit($Symbol, $Object, {
-      BuiltinBrand: BRANDS.BuiltinSymbol,
-      Extensible: false,
-      Private: true,
-      Name: null,
-      type: '$Symbol'
-    }, [
-      function each(){},
-      function get(){},
-      function set(){},
-      function describe(){},
-      function remove(){},
-      function has(){
-        return false;
-      },
-      function toString(){
-        return this.gensym;
-      },
-      function GetInheritance(){
-        return null;
-      },
-      function SetInheritance(v){
-        return false;
-      },
-      function IsExtensible(){
-        return false;
-      },
-      function PreventExtensions(){},
-      function HasOwnProperty(){
-        return false;
-      },
-      function GetOwnProperty(){},
-      function GetP(receiver, key){
-        if (key === 'toString') {
-          return intrinsics.ObjectToString;
-        }
-      },
-      function SetP(receiver, key, value){
-        return false;
-      },
-      function Delete(key){
-        return true;
-      },
-      function DefineOwnProperty(key, desc){
-        return false;
-      },
-      function enumerator(){
-        return iter;
-      },
-      function Keys(){
-        return [];
-      },
-      function OwnPropertyKeys(){
-        return [];
-      },
-      function Enumerate(){
-        return []
-      },
-      function Freeze(){
-        return true;
-      },
-      function Seal(){
-        return true;
-      },
-      function IsFrozen(){
-        return true;
-      },
-      function IsSealed(){
-        return true;
-      },
-      function DefaultValue(){
-        return '[object Symbol]';
-      }
-    ]);
-
-    return $Symbol;
-  })();
-
-  var $WellKnownSymbol = (function(){
-    var symbols = exports.wellKnownSymbols = new Hash;
-
-    function $WellKnownSymbol(name){
-      $Symbol.call(this, '@'+name, true);
-    }
-
-    natives.set('getWellKnownSymbol', function(name){
-      return symbols[name];
-    });
-
-    inherit($WellKnownSymbol, $Symbol);
-
-
-    $WellKnownSymbol.add = exports.addWellKnownSymbol = function add(name){
-      return symbols[name] = new $WellKnownSymbol(name);
-    };
-
-    return $WellKnownSymbol;
-  })();
-
-  var toStringTagSymbol  = $WellKnownSymbol.add('toStringTag'),
-      iteratorSymbol     = $WellKnownSymbol.add('iterator'),
-      hasInstanceSymbol  = $WellKnownSymbol.add('hasInstance'),
-      createSymbol       = $WellKnownSymbol.add('create'),
-      BooleanValueSymbol = $WellKnownSymbol.add('BooleanValue'),
-      StringValueSymbol  = $WellKnownSymbol.add('StringValue'),
-      NumberValue        = $WellKnownSymbol.add('NumberValue'),
-      DateValueSymbol    = $WellKnownSymbol.add('DateValue'),
-      ToPrimitiveSymbol  = $WellKnownSymbol.add('ToPrimitive');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -20030,7 +20026,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       });
     }();
 
-    internalModules.set('@@symbols', exports.wellKnownSymbols);
+    internalModules.set('@@symbols', wellKnownSymbols);
 
 
     var mutationScopeInit = new Script('void 0');
