@@ -111,6 +111,7 @@ var errors = (function(errors, messages, exports){
     property_not_function          : ["Property '", "$0", "' of object ", "$1", " is not a function"],
     not_constructor                : ["$0", " is not a constructor"],
     cannot_convert_to_primitive    : ["Cannot convert object to primitive value"],
+    cannot_convert_to_primitive2   : ["$0", " cannot convert object to primitive value"],
     with_expression                : ["$0", " has no properties"],
     illegal_invocation             : ["Illegal invocation"],
     invalid_in_operator_use        : ["Cannot use 'in' operator to search for '", "$0", "' in ", "$1"],

@@ -677,7 +677,7 @@ var natives = (function(module){
       DST_END         : +DST_END,
       DST_END_MONTH   : DST_END.getMonth(),
       DST_END_SUNDAY  : DST_END.getDate() > 15,
-      DST_START_OFFSET: DST_END.getHours() * 3600000 + DST_END.getMinutes() * 60000
+      DST_END_OFFSET  : DST_END.getHours() * 3600000 + DST_END.getMinutes() * 60000
     });
   }();
 
