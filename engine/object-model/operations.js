@@ -280,7 +280,7 @@ var operations = (function(exports){
     if (func && func.Abrupt) return func;
 
     if (isUndefined(func)) {
-      return $$ThrowException('property_not_function', [key, object.BuiltinBrand]);
+      return $$ThrowException('property_not_function', [key]);
     }
 
     return func.Call(receiver, args || emptyArgs);

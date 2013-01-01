@@ -1,17 +1,18 @@
 var natives = (function(module){
   "use strict";
-  var objects     = require('./lib/objects'),
-      Stack       = require('./lib/Stack'),
-      buffers     = require('./lib/buffers'),
-      errors      = require('./errors'),
-      $Array      = require('./object-model/$Array'),
-      $Object     = require('./object-model/$Object').$Object,
-      $TypedArray = require('./object-model/$TypedArray'),
-      operators   = require('./object-model/operators'),
-      operations  = require('./object-model/operations'),
-      descriptors = require('./object-model/descriptors'),
-      collections = require('./object-model/collections'),
-      constants   = require('./constants');
+  var objects          = require('./lib/objects'),
+      Stack            = require('./lib/Stack'),
+      buffers          = require('./lib/buffers'),
+      errors           = require('./errors'),
+      $Array           = require('./object-model/$Array'),
+      $Object          = require('./object-model/$Object').$Object,
+      $TypedArray      = require('./object-model/$TypedArray'),
+      operators        = require('./object-model/operators'),
+      operations       = require('./object-model/operations'),
+      descriptors      = require('./object-model/descriptors'),
+      collections      = require('./object-model/collections'),
+      constants        = require('./constants'),
+      wellKnownSymbols = require('./object-model/$Symbol').wellKnownSymbols;
 
   var BRANDS                    = constants.BRANDS,
       Undetectable              = constants.Undetectable,
@@ -291,6 +292,9 @@ var natives = (function(module){
     _now: Date.now || function(){ return +new Date },
     _SetDefaultLoader: function(obj, args){
       require('./runtime').realm.loader = args[0];
+    },
+    _getWellKnownSymbol: function(_, args){
+      return wellKnownSymbols[args[0]];
     },
     _promoteClass: function(obj, args){
       var ctor = args[0],

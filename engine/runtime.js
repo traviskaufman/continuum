@@ -13,6 +13,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       environments = require('./object-model/environments'),
       operations   = require('./object-model/operations'),
       descriptors  = require('./object-model/descriptors'),
+      $Symbol      = require('./object-model/$Symbol').$Symbol,
       $Object      = require('./object-model/$Object').$Object,
       $Array       = require('./object-model/$Array'),
       $Proxy       = require('./object-model/$Proxy'),
@@ -86,6 +87,17 @@ var runtime = (function(GLOBAL, exports, undefined){
       Builtin       = SYMBOLS.Builtin,
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
+
+  var wellKnownSymbols   = require('./object-model/$Symbol').wellKnownSymbols,
+      toStringTagSymbol  = wellKnownSymbols.toStringTag,
+      iteratorSymbol     = wellKnownSymbols.iterator,
+      hasInstanceSymbol  = wellKnownSymbols.hasInstance,
+      createSymbol       = wellKnownSymbols.create,
+      BooleanValueSymbol = wellKnownSymbols.BooleanValue,
+      StringValueSymbol  = wellKnownSymbols.StringValue,
+      NumberValue        = wellKnownSymbols.NumberValue,
+      DateValueSymbol    = wellKnownSymbols.DateValue,
+      ToPrimitiveSymbol  = wellKnownSymbols.ToPrimitive;
 
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
@@ -381,131 +393,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
   }
 
-
-
-  // ###############
-  // ### $Symbol ###
-  // ###############
-
-  var $Symbol = (function(){
-    var iter = new (require('./object-model/$Object').$Enumerator)([]),
-        prefix = uid();
-
-    function $Symbol(name, isPublic){
-      this.Name = name;
-      this.Private = !isPublic;
-      tag(this);
-      this.gensym = prefix+this.id;
-    }
-
-    inherit($Symbol, $Object, {
-      BuiltinBrand: BRANDS.BuiltinSymbol,
-      Extensible: false,
-      Private: true,
-      Name: null,
-      type: '$Symbol'
-    }, [
-      function each(){},
-      function get(){},
-      function set(){},
-      function describe(){},
-      function remove(){},
-      function has(){
-        return false;
-      },
-      function toString(){
-        return this.gensym;
-      },
-      function GetInheritance(){
-        return null;
-      },
-      function SetInheritance(v){
-        return false;
-      },
-      function IsExtensible(){
-        return false;
-      },
-      function PreventExtensions(){},
-      function HasOwnProperty(){
-        return false;
-      },
-      function GetOwnProperty(){},
-      function GetP(receiver, key){
-        if (key === 'toString') {
-          return intrinsics.ObjectToString;
-        }
-      },
-      function SetP(receiver, key, value){
-        return false;
-      },
-      function Delete(key){
-        return true;
-      },
-      function DefineOwnProperty(key, desc){
-        return false;
-      },
-      function enumerator(){
-        return iter;
-      },
-      function Keys(){
-        return [];
-      },
-      function OwnPropertyKeys(){
-        return [];
-      },
-      function Enumerate(){
-        return []
-      },
-      function Freeze(){
-        return true;
-      },
-      function Seal(){
-        return true;
-      },
-      function IsFrozen(){
-        return true;
-      },
-      function IsSealed(){
-        return true;
-      },
-      function DefaultValue(){
-        return '[object Symbol]';
-      }
-    ]);
-
-    return $Symbol;
-  })();
-
-  var $WellKnownSymbol = (function(){
-    var symbols = exports.wellKnownSymbols = new Hash;
-
-    function $WellKnownSymbol(name){
-      $Symbol.call(this, '@'+name, true);
-    }
-
-    natives.set('getWellKnownSymbol', function(name){
-      return symbols[name];
-    });
-
-    inherit($WellKnownSymbol, $Symbol);
-
-
-    $WellKnownSymbol.add = exports.addWellKnownSymbol = function add(name){
-      return symbols[name] = new $WellKnownSymbol(name);
-    };
-
-    return $WellKnownSymbol;
-  })();
-
-  var toStringTagSymbol  = $WellKnownSymbol.add('toStringTag'),
-      iteratorSymbol     = $WellKnownSymbol.add('iterator'),
-      hasInstanceSymbol  = $WellKnownSymbol.add('hasInstance'),
-      createSymbol       = $WellKnownSymbol.add('create'),
-      BooleanValueSymbol = $WellKnownSymbol.add('BooleanValue'),
-      StringValueSymbol  = $WellKnownSymbol.add('StringValue'),
-      NumberValue        = $WellKnownSymbol.add('NumberValue'),
-      DateValueSymbol    = $WellKnownSymbol.add('DateValue'),
-      ToPrimitiveSymbol  = $WellKnownSymbol.add('ToPrimitive');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -2561,7 +2448,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       });
     }();
 
-    internalModules.set('@@symbols', exports.wellKnownSymbols);
+    internalModules.set('@@symbols', wellKnownSymbols);
 
 
     var mutationScopeInit = new Script('void 0');

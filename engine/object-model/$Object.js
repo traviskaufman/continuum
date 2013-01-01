@@ -1,12 +1,13 @@
 var $Object = (function(exports){
-  var objects      = require('../lib/objects'),
-      errors       = require('../errors'),
-      constants    = require('../constants'),
-      operators    = require('./operators'),
-      descriptors  = require('./descriptors'),
-      operations   = require('./operations'),
-      PropertyList = require('../lib/PropertyList'),
-      utility      = require('../lib/utility');
+  var objects        = require('../lib/objects'),
+      errors         = require('../errors'),
+      constants      = require('../constants'),
+      operators      = require('./operators'),
+      descriptors    = require('./descriptors'),
+      operations     = require('./operations'),
+      PropertyList   = require('../lib/PropertyList'),
+      utility        = require('../lib/utility'),
+      iteratorSymbol = require('./$Symbol').wellKnownSymbols.iterator;
 
   var inherit = objects.inherit,
       define  = objects.define,
@@ -15,24 +16,24 @@ var $Object = (function(exports){
       is      = objects.is,
       Hash    = objects.Hash,
       tag     = utility.tag,
-      AccessorDescriptor = descriptors.AccessorDescriptor,
-      DataDescriptor     = descriptors.DataDescriptor,
-      Accessor           = descriptors.Accessor,
-      Value              = descriptors.Value,
-      $$IsDataDescriptor          = descriptors.$$IsDataDescriptor,
-      $$IsAccessorDescriptor      = descriptors.$$IsAccessorDescriptor,
-      $$IsEmptyDescriptor         = descriptors.$$IsEmptyDescriptor,
-      $$IsEquivalentDescriptor    = descriptors.$$IsEquivalentDescriptor,
-      $$IsGenericDescriptor       = descriptors.$$IsGenericDescriptor,
-      $$ThrowException            = errors.$$ThrowException,
-      $$ToBoolean                 = operators.$$ToBoolean,
-      $$ToString                  = operators.$$ToString,
-      $$ToUint32                  = operators.$$ToUint32,
-      $$IsCallable                = operations.$$IsCallable,
-      $$Invoke                    = operations.$$Invoke,
-      $$ThrowStopIteration        = operations.$$ThrowStopIteration,
-      $$CreateChangeRecord        = operations.$$CreateChangeRecord,
-      $$EnqueueChangeRecord       = operations.$$EnqueueChangeRecord;
+      AccessorDescriptor       = descriptors.AccessorDescriptor,
+      DataDescriptor           = descriptors.DataDescriptor,
+      Accessor                 = descriptors.Accessor,
+      Value                    = descriptors.Value,
+      $$IsDataDescriptor       = descriptors.$$IsDataDescriptor,
+      $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
+      $$IsEmptyDescriptor      = descriptors.$$IsEmptyDescriptor,
+      $$IsEquivalentDescriptor = descriptors.$$IsEquivalentDescriptor,
+      $$IsGenericDescriptor    = descriptors.$$IsGenericDescriptor,
+      $$ThrowException         = errors.$$ThrowException,
+      $$ToBoolean              = operators.$$ToBoolean,
+      $$ToString               = operators.$$ToString,
+      $$ToUint32               = operators.$$ToUint32,
+      $$IsCallable             = operations.$$IsCallable,
+      $$Invoke                 = operations.$$Invoke,
+      $$ThrowStopIteration     = operations.$$ThrowStopIteration,
+      $$CreateChangeRecord     = operations.$$CreateChangeRecord,
+      $$EnqueueChangeRecord    = operations.$$EnqueueChangeRecord;
 
   var E = 0x1,
       C = 0x2,
@@ -507,7 +508,7 @@ var $Object = (function(exports){
       }
     },
     function Iterate(){
-      return $$Invoke(intrinsics.iterator, this, []);
+      return $$Invoke(this, iteratorSymbol);
     },
     function enumerator(){
       return new $Enumerator(this.Enumerate(true, true));
@@ -627,42 +628,3 @@ var $Object = (function(exports){
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
-
-/*
-  function SetP(receiver, key, value){
-    var desc = $$OrdinaryGetOwnProperty(this, key);
-    if (desc && desc.Abrupt) return desc;
-
-    if (desc === undefined) {
-      var parent = this.GetInheritance();
-      if (parent && parent.Abrupt) return parent;
-
-      if (parent) {
-        return parent.SetP(receiver, key, value);
-      } else if ($$Type(receiver) !== 'Object') {
-        return false;
-      }
-      return $$CreateOwnDataProperty(receiver, key, value);
-    }
-
-    if ($$IsDataDescriptor(desc)) {
-      if (!desc.Writable) {
-        return false;
-      } else if (this === receiver) {
-        return $$OrdinaryDefineOwnProperty(this, key, { Value: value });
-      } else if ($$Type(receiver) !== 'Object') {
-        return false;
-      }
-      return $$CreateOwnDataProperty(receiver, key, value);
-    } else if ($$IsAccessorDescriptor(desc)) {
-      var setter = desc.Set;
-      if ($$IsCallable(setter)) {
-        var setterResult = setter.Call(receiver, [value]);
-        if (setterResult && setterResult.Abrupt) return setterResult;
-
-        return true;
-      }
-      return false;
-    }
-  }
-*/
