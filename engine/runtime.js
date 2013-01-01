@@ -405,6 +405,14 @@ var runtime = (function(GLOBAL, exports, undefined){
       Name: null,
       type: '$Symbol'
     }, [
+      function each(){},
+      function get(){},
+      function set(){},
+      function describe(){},
+      function remove(){},
+      function has(){
+        return false;
+      },
       function toString(){
         return this.gensym;
       },
@@ -1261,7 +1269,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       this.init(object, key);
-      each(key, this.add, this);
+      each(this.keys, this.add, this);
       tag(this);
     }
 
@@ -1378,15 +1386,23 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($NativeModule, $Module, [
       function init(bindings){
-        this.props = new Hash;
         this.bindings = bindings;
+        this.props = new Hash;
         this.keys = ownKeys(bindings);
       },
       function add(key){
-        this.props[key] = this.bindings[key];
+        if (typeof this.bindings[key] === 'function') {
+          this.props[key] = new $InternalFunction({
+            name: key,
+            call: this.bindings[key],
+            length: this.bindings[key].length
+          });
+        } else {
+          this.props[key] = this.bindings[key];
+        }
       },
       function get(key){
-        return this.props[keys];
+        return this.props[key];
       },
     ]);
 
@@ -1494,7 +1510,11 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var $InternalFunction = (function(){
     function $InternalFunction(options){
-      this.Prototype = intrinsics.FunctionProto;
+      if (intrinsics) {
+        this.Prototype = intrinsics.FunctionProto;
+      } else {
+        this.Prototype = null;
+      }
       this.Realm = realm;
       this.Call = typeof options === 'function' ? options : options.call;
       this.storage = new Hash;
@@ -2425,6 +2445,103 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
+
+    var internalModules = exports.internalModules = (function(modules){
+      return define({}, [
+        function set(name, bindings){
+          modules[name] = new $NativeModule(bindings);
+          modules[name].mrl = name;
+        },
+        function has(name){
+          return name in modules;
+        },
+        function get(name){
+          return modules[name];
+        },
+        function remove(name){
+          if (this.has(name)) {
+            delete modules[name];
+            return true;
+          }
+          return false;
+        }
+      ]);
+    })(new Hash);
+
+
+    void function(){
+      var objectTypes = {
+        Array   : $Array,
+        Boolean : $Boolean,
+        Date    : $Date,
+        Error   : $Error,
+        Function: $Function,
+        Module  : $Module,
+        Number  : $Number,
+        Object  : $Object,
+        Proxy   : $Proxy,
+        RegExp  : $RegExp,
+        Symbol  : $Symbol,
+        String  : $String,
+      };
+
+      internalModules.set('@@internals', {
+        $$ArgumentCount: function(){
+          return context.argumentCount();
+        },
+        $$CallerHasArgument: function(_, args){
+          return context.callerHasArgument(args[0]);
+        },
+        $$CallInternal: function(_, args){
+          var obj = args[0],
+              name = args[1],
+              argv = args[2],
+              func = obj[name];
+
+          if (func) {
+            if (args) {
+              return func.apply(obj, args.array);
+            }
+            return obj[name]();
+          }
+          return $$ThrowException('unknown_internal_function', [name]);
+        },
+        $$CreateObject: function(_, args){
+          return new objectTypes[args[0]](args[1]);
+        },
+        $$CreateInternalObject: function(_, args){
+          return create(args[0] || null);
+        },
+        $$CurrentRealm: function(){
+          return realm;
+        },
+        $$Exception: function(_, args){
+          return $$MakeException(args[0], args[1] ? args[1].array : []);
+        },
+        $$GetInternal: function(_, args){
+          return args[0][args[1]];
+        },
+        $$GetIntrinsic: function(_, args){
+          return realm.intrinsics[args[0]];
+        },
+        $$HasArgument: function(_, args){
+          return context.hasArgument(args[0]);
+        },
+        $$HasInternal: function(_, args){
+          return args[1] in args[0];
+        },
+        $$StringToNumber: function(_, args){
+          return +args[0];
+        },
+        $$SetInternal: function(_, args){
+          args[0][args[1]] = args[2];
+        }
+      });
+    }();
+
+    internalModules.set('@@symbols', exports.wellKnownSymbols);
+
+
     var mutationScopeInit = new Script('void 0');
 
     function initialize(realm, Ω, ƒ){
@@ -2554,7 +2671,11 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (typeof origin !== 'string' && origin instanceof Array) {
 
             } else {
-              load.Call(loader, [imported.origin, callback, errback]);
+              if (internalModules.has(imported.origin)) {
+                callback.Call(null, [internalModules.get(imported.origin)]);
+              } else {
+                load.Call(loader, [imported.origin, callback, errback]);
+              }
             }
           }
         });
