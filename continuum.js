@@ -16098,7 +16098,7 @@ exports.thunk = (function(exports){
       ToObject        = operators.$$ToObject,
       $$GetValue      = operators.$$GetValue,
       $$PutValue      = operators.$$PutValue,
-      STRICT_EQUAL    = operators.STRICT_EQUAL,
+      EQUAL           = operators.EQUAL,
       PRE_INC         = operators.PRE_INC,
       POST_INC        = operators.POST_INC,
       PRE_DEC         = operators.PRE_DEC,
@@ -16388,7 +16388,7 @@ exports.thunk = (function(exports){
     }
 
     function CASE(){
-      var result = STRICT_EQUAL(stack[--sp], stack[sp - 1]);
+      var result = EQUAL(stack[--sp], stack[sp - 1]);
 
 
       if (result) {
@@ -17771,7 +17771,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(toStringTag, brand);
+      proto.define(toStringTagSymbol, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -17819,7 +17819,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iter = $$Invoke(iterator, iterable);
+      var iter = $$Invoke(iteratorSymbol, iterable);
       if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
@@ -17874,6 +17874,14 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Name: null,
       type: '$Symbol'
     }, [
+      function each(){},
+      function get(){},
+      function set(){},
+      function describe(){},
+      function remove(){},
+      function has(){
+        return false;
+      },
       function toString(){
         return this.gensym;
       },
@@ -17950,23 +17958,23 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($WellKnownSymbol, $Symbol);
 
-    function addWellKnownSymbol(name){
-      return symbols[name] = new $WellKnownSymbol(name);
-    }
 
-    $WellKnownSymbol.add = exports.addWellKnownSymbol = addWellKnownSymbol;
+    $WellKnownSymbol.add = exports.addWellKnownSymbol = function add(name){
+      return symbols[name] = new $WellKnownSymbol(name);
+    };
 
     return $WellKnownSymbol;
   })();
 
-  var toStringTag  = $WellKnownSymbol.add('toStringTag'),
-      iterator     = $WellKnownSymbol.add('iterator'),
-    //create       = $WellKnownSymbol.add('create'),
-      BooleanValue = $WellKnownSymbol.add('BooleanValue'),
-      StringValue  = $WellKnownSymbol.add('StringValue'),
-      NumberValue  = $WellKnownSymbol.add('NumberValue'),
-      DateValue    = $WellKnownSymbol.add('DateValue'),
-      BuiltinBrand = $WellKnownSymbol.add('BuiltinBrand');
+  var toStringTagSymbol  = $WellKnownSymbol.add('toStringTag'),
+      iteratorSymbol     = $WellKnownSymbol.add('iterator'),
+      hasInstanceSymbol  = $WellKnownSymbol.add('hasInstance'),
+      createSymbol       = $WellKnownSymbol.add('create'),
+      BooleanValueSymbol = $WellKnownSymbol.add('BooleanValue'),
+      StringValueSymbol  = $WellKnownSymbol.add('StringValue'),
+      NumberValue        = $WellKnownSymbol.add('NumberValue'),
+      DateValueSymbol    = $WellKnownSymbol.add('DateValue'),
+      ToPrimitiveSymbol  = $WellKnownSymbol.add('ToPrimitive');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -18207,7 +18215,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.thunk = thunk;
 
       var self = this;
-      setFunction(this, iterator, function(){ return self });
+      setFunction(this, iteratorSymbol, function(){ return self });
       setFunction(this, 'next',   function(){ return self.Send() });
       setFunction(this, 'close',  function(){ return self.Close() });
       setFunction(this, 'send',   function(v){ return self.Send(v) });
@@ -18304,10 +18312,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$Date'
     }, [
       function getPrimitiveValue(){
-        return this.get(DateValue);
+        return this.get(DateValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(DateValue, value, _CW);
+        return this.define(DateValueSymbol, value, _CW);
       }
     ]);
 
@@ -18334,10 +18342,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$String'
     }, [
       function getPrimitiveValue(){
-        return ObjectGet.call(this, StringValue) || '';
+        return ObjectGet.call(this, StringValueSymbol) || '';
       },
       function setPrimitiveValue(value){
-        return this.define(StringValue, value, _CW);
+        return this.define(StringValueSymbol, value, _CW);
       },
 
       function each(callback){
@@ -18419,10 +18427,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$Number'
     }, [
       function getPrimitiveValue(){
-        return this.get(NumberValue);
+        return this.get(NumberValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(NumberValue, value, _CW);
+        return this.define(NumberValueSymbol, value, _CW);
       }
     ]);
 
@@ -18445,10 +18453,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       type: '$Boolean'
     }, [
       function getPrimitiveValue(){
-        return this.get(BooleanValue);
+        return this.get(BooleanValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(BooleanValue, value, _CW);
+        return this.define(BooleanValueSymbol, value, _CW);
       }
     ]);
 
@@ -18730,7 +18738,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       this.init(object, key);
-      each(key, this.add, this);
+      each(this.keys, this.add, this);
       tag(this);
     }
 
@@ -18847,15 +18855,23 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     inherit($NativeModule, $Module, [
       function init(bindings){
-        this.props = new Hash;
         this.bindings = bindings;
+        this.props = new Hash;
         this.keys = ownKeys(bindings);
       },
       function add(key){
-        this.props[key] = this.bindings[key];
+        if (typeof this.bindings[key] === 'function') {
+          this.props[key] = new $InternalFunction({
+            name: key,
+            call: this.bindings[key],
+            length: this.bindings[key].length
+          });
+        } else {
+          this.props[key] = this.bindings[key];
+        }
       },
       function get(key){
-        return this.props[keys];
+        return this.props[key];
       },
     ]);
 
@@ -18963,7 +18979,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var $InternalFunction = (function(){
     function $InternalFunction(options){
-      this.Prototype = intrinsics.FunctionProto;
+      if (intrinsics) {
+        this.Prototype = intrinsics.FunctionProto;
+      } else {
+        this.Prototype = null;
+      }
       this.Realm = realm;
       this.Call = typeof options === 'function' ? options : options.call;
       this.storage = new Hash;
@@ -19894,6 +19914,125 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
+
+    var internalModules = exports.internalModules = (function(modules){
+      return define({}, [
+        function set(name, bindings){
+          modules[name] = new $NativeModule(bindings);
+          modules[name].mrl = name;
+        },
+        function has(name){
+          return name in modules;
+        },
+        function get(name){
+          return modules[name];
+        },
+        function remove(name){
+          if (this.has(name)) {
+            delete modules[name];
+            return true;
+          }
+          return false;
+        }
+      ]);
+    })(new Hash);
+
+
+    void function(){
+      var objectTypes = {
+        Array   : $Array,
+        Boolean : $Boolean,
+        Date    : $Date,
+        Error   : $Error,
+        Function: $Function,
+        Module  : $Module,
+        Number  : $Number,
+        Object  : $Object,
+        Proxy   : $Proxy,
+        RegExp  : $RegExp,
+        Symbol  : $Symbol,
+        String  : $String,
+      };
+
+
+      internalModules.set('@@internals', {
+        $$ArgumentCount: function(){
+          return context.argumentCount();
+        },
+        $$CallerArgumentCount: function(){
+          if (context.caller) {
+            return context.argumentCount();
+          }
+          return null;
+        },
+        $$CallerHasArgument: function(_, args){
+          if (context.caller) {
+            return context.caller.hasArgument(args[0]);
+          }
+          return false;
+        },
+        $$CallerName: function(){
+          return context.callerName();
+        },
+        $$CallerIsConstruct: function(){
+          if (context.caller) {
+            return context.caller.isConstruct;
+          }
+          return false;
+        },
+        $$CallInternal: function(_, args){
+          var obj = args[0],
+              name = args[1],
+              argv = args[2],
+              func = obj[name];
+
+          if (func) {
+            if (args) {
+              return func.apply(obj, args.array);
+            }
+            return obj[name]();
+          }
+          return $$ThrowException('unknown_internal_function', [name]);
+        },
+        $$CreateObject: function(_, args){
+          return new objectTypes[args[0]](args[1]);
+        },
+        $$CreateInternalObject: function(_, args){
+          return create(args[0] || null);
+        },
+        $$CurrentRealm: function(){
+          return realm;
+        },
+        $$Exception: function(_, args){
+          return $$MakeException(args[0], args[1] ? args[1].array : []);
+        },
+        $$GetInternal: function(_, args){
+          return args[0][args[1]];
+        },
+        $$GetIntrinsic: function(_, args){
+          return realm.intrinsics[args[0]];
+        },
+        $$HasArgument: function(_, args){
+          return context.hasArgument(args[0]);
+        },
+        $$HasInternal: function(_, args){
+          return args[1] in args[0];
+        },
+        $$IsConstruct: function(){
+          return context.isConstruct;
+        },
+        $$StringToNumber: function(_, args){
+          return +args[0];
+        },
+        $$SetInternal: function(_, args){
+          args[0][args[1]] = args[2];
+        }
+      });
+    }();
+
+    internalModules.set('@@symbols', exports.wellKnownSymbols);
+
+
     var mutationScopeInit = new Script('void 0');
 
     function initialize(realm, Ω, ƒ){
@@ -20023,7 +20162,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             if (typeof origin !== 'string' && origin instanceof Array) {
 
             } else {
-              load.Call(loader, [imported.origin, callback, errback]);
+              if (internalModules.has(imported.origin)) {
+                callback.Call(null, [internalModules.get(imported.origin)]);
+              } else {
+                load.Call(loader, [imported.origin, callback, errback]);
+              }
             }
           }
         });
@@ -22144,7 +22287,7 @@ exports.index = (function(exports){
 
 exports.builtins["@@internal"] = "private @@toStringTag  = $__getWellKnownSymbol('toStringTag'),\n        @@iterator     = $__getWellKnownSymbol('iterator'),\n        @@create       = $__getWellKnownSymbol('create'),\n        @@BooleanValue = $__getWellKnownSymbol('BooleanValue'),\n        @@StringValue  = $__getWellKnownSymbol('StringValue'),\n        @@NumberValue  = $__getWellKnownSymbol('NumberValue'),\n        @@DateValue    = $__getWellKnownSymbol('DateValue'),\n        @@BuiltinBrand = $__getWellKnownSymbol('BuiltinBrand');\n\nconst StopIteration = $__StopIteration,\n      HIDDEN   = 6,\n      FROZEN   = 0,\n      Infinity = 1 / 0,\n      NaN      = +'NaN';\n\nlet undefined;\n\n\nfunction extend(object, properties){\n  const keys = $__Enumerate(properties, false, false);\n\n  let index = keys.length;\n\n  while (index--) {\n    const key  = keys[index],\n          desc = $__GetOwnProperty(properties, key);\n\n    desc.enumerable = false;\n\n    if (typeof desc.value === 'number') {\n      desc.configurable = desc.writable = false;\n    } else if (typeof desc.value === 'function') {\n      builtinFunction(desc.value);\n    }\n\n    $__DefineOwnProperty(object, key, desc);\n  }\n}\n\n$__extend = extend;\n\n\nfunction internalFunction(func){\n  $__setInternal(func, 'InternalFunction', true);\n  $__setInternal(func, 'strict', false);\n  $__delete(func, 'prototype');\n  $__delete(func, 'caller');\n  $__delete(func, 'arguments');\n}\n\ninternalFunction(internalFunction);\n\n\n\nfunction builtinClass(Ctor, brand){\n  var prototypeName = Ctor.name + 'Proto',\n      prototype = $__GetIntrinsic(prototypeName),\n      isSymbol = Ctor.name === 'Symbol';\n\n  if (prototype) {\n    if (!isSymbol) {\n      extend(prototype, Ctor.prototype);\n    }\n    $__set(Ctor, 'prototype', prototype);\n  } else {\n    $__SetIntrinsic(prototypeName, Ctor.prototype);\n  }\n\n  $__setInternal(Ctor, 'BuiltinConstructor', true);\n  $__setInternal(Ctor, 'BuiltinFunction', true);\n  $__setInternal(Ctor, 'strict', false);\n  $__update(Ctor, 'prototype', FROZEN);\n  $__set(Ctor, 'length', 1);\n  $__define(Ctor, 'caller', null, FROZEN);\n  $__define(Ctor, 'arguments', null, FROZEN);\n\n  if (!isSymbol) {\n    brand || (brand = 'Builtin'+Ctor.name);\n    $__SetBuiltinBrand(Ctor.prototype, brand);\n    $__define(Ctor.prototype, @@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\ninternalFunction(builtinClass);\n\n\n\nfunction builtinFunction(func){\n  $__setInternal(func, 'BuiltinFunction', true);\n  $__delete(func, 'prototype');\n  $__update(func, 'name', FROZEN);\n  $__define(func, 'caller', null, FROZEN);\n  $__define(func, 'arguments', null, FROZEN);\n}\n\ninternalFunction(builtinFunction);\n\n\n\nfunction hideEverything(o){\n  const type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  const keys = $__Enumerate(o, false, true);\n\n  let index = keys.length;\n\n  while (index--) {\n    $__update(o, keys[index], typeof o[keys[index]] === 'number' ? FROZEN : HIDDEN);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\ninternalFunction(hideEverything);\n\n$__hideEverything = hideEverything;\n\n\n\nfunction ensureObject(o, name){\n  const type = typeof o;\n  if (type === 'object' ? o === null : type !== 'function') {\n    throw $__Exception('called_on_non_object', [name]);\n  }\n}\n\ninternalFunction(ensureObject);\n\n\nfunction ensureDescriptor(o){\n  if (o === null || typeof o !== 'object') {\n    throw $__Exception('property_desc_object', [typeof o])\n  }\n}\n\ninternalFunction(ensureDescriptor);\n\n\nfunction ensureArgs(o, name){\n  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {\n    throw $__Exception('apply_wrong_args', []);\n  }\n\n  const brand = $__GetBuiltinBrand(o);\n  return brand === 'Array' || brand === 'Arguments' ? o : [...o];\n}\n\ninternalFunction(ensureArgs);\n\n\nfunction ensureFunction(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('called_on_non_function', [name]);\n  }\n}\n\ninternalFunction(ensureFunction);\n\n\nfunction ensureCallback(o, name){\n  if (typeof o !== 'function') {\n    throw $__Exception('callback_must_be_callable', [name]);\n  }\n}\n\ninternalFunction(ensureCallback);\n\n\nfunction ensureProto(proto){\n  if (proto !== null && $__Type(proto) !== 'Object') {\n    throw $__Exception('proto_object_or_null', [])\n  }\n}\n\ninternalFunction(ensureProto);\n\n\nfunction PutPropertyOrThrow(object, key, value, name){\n  if (!$__Put(object, key, value)) {\n    throw $__Exception('put_property_or_throw', [name, key]);\n  }\n}\n\ninternalFunction(PutPropertyOrThrow);\n\n\nfunction DeletePropertyOrThrow(object, key, name){\n  if (!$__Delete(object, key)) {\n    throw $__Exception('delete_property_or_throw', [name, key]);\n  }\n}\n\ninternalFunction(DeletePropertyOrThrow);\n\n";
 
-exports.builtins["@@operations"] = "// #############################\n// ### 9 Abstract Operations ###\n// #############################\n\nmakeModule('@@internals', {\n  $$CallInternal: function(obj, name, args){\n    if (obj[name]) {\n      if (args) {\n        return obj[name].apply(obj, args.array);\n      }\n      return obj[name]();\n    }\n    return $$ThrowException('unknown_internal_function', [name]);\n  },\n  $$CreateEmptyObject: function(){\n    return create($Object.prototype);\n  },\n  $$CreateInternalObject: function(){\n    return create(null);\n  },\n  $$CurrentRealm: function(){\n    return realm;\n  },\n  $$Exception: function(name, args){\n    return MakeException(name, args);\n  },\n  $$GetInternal: function(obj, name){\n    return obj[name];\n  },\n  $$GetIntrinsic: function(name){\n    return realm.intrinsics[name];\n  },\n  $$HasArgument: function(){},\n  $$HasInternal: function(obj, name){\n    return name in obj;\n  },\n  $$StringToNumber: function(str){\n    return +str;\n  },\n  $$SetInternal: function(obj, name, value){\n    obj[name] = value;\n  }\n});\n\nimport {\n  $$CallInternal,\n  $$CreateEmptyObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Exception,\n  $$GetInternal,\n  $$GetIntrinsic,\n  $$HasArgument,\n  $$HasInternal,\n  $$StringToNumber,\n  $$SetInternal\n} from '@@internals';\n\nimport {\n  ToPrimitive: @@ToPrimitive\n} from '@@symbols';\n\n\n\nfunction abs(x){\n  return x < 0 ? -x : x;\n}\n\nfunction floor(x){\n  return x >> 0;\n}\n\nfunction sign(x){\n  return x < 0 ? -1 : 1;\n}\n\nfunction hasBuiltinBrand(object, brand){\n  return $$GetInternal(obj, 'BuiltinBrand') === brand;\n}\n\nconst argsList  = [null, null],\n      emptyList = $$GetInternal([], 'array');\n\nfunction call(func, receiver, args){\n  argsList[0] = receiver;\n  argsList[1] = args ? $$GetInternal(args, 'array') : emptyList;\n  return $$CallInternal(func, 'Call', argsList);\n}\n\n// ##############################################\n// ### 8.3.18 ObjectCreate Abstract Operation ###\n// ##############################################\n\nexport function ObjectCreate(proto){\n  if (!$$HasArgument('proto')) {\n    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');\n  }\n  const obj = $$CreateEmptyObject(proto);\n  $$SetInternal(obj, 'Prototype', proto);\n  $$SetInternal(obj, 'Extensible', true);\n  return obj;\n}\n\n\n\n\n// #######################################\n// ### 9.1 Type Conversion and Testing ###\n// #######################################\n\n// #########################\n// ### 9.1.1 ToPrimitive ###\n// #########################\n\n\nexport function ToPrimitive(argument, PreferredType){\n  if (Type(argument) !== 'Object') {\n    return argument;\n  }\n\n  let hint;\n  if (!$$HasArgument('PreferredType')) {\n    hint = 'default';\n  } else if (PreferredType === 'String') {\n    hint = 'string';\n  } else {\n    hint = 'number';\n  }\n\n  const exoticToPrim = argument.@@ToPrimitive;\n  if (exoticToPrim !== undefined) {\n    if (!IsCallable(exoticToPrim)) {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n    const result = call(exoticToPrim, argument);\n    if (Type(result) !== 'Object') {\n      return result;\n    } else {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n  }\n\n  if (hint === 'default') {\n    hint = 'number';\n  }\n\n  return OrdinaryToPrimitive(argument, hint);\n}\n\nexport function OrdinaryToPrimitive(O, hint){\n  // Assert: Type(O) is Object\n  // Assert: Type(hint) is String and its value is either \"string\" or \"number\"\n  let tryFirst, trySecond;\n\n  if (hint === 'string') {\n    tryFirst = 'toString';\n    trySecond = 'valueOf';\n  } else {\n    tryFirst = 'valueOf';\n    trySecond = 'toString';\n  }\n\n  const first = O[tryFirst];\n  if (IsCallable(first)) {\n    const result = call(first, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    } else {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n  }\n\n  const second = O[trySecond];\n  if (IsCallable(second)) {\n    const result = call(second, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    }\n  }\n\n  throw $$Exception('cannot_convert_to_primitive', []);\n}\n\n// #######################\n// ### 9.1.2 ToBoolean ###\n// #######################\n\nexport function ToBoolean(argument){\n  switch (Type(argument)) {\n    case 'Boolean':\n      return argument;\n    case 'Undefined':\n    case 'Null':\n      return false;\n    case 'Number':\n      return argument !== 0 && argument === argument;\n    case 'String':\n      return argument !== '';\n    case 'Object'\n      return true;\n  }\n}\n\n\n// ######################\n// ### 9.1.3 ToNumber ###\n// ######################\n\nexport function ToNumber(argument){\n  switch (Type(argument)) {\n    case 'Number':\n      return argument;\n    case 'Undefined':\n      return NaN;\n    case 'Null':\n      return 0;\n    case 'Boolean':\n      return argument === true ? 1 : 0;\n    case 'String':\n      return $$StringToNumber(argument);\n    case 'Object':\n      return ToNumber(ToPrimitive(argument), 'Number');\n  }\n}\n\n\n// #######################\n// ### 9.1.4 ToInteger ###\n// #######################\n\nexport function ToInteger(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number)) {\n    return 0;\n  }\n\n  if (number === 0 || number === Infinity || number === -Infinity) {\n    return number;\n  }\n\n  return sign(number) * floor(abs(number));\n}\n\n\n// #####################\n// ### 9.1.5 ToInt32 ###\n// #####################\n\nexport function ToInt32(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  const int = sign(number) * floor(abs(number));\n        int32bit = int % 0x100000000;\n\n  if (int32bit >= 0x80000000) {\n    return int32bit - 0x80000000;\n  }\n  return int32bit;\n}\n\n\n// ######################\n// ### 9.1.6 ToUint32 ###\n// ######################\n\nexport function ToUint32(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  return (sign(number) * floor(abs(number))) % 0x100000000;\n}\n\n\n// ######################\n// ### 9.1.7 ToUint16 ###\n// ######################\n\nexport function ToUint16(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  return (sign(number) * floor(abs(number))) % 0x10000;\n}\n\n\n// ######################\n// ### 9.1.8 ToString ###\n// ######################\n\nexport function ToString(argument){\n  switch (Type(argument)) {\n    case 'String':\n      return argument;\n    case 'Undefined':\n      return 'undefined';\n    case 'Number':\n      return $$CallInternal(argument, 'toString');\n    case 'Null':\n      return 'null';\n    case 'Boolean':\n      return argument === true ? 'true' : 'false';\n    case 'Object':\n      return ToString(ToPrimitive(argument, 'String'));\n  }\n}\n\n\n// ###########################\n// ### 9.1.8 ToPropertyKey ###\n// ###########################\n\nexport function ToPropertyKey(argument){\n  if (!argument) {\n    return argument + '';\n  }\n\n  const type = Type(argument);\n  if (type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol')) {\n    return argument;\n  }\n  return ToString(argument);\n}\n\n\n\n// #############################################\n// ### 9.2 Testing and Comparison Operations ###\n// #############################################\n\n\n// ##################################\n// ### 9.2.1 CheckObjectCoercible ###\n// ##################################\n\nexport function CheckObjectCoercible(argument){\n  if (argument === null) {\n    throw $$Exception('null_to_object', []);\n  } else if (argument === undefined) {\n    throw $$Exception('undefined_to_object', []);\n  }\n  return argument;\n}\n\n// ########################\n// ### 9.2.2 IsCallable ###\n// ########################\n\nexport function IsCallable(argument){\n  return Type(argument) === 'Object' && $$HasInternal(argument, 'Call');\n}\n\n\n// #######################\n// ### 9.2.3 SameValue ###\n// #######################\n\nexport function SameValue(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;\n}\n\n\n// ###########################\n// ### 9.2.4 IsConstructor ###\n// ###########################\n\nexport function IsConstructor(argument){\n  return Type(argument) === 'Object' && $$HasInternal(argument, 'Construct');\n}\n\n// ###########################\n// ### 9.2.5 IsPropertyKey ###\n// ###########################\n\nexport function IsPropertyKey(argument){\n  const type = Type(argument);\n  return type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol');\n}\n\n\n\n\n// #################################\n// ### 9.3 Operations on Objects ###\n// #################################\n\n\n// #################\n// ### 9.3.1 Get ###\n// #################\n\nexport function Get(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  return $$CallInternal(O, 'GetP', [P]);\n}\n\n\n// #################\n// ### 9.3.2 Put ###\n// #################\n\nexport function Put(O, P, V, Throw){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  // Assert: Type(Throw) is Boolean.\n  const success = $$CallInternal(O, 'SetP', [P, V, O]);\n  if (Throw && !success) {\n    throw $$Exception('strict_cannot_assign', [P]);\n  }\n  return success;\n}\n\n\n// ###################################\n// ### 9.3.3 CreateOwnDataProperty ###\n// ###################################\n\nconst normalDescriptor = $$CreateInternalObject();\n$$SetInternal(normalDescriptor, 'Writable', true);\n$$SetInternal(normalDescriptor, 'Enumerable', true);\n$$SetInternal(normalDescriptor, 'Configurable', true);\n\nexport function CreateOwnDataProperty(O, P, V){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  // Assert: O does not have an own property whose key is P.\n  const extensible = $$CallInternal(O, 'IsExtensible');\n  if (!extensible) {\n    return extensible;\n  }\n  $$SetInternal(normalDescriptor, 'Value', V);\n  const result = $$CallInternal(O, 'DefineOwnProperty', [P, normalDescriptor]);\n  $$SetInternal(normalDescriptor, 'Value', undefined);\n  return result;\n}\n\n\n// ###################################\n// ### 9.3.4 DefinePropertyOrThrow ###\n// ###################################\n\nexport function DefinePropertyOrThrow(O, P, desc){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const success = $$CallInternal(O, 'DefineOwnProperty', [P, desc]);\n  if (!success) {\n    throw $$Exception('redefine_disallowed', [P]);\n  }\n  return success;\n}\n\n// ###################################\n// ### 9.3.5 DeletePropertyOrThrow ###\n// ###################################\n\nexport function DeletePropertyOrThrow(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const success = $$CallInternal(O, 'DeleteProperty', [P]);\n  if (!success) {\n    throw $$Exception('strict_delete_property', [P]);\n  }\n  return success;\n}\n\n\n// #########################\n// ### 9.3.6 HasProperty ###\n// #########################\n\nexport function HasProperty(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  return $$CallInternal(O, 'HasProperty', [P]);\n}\n\n\n// #######################\n// ### 9.3.7 GetMethod ###\n// #######################\n\nexport function GetMethod(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const func = $$CallInternal(O, 'GetP', [P, O]);\n  if (func === undefined) {\n    return func;\n  }\n\n  if (!IsCallable(func)) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return func;\n}\n\n\n// ####################\n// ### 9.3.8 Invoke ###\n// ####################\n\nconst emptyArgs = [];\n\nexport function Invoke(O, P, args){\n  // Assert: P is a valid property key.\n  args || (args = emptyArgs);\n\n  const obj  = ToObject(O),\n        func = GetMethod(obj, P);\n\n  if (func === undefined) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return $$CallInternal(func, 'Call', [O, $$GetInternal(args, 'array')]);\n}\n\n// ################################\n// ### 9.3.9 TestIfSecureObject ###\n// ################################\n\nfunction TestIfSecureObject(O, immutable){}\n\n\n// ###############################\n// ### 9.3.10 MakeObjectSecure ###\n// ###############################\n\nfunction MakeObjectSecure(O, immutable){}\n\n\n// ##################################\n// ### 9.3.11 CreateArrayFromList ###\n// ##################################\n\nfunction CreateArrayFromList(elements){\n  // Assert: elements is a List whose elements are all ECMAScript language values.\n  const array = ArrayCreate(0),\n        len   = $$GetInternal(elements, 'length');\n\n  for (var n=0; n < len; n++) {\n    CreateOwnDataProperty(array, ToString(n), $$GetInternal(elements, n));\n    // Assert: the call to CreateOwnDataProperty will never throw\n  }\n\n  return array;\n}\n\n\n// ##################################\n// ### 9.3.12 OrdinaryHasInstance ###\n// ##################################\n\nexport function OrdinaryHasInstance(C, O){\n  if (!IsCallable(C)) {\n    return false;\n  }\n\n  if ($$HasInternal(C, 'BoundTargetFunction')) {\n    return O instanceof $$GetInternal(C, 'BoundTargetFunction');\n  }\n\n  if (Type(O) !== 'Object') {\n    return false;\n  }\n\n  const P = Get(C, 'prototype');\n  if (Type(P) !== 'Object') {\n    throw $$Exception('instanceof_nonobject_proto');\n  }\n\n  do {\n    O = $$CallInternal(O, 'GetInheritance');\n    if (O === P) {\n      return true;\n    }\n  } while (O)\n\n  return false;\n}\n\n\n// ############################################\n// ### 9.3.13 OrdinaryCreateFromConstructor ###\n// ############################################\n\nexport function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){\n  if (Type(constructor) !== 'Object') {\n    throw $$Exception('construct_non_constructor', [Type(constructor)]);\n  }\n\n  let proto = constructor.prototype;\n\n  return ObjectCreate(Type(proto) === 'Object' ? proto : intrinsicDefaultProto);\n}\n\n";
+exports.builtins["@@operations"] = "// #############################\n// ### 9 Abstract Operations ###\n// #############################\n\nimport {\n  $$CallInternal,\n  $$CreateEmptyObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Exception,\n  $$GetInternal,\n  $$GetIntrinsic,\n  $$HasArgument,\n  $$HasInternal,\n  $$StringToNumber,\n  $$SetInternal\n} from '@@internals';\n\nimport {\n  @@ToPrimitive: ToPrimitive\n} from '@@symbols';\n\n\nfunction abs(x){\n  return x < 0 ? -x : x;\n}\n\nfunction floor(x){\n  return x >> 0;\n}\n\nfunction sign(x){\n  return x < 0 ? -1 : 1;\n}\n\nfunction hasBuiltinBrand(object, brand){\n  return $$GetInternal(obj, 'BuiltinBrand') === brand;\n}\n\nconst argsList  = [null, null],\n      emptyList = $$GetInternal([], 'array');\n\nfunction call(func, receiver, args){\n  argsList[0] = receiver;\n  argsList[1] = args ? $$GetInternal(args, 'array') : emptyList;\n  return $$CallInternal(func, 'Call', argsList);\n}\n\n\n\n// ###############\n// ### 8 Types ###\n// ###############\n\nexport function Type(argument){\n  if (argument === null) {\n    return 'Null';\n  }\n  switch (typeof argument) {\n    case 'undefined': return 'Undefined';\n    case 'function':\n    case 'object':    return 'Object';\n    case 'string':    return 'String';\n    case 'number':    return 'Number';\n    case 'boolean':   return 'Boolean';\n  }\n}\n\n// ##############################################\n// ### 8.3.18 ObjectCreate Abstract Operation ###\n// ##############################################\n\nexport function ObjectCreate(proto){\n  if (!$$HasArgument('proto')) {\n    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');\n  }\n  return $$CreateObject('Object', proto);\n}\n\n\n// ##############################################\n// ### 8.4.2.3 ArrayCreate Abstract Operation ###\n// ##############################################\n\nexport function ArrayCreate(len){\n  return $$CreateObject('Array', len);\n}\n\n\n// #######################################\n// ### 9.1 Type Conversion and Testing ###\n// #######################################\n\n// #########################\n// ### 9.1.1 ToPrimitive ###\n// #########################\n\n\nexport function ToPrimitive(argument, PreferredType){\n  if (Type(argument) !== 'Object') {\n    return argument;\n  }\n\n  let hint;\n  if (!$$HasArgument('PreferredType')) {\n    hint = 'default';\n  } else if (PreferredType === 'String') {\n    hint = 'string';\n  } else {\n    hint = 'number';\n  }\n\n  const exoticToPrim = Get(argument, @@ToPrimitive);\n  if (exoticToPrim !== undefined) {\n    if (!IsCallable(exoticToPrim)) {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n    const result = call(exoticToPrim, argument);\n    if (Type(result) !== 'Object') {\n      return result;\n    } else {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n  }\n\n  if (hint === 'default') {\n    hint = 'number';\n  }\n\n  return OrdinaryToPrimitive(argument, hint);\n}\n\nexport function OrdinaryToPrimitive(O, hint){\n  // Assert: Type(O) is Object\n  // Assert: Type(hint) is String and its value is either \"string\" or \"number\"\n  let tryFirst, trySecond;\n\n  if (hint === 'string') {\n    tryFirst = 'toString';\n    trySecond = 'valueOf';\n  } else {\n    tryFirst = 'valueOf';\n    trySecond = 'toString';\n  }\n\n  const first = O[tryFirst];\n  if (IsCallable(first)) {\n    const result = call(first, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    } else {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n  }\n\n  const second = O[trySecond];\n  if (IsCallable(second)) {\n    const result = call(second, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    }\n  }\n\n  throw $$Exception('cannot_convert_to_primitive', []);\n}\n\n// #######################\n// ### 9.1.2 ToBoolean ###\n// #######################\n\nexport function ToBoolean(argument){\n  switch (Type(argument)) {\n    case 'Boolean':\n      return argument;\n    case 'Undefined':\n    case 'Null':\n      return false;\n    case 'Number':\n      return argument !== 0 && argument === argument;\n    case 'String':\n      return argument !== '';\n    case 'Object':\n      return true;\n  }\n}\n\n\n// ######################\n// ### 9.1.3 ToNumber ###\n// ######################\n\nexport function ToNumber(argument){\n  switch (Type(argument)) {\n    case 'Number':\n      return argument;\n    case 'Undefined':\n      return NaN;\n    case 'Null':\n      return 0;\n    case 'Boolean':\n      return argument === true ? 1 : 0;\n    case 'String':\n      return $$StringToNumber(argument);\n    case 'Object':\n      return ToNumber(ToPrimitive(argument), 'Number');\n  }\n}\n\n//%Object%\n//%ObjectPrototype%\n//%ObjProto_toString%\n//%Function%\n//%FunctionPrototype%\n//%Array%\n//%ArrayPrototype%\n//%ArrayIteratorPrototype%\n//%Map%\n//%MapPrototype%\n//%MapIteratorPrototype%\n//%WeakMap%\n//%WeakMapPrototype%\n//%Set%\n//%SetPrototype%\n//%SetIteratorPrototype%\n//%StopIteration%\n\n// #######################\n// ### 9.1.4 ToInteger ###\n// #######################\n\nexport function ToInteger(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number)) {\n    return 0;\n  }\n\n  if (number === 0 || number === Infinity || number === -Infinity) {\n    return number;\n  }\n\n  return sign(number) * floor(abs(number));\n}\n\n\n// #####################\n// ### 9.1.5 ToInt32 ###\n// #####################\n\nexport function ToInt32(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  const int = sign(number) * floor(abs(number));\n        int32bit = int % 0x100000000;\n\n  if (int32bit >= 0x80000000) {\n    return int32bit - 0x80000000;\n  }\n  return int32bit;\n}\n\n\n// ######################\n// ### 9.1.6 ToUint32 ###\n// ######################\n\nexport function ToUint32(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  return (sign(number) * floor(abs(number))) % 0x100000000;\n}\n\n\n// ######################\n// ### 9.1.7 ToUint16 ###\n// ######################\n\nexport function ToUint16(argument){\n  const number = ToNumber(argument);\n  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {\n    return 0;\n  }\n\n  return (sign(number) * floor(abs(number))) % 0x10000;\n}\n\n\n// ######################\n// ### 9.1.8 ToString ###\n// ######################\n\nexport function ToString(argument){\n  switch (Type(argument)) {\n    case 'String':\n      return argument;\n    case 'Undefined':\n      return 'undefined';\n    case 'Number':\n      return $$CallInternal(argument, 'toString');\n    case 'Null':\n      return 'null';\n    case 'Boolean':\n      return argument === true ? 'true' : 'false';\n    case 'Object':\n      return ToString(ToPrimitive(argument, 'String'));\n  }\n}\n\n\n// ###########################\n// ### 9.1.8 ToPropertyKey ###\n// ###########################\n\nexport function ToPropertyKey(argument){\n  if (!argument) {\n    return argument + '';\n  }\n\n  const type = Type(argument);\n  if (type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol')) {\n    return argument;\n  }\n  return ToString(argument);\n}\n\n\n\n// #############################################\n// ### 9.2 Testing and Comparison Operations ###\n// #############################################\n\n\n// ##################################\n// ### 9.2.1 CheckObjectCoercible ###\n// ##################################\n\nexport function CheckObjectCoercible(argument){\n  if (argument === null) {\n    throw $$Exception('null_to_object', []);\n  } else if (argument === undefined) {\n    throw $$Exception('undefined_to_object', []);\n  }\n  return argument;\n}\n\n// ########################\n// ### 9.2.2 IsCallable ###\n// ########################\n\nexport function IsCallable(argument){\n  return Type(argument) === 'Object' && $$HasInternal(argument, 'Call');\n}\n\n\n// #######################\n// ### 9.2.3 SameValue ###\n// #######################\n\nexport function SameValue(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;\n}\n\n\n// ###########################\n// ### 9.2.4 IsConstructor ###\n// ###########################\n\nexport function IsConstructor(argument){\n  return Type(argument) === 'Object' && $$HasInternal(argument, 'Construct');\n}\n\n// ###########################\n// ### 9.2.5 IsPropertyKey ###\n// ###########################\n\nexport function IsPropertyKey(argument){\n  const type = Type(argument);\n  return type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol');\n}\n\n\n\n\n// #################################\n// ### 9.3 Operations on Objects ###\n// #################################\n\n\n// #################\n// ### 9.3.1 Get ###\n// #################\n\nexport function Get(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  return $$CallInternal(O, 'GetP', [P]);\n}\n\n\n// #################\n// ### 9.3.2 Put ###\n// #################\n\nexport function Put(O, P, V, Throw){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  // Assert: Type(Throw) is Boolean.\n  const success = $$CallInternal(O, 'SetP', [P, V, O]);\n  if (Throw && !success) {\n    throw $$Exception('strict_cannot_assign', [P]);\n  }\n  return success;\n}\n\n\n// ###################################\n// ### 9.3.3 CreateOwnDataProperty ###\n// ###################################\n\nconst normalDescriptor = $$CreateInternalObject();\n$$SetInternal(normalDescriptor, 'Writable', true);\n$$SetInternal(normalDescriptor, 'Enumerable', true);\n$$SetInternal(normalDescriptor, 'Configurable', true);\n\nexport function CreateOwnDataProperty(O, P, V){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  // Assert: O does not have an own property whose key is P.\n  const extensible = $$CallInternal(O, 'IsExtensible');\n  if (!extensible) {\n    return extensible;\n  }\n  $$SetInternal(normalDescriptor, 'Value', V);\n  const result = $$CallInternal(O, 'DefineOwnProperty', [P, normalDescriptor]);\n  $$SetInternal(normalDescriptor, 'Value', undefined);\n  return result;\n}\n\n\n// ###################################\n// ### 9.3.4 DefinePropertyOrThrow ###\n// ###################################\n\nexport function DefinePropertyOrThrow(O, P, desc){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const success = $$CallInternal(O, 'DefineOwnProperty', [P, desc]);\n  if (!success) {\n    throw $$Exception('redefine_disallowed', [P]);\n  }\n  return success;\n}\n\n// ###################################\n// ### 9.3.5 DeletePropertyOrThrow ###\n// ###################################\n\nexport function DeletePropertyOrThrow(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const success = $$CallInternal(O, 'DeleteProperty', [P]);\n  if (!success) {\n    throw $$Exception('strict_delete_property', [P]);\n  }\n  return success;\n}\n\n\n// #########################\n// ### 9.3.6 HasProperty ###\n// #########################\n\nexport function HasProperty(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  return $$CallInternal(O, 'HasProperty', [P]);\n}\n\n\n// #######################\n// ### 9.3.7 GetMethod ###\n// #######################\n\nexport function GetMethod(O, P){\n  // Assert: Type(O) is Object.\n  // Assert: IsPropertyKey(P) is true.\n  const func = $$CallInternal(O, 'GetP', [P, O]);\n  if (func === undefined) {\n    return func;\n  }\n\n  if (!IsCallable(func)) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return func;\n}\n\n\n// ####################\n// ### 9.3.8 Invoke ###\n// ####################\n\nconst emptyArgs = [];\n\nexport function Invoke(O, P, args){\n  // Assert: P is a valid property key.\n  args || (args = emptyArgs);\n\n  const obj  = ToObject(O),\n        func = GetMethod(obj, P);\n\n  if (func === undefined) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return $$CallInternal(func, 'Call', [O, $$GetInternal(args, 'array')]);\n}\n\n// ################################\n// ### 9.3.9 TestIfSecureObject ###\n// ################################\n\nfunction TestIfSecureObject(O, immutable){}\n\n\n// ###############################\n// ### 9.3.10 MakeObjectSecure ###\n// ###############################\n\nfunction MakeObjectSecure(O, immutable){}\n\n\n// ##################################\n// ### 9.3.11 CreateArrayFromList ###\n// ##################################\n\nfunction CreateArrayFromList(elements){\n  // Assert: elements is a List whose elements are all ECMAScript language values.\n  const array = ArrayCreate(0),\n        len   = $$GetInternal(elements, 'length');\n\n  for (var n=0; n < len; n++) {\n    CreateOwnDataProperty(array, ToString(n), $$GetInternal(elements, n));\n    // Assert: the call to CreateOwnDataProperty will never throw\n  }\n\n  return array;\n}\n\n\n// ##################################\n// ### 9.3.12 OrdinaryHasInstance ###\n// ##################################\n\nexport function OrdinaryHasInstance(C, O){\n  if (!IsCallable(C)) {\n    return false;\n  }\n\n  if ($$HasInternal(C, 'BoundTargetFunction')) {\n    return O instanceof $$GetInternal(C, 'BoundTargetFunction');\n  }\n\n  if (Type(O) !== 'Object') {\n    return false;\n  }\n\n  const P = Get(C, 'prototype');\n  if (Type(P) !== 'Object') {\n    throw $$Exception('instanceof_nonobject_proto');\n  }\n\n  do {\n    O = $$CallInternal(O, 'GetInheritance');\n    if (O === P) {\n      return true;\n    }\n  } while (O)\n\n  return false;\n}\n\n\n// ############################################\n// ### 9.3.13 OrdinaryCreateFromConstructor ###\n// ############################################\n\nexport function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){\n  if (Type(constructor) !== 'Object') {\n    throw $$Exception('construct_non_constructor', [Type(constructor)]);\n  }\n\n  let proto = constructor.prototype;\n\n  return ObjectCreate(Type(proto) === 'Object' ? proto : intrinsicDefaultProto);\n}\n\n";
 
 exports.builtins["@@utilities"] = "import {\n  $$NumberToString\n} from '@@internals';\n\n\nconst padding = ['', '0', '00', '000', '0000', '00000', '000000'];\n\nexport function zeroPad(number, places = 2){\n  const num  = $$NumberToString(number, 10),\n        len  = num.length,\n        diff = places - len;\n\n  if (diff > 0) {\n    return padding[diff] + num;\n  }\n  return num;\n}\n";
 
