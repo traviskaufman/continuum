@@ -18712,43 +18712,154 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
   var $Module = (function(){
-    function ModuleGetter(ref){
-      var getter = this.Get = {
-        Call: function(){
-          var value = $$GetValue(ref);
-          ref = null;
-          getter.Call = function(){ return value };
-          return value;
-        }
-      };
+    function ModuleValue(value){
+      this.Value = value;
     }
 
-    inherit(ModuleGetter, Accessor);
+    define(ModuleValue, {
+      Writable: false,
+      Enumerable: true,
+      Configurable: false,
+      isDescriptor: true,
+      isDataDescriptor: true
+    });
 
-
-    function $Module(object, names){
+    function $Module(object, key){
       if (object instanceof $Module) {
         return object;
       }
 
-      $Object.call(this, null);
-      this.remove('__proto__');
-      var self = this;
-
-      each(names, function(name){
-        self.define(name, new ModuleGetter(new Reference(object, name)), E_A);
-      });
+      this.init(object, key);
+      each(key, this.add, this);
+      tag(this);
     }
 
-    var fakeProps = { each: function(){} };
+    var _each = each;
 
     inherit($Module, $Object, {
-      BuiltinBrand: BRANDS.BuiltinModule,
-      Extensible: false,
-      type: '$Module'
-    });
+      type: '$Module',
+      BuiltinBrand: BRANDS.BuiltinModule
+    }, [
+      function init(object, keys){
+        this.props = new Hash;
+        this.object = object;
+        this.keys = keys;
+      },
+      function add(key){
+        this.props[key] = new Reference(this.object, key);
+      },
+      function get(key){
+        var ref = this.props[key];
+        if (ref) {
+          return $$GetValue(ref);
+        }
+      },
+      (function(){
+        return function define(key, value, attr){};
+      })(),
+      function set(key){},
+      function update(){},
+      function has(key){
+        return key in this.props;
+      },
+      function each(callback){
+        _each(this.keys, function(key){
+          callback.call(this, this.describe(key));
+        }, this);
+      },
+      function describe(key){
+        if (this.has(key)) {
+          return [key, this.get(key), E__];
+        }
+      },
+      function query(key){
+        if (this.has(key)) {
+          return E__;
+        }
+      },
+      function GetInheritance(){
+        return null;
+      },
+      function SetInheritance(v){
+        return false;
+      },
+      function IsExtensible(){
+        return false;
+      },
+      function PreventExtensions(){
+        return true;
+      },
+      function HasProperty(key){
+        return this.has(key);
+      },
+      function HasOwnProperty(key){
+        return this.has(key);
+      },
+      function Get(key){
+        return this.get(key);
+      },
+      function GetP(key, receiver){
+        return this.get(key);
+      },
+      function Put(key, value){
+        return false;
+      },
+      function SetP(key, value, receiver){
+        return false;
+      },
+      function GetOwnProperty(key){
+        if (this.has(key)) {
+          return new ModuleValue(this.get(key));
+        }
+        return false;
+      },
+      function DefineOwnProperty(key, desc, strict){
+        return strict ? $$ThrowException('strict_lhs_assignment') : false;
+      },
+      function Delete(key){
+        return false;
+      },
+      function DefaultValue(){
+        // TODO: remove DefaultValue
+        return '[object Module]';
+      },
+      function Keys(){
+        return this.keys;
+      },
+      function OwnPropertyKeys(){
+        return this.keys;
+      },
+      function Enumerate(){
+        return this.keys;
+      }
+    ]);
 
     return $Module;
+  })();
+
+
+
+  var $NativeModule = (function(){
+    function $NativeModule(bindings){
+      $Module.call(this, bindings);
+      delete this.bindings;
+    }
+
+    inherit($NativeModule, $Module, [
+      function init(bindings){
+        this.props = new Hash;
+        this.bindings = bindings;
+        this.keys = ownKeys(bindings);
+      },
+      function add(key){
+        this.props[key] = this.bindings[key];
+      },
+      function get(key){
+        return this.props[keys];
+      },
+    ]);
+
+    return $NativeModule;
   })();
 
 
