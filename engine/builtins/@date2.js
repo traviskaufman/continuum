@@ -29,7 +29,7 @@ import {
   $$IsConstruct,
   $$Now,
   $$ParseDate,
-  $$RegexExec
+  $$RegExpExec
 } from '@@internals';
 
 import {
@@ -199,7 +199,7 @@ const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
 function daysInMonth(m, leap) {
   m %= 12;
   if (m === 1) {
-    return 28 + leap;
+    return leap ? 28: 29;
   }
   return MONTH_DAYS[m];
 }
@@ -224,8 +224,8 @@ function getSundayInMonth(t, m, count){
 }
 
 function DaylightSavingTA(t) {
-  if (t >= getSundayInMonth(t, DST_START_MONTH, DST_START_SUNmsPerDay) + DST_START_OFFSET) {
-    if (t < getSundayInMonth(t, DST_END_MONTH, DST_END_SUNmsPerDay) + DST_END_OFFSET) {
+  if (t >= getSundayInMonth(t, DST_START_MONTH, DST_START_SUNDAY) + DST_START_OFFSET) {
+    if (t < getSundayInMonth(t, DST_END_MONTH, DST_END_SUNDAY) + DST_END_OFFSET) {
       return 3600000;
     }
   }
@@ -461,26 +461,26 @@ function toString(obj){
 function toDateString(obj){
   const weekday = DAYS[getTime(obj, false, WeekDay)],
         month   = MONTHS[getTime(obj, false, MonthFromTime)],
-        date    = pad(getTime(obj, false, DateFromTime)),
-        year    = pad(getTime(obj, false, YearFromTime), 4);
+        date    = zeroPad(getTime(obj, false, DateFromTime)),
+        year    = zeroPad(getTime(obj, false, YearFromTime), 4);
 
   return `${weekday} ${month} ${date} ${year}`;
 }
 
 function toTimeString(obj){
   const timezone = getTimezone(obj, msPerHour),
-        hour     = pad(getTime(obj, false, HourFromTime)),
-        min      = pad(getTime(obj, false, MinFromTime)),
-        sec      = pad(getTime(obj, false, SecFromTime)),
-        tz       = (timezone < 0 ? '+' : '-') + pad(abs(timezone) * 100, 4);
+        hour     = zeroPad(getTime(obj, false, HourFromTime)),
+        min      = zeroPad(getTime(obj, false, MinFromTime)),
+        sec      = zeroPad(getTime(obj, false, SecFromTime)),
+        tz       = (timezone < 0 ? '+' : '-') + zeroPad(abs(timezone) * 100, 4);
 
   return `${hour}:${min}:${sec} GMT${tz}`;
 }
 
 function toLocaleDateString(obj){
-  const month = pad(getTime(obj, false, MonthFromTime) + 1),
-        date  = pad(getTime(obj, false, DateFromTime)),
-        year  = pad(getTime(obj, false, YearFromTime), 4);
+  const month = zeroPad(getTime(obj, false, MonthFromTime) + 1),
+        date  = zeroPad(getTime(obj, false, DateFromTime)),
+        year  = zeroPad(getTime(obj, false, YearFromTime), 4);
 
   return `${month}/${date}/${year}`;
 }
@@ -488,8 +488,8 @@ function toLocaleDateString(obj){
 function toLocaleTimeString(obj){
   const h        = getTime(obj, false, HourFromTime),
         hour     = h % 12,
-        min      = pad(getTime(obj, false, MinFromTime)),
-        sec      = pad(getTime(obj, false, SecFromTime)),
+        min      = zeroPad(getTime(obj, false, MinFromTime)),
+        sec      = zeroPad(getTime(obj, false, SecFromTime)),
         meridiem = h === hour ? 'AM' : 'PM';
 
   return `${hour}:${min}:${sec} ${meridiem}`;
@@ -500,10 +500,10 @@ function toLocaleTimeString(obj){
 // ### 15.9.4.2 Date.parse ###
 // ###########################
 
-const dateRegex = /^(\d{4}|[+\-]\d{6})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
+const dateParser = /^(\d{4}|[+\-]\d{6})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
 
 export function parse(date){
-  const match = $$RegexExec(dateRegex, ToString(date));
+  const match = $$RegExpExec(dateParser, ToString(date));
 
   if (!match) {
     return $$ParseDate(date);
@@ -844,12 +844,12 @@ export class Date {
   // ############################################
   toUTCString(){
     const weekday = DAYS[getTime(this, true, WeekDay)],
-          date    = pad(getTime(this, true, DateFromTime)),
+          date    = zeroPad(getTime(this, true, DateFromTime)),
           month   = MONTHS[getTime(this, true, MonthFromTime)],
-          year    = pad(getTime(this, true, YearFromTime), 4),
-          hour    = pad(getTime(this, true, HourFromTime)),
-          min     = pad(getTime(this, true, MinFromTime)),
-          sec     = pad(getTime(this, true, SecFromTime));
+          year    = zeroPad(getTime(this, true, YearFromTime), 4),
+          hour    = zeroPad(getTime(this, true, HourFromTime)),
+          min     = zeroPad(getTime(this, true, MinFromTime)),
+          sec     = zeroPad(getTime(this, true, SecFromTime));
 
     return `${weekday}, ${date} ${month} ${year} ${hour}:${min}:${sec} GMT`;
   }
@@ -857,13 +857,13 @@ export class Date {
   // ### 15.9.5.43 Date.prototype.toISOString ###
   // ############################################
   toISOString(){
-   const year  = pad(getTime(this, true, YearFromTime), 4),
-         month = pad(getTime(this, true, MonthFromTime) + 1),
-         date  = pad(getTime(this, true, DateFromTime)),
-         hour  = pad(getTime(this, true, HourFromTime)),
-         min   = pad(getTime(this, true, MinFromTime)),
-         sec   = pad(getTime(this, true, SecFromTime)),
-         ms    = pad(getTime(this, true, msFromTime), 2);
+   const year  = zeroPad(getTime(this, true, YearFromTime), 4),
+         month = zeroPad(getTime(this, true, MonthFromTime) + 1),
+         date  = zeroPad(getTime(this, true, DateFromTime)),
+         hour  = zeroPad(getTime(this, true, HourFromTime)),
+         min   = zeroPad(getTime(this, true, MinFromTime)),
+         sec   = zeroPad(getTime(this, true, SecFromTime)),
+         ms    = zeroPad(getTime(this, true, msFromTime), 2);
 
     return `${year}-${month}-${date}T${hour}:${min}:${sec}.${ms}Z`;
   }
