@@ -834,7 +834,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.get(DateValue);
       },
       function setPrimitiveValue(value){
-        return this.set(DateValue, value);
+        return this.define(DateValue, value, _CW);
       }
     ]);
 
@@ -864,7 +864,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return ObjectGet.call(this, StringValue) || '';
       },
       function setPrimitiveValue(value){
-        return this.set(StringValue, value);
+        return this.define(StringValue, value, _CW);
       },
 
       function each(callback){
@@ -949,7 +949,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.get(NumberValue);
       },
       function setPrimitiveValue(value){
-        return this.set(NumberValue, value);
+        return this.define(NumberValue, value, _CW);
       }
     ]);
 
@@ -975,7 +975,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.get(BooleanValue);
       },
       function setPrimitiveValue(value){
-        return this.set(BooleanValue, value);
+        return this.define(BooleanValue, value, _CW);
       }
     ]);
 
@@ -1602,17 +1602,25 @@ var runtime = (function(GLOBAL, exports, undefined){
           return this;
         }
       },
-      function calleeName(){
+      function hasArgument(name){
         if (this.callee) {
-          return this.callee.Get('name');
+          var params = this.callee.FormalParameters;
+          if (params) {
+            var index = params.getIndex(name);
+            return index !== -1 && index <= this.args.length;
+          }
         }
-        return null;
+        return false;
+      },
+      function argumentCount(){
+        return this.args.length;
       },
       function callerName(){
-        if (this.caller) {
-          return this.caller.calleeName();
+        var caller = this.caller && this.caller.callee;
+        if (caller && caller.get) {
+          return caller.get('name');
         }
-        return null;
+        return '';
       },
       function createBinding(name, immutable){
         if (immutable) {
@@ -1771,11 +1779,35 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     natives.add({
+      _isConstruct: function(){
+        return context.isConstruct;
+      },
+      _argumentCount: function(){
+        return context.argumentCount();
+      },
+      _hasArgument: function(obj, args){
+        return context.hasArgument(args[0]);
+      },
       _callerName: function(){
         return context.callerName();
       },
-      _IsConstructCall: function(){
-        return context.isConstruct;
+      _callerIsConstruct: function(){
+        if (context.caller) {
+          return context.caller.isConstruct;
+        }
+        return false;
+      },
+      _callerArgumentCount: function(){
+        if (context.caller) {
+          return context.argumentCount();
+        }
+        return null;
+      },
+      _callerHasArgument: function(obj, args){
+        if (context.caller) {
+          return context.caller.hasArgument(args[0]);
+        }
+        return false;
       }
     });
 

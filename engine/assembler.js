@@ -334,6 +334,9 @@ var assembler = (function(exports){
       }
 
       define(Parameters.prototype, [
+        function getIndex(name){
+          return this.boundNames.indexOf(name);
+        },
         function __iterator__(){
           return new ParametersIterator(this);
         }
