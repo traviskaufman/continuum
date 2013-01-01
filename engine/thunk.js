@@ -13,7 +13,7 @@ var thunk = (function(exports){
       ToObject        = operators.$$ToObject,
       $$GetValue      = operators.$$GetValue,
       $$PutValue      = operators.$$PutValue,
-      STRICT_EQUAL    = operators.STRICT_EQUAL,
+      EQUAL           = operators.EQUAL,
       PRE_INC         = operators.PRE_INC,
       POST_INC        = operators.POST_INC,
       PRE_DEC         = operators.PRE_DEC,
@@ -303,7 +303,7 @@ var thunk = (function(exports){
     }
 
     function CASE(){
-      var result = STRICT_EQUAL(stack[--sp], stack[sp - 1]);
+      var result = EQUAL(stack[--sp], stack[sp - 1]);
 
 
       if (result) {
