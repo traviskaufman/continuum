@@ -49,10 +49,10 @@ import {
 
 import {
   BuiltinDate,
-  create     : @@create,
-  DateValue  : @@DateValue,
-  NativeBrand: @@NativeBrand,
-  ToPrimitive: @@ToPrimitive
+  @@create     : create,
+  @@DateValue  : DateValue,
+  @@NativeBrand: NativeBrand,
+  @@ToPrimitive: ToPrimitive
 } from '@@symbols';
 
 
@@ -241,7 +241,7 @@ function LocalTime(t){
   return t + LocalTZA + DaylightSavingTA(t);
 }
 
-function FromUTC(t){
+function ToUTC(t){
   t -= LocalTZA;
   return t - DaylightSavingTA(t);
 }
@@ -251,27 +251,24 @@ function FromUTC(t){
 // ### 15.9.1.10 Hours, Minutes, Second, and Milliseconds ###
 // ##########################################################
 
-const HoursPerDay      = 24
-      MinutesPerHour   = 60
-      SecondsPerMinute = 60
-      msPerSecond      = 1000,
-      msPerMinute      = 60 * msPerSecond,
-      msPerHour        = 60 * msPerMinute;
+const msPerSecond = 1000,
+      msPerMinute = 60 * msPerSecond,
+      msPerHour   = 60 * msPerMinute;
 
 function HourFromTime(t){
-  return floor(t / msPerHour) % HoursPerDay;
+  return floor(t / msPerHour) % 24;
 }
 
 function MinFromTime(t){
-  return floor(t / msPerMinute) % MinutesPerHour;
+  return floor(t / msPerMinute) % 60;
 }
 
 function SecFromTime(t){
-  return floor(t / msPerSecond) % SecondsPerMinute;
+  return floor(t / msPerSecond) % 60;
 }
 
 function msFromTime(t){
-  return t % msPerSecond;
+  return t % 1000;
 }
 
 
@@ -584,7 +581,7 @@ export class Date {
 
       const finalDate = MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli));
 
-      this.@@DateValue = TimeClip(FromUTC(finalDate));
+      this.@@DateValue = TimeClip(ToUTC(finalDate));
     } else if (argc === 1) {
       // 15.9.3.2 new Date (value)
       const date = ToPrimitive(year);
@@ -758,7 +755,7 @@ export class Date {
   // ### 15.9.5.28 Date.prototype.setMilliseconds ###
   // ################################################
   setMilliseconds(ms){
-    return this.@@DateValue = TimeClip(FromUTC(makeMilliseconds(this, ms)));
+    return this.@@DateValue = TimeClip(ToUTC(makeMilliseconds(this, ms)));
   }
   // ###################################################
   // ### 15.9.5.29 Date.prototype.setUTCMilliseconds ###
@@ -770,7 +767,7 @@ export class Date {
   // ### 15.9.5.30 Date.prototype.setSeconds ###
   // ###########################################
   setSeconds(sec, ms){
-    return this.@@DateValue = TimeClip(FromUTC(makeSeconds(this, sec, ms)));
+    return this.@@DateValue = TimeClip(ToUTC(makeSeconds(this, sec, ms)));
   }
   // ##############################################
   // ### 15.9.5.31 Date.prototype.setUTCSeconds ###
@@ -782,7 +779,7 @@ export class Date {
   // ### 15.9.5.32 Date.prototype.setMinutes ###
   // ###########################################
   setMinutes(min, sec, ms){
-    return this.@@DateValue = TimeClip(FromUTC(makeMinutes(this, min, sec, ms)));
+    return this.@@DateValue = TimeClip(ToUTC(makeMinutes(this, min, sec, ms)));
   }
   // ##############################################
   // ### 15.9.5.33 Date.prototype.setUTCMinutes ###
@@ -794,7 +791,7 @@ export class Date {
   // ### 15.9.5.34 Date.prototype.setHours ###
   // #########################################
   setHours(hour, min, sec, ms){
-    return this.@@DateValue = TimeClip(FromUTC(makeHours(this, hour, min, sec, ms)));
+    return this.@@DateValue = TimeClip(ToUTC(makeHours(this, hour, min, sec, ms)));
   }
   // ############################################
   // ### 15.9.5.35 Date.prototype.setUTCHours ###
@@ -806,7 +803,7 @@ export class Date {
   // ### 15.9.5.36 Date.prototype.setDate ###
   // ########################################
   setDate(date){
-    return this.@@DateValue = TimeClip(FromUTC(makeDate(this, date)));
+    return this.@@DateValue = TimeClip(ToUTC(makeDate(this, date)));
   }
   // ###########################################
   // ### 15.9.5.37 Date.prototype.setUTCDate ###
@@ -818,7 +815,7 @@ export class Date {
   // ### 15.9.5.38 Date.prototype.setMonth ###
   // #########################################
   setMonth(month, date){
-    return this.@@DateValue = TimeClip(FromUTC(makeMonth(this, month, date)));
+    return this.@@DateValue = TimeClip(ToUTC(makeMonth(this, month, date)));
   }
   // ############################################
   // ### 15.9.5.39 Date.prototype.setUTCMonth ###
@@ -830,7 +827,7 @@ export class Date {
   // ### 15.9.5.40 Date.prototype.setFullYear ###
   // ############################################
   setFullYear(year, month, date){
-    return this.@@DateValue = TimeClip(FromUTC(makeFullYear(this, year, month, date)));
+    return this.@@DateValue = TimeClip(ToUTC(makeFullYear(this, year, month, date)));
   }
   // ###############################################
   // ### 15.9.5.41 Date.prototype.setUTCFullYear ###
@@ -910,7 +907,7 @@ extend(Date, {
   @@create(){
     const obj = OrdinaryCreateFromConstructor(this, DatePrototype);
     obj.@@DateValue = undefined;
-    obj.@@NativeBrand = BuiltinDate;
+    obj.@@BuiltinBrand = BuiltinDate;
     return obj;
   }
 });
