@@ -585,6 +585,7 @@ var natives = (function(module){
       var realm = require('./runtime').realm;
       realm.emit.apply(realm, args);
     },
+    DateParse: Date.parse || function(){ return NaN },
     AddObserver: function(data, callback){
       data.set(callback, callback);
     },
@@ -633,6 +634,55 @@ var natives = (function(module){
       }
     });
   }();
+
+
+  void function(){
+    var month = 2592000000;
+
+    function nearest(current, compare){
+      current = new Date(current);
+      for (var step = month; step > 0; step = Math.floor(step / 3)) {
+        if (compare !== current.getTimezoneOffset()) {
+          while (compare !== current.getTimezoneOffset()) {
+            current = new Date(current.getTime() + step);
+          }
+          current = new Date(current.getTime() - step);
+        }
+      }
+
+      while (compare !== current.getTimezoneOffset()) {
+        current = new Date(current.getTime() + 1);
+      }
+
+      return current;
+    }
+
+    var jun = new Date(2000, 5, 20, 0, 0, 0, 0).getTimezoneOffset(),
+        dec = new Date(2000, 11, 20, 0, 0, 0, 0).getTimezoneOffset();
+
+    if (jun > dec) {
+      var DST_START = nearest(dec, jun),
+          DST_END   = nearest(jun, dec);
+    } else {
+      var DST_START = nearest(jun, dec),
+          DST_END   = nearest(dec, jun);
+    }
+
+    natives.add({
+      LOCAL_TZ         : new Date().getTimezoneOffset() / -60,
+      DST_START        : +DST_START,
+      DST_START_MONTH  : DST_START.getMonth(),
+      DST_START_SUNDAY : DST_START.getDate() > 15,
+      DST_START_HOUR   : DST_START.getHours(),
+      DST_START_MINUTES: DST_START.getMinutes(),
+      DST_END          : +DST_END,
+      DST_END_MONTH    : DST_END.getMonth(),
+      DST_END_SUNDAY   : DST_END.getDate() > 15,
+      DST_END_HOUR     : DST_END.getHours(),
+      DST_END_MINUTES  : DST_END.getMinutes()
+    });
+  }();
+
 
   return module.exports = natives;
 })(typeof module !== 'undefined' ? module : {});
