@@ -928,6 +928,9 @@ var assembler = (function(exports){
     }
 
     var handlers = {
+      AtSymbol: function(node){
+        return (node.internal ? '@@' : '@') + node.name;
+      },
       Glob: function(){
         return ['*', '*'];
       },

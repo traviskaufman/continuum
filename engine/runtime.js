@@ -32,6 +32,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       define      = objects.define,
       inherit     = objects.inherit,
       hide        = objects.hide,
+      ownKeys     = objects.keys,
       fname       = functions.fname,
       applyNew    = functions.applyNew,
       iterate     = iteration.iterate,
@@ -467,7 +468,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $Symbol;
   })();
 
-  var addWellKnownSymbol = exports.addWellKnownSymbol = (function(){
+  var $WellKnownSymbol = (function(){
     var symbols = exports.wellKnownSymbols = new Hash;
 
     function $WellKnownSymbol(name){
@@ -480,20 +481,23 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($WellKnownSymbol, $Symbol);
 
-    return function addWellKnownSymbol(name){
+    function addWellKnownSymbol(name){
       return symbols[name] = new $WellKnownSymbol(name);
-    };
+    }
+
+    $WellKnownSymbol.add = exports.addWellKnownSymbol = addWellKnownSymbol;
+
+    return $WellKnownSymbol;
   })();
 
-
-  var toStringTag  = addWellKnownSymbol('toStringTag'),
-      iterator     = addWellKnownSymbol('iterator'),
-      //create       = addWellKnownSymbol('create'),
-      BooleanValue = addWellKnownSymbol('BooleanValue'),
-      StringValue  = addWellKnownSymbol('StringValue'),
-      NumberValue  = addWellKnownSymbol('NumberValue'),
-      DateValue    = addWellKnownSymbol('DateValue'),
-      BuiltinBrand = addWellKnownSymbol('BuiltinBrand');
+  var toStringTag  = $WellKnownSymbol.add('toStringTag'),
+      iterator     = $WellKnownSymbol.add('iterator'),
+    //create       = $WellKnownSymbol.add('create'),
+      BooleanValue = $WellKnownSymbol.add('BooleanValue'),
+      StringValue  = $WellKnownSymbol.add('StringValue'),
+      NumberValue  = $WellKnownSymbol.add('NumberValue'),
+      DateValue    = $WellKnownSymbol.add('DateValue'),
+      BuiltinBrand = $WellKnownSymbol.add('BuiltinBrand');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -1258,7 +1262,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return object;
       }
 
-      $Object.call(this, intrinsics.Genesis);
+      $Object.call(this, null);
       this.remove('__proto__');
       var self = this;
 
@@ -2496,7 +2500,18 @@ var runtime = (function(GLOBAL, exports, undefined){
                   obj = obj.Get(part);
                 });
 
-                scope.SetMutableBinding(name, obj);
+                if (name[0] === '@') {
+                  var internal = name[1] === '@';
+                  if (internal && !(obj instanceof $WellKnownSymbol)) {
+                    ƒ($$MakeException('unknown_wellknown_symbol', [name]));
+                  } else if (!(obj instanceof $Symbol)) {
+                    ƒ($$MakeException('import_not_symbol', [name]));
+                  } else {
+                    scope.InitializeSymbolBinding(name.slice(1), obj);
+                  }
+                } else {
+                  scope.SetMutableBinding(name, obj);
+                }
               }
             });
           }

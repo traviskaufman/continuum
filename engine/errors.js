@@ -108,8 +108,9 @@ var errors = (function(errors, messages, exports){
     uncaught_exception             : ["Uncaught ", "$0"],
     stack_trace                    : ["Stack Trace:\n", "$0"],
     called_non_callable            : ["$0", " is not a function"],
-    property_not_function          : ["Property '", "$0", "' of object ", "$1", " is not a function"],
+    property_not_function          : ["Property '", "$0", "' is not a function"],
     not_constructor                : ["$0", " is not a constructor"],
+    construct_non_constructor      : ["Cannot construct non-function ", "$0"],
     cannot_convert_to_primitive    : ["Cannot convert object to primitive value"],
     cannot_convert_to_primitive2   : ["$0", " cannot convert object to primitive value"],
     with_expression                : ["$0", " has no properties"],
@@ -117,6 +118,7 @@ var errors = (function(errors, messages, exports){
     invalid_in_operator_use        : ["Cannot use 'in' operator to search for '", "$0", "' in ", "$1"],
     instanceof_function_expected   : ["Expecting a function in instanceof check, but got ", "$0"],
     instanceof_nonobject_proto     : ["Function has non-object prototype '", "$0", "' in instanceof check"],
+    construct_nonobject_proto      : ["Function has non-object prototype ", "$0"],
     null_to_object                 : ["Cannot convert null to object"],
     undefined_to_object            : ["Cannot convert undefined to object"],
     object_not_coercible           : ["$0", " cannot convert ", "$1", " to an object"],
@@ -172,9 +174,11 @@ var errors = (function(errors, messages, exports){
     missing_fundamental_handler         : ["Exotic object missing fundamental handler for '", "$0", "'"],
     buffer_unaligned_offset             : ["$0", " was called with an unalign offset"],
     buffer_out_of_bounds                : ["$0", " was was called with an out of bounds length and/or offset"],
-    buffer_unaligned_length             : ["$0", " was called with an unaligned length"]
+    buffer_unaligned_length             : ["$0", " was called with an unaligned length"],
+    import_not_symbol                   : ["Imported object is not a symbol ", "$0"]
   },
   ReferenceError: {
+    unknown_wellknown_symbol       : ["Referenced unknown well known symbol ", "$0"],
     undefined_symbol               : ["Referenced undefined symbol @", "$0"],
     unknown_label                  : ["Undefined label '", "$0", "'"],
     undefined_method               : ["Object ", "$1", " has no method '", "$0", "'"],
