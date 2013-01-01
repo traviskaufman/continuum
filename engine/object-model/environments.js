@@ -65,8 +65,7 @@ var environments = (function(exports, undefined){
       function InitializeSymbolBinding(name, symbol){
         if (!this.symbols) {
           this.symbols = new Hash;
-        }
-        if (name in this.symbols) {
+        } else if (name in this.symbols) {
           return $$ThrowException('symbol_redefine', name);
         }
         this.symbols[name] = symbol;
@@ -74,9 +73,8 @@ var environments = (function(exports, undefined){
       function GetSymbol(name){
         if (this.symbols && name in this.symbols) {
           return this.symbols[name];
-        } else{
-          return $$ThrowException('symbol_not_defined', name);
         }
+        return $$ThrowException('symbol_not_defined', name);
       }
     ]);
 
