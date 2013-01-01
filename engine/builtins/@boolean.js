@@ -1,7 +1,7 @@
 export class Boolean {
   constructor(value){
     value = $__ToBoolean(value);
-    return $__IsConstructCall() ? $__BooleanCreate(value) : value;
+    return $__isConstruct() ? $__BooleanCreate(value) : value;
   }
 
   toString(){
@@ -29,4 +29,4 @@ export class Boolean {
 
 builtinClass(Boolean);
 
-Boolean.prototype.@@BooleanValue = false;
+$__define(Boolean.prototype, @@BooleanValue, false);

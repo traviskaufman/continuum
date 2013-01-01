@@ -102,7 +102,7 @@ export class String {
   constructor(...string){
     const str = string.length ? $__ToString(string[0]) : '';
 
-    return $__IsConstructCall() ? $__StringCreate(str) : str;
+    return $__isConstruct() ? $__StringCreate(str) : str;
   }
 
   anchor(name){
@@ -362,7 +362,7 @@ export class String {
 }
 
 builtinClass(String);
-String.prototype.@@StringValue = '';
+$__define(String.prototype, @@NumberValue, '');
 $__define(String.prototype, 'length', 0, FROZEN);
 
 

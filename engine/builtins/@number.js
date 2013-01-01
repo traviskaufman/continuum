@@ -10,7 +10,7 @@ export const EPSILON           = 2.220446049250313e-16,
 export class Number {
   constructor(...value){
     value = value.length ? $__ToNumber(value[0]) : 0;
-    return $__IsConstructCall() ? $__NumberCreate(value) : value;
+    return $__isConstruct() ? $__NumberCreate(value) : value;
   }
 
   toString(radix){
@@ -46,7 +46,7 @@ export class Number {
 
 builtinClass(Number);
 
-Number.prototype.@@NumberValue = 0;
+$__define(Number.prototype, @@NumberValue, 0);
 
 
 export function isNaN(number){

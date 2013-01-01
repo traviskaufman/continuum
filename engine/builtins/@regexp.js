@@ -1,6 +1,6 @@
 export class RegExp {
   constructor(pattern, flags){
-    if ($__IsConstructCall()) {
+    if ($__isConstruct()) {
       if (pattern === undefined) {
         pattern = '';
       } else if (typeof pattern === 'string') {
