@@ -669,17 +669,15 @@ var natives = (function(module){
     }
 
     natives.add({
-      LOCAL_TZ         : new Date().getTimezoneOffset() / -60,
-      DST_START        : +DST_START,
-      DST_START_MONTH  : DST_START.getMonth(),
-      DST_START_SUNDAY : DST_START.getDate() > 15,
-      DST_START_HOUR   : DST_START.getHours(),
-      DST_START_MINUTES: DST_START.getMinutes(),
-      DST_END          : +DST_END,
-      DST_END_MONTH    : DST_END.getMonth(),
-      DST_END_SUNDAY   : DST_END.getDate() > 15,
-      DST_END_HOUR     : DST_END.getHours(),
-      DST_END_MINUTES  : DST_END.getMinutes()
+      LOCAL_TZ        : new Date().getTimezoneOffset() / -60,
+      DST_START       : +DST_START,
+      DST_START_MONTH : DST_START.getMonth(),
+      DST_START_SUNDAY: DST_START.getDate() > 15,
+      DST_START_OFFSET: DST_START.getHours() * 3600000 + DST_START.getMinutes() * 60000,
+      DST_END         : +DST_END,
+      DST_END_MONTH   : DST_END.getMonth(),
+      DST_END_SUNDAY  : DST_END.getDate() > 15,
+      DST_START_OFFSET: DST_END.getHours() * 3600000 + DST_END.getMinutes() * 60000
     });
   }();
 

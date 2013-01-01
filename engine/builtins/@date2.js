@@ -40,8 +40,10 @@ import {
 import {
   DST_START_MONTH,
   DST_START_SUNDAY,
+  DST_START_OFFSET,
   DST_END_MONTH,
   DST_END_SUNDAY,
+  DST_END_OFFSET,
   LOCAL_TZ
 } from '@@constants';
 
@@ -54,40 +56,18 @@ import {
 } from '@@symbols';
 
 
-const SECOND   = 1000,
-      MINUTE   = 60    * SECOND,
-      HOUR     = 60    * MINUTE,
-      DAY      = 24    * HOUR,
-      YEAR     = 365   * DAY,
-      LEAPYEAR = 366   * DAY,
-      YEAR4    = 1461  * DAY,
-      YEAR100  = 36524 * DAY,
-      YEAR400  = 100   * YEAR4,
-      YEAR2000 = 5     * YEAR400,
-      TIMECLIP = 1e8   * DAY;
-
-const DAYS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-      MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-const OFFSETS      = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365],
-      LEAP_OFFSETS = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366],
-      MONTH_DAYS   = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-const DST_START_OFFSET = DST_START_HOUR * HOUR + DST_START_MINUTE * MINUTE,
-      DST_END_OFFSET   = DST_END_HOUR * HOUR + DST_END_MINUTE * MINUTE;
-
-
-
 // ###############################################
 // ### 15.9.1.2 Day Number and Time within Day ###
 // ###############################################
 
+const msPerDay = 86400000;
+
 function Day(t){
-  return floor(t / DAY);
+  return floor(t / msPerDay);
 }
 
 function TimeWithinDay(t){
-  return t % DAY;
+  return t % msPerDay;
 }
 
 
@@ -111,16 +91,16 @@ function DayFromYear(y){
 }
 
 function TimeFromYear(y){
-  return DAY * DayFromYear(y);
+  return msPerDay * DayFromYear(y);
 }
 
 function YearFromTime(t) {
-  let year = floor(t / (DAY * 365.2425)) + 1970;
+  let year = floor(t / (msPerDay * 365.2425)) + 1970;
   const t2 = TimeFromYear(year);
 
   if (t2 > t) {
     year--;
-  } else if (t2 + DAY * DaysInYear(year) <= t) {
+  } else if (t2 + msPerDay * DaysInYear(year) <= t) {
     year++;
   }
 
@@ -135,6 +115,9 @@ function InLeapYear(t){
 // #############################
 // ### 15.9.1.4 Month Number ###
 // #############################
+
+const OFFSETS      = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365],
+      LEAP_OFFSETS = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366];
 
 function offsets(t){
   return InLeapYear(t) ? LEAP_OFFSETS : OFFSETS
@@ -204,12 +187,14 @@ function WeekDay(t){
 // ### 15.9.1.7 Local Time Zone Adjustment ###
 // ###########################################
 
-const LocalTZA = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * HOUR;
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+      LocalTZA   = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * 3600000;
 
 
 // ################################################
 // ### 15.9.1.8 Daylight Saving Time Adjustment ###
 // ################################################
+
 
 function daysInMonth(m, leap) {
   m %= 12;
@@ -221,27 +206,27 @@ function daysInMonth(m, leap) {
 
 function getSundayInMonth(t, m, count){
   const leap = InLeapYear(t);
-  let sunday = TimeFromYear(YearFromTime(t)) + daysInMonth(m, leap) * DAY;
+  let sunday = TimeFromYear(YearFromTime(t)) + daysInMonth(m, leap) * msPerDay;
 
   if (count) {
-    sunday += daysInMonth(m, leap) * DAY;
-    while (WeekDay(sunday) > 0) {
-      sunday -= DAY
+    sunday += daysInMonth(m, leap) * msPerDay;
+    while (WeekDay(sunday)) {
+      sunday -= msPerDay
     }
   } else {
-    while (WeekDay(sunday) > 0) {
-      sunday += DAY
+    while (WeekDay(sunday)) {
+      sunday += msPerDay
     }
-    sunday += 7 * DAY * (count - 1);
+    sunday += 7 * msPerDay * (count - 1);
   }
 
   return sunday;
 }
 
 function DaylightSavingTA(t) {
-  if (t >= getSundayInMonth(t, DST_START_MONTH, DST_START_SUNDAY) + DST_START_OFFSET) {
-    if (t < getSundayInMonth(t, DST_END_MONTH, DST_END_SUNDAY) + DST_END_OFFSET) {
-      return HOUR;
+  if (t >= getSundayInMonth(t, DST_START_MONTH, DST_START_SUNmsPerDay) + DST_START_OFFSET) {
+    if (t < getSundayInMonth(t, DST_END_MONTH, DST_END_SUNmsPerDay) + DST_END_OFFSET) {
+      return 3600000;
     }
   }
   return 0;
@@ -266,20 +251,27 @@ function FromUTC(t){
 // ### 15.9.1.10 Hours, Minutes, Second, and Milliseconds ###
 // ##########################################################
 
+const HoursPerDay      = 24
+      MinutesPerHour   = 60
+      SecondsPerMinute = 60
+      msPerSecond      = 1000,
+      msPerMinute      = 60 * msPerSecond,
+      msPerHour        = 60 * msPerMinute;
+
 function HourFromTime(t){
-  return floor(t / HOUR) % 24;
+  return floor(t / msPerHour) % HoursPerDay;
 }
 
 function MinFromTime(t){
-  return floor(t / MINUTE) % 60;
+  return floor(t / msPerMinute) % MinutesPerHour;
 }
 
 function SecFromTime(t){
-  return floor(t / SECOND) % 60;
+  return floor(t / msPerSecond) % SecondsPerMinute;
 }
 
 function msFromTime(t){
-  return t % 1000;
+  return t % msPerSecond;
 }
 
 
@@ -297,7 +289,7 @@ function MakeTime(hour, min, sec, ms){
   sec = ToInteger(sec);
   ms = ToInteger(ms);
 
-  return hour * HOUR + min * MINUTE + sec * SECOND + ms;
+  return hour * msPerHour + min * msPerMinute + sec * msPerSecond + ms;
 }
 
 
@@ -318,17 +310,17 @@ function MakeDay(year, month, date) {
 
   if (year < 1970){
     for (var i = 1969; i >= year; i--) {
-      t -= DaysInYear(i) * DAY;
+      t -= DaysInYear(i) * msPerDay;
     }
   } else {
     for (var i = 1970; i < year; i++) {
-      t += DaysInYear(i) * DAY;
+      t += DaysInYear(i) * msPerDay;
     }
   }
 
   const days = offsets(t);
   for (var i = 0; i < month; i++) {
-    t += days[i] * DAY;
+    t += days[i] * msPerDay;
   }
 
   if (YearFromTime(t) !== year + floor(month / 12) || MonthFromTime(t) !== month % 12 || DateFromTime(t) !== 1) {
@@ -359,7 +351,7 @@ function MakeDate(day, time){
     return NaN;
   }
 
-  return day * DAY + time;
+  return day * msPerDay + time;
 }
 
 
@@ -368,7 +360,7 @@ function MakeDate(day, time){
 // ##########################
 
 function TimeClip(time){
-  if(!isFinite(time) || abs(time) > TIMECLIP){
+  if(!isFinite(time) || abs(time) > 864e13){
     return NaN;
   }
 
@@ -459,6 +451,9 @@ function makeSeconds(obj, sec, ms){
 // ### Date to String Conversions ###
 // ##################################
 
+const DAYS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 function toString(obj){
   return toDateString(obj)+' '+toTimeString(obj);
 }
@@ -473,7 +468,7 @@ function toDateString(obj){
 }
 
 function toTimeString(obj){
-  const timezone = getTimezone(obj, HOUR),
+  const timezone = getTimezone(obj, msPerHour),
         hour     = pad(getTime(obj, false, HourFromTime)),
         min      = pad(getTime(obj, false, MinFromTime)),
         sec      = pad(getTime(obj, false, SecFromTime)),
@@ -493,9 +488,9 @@ function toLocaleDateString(obj){
 function toLocaleTimeString(obj){
   const h        = getTime(obj, false, HourFromTime),
         hour     = h % 12,
-        meridiem = h === hour ? 'AM' : 'PM',
         min      = pad(getTime(obj, false, MinFromTime)),
-        sec      = pad(getTime(obj, false, SecFromTime));
+        sec      = pad(getTime(obj, false, SecFromTime)),
+        meridiem = h === hour ? 'AM' : 'PM';
 
   return `${hour}:${min}:${sec} ${meridiem}`;
 }
@@ -750,7 +745,7 @@ export class Date {
   // ### 15.9.5.26 Date.prototype.getTimezoneOffset ###
   // ##################################################
   getTimezoneOffset(){
-    return getTimezone(this, MINUTE);
+    return getTimezone(this, msPerMinute);
   }
 
   // ########################################
