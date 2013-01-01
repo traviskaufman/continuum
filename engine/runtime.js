@@ -302,7 +302,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(toStringTag, brand);
+      proto.define(toStringTagSymbol, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -350,7 +350,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iter = $$Invoke(iterator, iterable);
+      var iter = $$Invoke(iteratorSymbol, iterable);
       if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
@@ -489,23 +489,23 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($WellKnownSymbol, $Symbol);
 
-    function addWellKnownSymbol(name){
-      return symbols[name] = new $WellKnownSymbol(name);
-    }
 
-    $WellKnownSymbol.add = exports.addWellKnownSymbol = addWellKnownSymbol;
+    $WellKnownSymbol.add = exports.addWellKnownSymbol = function add(name){
+      return symbols[name] = new $WellKnownSymbol(name);
+    };
 
     return $WellKnownSymbol;
   })();
 
-  var toStringTag  = $WellKnownSymbol.add('toStringTag'),
-      iterator     = $WellKnownSymbol.add('iterator'),
-    //create       = $WellKnownSymbol.add('create'),
-      BooleanValue = $WellKnownSymbol.add('BooleanValue'),
-      StringValue  = $WellKnownSymbol.add('StringValue'),
-      NumberValue  = $WellKnownSymbol.add('NumberValue'),
-      DateValue    = $WellKnownSymbol.add('DateValue'),
-      BuiltinBrand = $WellKnownSymbol.add('BuiltinBrand');
+  var toStringTagSymbol  = $WellKnownSymbol.add('toStringTag'),
+      iteratorSymbol     = $WellKnownSymbol.add('iterator'),
+      hasInstanceSymbol  = $WellKnownSymbol.add('hasInstance'),
+      createSymbol       = $WellKnownSymbol.add('create'),
+      BooleanValueSymbol = $WellKnownSymbol.add('BooleanValue'),
+      StringValueSymbol  = $WellKnownSymbol.add('StringValue'),
+      NumberValue        = $WellKnownSymbol.add('NumberValue'),
+      DateValueSymbol    = $WellKnownSymbol.add('DateValue'),
+      ToPrimitiveSymbol  = $WellKnownSymbol.add('ToPrimitive');
 
 
   var DefineOwn = $Object.prototype.DefineOwnProperty;
@@ -746,7 +746,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.thunk = thunk;
 
       var self = this;
-      setFunction(this, iterator, function(){ return self });
+      setFunction(this, iteratorSymbol, function(){ return self });
       setFunction(this, 'next',   function(){ return self.Send() });
       setFunction(this, 'close',  function(){ return self.Close() });
       setFunction(this, 'send',   function(v){ return self.Send(v) });
@@ -843,10 +843,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Date'
     }, [
       function getPrimitiveValue(){
-        return this.get(DateValue);
+        return this.get(DateValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(DateValue, value, _CW);
+        return this.define(DateValueSymbol, value, _CW);
       }
     ]);
 
@@ -873,10 +873,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$String'
     }, [
       function getPrimitiveValue(){
-        return ObjectGet.call(this, StringValue) || '';
+        return ObjectGet.call(this, StringValueSymbol) || '';
       },
       function setPrimitiveValue(value){
-        return this.define(StringValue, value, _CW);
+        return this.define(StringValueSymbol, value, _CW);
       },
 
       function each(callback){
@@ -958,10 +958,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Number'
     }, [
       function getPrimitiveValue(){
-        return this.get(NumberValue);
+        return this.get(NumberValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(NumberValue, value, _CW);
+        return this.define(NumberValueSymbol, value, _CW);
       }
     ]);
 
@@ -984,10 +984,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Boolean'
     }, [
       function getPrimitiveValue(){
-        return this.get(BooleanValue);
+        return this.get(BooleanValueSymbol);
       },
       function setPrimitiveValue(value){
-        return this.define(BooleanValue, value, _CW);
+        return this.define(BooleanValueSymbol, value, _CW);
       }
     ]);
 
@@ -2485,12 +2485,31 @@ var runtime = (function(GLOBAL, exports, undefined){
         String  : $String,
       };
 
+
       internalModules.set('@@internals', {
         $$ArgumentCount: function(){
           return context.argumentCount();
         },
+        $$CallerArgumentCount: function(){
+          if (context.caller) {
+            return context.argumentCount();
+          }
+          return null;
+        },
         $$CallerHasArgument: function(_, args){
-          return context.callerHasArgument(args[0]);
+          if (context.caller) {
+            return context.caller.hasArgument(args[0]);
+          }
+          return false;
+        },
+        $$CallerName: function(){
+          return context.callerName();
+        },
+        $$CallerIsConstruct: function(){
+          if (context.caller) {
+            return context.caller.isConstruct;
+          }
+          return false;
         },
         $$CallInternal: function(_, args){
           var obj = args[0],
@@ -2529,6 +2548,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$HasInternal: function(_, args){
           return args[1] in args[0];
+        },
+        $$IsConstruct: function(){
+          return context.isConstruct;
         },
         $$StringToNumber: function(_, args){
           return +args[0];
