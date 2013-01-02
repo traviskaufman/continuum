@@ -535,6 +535,14 @@ var operations = (function(exports){
 
   exports.$$CreateListFromArray = $$CreateListFromArray;
 
+
+  function $$CreateArrayFromList(elements){
+    return new $Array(elements.slice());
+  }
+
+  exports.$$CreateArrayFromList = $$CreateArrayFromList;
+
+
   var protos = {
     '%ArrayBufferPrototype%' : 'ArrayBufferProto',
     '%ArrayPrototype%'       : 'ArrayProto',
@@ -554,13 +562,6 @@ var operations = (function(exports){
     '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
     '%WeakMapPrototype%'     : 'WeakMapProto'
   };
-
-  function $$CreateArrayFromList(elements){
-    return new $Array(elements.slice());
-  }
-
-  exports.$$CreateArrayFromList = $$CreateArrayFromList;
-
 
   function $$OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
     if ($$Type(constructor) !== 'Object') {

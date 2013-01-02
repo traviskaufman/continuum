@@ -55,7 +55,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       AbruptCompletion = errors.AbruptCompletion;
 
   var $$GetValue = operators.$$GetValue,
-      $$ToObject = operators.$$ToObject;
+      $$ToObject = operators.$$ToObject,
+      $$Type     = operators.$$Type;
 
   var Reference                 = operations.Reference,
       $$IsCallable              = operations.$$IsCallable,
@@ -63,7 +64,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       $$EnqueueChangeRecord     = operations.$$EnqueueChangeRecord,
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
       $$CreateListFromArray     = operations.$$CreateListFromArray,
-      $$IsStopIteration         = operations.$$IsStopIteration;
+      $$IsStopIteration         = operations.$$IsStopIteration,
+      $$OrdinaryCreateFromConstructor = operations.$$OrdinaryCreateFromConstructor;
 
   var Value                    = descriptors.Value,
       Accessor                 = descriptors.Accessor,
@@ -354,7 +356,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iter = $$Invoke(iteratorSymbol, iterable);
+      var iter = $$Invoke(iterable, iteratorSymbol);
       if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
@@ -365,7 +367,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       var next;
-      while (next = $$ToObject($$Invoke('next', iter))) {
+      while (next = $$ToObject($$Invoke(iter, 'next'))) {
         if ($$IsStopIteration(next)) {
           return object;
         }
@@ -480,6 +482,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return result && result.type === Return ? result.value : result;
       },
       function Construct(args){
+        // return $$OrdinaryConstruct(this, args);
         if (this.ThisMode === 'lexical') {
           return $$ThrowException('construct_arrow_function');
         }
@@ -516,6 +519,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         return false;
       }
     ]);
+
+    function $$OrdinaryConstruct(F, argumentsList, fallBackProto){
+      var creator = F.Get(createSymbol);
+      if (creator && creator.Abrupt) return creator;
+
+      var obj = creator ? creator.Call(F, []) : $$OrdinaryCreateFromConstructor(F, '%ObjectPrototype%');
+      if (obj && obj.Abrupt) return obj;
+
+      var result = F.Call(obj, argumentsList);
+      if (result && result.Abrupt) return result;
+
+      return $$Type(result) === 'Object' ? result : obj;
+    }
 
     return $Function;
   })();
