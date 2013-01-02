@@ -133,9 +133,8 @@ var $Nil = (function(exports){
     function GetP(){
       return this;
     },
-    function SetP(){
-      return true;
-    },
+    function Put(){},
+    function SetP(){},
     function Delete(){
       return true;
     },
