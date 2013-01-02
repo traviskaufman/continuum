@@ -1,4 +1,4 @@
-var $Array = (function(module){
+var $Array = (function(exports){
   var objects      = require('../lib/objects'),
       utility      = require('../lib/utility'),
       errors       = require('../errors'),
@@ -40,6 +40,8 @@ var $Array = (function(module){
     }
     this.length = ['length', this.array.length, __W];
   }
+
+  exports.$Array = $Array;
 
   inherit($Array, $Object, {
     BuiltinBrand: 'BuiltinArray'
@@ -329,5 +331,5 @@ var $Array = (function(module){
     }
   ]);
 
-  return module.exports = $Array;
+  return exports;
 })(typeof module !== 'undefined' ? module : {});

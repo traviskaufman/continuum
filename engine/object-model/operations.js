@@ -57,7 +57,7 @@ var operations = (function(exports){
   }
 
   function $Array(o){
-    $Array = require('./$Array');
+    $Array = require('./$Array').$Array;
     return new $Array(o);
   }
 

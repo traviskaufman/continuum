@@ -7,7 +7,7 @@ var $Proxy = (function(module){
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
       $$Object    = require('./$Object'),
-      $Array      = require('./$Array');
+      $Array      = require('./$Array').$Array;
 
   var inherit     = objects.inherit,
       is          = objects.is,

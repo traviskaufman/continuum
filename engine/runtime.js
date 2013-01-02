@@ -17,7 +17,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
       $String          = require('./object-model/$String').$String,
-      $Array           = require('./object-model/$Array'),
+      $StrictArguments = require('./object-model/$Arguments').$StrictArguments,
+      $MappedArguments = require('./object-model/$Arguments').$MappedArguments,
+      $Array           = require('./object-model/$Array').$Array,
       $Proxy           = require('./object-model/$Proxy'),
       $TypedArray      = require('./object-model/$TypedArray'),
       natives          = require('./natives'),
@@ -65,7 +67,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var Value                    = descriptors.Value,
       Accessor                 = descriptors.Accessor,
-      ArgAccessor              = descriptors.ArgAccessor,
       DataDescriptor           = descriptors.DataDescriptor,
       $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
       $$FromPropertyDescriptor = descriptors.$$FromPropertyDescriptor,
@@ -927,124 +928,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $RegExp;
   })();
 
-
-
-  // ##################
-  // ### $Arguments ###
-  // ##################
-
-  var $Arguments = (function(){
-    function $Arguments(length){
-      $Object.call(this);
-      this.define('length', length, _CW);
-    }
-
-    inherit($Arguments, $Object, {
-      BuiltinBrand: 'BuiltinArguments',
-      ParameterMap: null
-    });
-
-    return $Arguments;
-  })();
-
-
-  var $StrictArguments = (function(){
-    function $StrictArguments(args){
-      $Arguments.call(this, args.length);
-      for (var i=0; i < args.length; i++) {
-        this.define(i+'', args[i], ECW);
-      }
-
-      this.define('arguments', intrinsics.ThrowTypeError, __A);
-      this.define('caller', intrinsics.ThrowTypeError, __A);
-    }
-
-    inherit($StrictArguments, $Arguments);
-
-    return $StrictArguments;
-  })();
-
-
-
-  var $MappedArguments = (function(){
-    function $MappedArguments(args, env, names, func){
-      var mapped = create(null);
-      $Arguments.call(this, args.length);
-
-      this.ParameterMap = new $Object;
-      this.isMapped = false;
-
-      for (var i=0; i < args.length; i++) {
-        this.define(i+'', args[i], ECW);
-        var name = names[i];
-        if (i < names.length && !(name in mapped)) {
-          this.isMapped = true;
-          mapped[name] = true;
-          this.ParameterMap.define(name, new ArgAccessor(name, env), _CA);
-        }
-      }
-
-      this.define('callee', func, _CW);
-    }
-
-    inherit($MappedArguments, $Arguments, {
-      ParameterMap: null
-    }, [
-      function Get(key){
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          return this.ParameterMap.Get(key);
-        } else {
-          var val = this.GetP(this, key);
-          if (key === 'caller' && $$IsCallable(val) && val.strict) {
-            return $$ThrowException('strict_poison_pill');
-          }
-          return val;
-        }
-      },
-      function GetOwnProperty(key){
-        var desc = $Object.prototype.GetOwnProperty.call(this, key);
-        if (desc === undefined) {
-          return desc;
-        }
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          desc.Value = this.ParameterMap.Get(key);
-        }
-        return desc;
-      },
-      function DefineOwnProperty(key, desc, strict){
-        if (!DefineOwn.call(this, key, desc, false) && strict) {
-          return $$ThrowException('strict_lhs_assignment');
-        }
-
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          if ($$IsAccessorDescriptor(desc)) {
-            this.ParameterMap.Delete(key, false);
-          } else {
-            if ('Value' in desc) {
-              this.ParameterMap.Put(key, desc.Value, strict);
-            }
-            if ('Writable' in desc) {
-              this.ParameterMap.Delete(key, false);
-            }
-          }
-        }
-
-        return true;
-      },
-      function Delete(key, strict){
-        var result = $Object.prototype.Delete.call(this, key, strict);
-        if (result.Abrupt) return result;
-
-        if (result && this.isMapped && this.ParameterMap.has(key)) {
-          this.ParameterMap.Delete(key, false);
-        }
-
-        return result;
-      }
-    ]);
-
-    return $MappedArguments;
-  })();
 
 
   var $Module = (function(){
@@ -2790,11 +2673,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       exports.global = global = operators.global = target.global;
       exports.intrinsics = intrinsics = target.intrinsics;
       target.active = true;
-      target.emit('activate');
       $Object.changeRealm(target);
       $Array.changeRealm(target);
       $String.changeRealm(target);
+      $StrictArguments.changeRealm(target);
       operations.changeRealm(target);
+      target.emit('activate');
     }
   }
 

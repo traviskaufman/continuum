@@ -1,11 +1,11 @@
 var $TypedArray = (function(module){
   "use strict";
-  var objects        = require('../lib/objects'),
-      buffers        = require('../lib/buffers'),
-      $Array         = require('./$Array'),
-      $Object        = require('./$Object').$Object,
+  var objects          = require('../lib/objects'),
+      buffers          = require('../lib/buffers'),
+      $Array           = require('./$Array').$Array,
+      $Object          = require('./$Object').$Object,
       $$ThrowException = require('../errors').$$ThrowException,
-      DataDescriptor = require('./descriptors').DataDescriptor;
+      DataDescriptor   = require('./descriptors').DataDescriptor;
 
   var inherit     = objects.inherit,
       define      = objects.define,
