@@ -13,14 +13,28 @@ var $Symbol = (function(exports){
   // ### $Symbol ###
   // ###############
 
+  var padding = ['', '0', '00', '000', '0000', '00000', '000000', '0000000', '00000000'];
+
+  function zeroPad(number, places){
+    var num  = ''+number,
+        len  = num.length,
+        diff = places - len;
+
+    if (diff > 0) {
+      return padding[diff] + num;
+    }
+    return num;
+  }
+
+
   var $Symbol = exports.$Symbol = (function(){
-    var prefix = uid();
+    var postfix = uid();
 
     function $Symbol(name, isPublic){
       this.Name = name;
       this.Private = !isPublic;
       tag(this);
-      this.gensym = prefix+this.id;
+      this.gensym = '___'+zeroPad(this.id, 8)+postfix;
     }
 
     define($Symbol.prototype, {
