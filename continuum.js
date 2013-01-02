@@ -13021,7 +13021,7 @@ exports.operators = (function(exports){
   void function(createUnaryOp){
     exports.NEGATIVE = NEGATIVE = createUnaryOp($$ToNumber,  function(n){ return -n });
     exports.BIT_NOT  = BIT_NOT  = createUnaryOp($$ToInt32,   function(n){ return ~n });
-    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return !n });
+    exports.NOT      = NOT      = createUnaryOp($$ToBoolean, function(n){ return isFalsey(n) });
   }(function(convert, finalize){
     return function(ref){
       if (isFalsey(ref) || typeof ref !== 'object') {
