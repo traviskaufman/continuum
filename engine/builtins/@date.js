@@ -361,8 +361,7 @@ function TimeClip(time){
     return NaN;
   }
 
-  //return ToInteger(time) + 0;
-  return time + 0;
+  return ToInteger(time) + 0;
 }
 
 
