@@ -127,12 +127,10 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function noop(){}
 
-  // ###############################
+
   // ###############################
   // ### Specification Functions ###
   // ###############################
-  // ###############################
-
 
   function $$MakeConstructor(func, writable, prototype){
     var install = prototype === undefined;
@@ -148,10 +146,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
     func.define('prototype', prototype, writable ? __W : ___);
   }
-
-
-
-
 
   var $$PropertyDefinitionEvaluation = (function(){
     function makeDefiner(constructs, field, desc){
@@ -955,10 +949,12 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     var _each = each;
 
-    inherit($Module, $Object, {
+    define($Module.prototype, {
       type: '$Module',
       BuiltinBrand: 'BuiltinModule'
-    }, [
+    });
+
+    define($Module.prototype, [
       function init(object, keys){
         this.props = new Hash;
         this.object = object;
@@ -1056,8 +1052,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     return $Module;
   })();
 
-
-
   var $NativeModule = (function(){
     function $NativeModule(bindings){
       $Module.call(this, bindings);
@@ -1088,6 +1082,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return $NativeModule;
   })();
+
 
 
   var $Error = (function(){
@@ -2397,17 +2392,12 @@ var runtime = (function(GLOBAL, exports, undefined){
               module.mrl = imported.code.name;
               callback.Call(null, [module]);
             }, errback.Call);
-          } else {
-            var origin = imported.origin;
-            if (typeof origin !== 'string' && origin instanceof Array) {
+          } else if (imported.origin instanceof Array) {
 
-            } else {
-              if (internalModules.has(imported.origin)) {
-                callback.Call(null, [internalModules.get(imported.origin)]);
-              } else {
-                load.Call(loader, [imported.origin, callback, errback]);
-              }
-            }
+          } else if (internalModules.has(imported.origin)) {
+            callback.Call(null, [internalModules.get(imported.origin)]);
+          } else {
+            load.Call(loader, [imported.origin, callback, errback]);
           }
         });
       } else {
@@ -2417,9 +2407,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function createSandbox(object, loader){
       var outerRealm = object.Realm || object.Prototype.Realm,
-          bindings = new $Object,
-          scope = new GlobalEnv(bindings),
-          realm = scope.Realm = bindings.Realm = create(outerRealm);
+          bindings   = new $Object,
+          scope      = new GlobalEnv(bindings),
+          realm      = scope.Realm = bindings.Realm = create(outerRealm);
 
       bindings.BuiltinBrand = 'GlobalObject';
       scope.outer = outerRealm.globalEnv;
@@ -2453,28 +2443,26 @@ var runtime = (function(GLOBAL, exports, undefined){
           } else if (imported.specifiers) {
             each(imported.specifiers, function(path, name){
               if (name === '*') {
-                module.each(function(prop){
+                return module.each(function(prop){
                   scope.SetMutableBinding(prop[0], module.Get(prop[0]));
                 });
+              }
+
+              var obj = module;
+              each(path, function(part){
+                obj = obj.Get(part);
+              });
+
+              if (name[0] !== '@') {
+                return scope.SetMutableBinding(name, obj);
+              }
+
+              if (name[1] === '@' && !(obj instanceof $WellKnownSymbol)) {
+                ƒ($$MakeException('unknown_wellknown_symbol', [name]));
+              } else if (!(obj instanceof $Symbol)) {
+                ƒ($$MakeException('import_not_symbol', [name]));
               } else {
-                var obj = module;
-
-                each(path, function(part){
-                  obj = obj.Get(part);
-                });
-
-                if (name[0] === '@') {
-                  var internal = name[1] === '@';
-                  if (internal && !(obj instanceof $WellKnownSymbol)) {
-                    ƒ($$MakeException('unknown_wellknown_symbol', [name]));
-                  } else if (!(obj instanceof $Symbol)) {
-                    ƒ($$MakeException('import_not_symbol', [name]));
-                  } else {
-                    scope.InitializeSymbolBinding(name.slice(1), obj);
-                  }
-                } else {
-                  scope.SetMutableBinding(name, obj);
-                }
+                scope.InitializeSymbolBinding(name.slice(1), obj);
               }
             });
           }
