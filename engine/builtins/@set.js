@@ -1,5 +1,21 @@
-import Map from '@map';
-import Iterator from '@iter';
+import {
+  @@iterator: iterator,
+  @@create  : create
+} from '@@symbols';
+
+import {
+  OrdinaryCreateFromConstructor,
+  Type
+} from '@@operations';
+
+import {
+  Map
+} from '@map';
+
+import {
+  Iterator
+} from '@iter';
+
 
 
 function ensureSet(o, name){
@@ -28,7 +44,7 @@ class SetIterator extends Iterator {
   }
 
   next(){
-    if (!$__IsObject(this)) {
+    if (Type(this) !== 'Object') {
       throw $__Exception('called_on_non_object', ['SetIterator.prototype.next']);
     }
 
@@ -80,6 +96,12 @@ export class Set {
     return new SetIterator(this);
   }
 }
+
+$__extend(Set, {
+  @@create(){
+    return OrdinaryCreateFromConstructor(this, '%SetPrototype%');
+  }
+});
 
 builtinClass(Set);
 const SetPrototype = Set.prototype;

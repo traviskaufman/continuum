@@ -1,4 +1,17 @@
-import Iterator from '@iter';
+import {
+  @@iterator: iterator,
+  @@create  : create
+} from '@@symbols';
+
+import {
+  OrdinaryCreateFromConstructor,
+  Type
+} from '@@operations';
+
+import {
+  Iterator
+} from '@iter';
+
 
 function ensureMap(o, name){
   if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {
@@ -22,9 +35,10 @@ class MapIterator extends Iterator {
   }
 
   next(){
-    if (!$__IsObject(this)) {
+    if (Type(this) !== 'Object') {
       throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
+
     if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {
       throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
@@ -106,6 +120,11 @@ export class Map {
   }
 }
 
+$__extend(Map, {
+  @@create(){
+    return OrdinaryCreateFromConstructor(this, '%MapPrototype%');
+  }
+});
 
 builtinClass(Map);
 const MapPrototype = Map.prototype;

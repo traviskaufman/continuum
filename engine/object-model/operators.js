@@ -146,7 +146,7 @@ var operators = (function(exports){
   exports.$$ToObject = $$ToObject;
 
 
-  function Type(argument){
+  function $$Type(argument){
     if (argument === null) {
       return 'Null';
     }
@@ -155,7 +155,7 @@ var operators = (function(exports){
         return 'Undefined';
       case 'object':
         if (argument.Reference) {
-          return Type($$GetValue(argument));
+          return $$Type($$GetValue(argument));
         } else if (argument.Completion){
           return 'Completion';
         }
@@ -169,20 +169,25 @@ var operators = (function(exports){
     }
   }
 
+  exports.$$Type = $$Type;
+
+
   function $$IsCallable(argument){
     if (argument && argument.Abrupt) return argument;
     return !!(argument && typeof argument === 'object' ? argument.Call : false);
   }
 
+  exports.$$IsCallable = $$IsCallable;
 
-  function $$ToPrimitive(argument, PreferredType){
-    if (Type(argument) !== 'Object') {
+
+  function $$ToPrimitive(argument, Preferred$$Type){
+    if ($$Type(argument) !== 'Object') {
       return argument;
     }
 
-    if (PreferredType === 'String') {
+    if (Preferred$$Type === 'String') {
       var hint = 'string';
-    } else if (PreferredType === 'Number') {
+    } else if (Preferred$$Type === 'Number') {
       var hint = 'number';
     } else {
       var hint = 'default';
@@ -194,7 +199,7 @@ var operators = (function(exports){
         return $$ThrowException('cannot_convert_to_primitive', []);
       }
       var result = exoticToPrim.Call(argument, [hint]);
-      if (Type(result) !== 'Object') {
+      if ($$Type(result) !== 'Object') {
         return result;
       }
       return $$ThrowException('cannot_convert_to_primitive', []);
@@ -211,8 +216,8 @@ var operators = (function(exports){
 
 
   function $$OrdinaryToPrimitive(O, hint){
-    // Assert: Type(O) is Object
-    // Assert: Type(hint) is String and its value is either "string" or "number"
+    // Assert: $$Type(O) is Object
+    // Assert: $$Type(hint) is String and its value is either "string" or "number"
 
     if (hint === 'string') {
       var tryFirst  = 'toString',
@@ -225,7 +230,7 @@ var operators = (function(exports){
     var first = O.Get(tryFirst);
     if ($$IsCallable(first)) {
       var result = first.Call(O);
-      if (Type(result) !== 'Object') {
+      if ($$Type(result) !== 'Object') {
         return result;
       }
     }
@@ -233,7 +238,7 @@ var operators = (function(exports){
     var second = O.Get(trySecond);
     if ($$IsCallable(second)) {
       var result = second.Call(O);
-      if (Type(result) !== 'Object') {
+      if ($$Type(result) !== 'Object') {
         return result;
       }
     }

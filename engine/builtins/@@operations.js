@@ -543,30 +543,37 @@ export function OrdinaryHasInstance(C, O){
 // ### 9.3.13 OrdinaryCreateFromConstructor ###
 // ############################################
 
+var protos = {
+  '%ArrayBufferPrototype%' : 'ArrayBufferProto',
+  '%ArrayPrototype%'       : 'ArrayProto',
+  '%DataViewPrototype%'    : 'DataViewProto',
+  '%DatePrototype%'        : 'DateProto',
+  '%Float32ArrayPrototype%': 'Float32ArrayProto',
+  '%Float64ArrayPrototype%': 'Float64ArrayProto',
+  '%FunctionPrototype%'    : 'FunctionProto',
+  '%Int16ArrayPrototype%'  : 'Int16ArrayProto',
+  '%Int32ArrayPrototype%'  : 'Int32ArrayProto',
+  '%Int8ArrayPrototype%'   : 'Int8ArrayProto',
+  '%MapPrototype%'         : 'MapProto',
+  '%ObjectPrototype%'      : 'ObjectProto',
+  '%SetPrototype%'         : 'SetProto',
+  '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',
+  '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',
+  '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
+  '%WeakMapPrototype%'     : 'WeakMapProto'
+};
+
 export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
   if (Type(constructor) !== 'Object') {
     throw $$Exception('construct_non_constructor', [Type(constructor)]);
   }
 
   let proto = constructor.prototype;
+  if (!proto) {
+    const realm = $$HasInternal(constructor, 'Realm') ? $$GetInternal('Realm') : $$CurrentRealm();
+    proto = $$GetIntrinsics(realm, protos[intrinsicDefaultProto]);
+  }
 
-  return ObjectCreate(Type(proto) === 'Object' ? proto : intrinsicDefaultProto);
+  return ObjectCreate(proto);
 }
 
-//%Object%
-//%ObjectPrototype%
-//%ObjProto_toString%
-//%Function%
-//%FunctionPrototype%
-//%Array%
-//%ArrayPrototype%
-//%ArrayIteratorPrototype%
-//%Map%
-//%MapPrototype%
-//%MapIteratorPrototype%
-//%WeakMap%
-//%WeakMapPrototype%
-//%Set%
-//%SetPrototype%
-//%SetIteratorPrototype%
-//%StopIteration%

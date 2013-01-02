@@ -945,8 +945,8 @@ extend(Date, {
   // 15.9.4.6 Date.@@create
   @@create(){
     const obj = OrdinaryCreateFromConstructor(this, DatePrototype);
-    obj.@@DateValue = NaN;
-    obj.@@BuiltinBrand = BuiltinDate;
+    obj.@@DateValue = undefined;
+    $$SetInternal('BuiltinBrand', 'BuiltinDate');
     return obj;
   }
 });

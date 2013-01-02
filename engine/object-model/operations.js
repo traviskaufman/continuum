@@ -24,6 +24,7 @@ var operations = (function(exports){
       $$GetThisValue         = operators.$$GetThisValue,
       $$ToUint32             = operators.$$ToUint32,
       $$ToObject             = operators.$$ToObject,
+      $$Type                 = operators.$$Type,
       $$IsDataDescriptor     = descriptors.$$IsDataDescriptor,
       $$IsAccessorDescriptor = descriptors.$$IsAccessorDescriptor,
       $$IsGenericDescriptor  = descriptors.$$IsGenericDescriptor,
@@ -534,6 +535,25 @@ var operations = (function(exports){
 
   exports.$$CreateListFromArray = $$CreateListFromArray;
 
+  var protos = {
+    '%ArrayBufferPrototype%' : 'ArrayBufferProto',
+    '%ArrayPrototype%'       : 'ArrayProto',
+    '%DataViewPrototype%'    : 'DataViewProto',
+    '%DatePrototype%'        : 'DateProto',
+    '%Float32ArrayPrototype%': 'Float32ArrayProto',
+    '%Float64ArrayPrototype%': 'Float64ArrayProto',
+    '%FunctionPrototype%'    : 'FunctionProto',
+    '%Int16ArrayPrototype%'  : 'Int16ArrayProto',
+    '%Int32ArrayPrototype%'  : 'Int32ArrayProto',
+    '%Int8ArrayPrototype%'   : 'Int8ArrayProto',
+    '%MapPrototype%'         : 'MapProto',
+    '%ObjectPrototype%'      : 'ObjectProto',
+    '%SetPrototype%'         : 'SetProto',
+    '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',
+    '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',
+    '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
+    '%WeakMapPrototype%'     : 'WeakMapProto'
+  };
 
   function $$CreateArrayFromList(elements){
     return new $Array(elements.slice());
@@ -541,6 +561,21 @@ var operations = (function(exports){
 
   exports.$$CreateArrayFromList = $$CreateArrayFromList;
 
+
+  function $$OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
+    if ($$Type(constructor) !== 'Object') {
+      return $$ThrowException('construct_non_constructor', [$$Type(constructor)]);
+    }
+
+    var proto = constructor.prototype;
+    if ($$Type(proto) !== 'Object') {
+      proto = (constructor.Realm || realm).intrinsics[protos[intrinsicDefaultProto]];
+    }
+
+    return new $Object(proto);
+  }
+
+  exports.$$OrdinaryCreateFromConstructor = $$OrdinaryCreateFromConstructor;
 
 
   var realm, intrinsics;

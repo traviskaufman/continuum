@@ -1,3 +1,13 @@
+import {
+  @@iterator: iterator,
+  @@create  : create
+} from '@@symbols';
+
+import {
+  OrdinaryCreateFromConstructor
+} from '@@operations';
+
+
 function ensureWeakMap(o, p, name){
   if ($__Type(o) !== 'Object' || !$__hasInternal(o, 'WeakMapData')) {
     throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);
@@ -35,6 +45,13 @@ export class WeakMap {
     return this;
   }
 }
+
+
+$__extend(WeakMap, {
+  @@create(){
+    return OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
+  }
+});
 
 builtinClass(WeakMap);
 

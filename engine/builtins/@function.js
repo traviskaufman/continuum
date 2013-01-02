@@ -1,3 +1,14 @@
+import {
+  @@create: create,
+  @@hasInstance: hasInstance
+} from '@@symbols';
+
+import {
+  OrdinaryCreateFromConstructor,
+  OrdinaryHasInstance
+} from '@@operations';
+
+
 export class Function {
   constructor(...args){
     return $__FunctionCreate(...args);
@@ -21,6 +32,14 @@ export class Function {
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
     return $__FunctionToString(this);
+  }
+
+  @@create(){
+    return OrdinaryCreateFromConstructor(this, '%ObjectPrototype%');
+  }
+
+  @@hasInstance(V){
+    return OrdinaryHasInstance(this, V);
   }
 }
 

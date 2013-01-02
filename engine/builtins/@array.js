@@ -1,6 +1,23 @@
-import Iterator from '@iter';
-import { Set, add, has } from '@set';
-import { min, max, floor } from '@math';
+import {
+  @@toStringTag: toStringTag,
+  @@iterator   : iterator
+} from '@@symbols';
+
+import {
+  Iterator
+} from '@iter';
+
+import {
+  Set,
+  add,
+  has
+} from '@set';
+
+import {
+  min,
+  max,
+  floor
+} from '@math';
 
 const arrays = new Set;
 
@@ -60,6 +77,7 @@ class ArrayIterator extends Iterator {
     return kind & V ? kind & K ? [key, array[key]] : array[key] : key;
   }
 }
+
 
 builtinClass(ArrayIterator);
 
