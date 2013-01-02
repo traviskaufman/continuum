@@ -9179,7 +9179,6 @@ exports.assembler = (function(exports){
       SPREAD_ARG       = new StandardOpCode(0, 'SPREAD_ARG'),
       SPREAD_ARRAY     = new StandardOpCode(1, 'SPREAD_ARRAY'),
       STRING           = new InternedOpCode(1, 'STRING'),
-      SUPER_CALL       = new StandardOpCode(0, 'SUPER_CALL'),
       SUPER_ELEMENT    = new StandardOpCode(0, 'SUPER_ELEMENT'),
       SUPER_MEMBER     = new StandardOpCode(1, 'SUPER_MEMBER'),
       SYMBOL           = new InternedOpCode(3, 'SYMBOL'),
@@ -10775,7 +10774,7 @@ exports.assembler = (function(exports){
       if (context.code.scopeType !== 'function') {
         context.earlyError(node, 'illegal_super');
       }
-      SUPER_CALL();
+      SUPER_MEMBER(context.code.name);
     } else {
       recurse(node.callee);
     }
@@ -13471,12 +13470,8 @@ exports.operations = (function(exports){
 
     if (status.Abrupt) return status;
 
-    if (prop === false) {
-      var key = env.GetMethodName();
-    } else {
-      var key = $$ToPropertyKey(prop);
-      if (key && key.Abrupt) return key;
-    }
+    var key = $$ToPropertyKey(prop);
+    if (key && key.Abrupt) return key;
 
     var ref = new Reference(baseValue, key, context.strict);
     ref.thisValue = env.GetThisBinding();
@@ -16684,7 +16679,7 @@ exports.thunk = (function(exports){
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
     LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
     REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
 
@@ -17501,18 +17496,6 @@ exports.thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function SUPER_CALL(){
-      var result = context.getSuperReference(false);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
     function SUPER_ELEMENT(){
       var result = context.getSuperReference(stack[--sp]);
 
@@ -17532,6 +17515,7 @@ exports.thunk = (function(exports){
         error = key;
         return unwind;
       }
+
       var result = context.getSuperReference(key);
 
       if (result && result.Abrupt) {
@@ -19772,11 +19756,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var Script = (function(){
     function ParseOptions(o){
-      if (o) {
-        for (var k in o) {
-          if (k in this) {
-            this[k] = o[k];
-          }
+      for (var k in o) {
+        if (k in this) {
+          this[k] = o[k];
         }
       }
     }
@@ -19790,7 +19772,18 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       tolerant: false
     };
 
-    function parse(src, origin, type, options){
+    function parse(src, filename, kind, options){
+      if (!options) {
+        if (isObject(kind)) {
+          options = kind;
+          kind = '';
+        } else if (isObject(filename)) {
+          options = filename;
+          filename = kind = '';
+        } else {
+          options = {};
+        }
+      }
       try {
         return esprima.parse(src, options ? new ParseOptions(options) : ParseOptions.prototype);
       } catch (e) {
@@ -19799,7 +19792,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             loc = { line: e.lineNumber, column: e.column };
 
         err.setCode({ start: loc, end: loc }, src);
-        err.setOrigin(origin, type);
+        err.setOrigin(filename, kind);
         return new AbruptCompletion('throw', err);
       }
     }
