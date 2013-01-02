@@ -324,6 +324,8 @@ h1, h2
 .ƒNumberValue    { color: #a6f } /* hsl(267, 100%, 70%) */
 .ƒStringValue    { color: #0f6 } /* hsl(144, 100%, 50%) */
 .ƒUndefinedValue { color: #686 } /* hsl(120,  14%, 47%) */
+.ƒNil            { color: #686 } /* hsl(120,  14%, 47%) */
+
 
 .ƒArguments      { color: #ff0 } /* hsl( 60, 100%, 50%) */
 .ƒArray          { color: #f68 } /* hsl(347, 100%, 70%) */

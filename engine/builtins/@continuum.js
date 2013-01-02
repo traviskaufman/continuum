@@ -10,4 +10,4 @@ export const promoteClass       = $__promoteClass,
              isConstruct        = $__isConstruct,
              argumentCount      = $__argumentCount,
              hasArgument        = $__hasArgument,
-             createNil          = $__createNil;
+             nil                = $__createNil();

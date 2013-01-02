@@ -798,6 +798,25 @@ var debug = (function(exports){
     return MirrorCollection;
   })();
 
+  var MirrorNil = (function(){
+    function MirrorNil(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorNil, MirrorObject, {
+      kind: 'Nil'
+    }, [
+      function label(){
+        return 'nil';
+      },
+      function list(){
+        return [];
+      }
+    ]);
+
+    return MirrorNil;
+  })();
+
 
   var MirrorSet = (function(){
     function MirrorSet(subject){
@@ -1243,6 +1262,7 @@ var debug = (function(exports){
     BuiltinMap         : 'Map',
     BuiltinMath        : 'Math',
     BuiltinModule      : 'Module',
+    BuiltinNil         : 'Nil',
     NumberWrapper      : 'Number',
     BuiltinRegExp      : 'RegExp',
     BuiltinSet         : 'Set',
@@ -1259,7 +1279,6 @@ var debug = (function(exports){
     BuiltinFloat64Array: 'Float64Array'
   };
 
-
   var brands = {
     BuiltinArguments   : MirrorArguments,
     BuiltinArray       : MirrorArray,
@@ -1272,6 +1291,7 @@ var debug = (function(exports){
     BuiltinMap         : MirrorMap,
     BuiltinMath        : MirrorMath,
     BuiltinModule      : MirrorModule,
+    BuiltinNil         : MirrorNil,
     NumberWrapper      : MirrorNumber,
     BuiltinRegExp      : MirrorRegExp,
     BuiltinSet         : MirrorSet,
@@ -1351,10 +1371,10 @@ var debug = (function(exports){
         } else if (subject.BuiltinBrand) {
           if (subject.Proxy) {
             return new MirrorProxy(subject);
-          } else if ('Call' in subject) {
-            return new MirrorFunction(subject);
           } else if (subject.BuiltinBrand in brands) {
             return new brands[subject.BuiltinBrand](subject);
+          } else if (subject.Call) {
+            return new MirrorFunction(subject);
           } else {
             return new MirrorObject(subject);
           }
@@ -1419,6 +1439,7 @@ var debug = (function(exports){
       Map: alwaysLabel,
       Math: alwaysLabel,
       Module: alwaysLabel,
+      Nil: alwaysLabel,
       Object: alwaysLabel,
       Number: alwaysLabel,
       RegExp: alwaysLabel,
@@ -1484,6 +1505,7 @@ var debug = (function(exports){
     MirrorJSON             :    MirrorJSON,
     MirrorMath             :    MirrorMath,
     MirrorModule           :    MirrorModule,
+    MirrorNil              :    MirrorNil,
     MirrorRegExp           :    MirrorRegExp,
     MirrorSymbol           :    MirrorSymbol,
     MirrorCollection       :    MirrorCollection,

@@ -73,7 +73,8 @@ var $Nil = (function(exports){
   exports.$Nil = $Nil;
 
   inherit($Nil, Undetectable, {
-    type: '$Nil'
+    type: '$Nil',
+    BuiltinBrand: 'BuiltinNil'
   }, [
     function toString(){
       return '';
