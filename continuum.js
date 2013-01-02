@@ -10545,9 +10545,8 @@ exports.assembler = (function(exports){
 
 
   function iter(node, KIND){
-    loop(function(){
-      var update;
-      unwinder('iteration', function(){
+    unwinder('iteration', function(){
+      loop(function(){
         if (isLexicalDeclaration(node.left)) {
           var lexical = true;
           pushScope('block');
@@ -10557,7 +10556,7 @@ exports.assembler = (function(exports){
         GET();
         KIND();
         MEMBER('next');
-        update = current();
+        var update = current();
         DUP();
         DUP();
         GET();
@@ -10575,8 +10574,8 @@ exports.assembler = (function(exports){
         lexical && SCOPE_CLONE();
         JUMP(update);
         lexical && popScope();
+        return update;
       });
-      return update;
     });
   }
 
@@ -16330,7 +16329,7 @@ exports.thunk = (function(exports){
 
 
       if (error) {
-        if (error.value && error.value.set) {
+        if (error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
           var range = code.ops[ip].range,
               loc = code.ops[ip].loc;
 
