@@ -102,6 +102,8 @@ var $Nil = (function(exports){
       return iter;
     },
     (function(){ return function define(){} })(),
+
+
     function GetInheritance(){
       return null;
     },
@@ -109,7 +111,7 @@ var $Nil = (function(exports){
       return true;
     },
     function IsExtensible(){
-      return true;
+      return false;
     },
     function PreventExtensions(){
       return true;
