@@ -168,7 +168,10 @@ var Component = (function(){
         if (parent) {
           parent.remove(this);
         } else {
-          this.element.parentNode.removeChild(this.element);
+          parent = this.element.parentNode;
+          if (parent) {
+            parent.removeChild(this.element);
+          }
         }
       } else {
         if (!subject.element && subject.component) {
