@@ -294,38 +294,6 @@ function MakeTime(hour, min, sec, ms){
 // ### 15.9.1.12 MakeDay ###
 // #########################
 
-function MakeDay(year, month, date) {
-  if (!(isFinite(year) && isFinite(month) && isFinite(date))) {
-    return NaN;
-  }
-
-  year = ToInteger(year);
-  month = ToInteger(month);
-  date = ToInteger(date);
-
-  let t = year < 1970 ? 1 : 0;
-
-  if (year < 1970){
-    for (var i = 1969; i >= year; i--) {
-      t -= DaysInYear(i) * msPerDay;
-    }
-  } else {
-    for (var i = 1970; i < year; i++) {
-      t += DaysInYear(i) * msPerDay;
-    }
-  }
-
-  const days = offsets(t);
-  for (var i = 0; i < month; i++) {
-    t += days[i] * msPerDay;
-  }
-
-  if (YearFromTime(t) !== year + floor(month / 12) || MonthFromTime(t) !== month % 12 || DateFromTime(t) !== 1) {
-    return NaN;
-  }
-  return Day(t) + date - 1;
-}
-
 // function MakeDay(year, month, date) {
 //   if (!(isFinite(year) && isFinite(month) && isFinite(date))) {
 //     return NaN;
@@ -335,8 +303,40 @@ function MakeDay(year, month, date) {
 //   month = ToInteger(month);
 //   date = ToInteger(date);
 
-//   return DayFromYear(year) + daysInMonth(month, InLeapYear(year)) + date - 1;
+//   let t = year < 1970 ? 1 : 0;
+
+//   if (year < 1970){
+//     for (var i = 1969; i >= year; i--) {
+//       t -= DaysInYear(i) * msPerDay;
+//     }
+//   } else {
+//     for (var i = 1970; i < year; i++) {
+//       t += DaysInYear(i) * msPerDay;
+//     }
+//   }
+
+//   const days = offsets(t);
+//   for (var i = 0; i < month; i++) {
+//     t += days[i] * msPerDay;
+//   }
+
+//   if (YearFromTime(t) !== year + floor(month / 12) || MonthFromTime(t) !== month % 12 || DateFromTime(t) !== 1) {
+//     return NaN;
+//   }
+//   return Day(t) + date - 1;
 // }
+
+function MakeDay(year, month, date) {
+  if (!(isFinite(year) && isFinite(month) && isFinite(date))) {
+    return NaN;
+  }
+
+  year = ToInteger(year);
+  month = ToInteger(month);
+  date = ToInteger(date);
+
+  return DayFromYear(year) + daysInMonth(month, InLeapYear(year)) + date - 1;
+}
 
 
 // ##########################
@@ -361,8 +361,11 @@ function TimeClip(time){
     return NaN;
   }
 
-  return ToInteger(time) + 0;
+  //return ToInteger(time) + 0;
+  return time + 0;
 }
+
+
 
 
 // ####################

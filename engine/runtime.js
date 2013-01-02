@@ -1433,7 +1433,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var params = this.callee.FormalParameters;
           if (params) {
             var index = params.getIndex(name);
-            return index !== -1 && index <= this.args.length;
+            return index !== -1 && index < this.args.length;
           }
         }
         return false;
