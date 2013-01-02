@@ -1246,7 +1246,9 @@ var debug = (function(exports){
   var brandMap = {
     BuiltinArguments   : 'Arguments',
     BuiltinArray       : 'Array',
+    BuiltinArrayBuffer : 'ArrayBuffer',
     BooleanWrapper     : 'Boolean',
+    BuiltinDataView    : 'DataView',
     BuiltinDate        : 'Date',
     BuiltinError       : 'Error',
     BuiltinFunction    : 'Function',
