@@ -48,7 +48,7 @@ var index = (function(exports){
 
 
   assign(exports, [
-    require('esprima').parse,
+    runtime.parse,
     function createRealm(listener){
       return new Realm(listener);
     },
