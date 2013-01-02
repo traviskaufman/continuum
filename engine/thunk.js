@@ -176,7 +176,7 @@ var thunk = (function(exports){
 
 
       if (error) {
-        if (error.value && error.value.set) {
+        if (error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
           var range = code.ops[ip].range,
               loc = code.ops[ip].loc;
 
