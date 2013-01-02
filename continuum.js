@@ -11755,7 +11755,7 @@ exports.$Nil = (function(exports){
       return true;
     },
     function IsExtensible(){
-      return false;
+      return true;
     },
     function PreventExtensions(){
       return true;
@@ -11779,8 +11779,12 @@ exports.$Nil = (function(exports){
     function GetP(){
       return this;
     },
-    function Put(){},
-    function SetP(){},
+    function Put(){
+      return true;
+    },
+    function SetP(){
+      return true;
+    },
     function Delete(){
       return true;
     },
@@ -11804,18 +11808,6 @@ exports.$Nil = (function(exports){
     },
     function Enumerate(){
       return [];
-    },
-    function Freeze(){
-      return true;
-    },
-    function Seal(){
-      return true;
-    },
-    function IsFrozen(){
-      return true;
-    },
-    function IsSealed(){
-      return true;
     }
   ]);
 
