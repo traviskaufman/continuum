@@ -1,22 +1,14 @@
 var operators = (function(exports){
   "use strict";
-  var constants = require('../constants'),
+  var constants        = require('../constants'),
+      symbols          = require('./$Symbol').wellKnownSymbols,
       $$ThrowException = require('../errors').$$ThrowException;
 
-  var SYMBOLS        = constants.SYMBOLS,
-      Break          = SYMBOLS.Break,
-      Pause          = SYMBOLS.Pause,
-      Throw          = SYMBOLS.Throw,
-      Empty          = SYMBOLS.Empty,
-      Resume         = SYMBOLS.Resume,
-      Return         = SYMBOLS.Return,
-      Abrupt         = SYMBOLS.Abrupt,
-      Builtin        = SYMBOLS.Builtin,
-      Continue       = SYMBOLS.Continue,
-      Reference      = SYMBOLS.Reference,
-      Completion     = SYMBOLS.Completion,
-      Uninitialized  = SYMBOLS.Uninitialized,
-      isFalsey       = constants.isFalsey,
+  var hasInstanceSymbol  = symbols.hasInstance,
+      createSymbol       = symbols.create,
+      ToPrimitiveSymbol  = symbols.ToPrimitive;
+
+  var isFalsey       = constants.isFalsey,
       isNullish      = constants.isNullish,
       isUndefined    = constants.isUndefined,
       isUndetectable = constants.isUndetectable;
@@ -154,13 +146,102 @@ var operators = (function(exports){
   exports.$$ToObject = $$ToObject;
 
 
-  function $$ToPrimitive(argument, hint){
-    if (argument && argument.DefaultValue) {
-      return $$ToPrimitive(argument.DefaultValue(hint), hint);
+  function Type(argument){
+    if (argument === null) {
+      return 'Null';
     }
-    return argument;
+    switch (typeof argument) {
+      case 'undefined':
+        return 'Undefined';
+      case 'object':
+        if (argument.Reference) {
+          return Type($$GetValue(argument));
+        } else if (argument.Completion){
+          return 'Completion';
+        }
+        return 'Object';
+      case 'string':
+        return 'String';
+      case 'number':
+        return 'Number';
+      case 'boolean':
+        return 'Boolean';
+    }
   }
+
+  function $$IsCallable(argument){
+    if (argument && argument.Abrupt) return argument;
+    return !!(argument && typeof argument === 'object' ? argument.Call : false);
+  }
+
+
+  function $$ToPrimitive(argument, PreferredType){
+    if (Type(argument) !== 'Object') {
+      return argument;
+    }
+
+    if (PreferredType === 'String') {
+      var hint = 'string';
+    } else if (PreferredType === 'Number') {
+      var hint = 'number';
+    } else {
+      var hint = 'default';
+    }
+
+    var exoticToPrim = argument.Get(ToPrimitiveSymbol);
+    if (exoticToPrim !== undefined) {
+      if (!$$IsCallable(exoticToPrim)) {
+        return $$ThrowException('cannot_convert_to_primitive', []);
+      }
+      var result = exoticToPrim.Call(argument, [hint]);
+      if (Type(result) !== 'Object') {
+        return result;
+      }
+      return $$ThrowException('cannot_convert_to_primitive', []);
+    }
+
+    if (hint === 'default') {
+      hint = 'number';
+    }
+
+    return $$OrdinaryToPrimitive(argument, hint);
+  }
+
   exports.$$ToPrimitive = $$ToPrimitive;
+
+
+  function $$OrdinaryToPrimitive(O, hint){
+    // Assert: Type(O) is Object
+    // Assert: Type(hint) is String and its value is either "string" or "number"
+
+    if (hint === 'string') {
+      var tryFirst  = 'toString',
+          trySecond = 'valueOf';
+    } else {
+      var tryFirst  = 'valueOf',
+          trySecond = 'toString';
+    }
+
+    var first = O.Get(tryFirst);
+    if ($$IsCallable(first)) {
+      var result = first.Call(O);
+      if (Type(result) !== 'Object') {
+        return result;
+      }
+    }
+
+    var second = O.Get(trySecond);
+    if ($$IsCallable(second)) {
+      var result = second.Call(O);
+      if (Type(result) !== 'Object') {
+        return result;
+      }
+    }
+
+    return $$ThrowException('cannot_convert_to_primitive', []);
+  }
+
+  exports.$$OrdinaryToPrimitive = $$OrdinaryToPrimitive;
 
 
   function $$ToBoolean(argument){
