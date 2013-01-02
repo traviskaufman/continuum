@@ -13698,7 +13698,7 @@ exports.$Symbol = (function(exports){
       this.Name = name;
       this.Private = !isPublic;
       tag(this);
-      this.gensym = '___'+zeroPad(this.id, 8)+postfix;
+      this.gensym = '@@@'+zeroPad(this.id, 8)+postfix;
     }
 
     define($Symbol.prototype, {
