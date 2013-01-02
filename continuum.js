@@ -19796,13 +19796,15 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       } catch (e) {
         if (!realm || !intrinsics) return e;
         var err = new $Error('SyntaxError', undefined, e.message),
-            loc = { line: e.lineNumber, column: e.column  };
+            loc = { line: e.lineNumber, column: e.column };
 
         err.setCode({ start: loc, end: loc }, src);
         err.setOrigin(origin, type);
         return new AbruptCompletion('throw', err);
       }
     }
+
+    exports.parse = parse;
 
     natives.add({
       parse: function(src, loc, range, raw, tokens, comment, tolerant, source){
@@ -22198,7 +22200,7 @@ exports.index = (function(exports){
 
 
   assign(exports, [
-    require('esprima').parse,
+    runtime.parse,
     function createRealm(listener){
       return new Realm(listener);
     },
