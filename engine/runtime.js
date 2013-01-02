@@ -16,6 +16,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
+      $String          = require('./object-model/$String').$String,
       $Array           = require('./object-model/$Array'),
       $Proxy           = require('./object-model/$Proxy'),
       $TypedArray      = require('./object-model/$TypedArray'),
@@ -40,11 +41,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       iterate     = iteration.iterate,
       each        = iteration.each,
       map         = iteration.map,
-      numbers     = utility.numbers,
       uid         = utility.uid,
       nextTick    = utility.nextTick,
       tag         = utility.tag,
-      unique      = utility.unique,
       MapData     = collections.MapData,
       WeakMapData = collections.WeakMapData;
 
@@ -64,8 +63,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $$CreateListFromArray     = operations.$$CreateListFromArray,
       $$IsStopIteration         = operations.$$IsStopIteration;
 
-  var StringIndex              = descriptors.StringIndex,
-      Value                    = descriptors.Value,
+  var Value                    = descriptors.Value,
       Accessor                 = descriptors.Accessor,
       ArgAccessor              = descriptors.ArgAccessor,
       DataDescriptor           = descriptors.DataDescriptor,
@@ -89,16 +87,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       Continue      = SYMBOLS.Continue,
       Uninitialized = SYMBOLS.Uninitialized;
 
-  var wellKnownSymbols   = require('./object-model/$Symbol').wellKnownSymbols,
-      toStringTagSymbol  = wellKnownSymbols.toStringTag,
-      iteratorSymbol     = wellKnownSymbols.iterator,
-      hasInstanceSymbol  = wellKnownSymbols.hasInstance,
-      createSymbol       = wellKnownSymbols.create,
-      BooleanValueSymbol = wellKnownSymbols.BooleanValue,
-      StringValueSymbol  = wellKnownSymbols.StringValue,
-      NumberValueSymbol  = wellKnownSymbols.NumberValue,
-      DateValueSymbol    = wellKnownSymbols.DateValue,
-      ToPrimitiveSymbol  = wellKnownSymbols.ToPrimitive;
+  var symbols            = require('./object-model/$Symbol').wellKnownSymbols,
+      toStringTagSymbol  = symbols.toStringTag,
+      iteratorSymbol     = symbols.iterator,
+      hasInstanceSymbol  = symbols.hasInstance,
+      createSymbol       = symbols.create,
+      BooleanValueSymbol = symbols.BooleanValue,
+      NumberValueSymbol  = symbols.NumberValue,
+      DateValueSymbol    = symbols.DateValue,
+      ToPrimitiveSymbol  = symbols.ToPrimitive;
 
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
@@ -741,93 +738,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-
-  // ###############
-  // ### $String ###
-  // ###############
-
-  var $String = (function(){
-    function $String(value){
-      $Object.call(this, intrinsics.StringProto);
-      this.setPrimitiveValue(value);
-      this.define('length', value.length, ___);
-    }
-
-    var ObjectGet = $Object.prototype.get;
-
-    inherit($String, $Object, {
-      BuiltinBrand: 'StringWrapper',
-      type: '$String'
-    }, [
-      function getPrimitiveValue(){
-        return ObjectGet.call(this, StringValueSymbol) || '';
-      },
-      function setPrimitiveValue(value){
-        return this.define(StringValueSymbol, value, _CW);
-      },
-
-      function each(callback){
-        var str = this.getPrimitiveValue();
-        for (var i=0; i < str.length; i++) {
-          callback([i+'', str[i], E__]);
-        }
-        $Object.prototype.each.call(this, callback);
-      },
-      function has(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return true;
-        }
-        return $Object.prototype.has.call(this, key);
-      },
-      function get(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return str[key];
-        }
-        return $Object.prototype.get.call(this, key);
-      },
-      function query(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return E__;
-        }
-        return $Object.prototype.query.call(this, key);
-      },
-      function describe(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return [key, str[key], E__];
-        }
-        return $Object.prototype.describe.call(this, key);
-      },
-      function GetOwnProperty(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return new StringIndex(str[key]);
-        }
-
-        var desc = $Object.prototype.GetOwnProperty.call(this, key);
-        if (desc) {
-          return desc;
-        }
-      },
-      function Get(key){
-        var str = this.getPrimitiveValue();
-        if (key < str.length && key >= 0) {
-          return str[key];
-        }
-        return this.GetP(this, key);
-      },
-      function Enumerate(includePrototype, onlyEnumerable){
-        var str = this.getPrimitiveValue();
-        var props = $Object.prototype.Enumerate.call(this, includePrototype, onlyEnumerable);
-        return unique(numbers(str.length).concat(props));
-      }
-    ]);
-
-    return $String;
-  })();
 
 
   // ###############
@@ -2477,7 +2387,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       LOCAL_TZ        : natives.get('LOCAL_TZ')
     });
 
-    internalModules.set('@@symbols', wellKnownSymbols);
+    internalModules.set('@@symbols', symbols);
 
 
     var mutationScopeInit = new Script('void 0');
@@ -2883,6 +2793,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       target.emit('activate');
       $Object.changeRealm(target);
       $Array.changeRealm(target);
+      $String.changeRealm(target);
       operations.changeRealm(target);
     }
   }

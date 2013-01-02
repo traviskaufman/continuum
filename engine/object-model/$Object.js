@@ -291,13 +291,6 @@ var $Object = (function(exports){
   exports.$Object = $Object;
 
 
-  define($Object, [
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
-
   define($Object.prototype, {
     Extensible: true,
     BuiltinBrand: 'BuiltinObject',
@@ -625,6 +618,13 @@ var $Object = (function(exports){
 
 
   var realm, intrinsics;
+
+  define($Object, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});

@@ -42,6 +42,7 @@ require('./builder')
   '../engine/object-model/operations.js',
   '../engine/object-model/$Symbol.js',
   '../engine/object-model/$Object.js',
+  '../engine/object-model/$String.js',
   '../engine/object-model/$Array.js',
   '../engine/object-model/$Proxy.js',
   '../engine/object-model/$TypedArray.js',
