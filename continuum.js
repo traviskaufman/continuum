@@ -20894,7 +20894,7 @@ exports.debug = (function(exports){
       kind: 'ArrayBuffer'
     }, [
       function label(){
-        return this.subject.BuiltinBrand;
+        return brandMap[this.subject.BuiltinBrand];
       }
     ]);
     return MirrorArrayBufferView;
