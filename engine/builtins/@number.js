@@ -49,16 +49,17 @@ builtinClass(Number);
 $__define(Number.prototype, @@NumberValue, 0);
 
 
-export function isNaN(number){
-  return number !== number;
+export function isNaN(value){
+  return value !== value;
 }
 
-export function isFinite(number){
+export function isFinite(value){
   return typeof value === 'number'
       && value === value
       && value < POSITIVE_INFINITY
       && value > NEGATIVE_INFINITY;
 }
+
 
 export function isInteger(value) {
   return typeof value === 'number'
