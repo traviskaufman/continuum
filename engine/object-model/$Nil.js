@@ -8,6 +8,7 @@ var $Nil = (function(exports){
 
   var ToPrimitiveSymbol = require('./$Symbol').wellKnownSymbols.ToPrimitiveSymbol;
 
+
   function Undetectable(value){
     this.value = value;
   }
@@ -25,33 +26,22 @@ var $Nil = (function(exports){
 
   exports.Undetectable = Undetectable;
 
-
-  function isUndetectable(value){
+  exports.isUndetectable = function isUndetectable(value){
     return value instanceof Undetectable;
-  }
+  };
 
-  exports.isUndetectable = isUndetectable;
-
-
-  function isUndefined(value){
+  exports.isUndefined = function isUndefined(value){
     return value === undefined || value instanceof Undetectable;
-  }
+  };
 
-  exports.isUndefined = isUndefined;
-
-
-  function isNullish(value){
+  exports.isNullish = function isNullish(value){
     return value == null || value instanceof Undetectable;
-  }
+  };
 
-  exports.isNullish = isNullish;
-
-
-  function isFalsey(value){
+  exports.isFalsey = function isFalsey(value){
     return !value || value instanceof Undetectable;
-  }
+  };
 
-  exports.isFalsey = isFalsey;
 
 
   var nilToPrimitive = {
@@ -71,6 +61,7 @@ var $Nil = (function(exports){
   }
 
   exports.$Nil = $Nil;
+
 
   inherit($Nil, Undetectable, {
     type: '$Nil',
@@ -166,7 +157,6 @@ var $Nil = (function(exports){
       return [];
     }
   ]);
-
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
