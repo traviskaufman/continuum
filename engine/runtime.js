@@ -96,7 +96,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       createSymbol       = wellKnownSymbols.create,
       BooleanValueSymbol = wellKnownSymbols.BooleanValue,
       StringValueSymbol  = wellKnownSymbols.StringValue,
-      NumberValue        = wellKnownSymbols.NumberValue,
+      NumberValueSymbol  = wellKnownSymbols.NumberValue,
       DateValueSymbol    = wellKnownSymbols.DateValue,
       ToPrimitiveSymbol  = wellKnownSymbols.ToPrimitive;
 
