@@ -374,10 +374,10 @@ export function Put(O, P, V, Throw){
 // ### 9.3.3 CreateOwnDataProperty ###
 // ###################################
 
-const normalDescriptor = $$CreateInternalObject();
-$$SetInternal(normalDescriptor, 'Writable', true);
-$$SetInternal(normalDescriptor, 'Enumerable', true);
-$$SetInternal(normalDescriptor, 'Configurable', true);
+const normal = $$CreateInternalObject();
+$$SetInternal(normal, 'Writable', true);
+$$SetInternal(normal, 'Enumerable', true);
+$$SetInternal(normal, 'Configurable', true);
 
 export function CreateOwnDataProperty(O, P, V){
   // Assert: Type(O) is Object.
@@ -387,9 +387,9 @@ export function CreateOwnDataProperty(O, P, V){
   if (!extensible) {
     return extensible;
   }
-  $$SetInternal(normalDescriptor, 'Value', V);
-  const result = $$CallInternal(O, 'DefineOwnProperty', [P, normalDescriptor]);
-  $$SetInternal(normalDescriptor, 'Value', undefined);
+  $$SetInternal(normal, 'Value', V);
+  const result = $$CallInternal(O, 'DefineOwnProperty', [P, normal]);
+  $$SetInternal(normal, 'Value', undefined);
   return result;
 }
 
@@ -568,10 +568,10 @@ export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto
     throw $$Exception('construct_non_constructor', [Type(constructor)]);
   }
 
-  let proto = constructor.prototype;
+  let proto = Get(constructor, 'prototype');
   if (!proto) {
     const realm = $$HasInternal(constructor, 'Realm') ? $$GetInternal('Realm') : $$CurrentRealm();
-    proto = $$GetIntrinsics(realm, protos[intrinsicDefaultProto]);
+    proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto));
   }
 
   return ObjectCreate(proto);
