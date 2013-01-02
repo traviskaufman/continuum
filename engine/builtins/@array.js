@@ -684,7 +684,7 @@ $__define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 ['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
 
 export function isArray(array){
-  return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'Array' : false;
+  return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'BuiltinArray' : false;
 }
 
 export function from(arrayLike){

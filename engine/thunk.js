@@ -20,8 +20,7 @@ var thunk = (function(exports){
       POST_DEC        = operators.POST_DEC,
       Pause           = constants.SYMBOLS.Pause,
       Empty           = constants.SYMBOLS.Empty,
-      Resume          = constants.SYMBOLS.Resume,
-      StopIteration   = constants.BRANDS.StopIteration;
+      Resume          = constants.SYMBOLS.Resume;
 
   var AbruptCompletion = require('./errors').AbruptCompletion;
 
@@ -167,7 +166,7 @@ var thunk = (function(exports){
             ip = entry.end + 1;
             return cmds[ip];
           } else if (entry.type === 'iteration') {
-            if (error && error.value && error.value.BuiltinBrand === StopIteration) {
+            if (error && error.value && error.value.BuiltinBrand === 'StopIteration') {
               ip = entry.end;
               return cmds[ip];
             }

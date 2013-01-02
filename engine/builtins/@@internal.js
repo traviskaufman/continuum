@@ -50,7 +50,11 @@ function internalFunction(func){
 
 internalFunction(internalFunction);
 
-
+const brands = {
+  BuiltinString: 'StringWrapper',
+  BuiltinNumber: 'NumberWrapper',
+  BuiltinBoolean: 'BooleanWrapper'
+};
 
 function builtinClass(Ctor, brand){
   var prototypeName = Ctor.name + 'Proto',
@@ -76,6 +80,9 @@ function builtinClass(Ctor, brand){
 
   if (!isSymbol) {
     brand || (brand = 'Builtin'+Ctor.name);
+    if (brand in brands) {
+      brand = brands[brand];
+    }
     $__SetBuiltinBrand(Ctor.prototype, brand);
     $__define(Ctor.prototype, @@toStringTag, Ctor.name);
     hideEverything(Ctor);
@@ -150,7 +157,7 @@ function ensureArgs(o, name){
   }
 
   const brand = $__GetBuiltinBrand(o);
-  return brand === 'Array' || brand === 'Arguments' ? o : [...o];
+  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];
 }
 
 internalFunction(ensureArgs);

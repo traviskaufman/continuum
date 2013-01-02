@@ -618,7 +618,7 @@ var ThrownBranch = (function(){
       location.append(inline('Uncaught Exception ', 'Uncaught'));
       location.append(inline(' in '));
       location.append(inline(this.mirror.origin(), 'Origin'));
-      location.append(inline(' at '));
+      location.append(inline(' at line '));
       location.append(inline(this.mirror.getValue('line'), 'Line'));
       var label = block();
       label.append(location);

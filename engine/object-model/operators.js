@@ -16,7 +16,6 @@ var operators = (function(exports){
       Reference      = SYMBOLS.Reference,
       Completion     = SYMBOLS.Completion,
       Uninitialized  = SYMBOLS.Uninitialized,
-      BuiltinSymbol  = constants.BRANDS.BuiltinSymbol,
       isFalsey       = constants.isFalsey,
       isNullish      = constants.isNullish,
       isUndefined    = constants.isUndefined,
@@ -233,7 +232,7 @@ var operators = (function(exports){
       return argument + '';
     }
     var type = typeof argument;
-    if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === BuiltinSymbol) {
+    if (type === 'string' || type === 'object' && argument.Abrupt || argument.BuiltinBrand === 'BuiltinSymbol') {
       return argument;
     }
     return $$ToString(argument);

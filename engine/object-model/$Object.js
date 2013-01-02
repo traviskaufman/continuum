@@ -300,7 +300,7 @@ var $Object = (function(exports){
 
   define($Object.prototype, {
     Extensible: true,
-    BuiltinBrand: constants.BRANDS.BuiltinObject,
+    BuiltinBrand: 'BuiltinObject',
     type: '$Object'
   });
 

@@ -54,50 +54,6 @@ var constants = (function(exports){
     }
   ]);
 
-
-  exports.BRANDS = {
-    BooleanWrapper      : new BuiltinBrand('Boolean'),
-    GlobalObject        : new BuiltinBrand('global'),
-    BuiltinArguments    : new BuiltinBrand('Arguments'),
-    BuiltinArrayIterator: new BuiltinBrand('ArrayIterator'),
-    BuiltinArray        : new BuiltinBrand('Array'),
-    BuiltinDate         : new BuiltinBrand('Date'),
-    BuiltinDataView     : new BuiltinBrand('DataView'),
-    BuiltinError        : new BuiltinBrand('Error'),
-    BuiltinFunction     : new BuiltinBrand('Function'),
-    BuiltinHandler      : new BuiltinBrand('Handler'),
-    BuiltinIterator     : new BuiltinBrand('Iterator'),
-    BuiltinJSON         : new BuiltinBrand('JSON'),
-    BuiltinMap          : new BuiltinBrand('Map'),
-    BuiltinMapIterator  : new BuiltinBrand('MapIterator'),
-    BuiltinMath         : new BuiltinBrand('Math'),
-    BuiltinModule       : new BuiltinBrand('Module'),
-    BuiltinObject       : new BuiltinBrand('Object'),
-    BuiltinProxy        : new BuiltinBrand('Proxy'),
-    BuiltinRegExp       : new BuiltinBrand('RegExp'),
-    BuiltinSet          : new BuiltinBrand('Set'),
-    BuiltinSetIterator  : new BuiltinBrand('SetIterator'),
-    BuiltinSymbol       : new BuiltinBrand('Symbol'),
-    BuiltinWeakMap      : new BuiltinBrand('WeakMap'),
-    NumberWrapper       : new BuiltinBrand('Number'),
-    StopIteration       : new BuiltinBrand('StopIteration'),
-    StringWrapper       : new BuiltinBrand('String'),
-    BuiltinArrayBuffer  : new BuiltinBrand('ArrayBuffer'),
-    BuiltinInt8Array    : new BuiltinBrand('Int8Array'),
-    BuiltinInt16Array   : new BuiltinBrand('Int16Array'),
-    BuiltinInt32Array   : new BuiltinBrand('Int32Array'),
-    BuiltinUint8Array   : new BuiltinBrand('Uint8Array'),
-    BuiltinUint16Array  : new BuiltinBrand('Uint16Array'),
-    BuiltinUint32Array  : new BuiltinBrand('Uint32Array'),
-    BuiltinFloat32Array : new BuiltinBrand('Float32Array'),
-    BuiltinFloat64Array : new BuiltinBrand('Float64Array')
-  };
-
-  exports.BRANDS.BuiltinString = exports.BRANDS.StringWrapper;
-  exports.BRANDS.BuiltinNumber = exports.BRANDS.NumberWrapper;
-  exports.BRANDS.BuiltinBoolean = exports.BRANDS.BooleanWrapper;
-
-
   exports.BINARYOPS = new Constants(['instanceof', 'in', '==', '!=', '===', '!==', '<', '>',
                                    '<=', '>=', '*', '/','%', '+', '-', '<<', '>>', '>>>', '|', '&', '^', 'string+']);
   exports.UNARYOPS = new Constants(['delete', 'void', 'typeof', '+', '-', '~', '!']);

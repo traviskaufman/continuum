@@ -178,6 +178,7 @@ var errors = (function(errors, messages, exports){
     import_not_symbol                   : ["Imported object is not a symbol ", "$0"]
   },
   ReferenceError: {
+    unknown_internal_function      : ["Referenced non-existent internal function ", "$0"],
     unknown_wellknown_symbol       : ["Referenced unknown well known symbol ", "$0"],
     undefined_symbol               : ["Referenced undefined symbol @", "$0"],
     unknown_label                  : ["Undefined label '", "$0", "'"],

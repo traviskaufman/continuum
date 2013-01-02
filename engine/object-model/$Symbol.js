@@ -38,7 +38,7 @@ var $Symbol = (function(exports){
     }
 
     define($Symbol.prototype, {
-      BuiltinBrand: require('../constants').BRANDS.BuiltinSymbol,
+      BuiltinBrand: 'BuiltinSymbol',
       Extensible: false,
       Private: true,
       Name: null,

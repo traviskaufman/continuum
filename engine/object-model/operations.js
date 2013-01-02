@@ -9,8 +9,7 @@ var operations = (function(exports){
       constants    = require('../constants'),
       MapData      = require('./collections').MapData;
 
-  var BRANDS                 = constants.BRANDS,
-      isFalsey               = constants.isFalsey,
+  var isFalsey               = constants.isFalsey,
       isNullish              = constants.isNullish,
       isUndefined            = constants.isUndefined,
       isUndetectable         = constants.isUndetectable,
@@ -504,7 +503,7 @@ var operations = (function(exports){
 
 
   function $$IsStopIteration(o){
-    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === BRANDS.StopIteration);
+    return !!(o && o.Abrupt && o.value && o.value.BuiltinBrand === 'StopIteration');
   }
 
   exports.$$IsStopIteration = $$IsStopIteration;

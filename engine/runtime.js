@@ -103,7 +103,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
 
-  var BRANDS = constants.BRANDS;
 
   var E = 0x1,
       C = 0x2,
@@ -436,7 +435,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Function, $Object, {
-      BuiltinBrand: BRANDS.BuiltinFunction,
+      BuiltinBrand: 'BuiltinFunction',
       FormalParameters: null,
       code: null,
       Scope: null,
@@ -727,7 +726,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Date, $Object, {
-      BuiltinBrand: BRANDS.BuiltinDate,
+      BuiltinBrand: 'BuiltinDate',
       type: '$Date'
     }, [
       function getPrimitiveValue(){
@@ -757,7 +756,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     var ObjectGet = $Object.prototype.get;
 
     inherit($String, $Object, {
-      BuiltinBrand: BRANDS.StringWrapper,
+      BuiltinBrand: 'StringWrapper',
       type: '$String'
     }, [
       function getPrimitiveValue(){
@@ -842,7 +841,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Number, $Object, {
-      BuiltinBrand: BRANDS.NumberWrapper,
+      BuiltinBrand: 'NumberWrapper',
       type: '$Number'
     }, [
       function getPrimitiveValue(){
@@ -868,7 +867,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Boolean, $Object, {
-      BuiltinBrand: BRANDS.BooleanWrapper,
+      BuiltinBrand: 'BooleanWrapper',
       type: '$Boolean'
     }, [
       function getPrimitiveValue(){
@@ -894,7 +893,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Map, $Object, {
-      BuiltinBrand: BRANDS.BuiltinMap
+      BuiltinBrand: 'BuiltinMap'
     });
 
     return $Map;
@@ -911,7 +910,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Set, $Object, {
-      BuiltinBrand: BRANDS.BuiltinSet
+      BuiltinBrand: 'BuiltinSet'
     });
 
     return $Set;
@@ -929,7 +928,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($WeakMap, $Object, {
-      BuiltinBrand: BRANDS.BuiltinWeakMap
+      BuiltinBrand: 'BuiltinWeakMap'
     });
 
     return $WeakMap;
@@ -959,7 +958,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     inherit($RegExp, $Object, {
-      BuiltinBrand: BRANDS.BuiltinRegExp,
+      BuiltinBrand: 'BuiltinRegExp',
       Match: null
     }, [
       function describe(key){
@@ -1031,7 +1030,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Arguments, $Object, {
-      BuiltinBrand: BRANDS.BuiltinArguments,
+      BuiltinBrand: 'BuiltinArguments',
       ParameterMap: null
     });
 
@@ -1165,7 +1164,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     inherit($Module, $Object, {
       type: '$Module',
-      BuiltinBrand: BRANDS.BuiltinModule
+      BuiltinBrand: 'BuiltinModule'
     }, [
       function init(object, keys){
         this.props = new Hash;
@@ -1308,7 +1307,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($Error, $Object, {
-      BuiltinBrand: BRANDS.BuiltinError
+      BuiltinBrand: 'BuiltinError'
     }, [
       function setOrigin(filename, kind){
         if (filename) {
@@ -1953,7 +1952,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       intrinsics.Genesis.HiddenPrototype = true;
       intrinsics.ObjectProto = new $Object(intrinsics.Genesis);
       intrinsics.global = global = operators.global = realm.global = new $Object(intrinsics.ObjectProto);
-      intrinsics.global.BuiltinBrand = BRANDS.GlobalObject;
+      intrinsics.global.BuiltinBrand = 'GlobalObject';
       realm.globalEnv = new GlobalEnv(intrinsics.global);
       realm.globalEnv.Realm = realm;
 
@@ -1973,12 +1972,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
-      intrinsics.StopIteration.BuiltinBrand = BRANDS.StopIteration;
+      intrinsics.StopIteration.BuiltinBrand = 'StopIteration';
 
       intrinsics.FunctionProto.FormalParameters = [];
       intrinsics.FunctionProto.Call = FunctionPrototypeCall;
       intrinsics.FunctionProto.HasInstance = FunctionPrototypeHasInstance;
-      intrinsics.FunctionProto.BuiltinBrand = BRANDS.BuiltinFunction;
+      intrinsics.FunctionProto.BuiltinBrand = 'BuiltinFunction';
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;
       intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
@@ -2310,7 +2309,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       _ToModule: function(obj, args){
-        if (args[0].BuiltinBrand === BRANDS.BuiltinModule) {
+        if (args[0].BuiltinBrand === 'BuiltinModule') {
           return args[0];
         }
         return new $Module(args[0], args[0].Enumerate(false, false));
@@ -2401,17 +2400,17 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$CallInternal: function(_, args){
           var obj = args[0],
-              name = args[1],
+              key = args[1],
               argv = args[2],
-              func = obj[name];
+              func = obj[key];
 
           if (func) {
-            if (args) {
-              return func.apply(obj, args.array);
+            if (argv) {
+              return func.apply(obj, argv.array);
             }
-            return obj[name]();
+            return obj[key]();
           }
-          return $$ThrowException('unknown_internal_function', [name]);
+          return $$ThrowException('unknown_internal_function', [key]);
         },
         $$CreateObject: function(_, args){
           return new objectTypes[args[0]](args[1]);
@@ -2440,14 +2439,43 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$IsConstruct: function(){
           return context.isConstruct;
         },
+        $$Now: Date.now
+          ? Date.now
+          : function(){ return +new Date },
+        $$ParseDate: Date.parse
+          ? function(_, args){ return Date.parse(args[0]) }
+          : function(_, args){ return NaN },
+        $$RegExpExec: function(_, args){
+          var result = args[0].PrimitiveValue.exec(args[1]);
+          if (result) {
+            var array = new $Array(result);
+            array.set('index', result.index);
+            array.set('input', args[1]);
+            return array;
+          }
+          return null;
+        },
         $$StringToNumber: function(_, args){
           return +args[0];
+        },
+        $$NumberToString: function(_, args){
+          return args[0].toString(args[1] || 10);
         },
         $$SetInternal: function(_, args){
           args[0][args[1]] = args[2];
         }
       });
     }();
+
+    internalModules.set('@@constants', {
+      DST_START_MONTH : natives.get('DST_START_MONTH'),
+      DST_START_SUNDAY: natives.get('DST_START_SUNDAY'),
+      DST_START_OFFSET: natives.get('DST_START_OFFSET'),
+      DST_END_MONTH   : natives.get('DST_END_MONTH'),
+      DST_END_SUNDAY  : natives.get('DST_END_SUNDAY'),
+      DST_END_OFFSET  : natives.get('DST_END_OFFSET'),
+      LOCAL_TZ        : natives.get('LOCAL_TZ')
+    });
 
     internalModules.set('@@symbols', wellKnownSymbols);
 
@@ -2600,7 +2628,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           scope = new GlobalEnv(bindings),
           realm = scope.Realm = bindings.Realm = create(outerRealm);
 
-      bindings.BuiltinBrand = BRANDS.GlobalObject;
+      bindings.BuiltinBrand = 'GlobalObject';
       scope.outer = outerRealm.globalEnv;
       realm.global = bindings;
       realm.globalEnv = scope;

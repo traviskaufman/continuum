@@ -42,7 +42,7 @@ var $Array = (function(module){
   }
 
   inherit($Array, $Object, {
-    BuiltinBrand: constants.BRANDS.BuiltinArray
+    BuiltinBrand: 'BuiltinArray'
   }, [
     function has(key){
       if (key === 'length') {

@@ -14,8 +14,7 @@ var natives = (function(module){
       constants        = require('./constants'),
       wellKnownSymbols = require('./object-model/$Symbol').wellKnownSymbols;
 
-  var BRANDS                    = constants.BRANDS,
-      Undetectable              = constants.Undetectable,
+  var Undetectable              = constants.Undetectable,
       isUndetectable            = constants.isUndetectable,
       inherit                   = objects.inherit,
       define                    = objects.define,
@@ -135,17 +134,10 @@ var natives = (function(module){
       return args[0].Construct($$CreateListFromArray(args[1]));
     },
     _GetBuiltinBrand: function(obj, args){
-      if (args[0].BuiltinBrand) {
-        return args[0].BuiltinBrand.name;
-      }
+      return args[0].BuiltinBrand;
     },
     _SetBuiltinBrand: function(obj, args){
-      var brand = BRANDS[args[1]];
-      if (brand) {
-        args[0].BuiltinBrand = brand;
-        return args[0].BuiltinBrand.name;
-      }
-      return $$ThrowException('unknown_builtin_brand');
+      args[0].BuiltinBrand = args[1];
     },
     _TypedArrayCreate: function(obj, args){
       return new $TypedArray(args[0], args[1], args[2], args[3]);
@@ -416,7 +408,7 @@ var natives = (function(module){
       var code = obj.code;
       if (obj.BuiltinFunction || !code) {
         var name = obj.get('name');
-        if (name && typeof name !== 'string' && name.BuiltinBrand === BRANDS.BuiltinSymbol) {
+        if (name && typeof name !== 'string' && name.BuiltinBrand === 'BuiltinSymbol') {
           name = '@' + name.Name;
         }
         return nativeCode[0] + name + nativeCode[1];

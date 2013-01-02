@@ -133,7 +133,7 @@ export class Loader {
 
 export function Module(object, mrl){
   object = $__ToObject(object);
-  if ($__GetBuiltinBrand(object) === 'Module') {
+  if ($__GetBuiltinBrand(object) === 'BuiltinModule') {
     return object;
   }
   var module = $__ToModule(object);

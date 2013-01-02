@@ -190,7 +190,7 @@ var debug = (function(exports){
         return !!this.subject.Class;
       },
       function getBrand(){
-        return this.subject.Brand || this.subject.BuiltinBrand;
+        return this.subject.BuiltinBrand;
       },
       function getValue(key){
         return this.get(key).subject;
@@ -317,9 +317,9 @@ var debug = (function(exports){
         return attrs === null ? this.getPrototype().query(key) : attrs;
       },
       function label(){
-        var brand = this.subject.Brand || this.subject.BuiltinBrand;
-        if (brand && brand.name !== 'Object') {
-          return brand.name;
+        var brand = this.subject.BuiltinBrand;
+        if (brand && brand !== 'BuiltinObject') {
+          return brandMap[brand];
         }
 
         if (this.subject.ConstructorName) {
@@ -440,7 +440,7 @@ var debug = (function(exports){
       kind: 'ArrayBuffer'
     }, [
       function label(){
-        return this.subject.BuiltinBrand.name;
+        return this.subject.BuiltinBrand;
       }
     ]);
     return MirrorArrayBufferView;
@@ -546,7 +546,7 @@ var debug = (function(exports){
       kind: 'Thrown'
     }, [
       function getError(){
-        if (this.subject.BuiltinBrand.name === 'StopIteration') {
+        if (this.subject.BuiltinBrand === 'StopIteration') {
           return 'StopIteration';
         }
         return this.getValue('name') + ': ' + this.getValue('message');
@@ -1243,34 +1243,61 @@ var debug = (function(exports){
   })();
 
 
+  var brandMap = {
+    BuiltinArguments   : 'Arguments',
+    BuiltinArray       : 'Array',
+    BooleanWrapper     : 'Boolean',
+    BuiltinDate        : 'Date',
+    BuiltinError       : 'Error',
+    BuiltinFunction    : 'Function',
+    GlobalObject       : 'global',
+    BuiltinJSON        : 'JSON',
+    BuiltinMap         : 'Map',
+    BuiltinMath        : 'Math',
+    BuiltinModule      : 'Module',
+    NumberWrapper      : 'Number',
+    BuiltinRegExp      : 'RegExp',
+    BuiltinSet         : 'Set',
+    StringWrapper      : 'String',
+    BuiltinSymbol      : 'Symbol',
+    BuiltinWeakMap     : 'WeakMap',
+    BuiltinInt8Array   : 'Int8Array',
+    BuiltinUint8Array  : 'Uint8Array',
+    BuiltinInt16Array  : 'Int16Array',
+    BuiltinUint16Array : 'Uint16Array',
+    BuiltinInt32Array  : 'Int32Array',
+    BuiltinUint32Array : 'Uint32Array',
+    BuiltinFloat32Array: 'Float32Array',
+    BuiltinFloat64Array: 'Float64Array'
+  };
 
 
   var brands = {
-    Arguments   : MirrorArguments,
-    Array       : MirrorArray,
-    Boolean     : MirrorBoolean,
-    Date        : MirrorDate,
-    Error       : MirrorError,
-    Function    : MirrorFunction,
-    global      : MirrorGlobal,
-    JSON        : MirrorJSON,
-    Map         : MirrorMap,
-    Math        : MirrorMath,
-    Module      : MirrorModule,
-    Number      : MirrorNumber,
-    RegExp      : MirrorRegExp,
-    Set         : MirrorSet,
-    String      : MirrorString,
-    Symbol      : MirrorSymbol,
-    WeakMap     : MirrorWeakMap,
-    Int8Array   : MirrorArrayBufferView,
-    Uint8Array  : MirrorArrayBufferView,
-    Int16Array  : MirrorArrayBufferView,
-    Uint16Array : MirrorArrayBufferView,
-    Int32Array  : MirrorArrayBufferView,
-    Uint32Array : MirrorArrayBufferView,
-    Float32Array: MirrorArrayBufferView,
-    Float64Array: MirrorArrayBufferView
+    BuiltinArguments   : MirrorArguments,
+    BuiltinArray       : MirrorArray,
+    BooleanWrapper     : MirrorBoolean,
+    BuiltinDate        : MirrorDate,
+    BuiltinError       : MirrorError,
+    BuiltinFunction    : MirrorFunction,
+    GlobalObject       : MirrorGlobal,
+    BuiltinJSON        : MirrorJSON,
+    BuiltinMap         : MirrorMap,
+    BuiltinMath        : MirrorMath,
+    BuiltinModule      : MirrorModule,
+    NumberWrapper      : MirrorNumber,
+    BuiltinRegExp      : MirrorRegExp,
+    BuiltinSet         : MirrorSet,
+    StringWrapper      : MirrorString,
+    BuiltinSymbol      : MirrorSymbol,
+    BuiltinWeakMap     : MirrorWeakMap,
+    BuiltinInt8Array   : MirrorArrayBufferView,
+    BuiltinUint8Array  : MirrorArrayBufferView,
+    BuiltinInt16Array  : MirrorArrayBufferView,
+    BuiltinUint16Array : MirrorArrayBufferView,
+    BuiltinInt32Array  : MirrorArrayBufferView,
+    BuiltinUint32Array : MirrorArrayBufferView,
+    BuiltinFloat32Array: MirrorArrayBufferView,
+    BuiltinFloat64Array: MirrorArrayBufferView
   };
 
   var _Null        = new MirrorValue(null, 'null'),
@@ -1338,8 +1365,8 @@ var debug = (function(exports){
             return new MirrorProxy(subject);
           } else if ('Call' in subject) {
             return new MirrorFunction(subject);
-          } else if (subject.BuiltinBrand.name in brands) {
-            return new brands[subject.BuiltinBrand.name](subject);
+          } else if (subject.BuiltinBrand in brands) {
+            return new brands[subject.BuiltinBrand](subject);
           } else {
             return new MirrorObject(subject);
           }

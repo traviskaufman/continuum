@@ -7,8 +7,7 @@ var $TypedArray = (function(module){
       $$ThrowException = require('../errors').$$ThrowException,
       DataDescriptor = require('./descriptors').DataDescriptor;
 
-  var BRANDS      = require('../constants').BRANDS,
-      inherit     = objects.inherit,
+  var inherit     = objects.inherit,
       define      = objects.define,
       Hash        = objects.Hash,
       DataView    = buffers.DataView,
@@ -39,7 +38,7 @@ var $TypedArray = (function(module){
     this.cast  = options.cast;
     this.set   = options.set;
     this.get   = options.get;
-    this.brand = BRANDS['Builtin'+this.name+'Array'];
+    this.brand = 'Builtin'+this.name+'Array';
     types[this.name+'Array'] = this;
   }
 

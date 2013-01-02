@@ -1,10 +1,14 @@
+function isRegExp(o){
+  return $__Type(o) === 'Object' && $__GetBuiltinBrand(o) === 'BuiltinRegExp';
+}
+
 export class RegExp {
   constructor(pattern, flags){
     if ($__isConstruct()) {
       if (pattern === undefined) {
         pattern = '';
       } else if (typeof pattern === 'string') {
-      } else if (pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {
+      } else if (isRegExp(pattern)) {
         if (flags !== undefined) {
           throw $__Exception('regexp_flags', []);
         }
@@ -13,7 +17,7 @@ export class RegExp {
       }
       return $__RegExpCreate(pattern, flags);
     } else {
-      if (flags === undefined && pattern && $__GetBuiltinBrand(pattern) === 'RegExp') {
+      if (flags === undefined && isRegExp(pattern)) {
         return pattern;
       }
       return $__RegExpCreate(pattern, flags);
@@ -21,21 +25,21 @@ export class RegExp {
   }
 
   exec(string){
-    if ($__GetBuiltinBrand(this) === 'RegExp') {
+    if (isRegExp(this)) {
       return $__RegExpExec(this, $__ToString(string));
     }
     throw $__Exception('not_generic', ['RegExp.prototype.exec']);
   }
 
   test(string){
-    if ($__GetBuiltinBrand(this) === 'RegExp') {
+    if (isRegExp(this)) {
       return $__RegExpTest(this, $__ToString(string));
     }
     throw $__Exception('not_generic', ['RegExp.prototype.test']);
   }
 
   toString(){
-    if ($__GetBuiltinBrand(this) === 'RegExp') {
+    if (isRegExp(this)) {
       return $__RegExpToString(this);
     }
     throw $__Exception('not_generic', ['RegExp.prototype.toString']);
@@ -46,7 +50,7 @@ builtinClass(RegExp);
 
 
 export function exec(regexp, string){
-  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {
+  if (isRegExp(regexp)) {
     return $__RegExpExec(regexp, $__ToString(string));
   }
   throw $__Exception('not_generic', ['@regexp.exec']);
@@ -56,7 +60,7 @@ builtinFunction(exec);
 
 
 export function test(regexp, string){
-  if (regexp && $__GetBuiltinBrand(regexp) === 'RegExp') {
+  if (isRegExp(regexp)) {
     return $__RegExpTest(regexp, [$__ToString(string)]);
   }
   throw $__Exception('not_generic', ['@regexp.test']);

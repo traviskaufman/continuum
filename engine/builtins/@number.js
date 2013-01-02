@@ -17,7 +17,7 @@ export class Number {
     radix = $__ToInteger(radix || 10);
     if (typeof this === 'number') {
       return $__NumberToString(this, radix);
-    } else if ($__GetBuiltinBrand(this) === 'Number') {
+    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {
       return $__NumberToString(this.@@NumberValue, radix);
     }
     throw $__Exception('not_generic', ['Number.prototype.toString']);
@@ -26,7 +26,7 @@ export class Number {
   valueOf(){
     if (typeof this === 'number') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'Number') {
+    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {
       return this.@@NumberValue;
     }
     throw $__Exception('not_generic', ['Number.prototype.valueOf']);

@@ -23,7 +23,7 @@ internalFunction(ToHTML);
 
 
 function isRegExp(subject){
-  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'RegExp';
+  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'BuiltinRegExp';
 }
 
 internalFunction(isRegExp);
@@ -337,7 +337,7 @@ export class String {
   toString(){
     if (typeof this === 'string') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'String') {
+    } else if ($__GetBuiltinBrand(this) === 'StringWrapper') {
       return this.@@StringValue;
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
@@ -354,7 +354,7 @@ export class String {
   valueOf(){
     if (typeof this === 'string') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'String') {
+    } else if ($__GetBuiltinBrand(this) === 'StringWrapper') {
       return this.@@StringValue;
     }
     throw $__Exception('not_generic', ['String.prototype.toString']);
