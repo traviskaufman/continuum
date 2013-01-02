@@ -4,8 +4,11 @@ import {
 } from '@@symbols';
 
 import {
-  OrdinaryCreateFromConstructor,
   Type
+} from '@@types';
+
+import {
+  OrdinaryCreateFromConstructor
 } from '@@operations';
 
 import {
@@ -52,7 +55,11 @@ class SetIterator extends Iterator {
       throw $__Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
-    return this.@key = $__MapNext(this.@data, this.@key)[0];
+    const next = $__MapNext(this.@data, this.@key);
+    if (!next) {
+      throw $__StopIteration;
+    }
+    return this.@key = next[0];
   }
 }
 

@@ -4,8 +4,11 @@ import {
 } from '@@symbols';
 
 import {
-  OrdinaryCreateFromConstructor,
   Type
+} from '@@types';
+
+import {
+  OrdinaryCreateFromConstructor
 } from '@@operations';
 
 import {
@@ -20,7 +23,6 @@ function ensureMap(o, name){
 }
 
 internalFunction(ensureMap);
-
 
 
 class MapIterator extends Iterator {
@@ -100,12 +102,12 @@ export class Map {
 
   entries(){
     ensureMap(this, 'entries');
-    return new MapIterator('key+value');
+    return new MapIterator(this, 'key+value');
   }
 
   keys(){
     ensureMap(this, 'keys');
-    return new MapIterator('key');
+    return new MapIterator(this, 'key');
   }
 
   set(key, value){
@@ -116,7 +118,7 @@ export class Map {
 
   values(){
     ensureMap(this, 'values');
-    return new MapIterator('value');
+    return new MapIterator(this, 'value');
   }
 }
 
