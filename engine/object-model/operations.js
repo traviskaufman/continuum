@@ -360,7 +360,7 @@ var operations = (function(exports){
   function $$SpreadDestructuring(context, spread, index){
     var array = new $Array(0);
 
-    if (isNullish(target)) {
+    if (isNullish(spread)) {
       return array;
     }
 
