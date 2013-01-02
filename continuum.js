@@ -10545,8 +10545,9 @@ exports.assembler = (function(exports){
 
 
   function iter(node, KIND){
-    unwinder('iteration', function(){
-      loop(function(){
+    loop(function(){
+      var update;
+      unwinder('iteration', function(){
         if (isLexicalDeclaration(node.left)) {
           var lexical = true;
           pushScope('block');
@@ -10556,7 +10557,7 @@ exports.assembler = (function(exports){
         GET();
         KIND();
         MEMBER('next');
-        var update = current();
+        update = current();
         DUP();
         DUP();
         GET();
@@ -10574,8 +10575,8 @@ exports.assembler = (function(exports){
         lexical && SCOPE_CLONE();
         JUMP(update);
         lexical && popScope();
-        return update;
       });
+      return update;
     });
   }
 
@@ -17632,7 +17633,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       createSymbol       = wellKnownSymbols.create,
       BooleanValueSymbol = wellKnownSymbols.BooleanValue,
       StringValueSymbol  = wellKnownSymbols.StringValue,
-      NumberValue        = wellKnownSymbols.NumberValue,
+      NumberValueSymbol  = wellKnownSymbols.NumberValue,
       DateValueSymbol    = wellKnownSymbols.DateValue,
       ToPrimitiveSymbol  = wellKnownSymbols.ToPrimitive;
 
