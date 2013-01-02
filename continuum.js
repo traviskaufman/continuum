@@ -13120,7 +13120,7 @@ exports.operations = (function(exports){
   }
 
   function $Array(o){
-    $Array = require('./$Array');
+    $Array = require('./$Array').$Array;
     return new $Array(o);
   }
 
@@ -14406,6 +14406,156 @@ exports.$Object = (function(exports){
 })(typeof module !== 'undefined' ? exports : {});
 
 
+exports.$Arguments = (function(exports){
+  var objects     = require('../lib/objects'),
+      utility     = require('../lib/utility'),
+      errors      = require('../errors'),
+      descriptors = require('./descriptors'),
+      operations  = require('./operations'),
+      $Object     = require('./$Object').$Object;
+
+  var Hash    = objects.Hash,
+      inherit = objects.inherit,
+      define  = objects.define,
+      ArgAccessor            = descriptors.ArgAccessor,
+      $$ThrowException       = errors.$$ThrowException,
+      $$IsCallable           = operations.$$IsCallable,
+      $$IsAccessorDescriptor = descriptors.$$IsAccessorDescriptor;
+
+
+  var _CW = 6,
+      ECW = 7,
+      __A = 8,
+      _CA = 10;
+
+  var $Arguments = exports.$Arguments = (function(){
+    function $Arguments(length){
+      $Object.call(this);
+      this.define('length', length, _CW);
+    }
+
+    inherit($Arguments, $Object, {
+      BuiltinBrand: 'BuiltinArguments',
+      ParameterMap: null
+    });
+
+    return $Arguments;
+  })();
+
+
+  var $StrictArguments = exports.$StrictArguments = (function(){
+    function $StrictArguments(args){
+      $Arguments.call(this, args.length);
+      for (var i=0; i < args.length; i++) {
+        this.define(i+'', args[i], ECW);
+      }
+
+      this.define('arguments', intrinsics.ThrowTypeError, __A);
+      this.define('caller', intrinsics.ThrowTypeError, __A);
+    }
+
+    inherit($StrictArguments, $Arguments);
+
+    return $StrictArguments;
+  })();
+
+
+
+  var $MappedArguments = exports.$MappedArguments = (function(){
+    function $MappedArguments(args, env, names, func){
+      var mapped = new Hash;
+      $Arguments.call(this, args.length);
+
+      this.ParameterMap = new $Object;
+      this.isMapped = false;
+
+      for (var i=0; i < args.length; i++) {
+        this.define(i+'', args[i], ECW);
+        var name = names[i];
+        if (i < names.length && !(name in mapped)) {
+          this.isMapped = true;
+          mapped[name] = true;
+          this.ParameterMap.define(name, new ArgAccessor(name, env), _CA);
+        }
+      }
+
+      this.define('callee', func, _CW);
+    }
+
+    inherit($MappedArguments, $Arguments, {
+      ParameterMap: null
+    }, [
+      function Get(key){
+        if (this.isMapped && this.ParameterMap.has(key)) {
+          return this.ParameterMap.Get(key);
+        } else {
+          var val = this.GetP(this, key);
+          if (key === 'caller' && $$IsCallable(val) && val.strict) {
+            return $$ThrowException('strict_poison_pill');
+          }
+          return val;
+        }
+      },
+      function GetOwnProperty(key){
+        var desc = $Object.prototype.GetOwnProperty.call(this, key);
+        if (desc === undefined) {
+          return desc;
+        }
+        if (this.isMapped && this.ParameterMap.has(key)) {
+          desc.Value = this.ParameterMap.Get(key);
+        }
+        return desc;
+      },
+      function DefineOwnProperty(key, desc, strict){
+        if (!DefineOwn.call(this, key, desc, false) && strict) {
+          return $$ThrowException('strict_lhs_assignment');
+        }
+
+        if (this.isMapped && this.ParameterMap.has(key)) {
+          if ($$IsAccessorDescriptor(desc)) {
+            this.ParameterMap.Delete(key, false);
+          } else {
+            if ('Value' in desc) {
+              this.ParameterMap.Put(key, desc.Value, strict);
+            }
+            if ('Writable' in desc) {
+              this.ParameterMap.Delete(key, false);
+            }
+          }
+        }
+
+        return true;
+      },
+      function Delete(key, strict){
+        var result = $Object.prototype.Delete.call(this, key, strict);
+        if (result.Abrupt) return result;
+
+        if (result && this.isMapped && this.ParameterMap.has(key)) {
+          this.ParameterMap.Delete(key, false);
+        }
+
+        return result;
+      }
+    ]);
+
+    return $MappedArguments;
+  })();
+
+
+
+  var realm, intrinsics;
+
+  define($StrictArguments, [
+    function changeRealm(newRealm){
+      realm = newRealm;
+      intrinsics = realm ? realm.intrinsics : undefined;
+    }
+  ]);
+
+  return exports;
+})(typeof module !== 'undefined' ? exports : {});
+
+
 exports.$String = (function(exports){
   var objects     = require('../lib/objects'),
       utility     = require('../lib/utility'),
@@ -14527,7 +14677,7 @@ exports.$String = (function(exports){
 })(typeof module !== 'undefined' ? exports : {});
 
 
-exports.$Array = (function(module){
+exports.$Array = (function(exports){
   var objects      = require('../lib/objects'),
       utility      = require('../lib/utility'),
       errors       = require('../errors'),
@@ -14569,6 +14719,8 @@ exports.$Array = (function(module){
     }
     this.length = ['length', this.array.length, __W];
   }
+
+  exports.$Array = $Array;
 
   inherit($Array, $Object, {
     BuiltinBrand: 'BuiltinArray'
@@ -14858,7 +15010,7 @@ exports.$Array = (function(module){
     }
   ]);
 
-  return module.exports = $Array;
+  return exports;
 })(typeof module !== 'undefined' ? module : {});
 
 
@@ -14871,7 +15023,7 @@ exports.$Proxy = (function(module){
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
       $$Object    = require('./$Object'),
-      $Array      = require('./$Array');
+      $Array      = require('./$Array').$Array;
 
   var inherit     = objects.inherit,
       is          = objects.is,
@@ -15316,12 +15468,12 @@ exports.$Proxy = (function(module){
 
 exports.$TypedArray = (function(module){
   "use strict";
-  var objects        = require('../lib/objects'),
-      buffers        = require('../lib/buffers'),
-      $Array         = require('./$Array'),
-      $Object        = require('./$Object').$Object,
+  var objects          = require('../lib/objects'),
+      buffers          = require('../lib/buffers'),
+      $Array           = require('./$Array').$Array,
+      $Object          = require('./$Object').$Object,
       $$ThrowException = require('../errors').$$ThrowException,
-      DataDescriptor = require('./descriptors').DataDescriptor;
+      DataDescriptor   = require('./descriptors').DataDescriptor;
 
   var inherit     = objects.inherit,
       define      = objects.define,
@@ -15595,7 +15747,7 @@ exports.natives = (function(module){
       Stack            = require('./lib/Stack'),
       buffers          = require('./lib/buffers'),
       errors           = require('./errors'),
-      $Array           = require('./object-model/$Array'),
+      $Array           = require('./object-model/$Array').$Array,
       $Object          = require('./object-model/$Object').$Object,
       $TypedArray      = require('./object-model/$TypedArray'),
       operators        = require('./object-model/operators'),
@@ -17675,7 +17827,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
       $String          = require('./object-model/$String').$String,
-      $Array           = require('./object-model/$Array'),
+      $StrictArguments = require('./object-model/$Arguments').$StrictArguments,
+      $MappedArguments = require('./object-model/$Arguments').$MappedArguments,
+      $Array           = require('./object-model/$Array').$Array,
       $Proxy           = require('./object-model/$Proxy'),
       $TypedArray      = require('./object-model/$TypedArray'),
       natives          = require('./natives'),
@@ -17723,7 +17877,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
   var Value                    = descriptors.Value,
       Accessor                 = descriptors.Accessor,
-      ArgAccessor              = descriptors.ArgAccessor,
       DataDescriptor           = descriptors.DataDescriptor,
       $$IsAccessorDescriptor   = descriptors.$$IsAccessorDescriptor,
       $$FromPropertyDescriptor = descriptors.$$FromPropertyDescriptor,
@@ -18585,124 +18738,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     return $RegExp;
   })();
 
-
-
-  // ##################
-  // ### $Arguments ###
-  // ##################
-
-  var $Arguments = (function(){
-    function $Arguments(length){
-      $Object.call(this);
-      this.define('length', length, _CW);
-    }
-
-    inherit($Arguments, $Object, {
-      BuiltinBrand: 'BuiltinArguments',
-      ParameterMap: null
-    });
-
-    return $Arguments;
-  })();
-
-
-  var $StrictArguments = (function(){
-    function $StrictArguments(args){
-      $Arguments.call(this, args.length);
-      for (var i=0; i < args.length; i++) {
-        this.define(i+'', args[i], ECW);
-      }
-
-      this.define('arguments', intrinsics.ThrowTypeError, __A);
-      this.define('caller', intrinsics.ThrowTypeError, __A);
-    }
-
-    inherit($StrictArguments, $Arguments);
-
-    return $StrictArguments;
-  })();
-
-
-
-  var $MappedArguments = (function(){
-    function $MappedArguments(args, env, names, func){
-      var mapped = create(null);
-      $Arguments.call(this, args.length);
-
-      this.ParameterMap = new $Object;
-      this.isMapped = false;
-
-      for (var i=0; i < args.length; i++) {
-        this.define(i+'', args[i], ECW);
-        var name = names[i];
-        if (i < names.length && !(name in mapped)) {
-          this.isMapped = true;
-          mapped[name] = true;
-          this.ParameterMap.define(name, new ArgAccessor(name, env), _CA);
-        }
-      }
-
-      this.define('callee', func, _CW);
-    }
-
-    inherit($MappedArguments, $Arguments, {
-      ParameterMap: null
-    }, [
-      function Get(key){
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          return this.ParameterMap.Get(key);
-        } else {
-          var val = this.GetP(this, key);
-          if (key === 'caller' && $$IsCallable(val) && val.strict) {
-            return $$ThrowException('strict_poison_pill');
-          }
-          return val;
-        }
-      },
-      function GetOwnProperty(key){
-        var desc = $Object.prototype.GetOwnProperty.call(this, key);
-        if (desc === undefined) {
-          return desc;
-        }
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          desc.Value = this.ParameterMap.Get(key);
-        }
-        return desc;
-      },
-      function DefineOwnProperty(key, desc, strict){
-        if (!DefineOwn.call(this, key, desc, false) && strict) {
-          return $$ThrowException('strict_lhs_assignment');
-        }
-
-        if (this.isMapped && this.ParameterMap.has(key)) {
-          if ($$IsAccessorDescriptor(desc)) {
-            this.ParameterMap.Delete(key, false);
-          } else {
-            if ('Value' in desc) {
-              this.ParameterMap.Put(key, desc.Value, strict);
-            }
-            if ('Writable' in desc) {
-              this.ParameterMap.Delete(key, false);
-            }
-          }
-        }
-
-        return true;
-      },
-      function Delete(key, strict){
-        var result = $Object.prototype.Delete.call(this, key, strict);
-        if (result.Abrupt) return result;
-
-        if (result && this.isMapped && this.ParameterMap.has(key)) {
-          this.ParameterMap.Delete(key, false);
-        }
-
-        return result;
-      }
-    ]);
-
-    return $MappedArguments;
-  })();
 
 
   var $Module = (function(){
@@ -20448,11 +20483,12 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       exports.global = global = operators.global = target.global;
       exports.intrinsics = intrinsics = target.intrinsics;
       target.active = true;
-      target.emit('activate');
       $Object.changeRealm(target);
       $Array.changeRealm(target);
       $String.changeRealm(target);
+      $StrictArguments.changeRealm(target);
       operations.changeRealm(target);
+      target.emit('activate');
     }
   }
 
