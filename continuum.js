@@ -11746,6 +11746,8 @@ exports.$Nil = (function(exports){
       return iter;
     },
     (function(){ return function define(){} })(),
+
+
     function GetInheritance(){
       return null;
     },
@@ -11753,7 +11755,7 @@ exports.$Nil = (function(exports){
       return true;
     },
     function IsExtensible(){
-      return true;
+      return false;
     },
     function PreventExtensions(){
       return true;
