@@ -303,7 +303,7 @@ var index = (function(exports){
     introspect: debug.introspect,
     createInterceptor: createInterceptor,
     brainTransplant: brainTransplant,
-    isUndetectable: constants.isUndetectable,
+    isUndetectable: require('./object-model/$Nil').isUndetectable,
     utility: assignAll({}, [
       require('./lib/functions'),
       require('./lib/iteration'),

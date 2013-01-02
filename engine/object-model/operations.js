@@ -7,12 +7,13 @@ var operations = (function(exports){
       iteration    = require('../lib/iteration'),
       errors       = require('../errors'),
       constants    = require('../constants'),
+      Nil          = require('./$Nil'),
       MapData      = require('./collections').MapData;
 
-  var isFalsey               = constants.isFalsey,
-      isNullish              = constants.isNullish,
-      isUndefined            = constants.isUndefined,
-      isUndetectable         = constants.isUndetectable,
+  var isFalsey               = Nil.isFalsey,
+      isNullish              = Nil.isNullish,
+      isUndefined            = Nil.isUndefined,
+      isUndetectable         = Nil.isUndetectable,
       is                     = objects.is,
       create                 = objects.create,
       define                 = objects.define,

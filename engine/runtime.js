@@ -29,25 +29,27 @@ var runtime = (function(GLOBAL, exports, undefined){
       Stack            = require('./lib/Stack');
 
 
-  var Hash        = objects.Hash,
-      create      = objects.create,
-      hasOwn      = objects.hasOwn,
-      isObject    = objects.isObject,
-      assign      = objects.assign,
-      define      = objects.define,
-      inherit     = objects.inherit,
-      hide        = objects.hide,
-      ownKeys     = objects.keys,
-      fname       = functions.fname,
-      applyNew    = functions.applyNew,
-      iterate     = iteration.iterate,
-      each        = iteration.each,
-      map         = iteration.map,
-      uid         = utility.uid,
-      nextTick    = utility.nextTick,
-      tag         = utility.tag,
-      MapData     = collections.MapData,
-      WeakMapData = collections.WeakMapData;
+  var Hash           = objects.Hash,
+      create         = objects.create,
+      hasOwn         = objects.hasOwn,
+      isObject       = objects.isObject,
+      assign         = objects.assign,
+      define         = objects.define,
+      inherit        = objects.inherit,
+      hide           = objects.hide,
+      ownKeys        = objects.keys,
+      properties     = objects.properties,
+      getPrototypeOf = objects.getPrototypeOf,
+      fname          = functions.fname,
+      applyNew       = functions.applyNew,
+      iterate        = iteration.iterate,
+      each           = iteration.each,
+      map            = iteration.map,
+      uid            = utility.uid,
+      nextTick       = utility.nextTick,
+      tag            = utility.tag,
+      MapData        = collections.MapData,
+      WeakMapData    = collections.WeakMapData;
 
   var $$ThrowException = errors.$$ThrowException,
       $$MakeException  = errors.$$MakeException,
@@ -79,16 +81,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       FunctionEnv    = environments.FunctionEnvironmentRecord,
       GlobalEnv      = environments.GlobalEnvironmentRecord;
 
-  var SYMBOLS       = constants.SYMBOLS,
-      Break         = SYMBOLS.Break,
-      Pause         = SYMBOLS.Pause,
-      Throw         = SYMBOLS.Throw,
-      Empty         = SYMBOLS.Empty,
-      Return        = SYMBOLS.Return,
-      Normal        = SYMBOLS.Normal,
-      Builtin       = SYMBOLS.Builtin,
-      Continue      = SYMBOLS.Continue,
-      Uninitialized = SYMBOLS.Uninitialized;
+  var SYMBOLS = constants.SYMBOLS,
+      Break   = SYMBOLS.Break,
+      Pause   = SYMBOLS.Pause,
+      Throw   = SYMBOLS.Throw,
+      Return  = SYMBOLS.Return,
+      Normal  = SYMBOLS.Normal;
 
   var symbols            = require('./object-model/$Symbol').wellKnownSymbols,
       toStringTagSymbol  = symbols.toStringTag,
@@ -985,9 +983,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$GetValue(ref);
         }
       },
-      (function(){
-        return function define(key, value, attr){};
-      })(),
+      (function(){ return function define(){} })(),
       function set(key){},
       function update(){},
       function has(key){
@@ -2018,6 +2014,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     natives.add({
+      wrapper: function(_, args){
+        var func = args[0];
+      },
       _eval: (function(){
         function builtinEval(obj, args, direct){
           var code = args[0];
@@ -2235,6 +2234,25 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$CurrentRealm: function(){
           return realm;
+        },
+        $$EnumerateInternal: function(_, args){
+          return new $Array(properties(args[0]));
+        },
+        $$EnumerateAllInternal: function(_, args){
+          var obj   = args[0],
+              seen  = new Hash,
+              props = [];
+
+          while (obj instanceof $Object) {
+            each(properties(obj), function(prop){
+              if (!(prop in seen)) {
+                seen[prop] = props.push(prop);
+              }
+            });
+            obj = getPrototypeOf(obj);
+          }
+
+          return new $Array(props);
         },
         $$Exception: function(_, args){
           return $$MakeException(args[0], args[1] ? args[1].array : []);

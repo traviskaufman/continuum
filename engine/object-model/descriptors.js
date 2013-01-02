@@ -6,12 +6,12 @@ var descriptors = (function(exports){
       utility   = require('../lib/utility');
 
 
-  var is = objects.is,
-      create = objects.create,
-      define = objects.define,
+  var is      = objects.is,
+      create  = objects.create,
+      define  = objects.define,
       inherit = objects.inherit,
-      each = iteration.each,
-      tag = utility.tag,
+      each    = iteration.each,
+      tag     = utility.tag,
       $$ThrowException = errors.$$ThrowException;
 
   var E = 0x1,

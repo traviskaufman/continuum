@@ -4,6 +4,7 @@ var natives = (function(module){
       Stack            = require('./lib/Stack'),
       buffers          = require('./lib/buffers'),
       errors           = require('./errors'),
+      Nil              = require('./object-model/$Nil'),
       $Array           = require('./object-model/$Array').$Array,
       $Object          = require('./object-model/$Object').$Object,
       $TypedArray      = require('./object-model/$TypedArray'),
@@ -14,17 +15,18 @@ var natives = (function(module){
       constants        = require('./constants'),
       wellKnownSymbols = require('./object-model/$Symbol').wellKnownSymbols;
 
-  var Undetectable              = constants.Undetectable,
-      isUndetectable            = constants.isUndetectable,
-      inherit                   = objects.inherit,
-      define                    = objects.define,
-      isObject                  = objects.isObject,
-      create                    = objects.create,
-      Hash                      = objects.Hash,
-      $$ThrowException          = errors.$$ThrowException,
-      $$MakeException           = errors.$$MakeException,
-      DataView                  = buffers.DataView,
-      ArrayBuffer               = buffers.ArrayBuffer,
+  var $Nil             = Nil.$Nil,
+      Undetectable     = Nil.Undetectable,
+      isUndetectable   = Nil.isUndetectable,
+      inherit          = objects.inherit,
+      define           = objects.define,
+      isObject         = objects.isObject,
+      create           = objects.create,
+      Hash             = objects.Hash,
+      DataView         = buffers.DataView,
+      ArrayBuffer      = buffers.ArrayBuffer,
+      $$ThrowException = errors.$$ThrowException,
+      $$MakeException  = errors.$$MakeException,
       $$ToPropertyDescriptor    = descriptors.$$ToPropertyDescriptor,
       $$FromPropertyDescriptor  = descriptors.$$FromPropertyDescriptor,
       $$IsCallable              = operations.$$IsCallable,
@@ -311,6 +313,9 @@ var natives = (function(module){
       };
 
       return ctor;
+    },
+    _createNil: function(){
+      return new $Nil;
     },
     _getHook: function(obj, args){
       var hook = args[0][args[1]];

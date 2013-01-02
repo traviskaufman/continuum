@@ -36,6 +36,7 @@ require('./builder')
   '../engine/assembler.js',
 
   '../engine/object-model/$Symbol.js',
+  '../engine/object-model/$Nil.js',
   '../engine/object-model/descriptors.js',
   '../engine/object-model/collections.js',
   '../engine/object-model/operators.js',

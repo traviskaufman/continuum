@@ -1,6 +1,7 @@
 var operators = (function(exports){
   "use strict";
   var constants        = require('../constants'),
+      Nil              = require('./$Nil'),
       symbols          = require('./$Symbol').wellKnownSymbols,
       $$ThrowException = require('../errors').$$ThrowException;
 
@@ -8,10 +9,10 @@ var operators = (function(exports){
       createSymbol       = symbols.create,
       ToPrimitiveSymbol  = symbols.ToPrimitive;
 
-  var isFalsey       = constants.isFalsey,
-      isNullish      = constants.isNullish,
-      isUndefined    = constants.isUndefined,
-      isUndetectable = constants.isUndetectable;
+  var isFalsey       = Nil.isFalsey,
+      isNullish      = Nil.isNullish,
+      isUndefined    = Nil.isUndefined,
+      isUndetectable = Nil.isUndetectable;
 
 
   function $$HasPrimitiveBase(v){
@@ -25,10 +26,10 @@ var operators = (function(exports){
   // ## $$GetValue
 
   function $$GetValue(v){
-    if (isFalsey(v) || !v.Reference || v.Abrupt) return v;
+    if (!v || !v.Reference || v.Abrupt) return v;
     var base = v.base;
 
-    if (isNullish(base)) {
+    if (base == null) {
       return $$ThrowException('not_defined', [v.name]);
     } else {
       var type = typeof base;
@@ -59,7 +60,7 @@ var operators = (function(exports){
   // ## $$PutValue
 
   function $$PutValue(v, w){
-    if (isFalsey(v)) {
+    if (!v) {
       return $$ThrowException('non_object_property_store', [TYPEOF(v), TYPEOF(w)]);
     } else if (v.Abrupt) {
       return v;
@@ -71,7 +72,7 @@ var operators = (function(exports){
 
     var base = v.base;
 
-    if (isUndefined(base)) {
+    if (base == null) {
       if (v.strict) {
         return $$ThrowException('not_defined', [v.name, base]);
       }
@@ -87,21 +88,22 @@ var operators = (function(exports){
         return base.SetP(GetThisValue(v), v.name, w, v.strict);
       }
       return base.Put(v.name, w, v.strict);
+    } else if (base.SetMutableBinding) {
+      return base.SetMutableBinding(v.name, w, v.strict);
     }
-    return base.SetMutableBinding(v.name, w, v.strict);
   }
   exports.$$PutValue = $$PutValue;
 
   // ## GetThisValue
 
   function $$GetThisValue(v){
-    if (isFalsey(v) || v.Abrupt || !v.Reference) {
+    if (!v || v.Abrupt || !v.Reference) {
       return v;
     }
 
     var base = v.base;
 
-    if (isUndefined(base)) {
+    if (base == null) {
       return $$ThrowException('non_object_property_load', [v.name, base]);
     }
 
@@ -158,6 +160,8 @@ var operators = (function(exports){
           return $$Type($$GetValue(argument));
         } else if (argument.Completion){
           return 'Completion';
+        } else if (isUndefined(argument)) {
+          return 'Undefined'
         }
         return 'Object';
       case 'string':
@@ -180,14 +184,14 @@ var operators = (function(exports){
   exports.$$IsCallable = $$IsCallable;
 
 
-  function $$ToPrimitive(argument, Preferred$$Type){
+  function $$ToPrimitive(argument, PreferredType){
     if ($$Type(argument) !== 'Object') {
       return argument;
     }
 
-    if (Preferred$$Type === 'String') {
+    if (PreferredType === 'String') {
       var hint = 'string';
-    } else if (Preferred$$Type === 'Number') {
+    } else if (PreferredType === 'Number') {
       var hint = 'number';
     } else {
       var hint = 'default';
@@ -339,7 +343,7 @@ var operators = (function(exports){
         } else if (argument.Abrupt) {
           return argument;
         } else if (isUndetectable(argument)) {
-          return 'undefined';
+          return argument.toString();
         }
         return $$ToString($$ToPrimitive(argument, 'String'));
     }
@@ -600,9 +604,6 @@ var operators = (function(exports){
         if (val.Abrupt) return val;
 
         if (val.Reference) {
-          if (isUndefined(val.base)) {
-            return 'undefined';
-          }
           return TYPEOF($$GetValue(val));
         }
 
