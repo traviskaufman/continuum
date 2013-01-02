@@ -16691,9 +16691,13 @@ exports.thunk = (function(exports){
   var objects   = require('./lib/objects'),
       constants = require('./constants'),
       operators = require('./object-model/operators'),
+      Nil       = require('./object-model/$Nil'),
       Emitter   = require('./lib/Emitter');
 
-  var define          = objects.define,
+  var isFalsey        = Nil.isFalsey,
+      isNullish       = Nil.isNullish,
+      isUndefined     = Nil.isUndefined,
+      define          = objects.define,
       inherit         = objects.inherit,
       Hash            = objects.Hash,
       UnaryOperation  = operators.UnaryOperation,
@@ -16899,12 +16903,12 @@ exports.thunk = (function(exports){
 
 
     function AND(){
-      if (stack[sp - 1]) {
-        sp--;
-        return cmds[++ip];
-      } else {
+      if (isFalsey(stack[sp - 1])) {
         ip = ops[ip][0];
         return cmds[ip];
+      } else {
+        sp--;
+        return cmds[++ip];
       }
     }
 
@@ -17260,7 +17264,7 @@ exports.thunk = (function(exports){
 
     function JTRUE(){
       var cmp = stack[--sp];
-      if (cmp) {
+      if (!isFalsey(cmp)) {
         ip = ops[ip][0];
         return cmds[ip];
       }
@@ -17269,7 +17273,7 @@ exports.thunk = (function(exports){
 
     function JFALSE(){
       var cmp = stack[--sp];
-      if (!cmp) {
+      if (isFalsey(cmp)) {
         ip = ops[ip][0];
         return cmds[ip];
       }
@@ -17277,7 +17281,7 @@ exports.thunk = (function(exports){
     }
 
     function JEQ_UNDEFINED(){
-      if (stack[sp - 1] === undefined) {
+      if (isUndefined(stack[sp - 1])) {
         sp--;
         ip = ops[ip][0];
         return cmds[ip];
@@ -17286,7 +17290,7 @@ exports.thunk = (function(exports){
     }
 
     function JNEQ_UNDEFINED(){
-      if (stack[sp - 1] !== undefined) {
+      if (!isUndefined(stack[sp - 1])) {
         ip = ops[ip][0];
         return cmds[ip];
       }
@@ -17428,12 +17432,12 @@ exports.thunk = (function(exports){
     }
 
     function OR(){
-      if (stack[sp - 1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      } else {
+      if (isFalsey(stack[sp - 1])) {
         sp--;
         return cmds[++ip];
+      } else {
+        ip = ops[ip][0];
+        return cmds[ip];
       }
     }
 
