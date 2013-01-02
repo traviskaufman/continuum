@@ -50,7 +50,7 @@ var $Proxy = (function(module){
       $$CopyAttributes(descObj, normalizedDescObj);
 
       var trapResult = trap.Call(handler, [target, key, normalizedDescObj]),
-          success = $$ToBoolean(trapResult),
+          success    = $$ToBoolean(trapResult),
           targetDesc = target.GetOwnProperty(key),
           extensible = target.IsExtensible();
 
