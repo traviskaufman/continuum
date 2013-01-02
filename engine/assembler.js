@@ -197,7 +197,6 @@ var assembler = (function(exports){
       SPREAD_ARG       = new StandardOpCode(0, 'SPREAD_ARG'),
       SPREAD_ARRAY     = new StandardOpCode(1, 'SPREAD_ARRAY'),
       STRING           = new InternedOpCode(1, 'STRING'),
-      SUPER_CALL       = new StandardOpCode(0, 'SUPER_CALL'),
       SUPER_ELEMENT    = new StandardOpCode(0, 'SUPER_ELEMENT'),
       SUPER_MEMBER     = new StandardOpCode(1, 'SUPER_MEMBER'),
       SYMBOL           = new InternedOpCode(3, 'SYMBOL'),
@@ -1793,7 +1792,7 @@ var assembler = (function(exports){
       if (context.code.scopeType !== 'function') {
         context.earlyError(node, 'illegal_super');
       }
-      SUPER_CALL();
+      SUPER_MEMBER(context.code.name);
     } else {
       recurse(node.callee);
     }

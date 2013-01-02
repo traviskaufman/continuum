@@ -1840,11 +1840,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var Script = (function(){
     function ParseOptions(o){
-      if (o) {
-        for (var k in o) {
-          if (k in this) {
-            this[k] = o[k];
-          }
+      for (var k in o) {
+        if (k in this) {
+          this[k] = o[k];
         }
       }
     }
@@ -1858,7 +1856,18 @@ var runtime = (function(GLOBAL, exports, undefined){
       tolerant: false
     };
 
-    function parse(src, origin, type, options){
+    function parse(src, filename, kind, options){
+      if (!options) {
+        if (isObject(kind)) {
+          options = kind;
+          kind = '';
+        } else if (isObject(filename)) {
+          options = filename;
+          filename = kind = '';
+        } else {
+          options = {};
+        }
+      }
       try {
         return esprima.parse(src, options ? new ParseOptions(options) : ParseOptions.prototype);
       } catch (e) {
@@ -1867,7 +1876,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             loc = { line: e.lineNumber, column: e.column };
 
         err.setCode({ start: loc, end: loc }, src);
-        err.setOrigin(origin, type);
+        err.setOrigin(filename, kind);
         return new AbruptCompletion('throw', err);
       }
     }

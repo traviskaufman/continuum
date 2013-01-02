@@ -135,7 +135,7 @@ var thunk = (function(exports){
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
     LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
     REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_CALL, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
 
@@ -952,18 +952,6 @@ var thunk = (function(exports){
       return cmds[++ip];
     }
 
-    function SUPER_CALL(){
-      var result = context.getSuperReference(false);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
     function SUPER_ELEMENT(){
       var result = context.getSuperReference(stack[--sp]);
 
@@ -983,6 +971,7 @@ var thunk = (function(exports){
         error = key;
         return unwind;
       }
+
       var result = context.getSuperReference(key);
 
       if (result && result.Abrupt) {

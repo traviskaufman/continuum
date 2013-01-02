@@ -165,12 +165,8 @@ var operations = (function(exports){
 
     if (status.Abrupt) return status;
 
-    if (prop === false) {
-      var key = env.GetMethodName();
-    } else {
-      var key = $$ToPropertyKey(prop);
-      if (key && key.Abrupt) return key;
-    }
+    var key = $$ToPropertyKey(prop);
+    if (key && key.Abrupt) return key;
 
     var ref = new Reference(baseValue, key, context.strict);
     ref.thisValue = env.GetThisBinding();
