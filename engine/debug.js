@@ -482,20 +482,6 @@ var debug = (function(exports){
 
 
   var MirrorDate = (function(){
-    var formatDate = (function(){
-      if ('toJSON' in Date.prototype) {
-        return function formatDate(date){
-          if (!date || !date.toJSON || date+'' === 'Invalid Date') {
-            return 'Invalid Date';
-          }
-          var json = date.toJSON();
-          return json.slice(0, 10) + ' ' + json.slice(11, 19);
-        };
-      }
-      return function formateDate(date){
-        return ''+date;
-      };
-    })();
 
     function MirrorDate(subject){
       MirrorObject.call(this, subject);
@@ -505,8 +491,9 @@ var debug = (function(exports){
       kind: 'Date'
     }, [
       function label(){
-        if (this.subject.getPrimitiveValue) {
-          return formatDate(this.subject.getPrimitiveValue());
+        var toLocaleString = this.subject.Get('toLocaleString');
+        if (toLocaleString) {
+          return toLocaleString.Call(this.subject, []);
         }
         return 'Invalid Date';
       }

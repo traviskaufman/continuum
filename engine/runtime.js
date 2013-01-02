@@ -2548,7 +2548,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       function init(){
         initialize(self, function(){
-          intrinsics.DateProto.setPrimitiveValue(Date.prototype);
           deactivate(self);
           self.scripts = [];
           self.state = 'idle';
