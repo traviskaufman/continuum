@@ -71,6 +71,8 @@ var $Symbol = (function(exports){
         return false;
       },
       function GetOwnProperty(){},
+      function Get(key){
+      },
       function GetP(receiver, key){
         if (key === 'toString') {
           return receiver.Realm.intrinsics.ObjectToString;
