@@ -393,7 +393,7 @@ $$SetInternal(normal, 'Configurable', true);
 export function CreateOwnDataProperty(O, P, V){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
-  $$Assert(!hasOwn(O, P));
+  //$$Assert(!hasOwn(O, P));
 
   const extensible = $$CallInternal(O, 'IsExtensible');
   if (!extensible) {
