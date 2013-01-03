@@ -2195,25 +2195,25 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (args[0] === true) {
             return true;
           }
-          return $$ThrowException('assertion_failed');
+          return $$ThrowException('assertion_failed', ['$$Assert']);
         },
         $$AssertIsInternalArray: function(_, args){
           if (args[0] instanceof Array) {
             return true;
           }
-          return $$ThrowException('assertion_failed');
+          return $$ThrowException('assertion_failed', ['$$AssertIsInternalArray']);
         },
         $$AssertIsECMAScriptValue: function(_, args){
           if (typeof args[0] !== 'object' || args[0] === null && args[0].DefineOwnProperty) {
             return true;
           }
-          return $$ThrowException('assertion_failed');
+          return $$ThrowException('assertion_failed', ['$$AssertIsECMAScriptValue:']);
         },
         $$AssertWontThrow: function(_, args){
           if (!args[0] || !args[0].Abrupt) {
             return true;
           }
-          return $$ThrowException('assertion_failed');
+          return $$ThrowException('assertion_failed', ['$$AssertWontThrow']);
         },
         $$CallerArgumentCount: function(){
           if (context.caller) {
