@@ -540,7 +540,7 @@ export function OrdinaryHasInstance(C, O){
   }
 
   if ($$HasInternal(C, 'BoundTargetFunction')) {
-    return O instanceof $$CallInternal($$GetInternal(C, 'BoundTargetFunction'));
+    return O instanceof $$GetInternal(C, 'BoundTargetFunction');
   }
 
   if (Type(O) !== 'Object') {
