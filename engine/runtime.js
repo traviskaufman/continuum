@@ -2191,6 +2191,30 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$ArgumentCount: function(){
           return context.argumentCount();
         },
+        $$Assert: function(_, args){
+          if (args[0] === true) {
+            return true;
+          }
+          return $$ThrowException('assertion_failed');
+        },
+        $$AssertIsInternalArray: function(_, args){
+          if (args[0] instanceof Array) {
+            return true;
+          }
+          return $$ThrowException('assertion_failed');
+        },
+        $$AssertIsECMAScriptValue: function(_, args){
+          if (typeof args[0] !== 'object' || args[0] === null && args[0].DefineOwnProperty) {
+            return true;
+          }
+          return $$ThrowException('assertion_failed');
+        },
+        $$AssertWontThrow: function(_, args){
+          if (!args[0] || !args[0].Abrupt) {
+            return true;
+          }
+          return $$ThrowException('assertion_failed');
+        },
         $$CallerArgumentCount: function(){
           if (context.caller) {
             return context.argumentCount();

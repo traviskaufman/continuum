@@ -12,12 +12,16 @@ import {
 } from '@@utilities';
 
 import {
-  Type,
+  ArrayCreate,
   ObjectCreate,
-  ArrayCreate
+  Type
 } from '@@types';
 
 import {
+  $$Assert,
+  $$AssertIsInternalArray,
+  $$AssertIsECMAScriptValue,
+  $$AssertWontThrow,
   $$CallInternal,
   $$CreateObject,
   $$CreateInternalObject,
@@ -41,23 +45,21 @@ import {
 // ##### 9.1 Type Conversion and Testing #####
 // ###########################################
 
+
 // #########################
 // ### 9.1.1 ToPrimitive ###
 // #########################
-
 
 export function ToPrimitive(argument, PreferredType){
   if (Type(argument) !== 'Object') {
     return argument;
   }
 
-  let hint;
+  let hint = 'number';
   if (!$$HasArgument('PreferredType')) {
     hint = 'default';
   } else if (PreferredType === 'String') {
     hint = 'string';
-  } else {
-    hint = 'number';
   }
 
   const exoticToPrim = Get(argument, @@ToPrimitive);
@@ -65,6 +67,7 @@ export function ToPrimitive(argument, PreferredType){
     if (!IsCallable(exoticToPrim)) {
       throw $$Exception('cannot_convert_to_primitive', []);
     }
+
     const result = call(exoticToPrim, argument);
     if (Type(result) !== 'Object') {
       return result;
@@ -81,10 +84,10 @@ export function ToPrimitive(argument, PreferredType){
 }
 
 export function OrdinaryToPrimitive(O, hint){
-  // Assert: Type(O) is Object
-  // Assert: Type(hint) is String and its value is either "string" or "number"
-  let tryFirst, trySecond;
+  $$Assert(Type(O) === 'Object');
+  $$Assert(Type(hint) === 'String' && hint === 'string' || hint === 'number');
 
+  let tryFirst, trySecond;
   if (hint === 'string') {
     tryFirst = 'toString';
     trySecond = 'valueOf';
@@ -111,6 +114,7 @@ export function OrdinaryToPrimitive(O, hint){
 
   throw $$Exception('cannot_convert_to_primitive', []);
 }
+
 
 // #######################
 // ### 9.1.2 ToBoolean ###
@@ -154,6 +158,7 @@ export function ToNumber(argument){
   }
 }
 
+
 // #######################
 // ### 9.1.4 ToInteger ###
 // #######################
@@ -183,13 +188,13 @@ export function ToInt32(argument){
     return 0;
   }
 
-  const int = sign(number) * floor(abs(number));
-        int32bit = int % 0x100000000;
+  const int = sign(number) * floor(abs(number)) & 0xffffffff;
 
-  if (int32bit >= 0x80000000) {
-    return int32bit - 0x80000000;
+  if (int >= 0x80000000) {
+    return int - 0x80000000;
   }
-  return int32bit;
+
+  return int;
 }
 
 
@@ -203,7 +208,7 @@ export function ToUint32(argument){
     return 0;
   }
 
-  return (sign(number) * floor(abs(number))) % 0x100000000;
+  return (sign(number) * floor(abs(number))) & 0xffffffff;
 }
 
 
@@ -217,7 +222,7 @@ export function ToUint16(argument){
     return 0;
   }
 
-  return (sign(number) * floor(abs(number))) % 0x10000;
+  return (sign(number) * floor(abs(number))) & 0xffff;
 }
 
 
@@ -249,6 +254,7 @@ export function ToString(argument){
 
 export function ToObject(argument){
   const type = Type(argument);
+
   switch (type) {
     case 'Object':
       return argument;
@@ -277,14 +283,15 @@ export function ToPropertyKey(argument){
   if (type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol')) {
     return argument;
   }
+
   return ToString(argument);
 }
 
 
 
-// #############################################
-// ### 9.2 Testing and Comparison Operations ###
-// #############################################
+// #################################################
+// ##### 9.2 Testing and Comparison Operations #####
+// #################################################
 
 
 // ##################################
@@ -297,6 +304,7 @@ export function CheckObjectCoercible(argument){
   } else if (argument === undefined) {
     throw $$Exception('undefined_to_object', []);
   }
+
   return argument;
 }
 
@@ -338,9 +346,9 @@ export function IsPropertyKey(argument){
 
 
 
-// #################################
-// ### 9.3 Operations on Objects ###
-// #################################
+// #####################################
+// ##### 9.3 Operations on Objects #####
+// #####################################
 
 
 // #################
@@ -348,8 +356,9 @@ export function IsPropertyKey(argument){
 // #################
 
 export function Get(O, P){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
   return $$CallInternal(O, 'GetP', [O, P]);
 }
 
@@ -359,13 +368,15 @@ export function Get(O, P){
 // #################
 
 export function Put(O, P, V, Throw){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
-  // Assert: Type(Throw) is Boolean.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+  $$Assert(Type(Throw) === 'Boolean');
+
   const success = $$CallInternal(O, 'SetP', [O, P, V]);
   if (Throw && !success) {
     throw $$Exception('strict_cannot_assign', [P]);
   }
+
   return success;
 }
 
@@ -380,16 +391,19 @@ $$SetInternal(normal, 'Enumerable', true);
 $$SetInternal(normal, 'Configurable', true);
 
 export function CreateOwnDataProperty(O, P, V){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
-  // Assert: O does not have an own property whose key is P.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+  $$Assert(!hasOwn(O, P));
+
   const extensible = $$CallInternal(O, 'IsExtensible');
   if (!extensible) {
     return extensible;
   }
+
   $$SetInternal(normal, 'Value', V);
   const result = $$CallInternal(O, 'DefineOwnProperty', [P, normal]);
   $$SetInternal(normal, 'Value', undefined);
+
   return result;
 }
 
@@ -399,22 +413,26 @@ export function CreateOwnDataProperty(O, P, V){
 // ###################################
 
 export function DefinePropertyOrThrow(O, P, desc){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
   const success = $$CallInternal(O, 'DefineOwnProperty', [P, desc]);
   if (!success) {
     throw $$Exception('redefine_disallowed', [P]);
   }
+
   return success;
 }
+
 
 // ###################################
 // ### 9.3.5 DeletePropertyOrThrow ###
 // ###################################
 
 export function DeletePropertyOrThrow(O, P){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
   const success = $$CallInternal(O, 'Delete', [P]); // TODO: rename to DeleteProperty
   if (!success) {
     throw $$Exception('strict_delete_property', [P, Type(O)]);
@@ -428,8 +446,9 @@ export function DeletePropertyOrThrow(O, P){
 // #########################
 
 export function HasProperty(O, P){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
   return $$CallInternal(O, 'HasProperty', [P]);
 }
 
@@ -439,8 +458,9 @@ export function HasProperty(O, P){
 // #######################
 
 export function GetMethod(O, P){
-  // Assert: Type(O) is Object.
-  // Assert: IsPropertyKey(P) is true.
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
   const func = $$CallInternal(O, 'GetP', [O, P]);
   if (func === undefined) {
     return func;
@@ -461,7 +481,8 @@ export function GetMethod(O, P){
 const emptyArgs = [];
 
 export function Invoke(O, P, args){
-  // Assert: P is a valid property key.
+  $$Assert(IsPropertyKey(P) === true);
+
   args || (args = emptyArgs);
 
   const obj  = ToObject(O),
@@ -473,6 +494,7 @@ export function Invoke(O, P, args){
 
   return $$CallInternal(func, 'Call', [O, $$GetInternal(args, 'array')]);
 }
+
 
 // ################################
 // ### 9.3.9 TestIfSecureObject ###
@@ -493,13 +515,15 @@ function MakeObjectSecure(O, immutable){}
 // ##################################
 
 function CreateArrayFromList(elements){
-  // Assert: elements is a List whose elements are all ECMAScript language values.
+  $$AssertIsInternalArray(elements);
+
   const array = ArrayCreate(0),
         len   = $$GetInternal(elements, 'length');
 
-  for (var n=0; n < len; n++) {
-    CreateOwnDataProperty(array, ToString(n), $$GetInternal(elements, n));
-    // Assert: the call to CreateOwnDataProperty will never throw
+  for (let n=0; n < len; n++) {
+    const element = $$GetInternal(elements, n);
+    $$AssertIsECMAScriptValue(elements);
+    $$AssertWontThrow(CreateOwnDataProperty(array, ToString(n), element));
   }
 
   return array;
@@ -516,7 +540,7 @@ export function OrdinaryHasInstance(C, O){
   }
 
   if ($$HasInternal(C, 'BoundTargetFunction')) {
-    return O instanceof $$GetInternal(C, 'BoundTargetFunction');
+    return O instanceof $$CallInternal($$GetInternal(C, 'BoundTargetFunction'));
   }
 
   if (Type(O) !== 'Object') {
@@ -543,7 +567,7 @@ export function OrdinaryHasInstance(C, O){
 // ### 9.3.13 OrdinaryCreateFromConstructor ###
 // ############################################
 
-var protos = {
+const protos = {
   '%ArrayBufferPrototype%' : 'ArrayBufferProto',
   '%ArrayPrototype%'       : 'ArrayProto',
   '%DataViewPrototype%'    : 'DataViewProto',
