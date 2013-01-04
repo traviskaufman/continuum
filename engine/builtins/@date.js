@@ -129,11 +129,22 @@ function InLeapYear(t){
 // #############################
 
 const OFFSETS      = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365],
-      LEAP_OFFSETS = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366];
+      LEAP_OFFSETS = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366],
+      MONTH_DAYS   = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 
 function getDays(t){
   return InLeapYear(t) ? LEAP_OFFSETS : OFFSETS
 }
+
+function daysInMonth(m, leap) {
+  m %= 12;
+  if (m === 1) {
+    return leap ? 28: 29;
+  }
+  return MONTH_DAYS[m];
+}
+
 
 function MonthFromTime(t){
   const days = getDays(t),
@@ -195,24 +206,21 @@ function WeekDay(t){
 }
 
 
-// ###########################################
-// ### 15.9.1.7 Local Time Zone Adjustment ###
-// ###########################################
+const [
+  // ###########################################
+  // ### 15.9.1.7 Local Time Zone Adjustment ###
+  // ###########################################
+  LocalTZA,
 
-function daysInMonth(m, leap) {
-  m %= 12;
-  if (m === 1) {
-    return leap ? 28: 29;
-  }
-  return MONTH_DAYS[m];
-}
+  // ################################################
+  // ### 15.9.1.8 Daylight Saving Time Adjustment ###
+  // ################################################
+  DaylightSavingTA
 
+] = (function(){
 
-let adjustFirst, adjustLast;
-
-{
   function nextMonth(adjustment){
-    return (t, leap) => {
+    return function(t, leap){
       t += daysInMonth(adjustment, leap) * msPerDay;
       return t - WeekDay(t) * msPerDay;
     };
@@ -222,29 +230,26 @@ let adjustFirst, adjustLast;
     return t => t + WeekDay(t) * msPerDay - msPerDay * 7;
   }
 
-  adjustFirst = (DST_START_SUNDAY ? nextMonth : currentMonth)(DST_START_MONTH);
-  adjustLast  = (DST_END_SUNDAY ? nextMonth : currentMonth)(DST_END_MONTH);
-}
-
-const MONTH_DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-      LocalTZA   = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * msPerHour;
+  const adjustFirst = (DST_START_SUNDAY ? nextMonth : currentMonth)(DST_START_MONTH),
+        adjustLast  = (DST_END_SUNDAY ? nextMonth : currentMonth)(DST_END_MONTH);
 
 
-// ################################################
-// ### 15.9.1.8 Daylight Saving Time Adjustment ###
-// ################################################
+  function DaylightSavingTA(t){
+    const year = TimeFromYear(YearFromTime(t)),
+          leap = InLeapYear(t);
 
+    if (DST_START_OFFSET + adjustFirst(year, leap) <= t && t < DST_END_OFFSET + adjustLast(year, leap)) {
+      return msPerHour;
+    }
 
-function DaylightSavingTA(t){
-  const year = TimeFromYear(YearFromTime(t)),
-        leap = InLeapYear(t);
-
-  if (DST_START_OFFSET + adjustFirst(year, leap) <= t && t < DST_END_OFFSET + adjustLast(year, leap)) {
-    return msPerHour;
+    return 0;
   }
 
-  return 0;
-}
+  return [
+    LOCAL_TZ * msPerHour - DaylightSavingTA($$Now()),
+    DaylightSavingTA
+  ];
+})();
 
 
 // ###########################
