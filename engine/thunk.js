@@ -232,18 +232,47 @@ var thunk = (function(exports){
     return context.cmds[++context.ip];
   }
 
-  function CALL(context){
-    var args     = context.stack[--context.sp],
-        func     = context.stack[--context.sp],
-        receiver = context.stack[--context.sp],
-        result   = context.callFunction(receiver, func, args, context.ops[context.ip][0]);
 
-    if (result && result.Abrupt) {
-      context.error = result;
+  function $$EvaluateCall(ref, func, args, tail){
+    if (!func || !func.Call) {
+      return $$ThrowException('called_non_callable', [ref && ref.name]);
+    }
+
+    if (ref && ref.Reference) {
+      var receiver = $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
+    }
+
+    return
+  }
+
+
+  function CALL(context){
+    var args = context.stack[--context.sp],
+        func = context.stack[--context.sp],
+        ref  = context.stack[--context.sp],
+        tail = context.ops[context.ip][0];
+
+    if (!func || !func.Call) {
+      context.error = $$ThrowException('called_non_callable', [ref && ref.name]);
       return unwind;
     }
 
-    context.stack[context.sp++] = result;
+    var receiver = context.resolveReceiver(ref);
+
+    if (func.code && tail) {
+      func.prepare(receiver, args, context);
+      return context.cmds[context.ip];
+    } else {
+      var result = func.Call(receiver, args);
+
+      if (result && result.Abrupt) {
+        context.error = result;
+        return unwind;
+      }
+
+      context.stack[context.sp++] = result;
+    }
+
     return context.cmds[++context.ip];
   }
 

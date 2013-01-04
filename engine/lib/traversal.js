@@ -232,7 +232,7 @@ var traversal = (function(exports){
     VisitorHandlers.prototype = create(null);
 
     function VisitorState(dispatcher, handlers, root){
-      var stack = this.stack = new Stack([[root]]);
+      var stack = this.stack = [[root]];
       this.dispatcher = dispatcher;
       this.handlers = handlers;
       this.branded = [];

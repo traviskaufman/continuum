@@ -2465,6 +2465,7 @@ var assembler = (function(exports){
           code.strict = false;
         }
 
+        annotateTailPosition(node);
         this.queue(code);
 
         while (this.pending.length) {

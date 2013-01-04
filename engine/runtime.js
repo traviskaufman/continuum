@@ -56,9 +56,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       Completion       = errors.Completion,
       AbruptCompletion = errors.AbruptCompletion;
 
-  var $$GetValue = operators.$$GetValue,
-      $$ToObject = operators.$$ToObject,
-      $$Type     = operators.$$Type;
+  var $$GetValue     = operators.$$GetValue,
+      $$ToObject     = operators.$$ToObject,
+      $$Type         = operators.$$Type,
+      $$GetThisValue = operators.$$GetThisValue;
 
   var Reference                 = operations.Reference,
       $$IsCallable              = operations.$$IsCallable,
@@ -67,6 +68,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
       $$CreateListFromArray     = operations.$$CreateListFromArray,
       $$IsStopIteration         = operations.$$IsStopIteration,
+      $$IsStopIteration         = operations.$$IsStopIteration,
+      $$IsPropertyReference     = operations.$$IsPropertyReference,
       $$OrdinaryCreateFromConstructor = operations.$$OrdinaryCreateFromConstructor;
 
   var Value                    = descriptors.Value,
@@ -436,11 +439,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       Realm: null,
       type: '$Function'
     }, [
-      function Call(receiver, args, isConstruct){
-
+      function prepare(receiver, args, ctx, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
         }
+
         if (this.ThisMode === 'lexical') {
           var local = new DeclarativeEnv(this.Scope);
         } else {
@@ -455,25 +458,33 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnv(receiver, this);
         }
 
-        var caller = context ? context.callee : null,
-            ctx    = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
+        if (ctx) {
+          ExecutionContext.call(ctx, ctx.caller, local, realm, this.code, this, args, isConstruct);
+        } else {
+          var caller = context ? context.callee : null;
+          ctx = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
 
-        ExecutionContext.push(ctx);
-
-        if (!this.strict) {
-          this.define('arguments', local.arguments, ___);
-          this.define('caller', caller, ___);
-          local.arguments = null;
+          if (this.define && !this.strict) {
+            this.define('arguments', local.arguments, ___);
+            this.define('caller', caller, ___);
+            local.arguments = null;
+          }
         }
 
-        var result = context.run();
-        ctx === context && ctx.pop();
-
-        if (!this.strict) {
+        return ctx;
+      },
+      function cleanup(){
+        if (this.define && !this.strict) {
           this.define('arguments', null, ___);
           this.define('caller', null, ___);
         }
-
+      },
+      function Call(receiver, args, isConstruct){
+        var ctx = this.prepare(receiver, args, null, isConstruct);
+        ExecutionContext.push(ctx);
+        var result = context.run();
+        ctx === context && ExecutionContext.pop();
+        this.cleanup();
         return result && result.type === Return ? result.value : result;
       },
       function Construct(args){
@@ -1338,6 +1349,37 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($WrappedObject, $Object);
   })();
 
+
+
+  function Interpreter(){
+
+  }
+
+  define(Interpreter.prototype, [
+    function run(context){
+      var f = context.cmds[context.ip];
+
+      if (!context.Realm.quiet && !context.code.natives || context.Realm.debugBuiltins) {
+        context.history || (context.history = []);
+
+        while (f) {
+          context.history[context.history.length] = context.ops[context.ip];
+          context.Realm.emit('op', context.ops[context.ip], context.stack[context.sp - 1]);
+          f = f(context);
+        }
+      } else {
+        while (f) f = f(context);
+      }
+
+      return context.completion;
+    },
+    function send(value){
+      context.stack[context.sp++] = value;
+      return context.run();
+    }
+  ]);
+
+
   var ExecutionContext = (function(){
     var $$GetSymbol           = operations.$$GetSymbol,
         $$Element             = operations.$$Element,
@@ -1444,6 +1486,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function argumentCount(){
         return this.args.length;
+      },
+      function resolveReceiver(ref){
+        if (ref && ref.Reference) {
+          return $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
+        }
       },
       function callerName(){
         var caller = this.caller && this.caller.callee;
@@ -2049,7 +2096,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
           ExecutionContext.push(ctx);
           var result = context.run();
-          ctx === context && ctx.pop();
+          ctx === context && ExecutionContext.pop();
           return result;
         }
         builtinEval.isBuiltinEval = true;
@@ -2071,7 +2118,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
         ExecutionContext.push(ctx);
         var func = ctx.run();
-        ctx === context && ctx.pop();
+        ctx === context && ExecutionContext.pop();
         return func;
       },
       _BoundFunctionCreate: function(obj, args){
