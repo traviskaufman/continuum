@@ -616,7 +616,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function $$Resume(ctx, completionType, value){
       ExecutionContext.push(ctx);
-      if (completionType !== Normal) {
+      if (completionType !== 'normal') {
         value = new AbruptCompletion(completionType, value);
       }
       return ctx.send(value);
@@ -633,11 +633,11 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       var self = this;
       ExecutionContext.push(ctx);
-      setFunction(this, iteratorSymbol, function(){ return self });
-      setFunction(this, 'next',         function(){ return self.Send() });
-      setFunction(this, 'close',        function(){ return self.Close() });
-      setFunction(this, 'send',         function(v){ return self.Send(v) });
-      setFunction(this, 'throw',        function(v){ return self.Throw(v) });
+      setFunction(this, iteratorSymbol, function(_, args){ return self });
+      setFunction(this, 'next',         function(_, args){ return self.Send() });
+      setFunction(this, 'close',        function(_, args){ return self.Close() });
+      setFunction(this, 'send',         function(_, args){ return self.Send(args[0]) });
+      setFunction(this, 'throw',        function(_, args){ return self.Throw(args[0]) });
       ctx.pop();
     }
 
@@ -664,7 +664,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = 'executing';
-        return $$Resume(this.ExecutionContext, Normal, value);
+        return $$Resume(this.ExecutionContext, 'normal', value);
       },
       function Throw(value){
         if (this.State === 'executing') {
@@ -674,11 +674,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else if (this.State === 'newborn') {
           this.State = 'closed';
           this.code = null;
-          return new AbruptCompletion(Throw, value);
+          return new AbruptCompletion('throw', value);
         }
 
         this.State = 'executing';
-        return $$Resume(this.ExecutionContext, Throw, value);
+        return $$Resume(this.ExecutionContext, 'throw', value);
       },
       function Close(value){
         if (this.State === 'executing') {
@@ -692,7 +692,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         this.State = 'executing';
-        var result = $$Resume(this.ExecutionContext, Return, value);
+        var result = $$Resume(this.ExecutionContext, 'return', value);
         this.State = 'closed';
 
         return result;
@@ -1111,7 +1111,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
-
   var $NativeFunction = (function(){
     function $NativeFunction(options){
       if (typeof options === 'function') {
@@ -1367,7 +1366,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.ip = 0;
       this.sp = 0;
       this.error = undefined;
-      this.yielded = undefined;
       this.completion = undefined;
       this.stacktrace = undefined;
       this.ops = code.ops;
@@ -1411,7 +1409,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         var f = this.cmds[this.ip];
 
         if (!this.Realm.quiet && !this.code.natives || this.Realm.debugBuiltins) {
-          this.history = [];
+          this.history || (this.history = []);
 
           while (f) {
             this.history[this.history.length] = this.ops[this.ip];
