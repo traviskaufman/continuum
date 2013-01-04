@@ -131,6 +131,13 @@ export function hypot(x, y) {
   return $__sqrt(x * x + y * y);
 }
 
+export function imul(x, y){
+  x = $__ToUint32(x);
+  y = $__ToUint32(y);
+
+  return $__ToInt32((x * y) & 0xffffffff);
+}
+
 export function log(x){
   x = $__ToNumber(x);
   return isFiniteNonZero(x) ? $__log(x) : x;
