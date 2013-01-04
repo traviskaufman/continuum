@@ -6,6 +6,7 @@
 import {
   $$ArgumentCount,
   $$CallerHasArgument,
+  $$CallerName,
   $$Exception,
   $$HasArgument,
   $$IsConstruct,
@@ -61,11 +62,16 @@ import {
 } from '@@symbols';
 
 
+
+const msPerSecond = 1000,
+      msPerMinute = 60 * msPerSecond,
+      msPerHour   = 60 * msPerMinute,
+      msPerDay    = 24 * msPerHour;
+
+
 // ###############################################
 // ### 15.9.1.2 Day Number and Time within Day ###
 // ###############################################
-
-const msPerDay = 86400000;
 
 function Day(t){
   return floor(t / msPerDay);
@@ -124,12 +130,12 @@ function InLeapYear(t){
 const OFFSETS      = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365],
       LEAP_OFFSETS = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366];
 
-function offsets(t){
+function getDays(t){
   return InLeapYear(t) ? LEAP_OFFSETS : OFFSETS
 }
 
 function MonthFromTime(t){
-  const days = offsets(t),
+  const days = getDays(t),
         day  = DayWithinYear(t);
 
   if (day < days[6]) {
@@ -175,7 +181,7 @@ function DayWithinYear(t){
 // ############################
 
 function DateFromTime(t){
-  return DayWithinYear(t) - offsets(t)[MonthFromTime(t)] + 1;
+  return DayWithinYear(t) - getDays(t)[MonthFromTime(t)] + 1;
 }
 
 
@@ -192,15 +198,6 @@ function WeekDay(t){
 // ### 15.9.1.7 Local Time Zone Adjustment ###
 // ###########################################
 
-const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-      LocalTZA   = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * 3600000;
-
-
-// ################################################
-// ### 15.9.1.8 Daylight Saving Time Adjustment ###
-// ################################################
-
-
 function daysInMonth(m, leap) {
   m %= 12;
   if (m === 1) {
@@ -209,31 +206,44 @@ function daysInMonth(m, leap) {
   return MONTH_DAYS[m];
 }
 
-function getSundayInMonth(t, m, count){
-  const leap = InLeapYear(t);
-  let sunday = TimeFromYear(YearFromTime(t)) + daysInMonth(m, leap) * msPerDay;
 
-  if (count) {
-    sunday += daysInMonth(m, leap) * msPerDay;
-    while (WeekDay(sunday)) {
-      sunday -= msPerDay
-    }
-  } else {
-    while (WeekDay(sunday)) {
-      sunday += msPerDay
-    }
-    sunday += 7 * msPerDay * (count - 1);
+let adjustFirst, adjustLast;
+
+{
+  function nextMonth(adjustment){
+    return (t, leap) => {
+      t += daysInMonth(adjustment, leap) * msPerDay;
+      return t - WeekDay(t) * msPerDay;
+    };
   }
 
-  return sunday;
+  function currentMonth(adjustment){
+    return t => t + WeekDay(t) * msPerDay - msPerDay * 7;
+  }
+
+  adjustFirst = (DST_START_SUNDAY ? nextMonth : currentMonth)(DST_START_MONTH);
+  adjustLast  = (DST_END_SUNDAY ? nextMonth : currentMonth)(DST_END_MONTH);
 }
 
-function DaylightSavingTA(t) {
-  if (t >= getSundayInMonth(t, DST_START_MONTH, DST_START_SUNDAY) + DST_START_OFFSET) {
-    if (t < getSundayInMonth(t, DST_END_MONTH, DST_END_SUNDAY) + DST_END_OFFSET) {
-      return 3600000;
+const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+      LocalTZA   = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * msPerHour;
+
+
+// ################################################
+// ### 15.9.1.8 Daylight Saving Time Adjustment ###
+// ################################################
+
+
+function DaylightSavingTA(t){
+  const year = TimeFromYear(YearFromTime(t)),
+        leap = InLeapYear(t);
+
+  if (t >= DST_START_OFFSET + adjustFirst(year, leap)) {
+    if (t < DST_END_OFFSET + adjustLast(year, leap)) {
+      return msPerHour;
     }
   }
+
   return 0;
 }
 
@@ -256,9 +266,6 @@ function ToUTC(t){
 // ### 15.9.1.10 Hours, Minutes, Second, and Milliseconds ###
 // ##########################################################
 
-const msPerSecond = 1000,
-      msPerMinute = 60 * msPerSecond,
-      msPerHour   = 60 * msPerMinute;
 
 function HourFromTime(t){
   return floor(t / msPerHour) % 24;
@@ -299,7 +306,7 @@ function MakeTime(hour, min, sec, ms){
 // ### 15.9.1.12 MakeDay ###
 // #########################
 
-// function MakeDay(year, month, date) {
+// function MakeDay(year, month, date){
 //   if (!(isFinite(year) && isFinite(month) && isFinite(date))) {
 //     return NaN;
 //   }
@@ -320,7 +327,7 @@ function MakeTime(hour, min, sec, ms){
 //     }
 //   }
 
-//   const days = offsets(t);
+//   const days = getDays(t);
 //   for (var i = 0; i < month; i++) {
 //     t += days[i] * msPerDay;
 //   }
@@ -331,7 +338,7 @@ function MakeTime(hour, min, sec, ms){
 //   return Day(t) + date - 1;
 // }
 
-function MakeDay(year, month, date) {
+function MakeDay(year, month, date){
   if (!(isFinite(year) && isFinite(month) && isFinite(date))) {
     return NaN;
   }
@@ -371,20 +378,33 @@ function TimeClip(time){
 }
 
 
-
+function ensureDate(t){
+  if (t === undefined) {
+    throw $$Exception('not_generic', [`Date.prototype.${$$CallerName()}`]);
+  }
+}
 
 // ####################
 // ### Date Getters ###
 // ####################
 
 function getTimezone(t, divisor){
+  if (t === undefined) {
+    throw $$Exception('not_generic', [`Date.prototype.${$$CallerName()}`]);
+  }
   return isNaN(t) ? t : (t - LocalTime(t)) / divisor;
 }
 
 function getTime(t, utc, callback){
+  if (t === undefined) {
+    throw $$Exception('not_generic', [`Date.prototype.${$$CallerName()}`]);
+  }
   return isNaN(t) ? t : callback(utc ? t : LocalTime(t));
 }
 
+function coerceNaNToZero(t){
+  return isNaN(t) ? 0 : t;
+}
 
 // ####################
 // ### Date Setters ###
@@ -398,7 +418,8 @@ function makeDate(utc, date){
 }
 
 function makeFullYear(utc, year, month, date){
-  const t  = LocalTime(utc),
+  const lt = LocalTime(utc),
+        t  = isNaN(lt) ? 0 : lt,
         y  = ToNumber(year),
         m  = $$CallerHasArgument('month') ? ToNumber(month) : MonthFromTime(t),
         dt = $$CallerHasArgument('date')  ? ToNumber(date)  : DateFromTime(t);
@@ -563,7 +584,7 @@ export class Date {
   // ###########################################
   // ### 15.9.5.1 Date.prototype.constructor ###
   // ###########################################
-  constructor(year, month, date, hours, minutes, seconds, ms){
+  constructor(year, month, date = 1, hours = 0, minutes = 0, seconds = 0, ms = 0){
     if (!$$IsConstruct()) {
       // 15.9.2 The Date Constructor Called as a Function
       return toString($$Now());
@@ -576,18 +597,16 @@ export class Date {
       // 15.9.3.1 new Date (year, month [, date [, hours [, minutes [, seconds [, ms ] ] ] ] ] )
       const y     = ToNumber(year),
             m     = ToNumber(month),
-            dt    = $$HasArgument('date')    ? ToNumber(date)    : 1,
-            h     = $$HasArgument('hours')   ? ToNumber(hours)   : 0,
-            min   = $$HasArgument('minutes') ? ToNumber(minutes) : 0,
-            s     = $$HasArgument('seconds') ? ToNumber(seconds) : 0,
-            milli = $$HasArgument('ms')      ? ToNumber(ms)      : 0;
+            dt    = ToNumber(date),
+            h     = ToNumber(hours),
+            min   = ToNumber(minutes),
+            s     = ToNumber(seconds),
+            milli = ToNumber(ms);
 
       const yInt = ToInteger(y),
             yr   = !isNaN(y) && 0 <= yInt && yInt <= 99 ? y + 1900 : y;
 
-      const finalDate = MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli));
-
-      this.@@DateValue = TimeClip(ToUTC(finalDate));
+      this.@@DateValue = TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
     } else if (argc === 1) {
       // 15.9.3.2 new Date (value)
       const date = ToPrimitive(year);
@@ -603,7 +622,9 @@ export class Date {
   // ########################################
   toString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -614,7 +635,9 @@ export class Date {
   // ############################################
   toDateString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -625,7 +648,9 @@ export class Date {
   // ############################################
   toTimeString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -636,7 +661,9 @@ export class Date {
   // ##############################################
   toLocaleString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -647,7 +674,9 @@ export class Date {
   // ##################################################
   toLocaleDateString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -658,7 +687,9 @@ export class Date {
   // ##################################################
   toLocaleTimeString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -877,7 +908,9 @@ export class Date {
   // ############################################
   toUTCString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
@@ -896,7 +929,9 @@ export class Date {
   // ############################################
   toISOString(){
     const t = this.@@DateValue;
-    if (!isFinite(t)) {
+    ensureDate(t);
+
+    if (isNaN(t)) {
       return 'Invalid Date';
     }
 
