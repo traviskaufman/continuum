@@ -33,6 +33,7 @@ import {
 import {
   abs,
   call,
+  define,
   extend,
   hideEverything,
   floor,
@@ -110,9 +111,9 @@ function YearFromTime(t) {
   const t2 = TimeFromYear(year);
 
   if (t2 > t) {
-    year--;
+    return year - 1;
   } else if (t2 + msPerDay * DaysInYear(year) <= t) {
-    year++;
+    return year + 1;
   }
 
   return year;
@@ -138,33 +139,33 @@ function MonthFromTime(t){
   const days = getDays(t),
         day  = DayWithinYear(t);
 
-  if (day < days[6]) {
-    if (day < days[3]) {
-      if (day < days[1]) {
+  if (day <= days[6]) {
+    if (day <= days[3]) {
+      if (day <= days[1]) {
         return 0;
       } else if (day < days[2]) {
         return 1;
       } else {
         return 2;
       }
-    } else if (day < days[4]) {
+    } else if (day <= days[4]) {
       return 3;
-    } else if (day < days[5]) {
+    } else if (day <= days[5]) {
       return 4;
     } else {
       return 5;
     }
-  } else if (day < days[9]) {
+  } else if (day <= days[9]) {
     if (day < days[7]) {
       return 6;
-    } else if (day < days[8]) {
+    } else if (day <= days[8]) {
       return 7;
     } else {
       return 8;
     }
-  } else if (day < days[10]) {
+  } else if (day <= days[10]) {
     return 9;
-  } else if (day < days[11]) {
+  } else if (day <= days[11]) {
     return 10;
   } else {
     return 11;
@@ -225,7 +226,7 @@ let adjustFirst, adjustLast;
   adjustLast  = (DST_END_SUNDAY ? nextMonth : currentMonth)(DST_END_MONTH);
 }
 
-const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+const MONTH_DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
       LocalTZA   = (LOCAL_TZ - (DaylightSavingTA($$Now()) ? 1 : 0)) * msPerHour;
 
 
@@ -238,10 +239,8 @@ function DaylightSavingTA(t){
   const year = TimeFromYear(YearFromTime(t)),
         leap = InLeapYear(t);
 
-  if (t >= DST_START_OFFSET + adjustFirst(year, leap)) {
-    if (t < DST_END_OFFSET + adjustLast(year, leap)) {
-      return msPerHour;
-    }
+  if (DST_START_OFFSET + adjustFirst(year, leap) <= t && t < DST_END_OFFSET + adjustLast(year, leap)) {
+    return msPerHour;
   }
 
   return 0;
@@ -606,14 +605,14 @@ export class Date {
       const yInt = ToInteger(y),
             yr   = !isNaN(y) && 0 <= yInt && yInt <= 99 ? y + 1900 : y;
 
-      this.@@DateValue = TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
+      define(this, @@DateValue, TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli)))));
     } else if (argc === 1) {
       // 15.9.3.2 new Date (value)
       const date = ToPrimitive(year);
-      this.@@DateValue = TimeClip(typeof date === 'string' ? parse(date) : date);
+      define(this, @@DateValue, TimeClip(typeof date === 'string' ? parse(date) : date));
     } else {
       // 15.9.3.3 new Date ( )
-      this.@@DateValue = $$Now();
+      define(this, @@DateValue, $$Now());
     }
   }
 
@@ -941,7 +940,7 @@ export class Date {
           hour  = zeroPad(getTime(t, true, HourFromTime)),
           min   = zeroPad(getTime(t, true, MinFromTime)),
           sec   = zeroPad(getTime(t, true, SecFromTime)),
-          ms    = zeroPad(getTime(t, true, msFromTime), 2);
+          ms    = zeroPad(getTime(t, true, msFromTime), 3);
 
     return `${year}-${month}-${date}T${hour}:${min}:${sec}.${ms}Z`;
   }
@@ -979,16 +978,14 @@ export class Date {
 }
 
 builtinClass(Date);
-const DatePrototype = Date.prototype;
-DatePrototype.@@DateValue = NaN;
-
+define(Date.prototype, @@DateValue, NaN);
 extend(Date, { parse, UTC, now });
 
 extend(Date, {
   // 15.9.4.6 Date.@@create
   @@create(){
-    const obj = OrdinaryCreateFromConstructor(this, DatePrototype);
-    obj.@@DateValue = undefined;
+    const obj = OrdinaryCreateFromConstructor(this, '%DatePrototype%');
+    define(obj, @@DateValue);
     $$SetInternal('BuiltinBrand', 'BuiltinDate');
     return obj;
   }

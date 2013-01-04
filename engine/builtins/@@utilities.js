@@ -67,11 +67,11 @@ function deleteProperty(object, key){
   return $$Call(object, 'remove', [key]);
 }
 
-function update(object, key, attr){
+export function update(object, key, attr){
   return $$Call(object, 'update', [key, attr]);
 }
 
-function define(object, key, value, attr){
+export function define(object, key, value, attr){
   return $$Call(object, 'define', [key, value, attr]);
 }
 
@@ -148,8 +148,7 @@ function builtinClass(Ctor, brand){
   define(Ctor, 'arguments', null, FROZEN);
 
   if (!isSymbol) {
-    brand || (brand = 'Builtin'+Ctor.name);
-    $__SetBuiltinBrand(Ctor.prototype, brand);
+    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name)
     define(Ctor.prototype, @@toStringTag, Ctor.name);
     hideEverything(Ctor);
   }
