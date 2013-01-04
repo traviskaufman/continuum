@@ -957,11 +957,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
 
       this.init(object, key);
-      each(this.keys, this.add, this);
+      iteration.each(this.keys, this.add, this);
       tag(this);
     }
 
-    var _each = each;
 
     define($Module.prototype, {
       type: '$Module',
@@ -990,7 +989,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return key in this.props;
       },
       function each(callback){
-        _each(this.keys, function(key){
+        iteration.each(this.keys, function(key){
           callback.call(this, this.describe(key));
         }, this);
       },
@@ -1074,7 +1073,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       function init(bindings){
         this.bindings = bindings;
         this.props = new Hash;
-        this.keys = ownKeys(bindings);
+        this.keys = map(bindings, function(value, key){
+          return key;
+        });
       },
       function add(key){
         if (typeof this.bindings[key] === 'function') {
@@ -1089,7 +1090,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function get(key){
         return this.props[key];
-      },
+      }
     ]);
 
     return $NativeModule;
@@ -1109,13 +1110,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     inherit($Error, $Object, {
       BuiltinBrand: 'BuiltinError'
     }, [
-      function setOrigin(filename, kind){
-        if (filename) {
-          this.set('filename', filename);
-        }
-        if (kind) {
-          this.set('kind', kind);
-        }
+      function setOrigin(filename, origin){
+        filename && this.set('filename', filename);
+        origin && this.set('origin', origin);
       },
       function setCode(loc, code){
         var line = code.split('\n')[loc.start.line - 1];
@@ -1739,7 +1736,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     var primitives = {
-      RegExp: RegExp.prototype,
+      RegExp: RegExp.prototype
     };
 
     function Intrinsics(realm){
@@ -2183,7 +2180,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         Proxy   : $Proxy,
         RegExp  : $RegExp,
         Symbol  : $Symbol,
-        String  : $String,
+        String  : $String
       };
 
 
