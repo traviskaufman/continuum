@@ -1455,7 +1455,7 @@ var assembler = (function(exports){
       BINDING('arguments', strict);
     //}
 
-    each(code.VarDeclaredNames, createBindingIfNew);
+    each(code.VarDeclaredNames, initBindingIfNew);
 
     initLexicalDecls(code.body);
 
