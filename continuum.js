@@ -16736,13 +16736,9 @@ exports.thunk = (function(exports){
   var log = false;
 
 
-  function setOrigin(obj, filename, kind){
-    if (filename) {
-      obj.set('filename', filename);
-    }
-    if (kind) {
-      obj.set('kind', kind);
-    }
+  function setOrigin(obj, filename, name){
+    filename && obj.set('filename', filename);
+    name && obj.set('name', name);
   }
 
   function setCode(obj, loc, code){
@@ -16851,29 +16847,37 @@ exports.thunk = (function(exports){
       }
 
 
-      if (error) {
-        if (error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
-          var range = code.ops[ip].range,
-              loc = code.ops[ip].loc;
+      if (error && error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
+        var range = code.ops[ip].range,
+            loc   = code.ops[ip].loc,
+            err   = error.value;
 
-          if (!error.value.hasLocation) {
-            error.value.hasLocation = true;
-            setCode(error.value, loc, code.source);
-            setOrigin(error.value, code.filename, code.displayName || code.name);
-          }
+        if (!err.hasLocation) {
+          err.hasLocation = true;
+          setCode(err, loc, code.source);
+          var name = code.displayName || code.name;
+          setOrigin(err, code.filename, name);
 
-          if (stacktrace) {
-            if (error.value.trace) {
-              [].push.apply(error.value.trace, stacktrace);
-            } else {
-              error.value.trace = stacktrace;
-            }
-            error.value.context || (error.value.context = context);
+
+          if (name) {
+            name = 'in '+name+' ';
           }
+          console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
+                      err.Get('name')+': '+err.Get('message')+'\n'+
+                      err.Get('code'));
+          console.dir(err);
+        }
+
+        if (stacktrace) {
+          if (err.trace) {
+            [].push.apply(err.trace, stacktrace);
+          } else {
+            err.trace = stacktrace;
+          }
+          err.context || (err.context = context);
         }
       }
 
-      console.log(error);
       completion = error;
       return false;
     }
@@ -19005,11 +19009,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       }
 
       this.init(object, key);
-      each(this.keys, this.add, this);
+      iteration.each(this.keys, this.add, this);
       tag(this);
     }
 
-    var _each = each;
 
     define($Module.prototype, {
       type: '$Module',
@@ -19038,7 +19041,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return key in this.props;
       },
       function each(callback){
-        _each(this.keys, function(key){
+        iteration.each(this.keys, function(key){
           callback.call(this, this.describe(key));
         }, this);
       },
@@ -19122,7 +19125,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       function init(bindings){
         this.bindings = bindings;
         this.props = new Hash;
-        this.keys = ownKeys(bindings);
+        this.keys = map(bindings, function(value, key){
+          return key;
+        });
       },
       function add(key){
         if (typeof this.bindings[key] === 'function') {
@@ -19137,7 +19142,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function get(key){
         return this.props[key];
-      },
+      }
     ]);
 
     return $NativeModule;
@@ -19157,13 +19162,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     inherit($Error, $Object, {
       BuiltinBrand: 'BuiltinError'
     }, [
-      function setOrigin(filename, kind){
-        if (filename) {
-          this.set('filename', filename);
-        }
-        if (kind) {
-          this.set('kind', kind);
-        }
+      function setOrigin(filename, origin){
+        filename && this.set('filename', filename);
+        origin && this.set('origin', origin);
       },
       function setCode(loc, code){
         var line = code.split('\n')[loc.start.line - 1];
@@ -19787,7 +19788,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     }
 
     var primitives = {
-      RegExp: RegExp.prototype,
+      RegExp: RegExp.prototype
     };
 
     function Intrinsics(realm){
@@ -20231,7 +20232,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         Proxy   : $Proxy,
         RegExp  : $RegExp,
         Symbol  : $Symbol,
-        String  : $String,
+        String  : $String
       };
 
 
@@ -21355,7 +21356,7 @@ exports.debug = (function(exports){
       },
       function origin(){
         var file = this.getValue('filename') || '',
-            type = this.getValue('kind') || '';
+            type = this.getValue('origin') || '';
 
         return file && type ? type + ' ' + file : type + file;
       },
@@ -22699,7 +22700,7 @@ exports.builtins["@json"] = "let ReplacerFunction, PropertyList, stack, indent, 
 
 exports.builtins["@map"] = "import {\n  @@iterator: iterator,\n  @@create  : create\n} from '@@symbols';\n\nimport {\n  Type\n} from '@@types';\n\nimport {\n  OrdinaryCreateFromConstructor\n} from '@@operations';\n\nimport {\n  Iterator\n} from '@iter';\n\n\nfunction ensureMap(o, name){\n  if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {\n    throw $__Exception('called_on_incompatible_object', ['Map.prototype.'+name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = $__ToObject(map);\n    this.@key = $__MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (Type(this) !== 'Object') {\n      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n\n    if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {\n      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $__MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;\n    return mapCreate(map, iterable);\n  }\n\n  get size(){\n    if (this && $__hasInternal(this, 'MapData')) {\n      return $__MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'clear');\n    $__MapClear(this, key);\n    return this;\n  }\n\n  delete(key){\n    ensureMap(this, 'delete');\n    return $__MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'get');\n    return $__MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'has');\n    return $__MapHas(this, key);\n  }\n\n  entries(){\n    ensureMap(this, 'entries');\n    return new MapIterator(this, 'key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'keys');\n    return new MapIterator(this, 'key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'set');\n    $__MapSet(this, key, value);\n    return this;\n  }\n\n  values(){\n    ensureMap(this, 'values');\n    return new MapIterator(this, 'value');\n  }\n}\n\n$__extend(Map, {\n  @@create(){\n    return OrdinaryCreateFromConstructor(this, '%MapPrototype%');\n  }\n});\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\n$__define(MapPrototype, @@iterator, MapPrototype.entries);\n\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  $__MapClear(map);\n  return map;\n}\n\nbuiltinFunction(mapClear);\n\nfunction mapCreate(target, iterable){\n  target = $__ToObject(target);\n\n  if ($__hasInternal(target, 'MapData')) {\n    throw $__Exception('double_initialization', ['Map']);\n  }\n\n  $__MapInitialization(target, iterable);\n  return target;\n}\n\nbuiltinFunction(mapCreate);\n\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $__MapDelete(map, key);\n}\n\nbuiltinFunction(mapDelete);\n\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $__MapGet(map, key);\n}\n\nbuiltinFunction(mapGet);\n\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $__MapHas(map, key);\n}\n\nbuiltinFunction(mapHas);\n\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));\n}\n\nbuiltinFunction(mapIterate);\n\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  $__MapSet(map, key, value);\n  return map;\n}\n\nbuiltinFunction(mapSet);\n\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $__MapSize(map);\n}\n\nbuiltinFunction(mapSize);\n\n\nexport const clear   = mapClear,\n             create  = mapCreate,\n           //delete  = mapDelete, TODO: fix exporting reserved names\n             get     = mapGet,\n             has     = mapHas,\n             iterate = mapIterate,\n             set     = mapSet,\n             size    = mapSize;\n";
 
-exports.builtins["@math"] = "export const E       = 2.718281828459045,\n             LN10    = 2.302585092994046,\n             LN2     = 0.6931471805599453,\n             LOG10E  = 0.4342944819032518,\n             LOG2E   = 1.4426950408889634,\n             PI      = 3.141592653589793,\n             SQRT1_2 = 0.7071067811865476,\n             SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== -Infinity\n      && value !== Infinity;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  var i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  }\n  return ($__exp(x) + $__exp(-x)) / 2;\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function max(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return -Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x > y ? x : y;\n  } else {\n    let index   = count,\n        maximum = -Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current > maximum) {\n        maximum = current;\n      }\n    }\n\n    return maximum;\n  }\n}\n\n$__set(max, 'length', 2);\n\nexport function min(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x < y ? x : y;\n  } else {\n    let index   = count,\n        minimum = Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current < minimum) {\n        minimum = current;\n      }\n    }\n\n    return minimum;\n  }\n}\n\n$__set(min, 'length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\n$__SetBuiltinBrand(Math, 'BuiltinMath');\n$__define(Math, @@toStringTag, 'Math');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    $__update(Math, k, HIDDEN);\n  } else {\n    $__update(Math, k, FROZEN);\n  }\n}\n";
+exports.builtins["@math"] = "export const E       = 2.718281828459045,\n             LN10    = 2.302585092994046,\n             LN2     = 0.6931471805599453,\n             LOG10E  = 0.4342944819032518,\n             LOG2E   = 1.4426950408889634,\n             PI      = 3.141592653589793,\n             SQRT1_2 = 0.7071067811865476,\n             SQRT2   = 1.4142135623730951;\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== -Infinity\n      && value !== Infinity;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  var i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport function abs(x){\n  x = $__ToNumber(x);\n  return x === 0 ? 0 : x < 0 ? -x : x;\n}\n\nexport function acos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__acos(x) : x;\n}\n\nexport function acosh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;\n}\n\nexport function asin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__asin(x) : x;\n}\n\nexport function asinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;\n}\n\nexport function atan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan(x) : x;\n}\n\nexport function atan2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__atan2(x) : x;\n}\n\nexport function atanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;\n}\n\nexport function ceil(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + 1 >> 0 : x;\n}\n\nexport function cos(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__cos(x) : x;\n}\n\nexport function cosh(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  x = abs(x);\n  if (x > 21) {\n    return $__exp(x) / 2;\n  }\n  return ($__exp(x) + $__exp(-x)) / 2;\n}\n\nexport function exp(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__exp(x) : x;\n}\n\nexport function expm1(x) {\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  for (var i = 1; i < n; i++) {\n    o += $__pow(x, i) / factorial(i);\n  }\n  return o;\n}\n\nexport function floor(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x >> 0 : x;\n}\n\nexport function hypot(x, y) {\n  x = $__ToNumber(x);\n  y = $__ToNumber(y);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n  if (!isFiniteNonZero(y)) {\n    return y;\n  }\n  return $__sqrt(x * x + y * y);\n}\n\nexport function imul(x, y){\n  x = $__ToUint32(x);\n  y = $__ToUint32(y);\n\n  return $__ToInt32((x * y) & 0xffffffff);\n}\n\nexport function log(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) : x;\n}\n\nexport function log10(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;\n}\n\nexport function log1p(x){\n  x = $__ToNumber(x);\n  if (!isFiniteNonZero(x)) {\n    return x;\n  }\n\n  var o = 0,\n      n = 50;\n\n  if (x <= -1) {\n    return -Infinity;\n  } else if (x < 0 || x > 1) {\n    return $__log(1 + x);\n  } else {\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $__pow(x, i) / i;\n      } else {\n        o += $__pow(x, i) / i;\n      }\n    }\n    return o;\n  }\n}\n\nexport function log2(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;\n}\n\nexport function max(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return -Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x > y ? x : y;\n  } else {\n    let index   = count,\n        maximum = -Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current > maximum) {\n        maximum = current;\n      }\n    }\n\n    return maximum;\n  }\n}\n\n$__set(max, 'length', 2);\n\nexport function min(...values){\n  const count = values.length;\n\n  if (count === 0) {\n    return Infinity;\n  } else if (count === 1) {\n    return $__ToNumber(values[0]);\n  } else if (count === 2) {\n    const x = $__ToNumber(values[0]),\n          y = $__ToNumber(values[1]);\n\n    if (x !== x || y !== y) {\n      return NaN;\n    }\n    return x < y ? x : y;\n  } else {\n    let index   = count,\n        minimum = Infinity;\n\n    while (index--) {\n      const current = $__ToNumber(values[index]);\n\n      if (current !== current) {\n        return NaN;\n      } else if (current < minimum) {\n        minimum = current;\n      }\n    }\n\n    return minimum;\n  }\n}\n\n$__set(min, 'length', 2);\n\nexport function pow(x, y){\n  return $__pow($__ToNumber(x), $__ToNumber(y));\n}\n\nexport let random = $__random;\n\nexport function round(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? x + .5 | 0 : x;\n}\n\nexport function sign(x){\n  x = $__ToNumber(x);\n  return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n}\n\nexport function sin(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__sin(x) : x;\n}\n\nexport function sinh(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;\n}\n\nexport function sqrt(x, y){\n  return $__sqrt(+x, +y);\n}\n\nexport function tan(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? $__tan(x) : x;\n}\n\nexport function tanh(x) {\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;\n}\n\nexport function trunc(x){\n  x = $__ToNumber(x);\n  return isFiniteNonZero(x) ? ~~x : x;\n}\n\nexport const Math = {\n  E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2,\n  abs, acos, acosh, asinh, asin, atan, atanh, atan2, ceil, cos,\n  cosh, exp, expm1, floor, hypot, log, log2, log10, log1p, max,\n  min, pow, random, round, sign, sinh, sin, sqrt, tan, tanh, trunc\n};\n\n$__SetBuiltinBrand(Math, 'BuiltinMath');\n$__define(Math, @@toStringTag, 'Math');\n\nfor (let k in Math) {\n  if (typeof Math[k] === 'function') {\n    builtinFunction(Math[k]);\n    $__update(Math, k, HIDDEN);\n  } else {\n    $__update(Math, k, FROZEN);\n  }\n}\n";
 
 exports.builtins["@number"] = "export const EPSILON           = 2.220446049250313e-16,\n             MAX_INTEGER       = 9007199254740992,\n             MAX_VALUE         = 1.7976931348623157e+308,\n             MIN_VALUE         = 5e-324,\n             NaN               = NaN,\n             NEGATIVE_INFINITY = -Infinity,\n             POSITIVE_INFINITY = Infinity;\n\n\nexport class Number {\n  constructor(...value){\n    value = value.length ? $__ToNumber(value[0]) : 0;\n    return $__isConstruct() ? $__NumberCreate(value) : value;\n  }\n\n  toString(radix){\n    radix = $__ToInteger(radix || 10);\n    if (typeof this === 'number') {\n      return $__NumberToString(this, radix);\n    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {\n      return $__NumberToString(this.@@NumberValue, radix);\n    }\n    throw $__Exception('not_generic', ['Number.prototype.toString']);\n  }\n\n  valueOf(){\n    if (typeof this === 'number') {\n      return this;\n    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {\n      return this.@@NumberValue;\n    }\n    throw $__Exception('not_generic', ['Number.prototype.valueOf']);\n  }\n\n  clz() {\n    let x = $__ToNumber(this);\n    if (!x || !isFinite(x)) {\n      return 32;\n    } else {\n      x = x < 0 ? x + 1 | 0 : x | 0;\n      x -= (x / 0x100000000 | 0) * 0x100000000;\n      return 32 - $__NumberToString(x, 2).length;\n    }\n  }\n}\n\nbuiltinClass(Number);\n\n$__define(Number.prototype, @@NumberValue, 0);\n\n\nexport function isNaN(value){\n  return value !== value;\n}\n\nexport function isFinite(value){\n  return typeof value === 'number'\n      && value === value\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && value === value\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function toInteger(value){\n  return (value / 1 || 0) | 0;\n}\n\nextend(Number, { isNaN, isFinite, isInteger, toInteger,\n                 EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,\n                 NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });\n\n";
 
