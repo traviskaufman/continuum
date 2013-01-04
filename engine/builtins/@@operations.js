@@ -7,7 +7,7 @@ import {
   abs,
   floor,
   sign,
-  hasBuiltinBrand,
+  hasBrand,
   call
 } from '@@utilities';
 
@@ -152,198 +152,11 @@ export function ToNumber(argument){
     case 'Boolean':
       return argument === true ? 1 : 0;
     case 'String':
-      return $$StringToNumber(argument);
+      return StringToNumber(argument);
     case 'Object':
       return ToNumber(ToPrimitive(argument), 'Number');
   }
 }
-
-
-    function scanNumericLiteral() {
-        var number, start, ch, octal;
-
-        ch = source[index];
-        assert(isDecimalDigit(ch) || (ch === '.'),
-            'Numeric literal must start with a decimal digit or a decimal point');
-
-        start = index;
-        number = '';
-        if (ch !== '.') {
-            number = nextChar();
-            ch = source[index];
-
-            // Hex number starts with '0x'.
-            // Octal number starts with '0'.
-            // Octal number in ES6 starts with '0o'.
-            // Binary number in ES6 starts with '0b'.
-            if (number === '0') {
-                if (ch === 'x' || ch === 'X') {
-                    number += nextChar();
-                    while (index < length) {
-                        ch = source[index];
-                        if (!isHexDigit(ch)) {
-                            break;
-                        }
-                        number += nextChar();
-                    }
-
-                    if (number.length <= 2) {
-                        // only 0x
-                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                    }
-
-                    if (index < length) {
-                        ch = source[index];
-                        if (isIdentifierStart(ch)) {
-                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                        }
-                    }
-                    return {
-                        type: Token.NumericLiteral,
-                        value: parseInt(number, 16),
-                        lineNumber: lineNumber,
-                        lineStart: lineStart,
-                        range: [start, index]
-                    };
-                } else if (ch === 'b' || ch === 'B') {
-                    nextChar();
-                    number = '';
-
-                    while (index < length) {
-                        ch = source[index];
-                        if (ch !== '0' && ch !== '1') {
-                            break;
-                        }
-                        number += nextChar();
-                    }
-
-                    if (number.length === 0) {
-                        // only 0b or 0B
-                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                    }
-
-                    if (index < length) {
-                        ch = source[index];
-                        if (isIdentifierStart(ch) || isDecimalDigit(ch)) {
-                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                        }
-                    }
-                    return {
-                        type: Token.NumericLiteral,
-                        value: parseInt(number, 2),
-                        lineNumber: lineNumber,
-                        lineStart: lineStart,
-                        range: [start, index]
-                    };
-                } else if (ch === 'o' || ch === 'O' || isOctalDigit(ch)) {
-                    if (isOctalDigit(ch)) {
-                        octal = true;
-                        number = nextChar();
-                    } else {
-                        octal = false;
-                        nextChar();
-                        number = '';
-                    }
-
-                    while (index < length) {
-                        ch = source[index];
-                        if (!isOctalDigit(ch)) {
-                            break;
-                        }
-                        number += nextChar();
-                    }
-
-                    if (number.length === 0) {
-                        // only 0o or 0O
-                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                    }
-
-                    if (index < length) {
-                        ch = source[index];
-                        if (isIdentifierStart(ch) || isDecimalDigit(ch)) {
-                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                        }
-                    }
-
-                    return {
-                        type: Token.NumericLiteral,
-                        value: parseInt(number, 8),
-                        octal: octal,
-                        lineNumber: lineNumber,
-                        lineStart: lineStart,
-                        range: [start, index]
-                    };
-                }
-
-                // decimal number starts with '0' such as '09' is illegal.
-                if (isDecimalDigit(ch)) {
-                    throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-                }
-            }
-
-            while (index < length) {
-                ch = source[index];
-                if (!isDecimalDigit(ch)) {
-                    break;
-                }
-                number += nextChar();
-            }
-        }
-
-        if (ch === '.') {
-            number += nextChar();
-            while (index < length) {
-                ch = source[index];
-                if (!isDecimalDigit(ch)) {
-                    break;
-                }
-                number += nextChar();
-            }
-        }
-
-        if (ch === 'e' || ch === 'E') {
-            number += nextChar();
-
-            ch = source[index];
-            if (ch === '+' || ch === '-') {
-                number += nextChar();
-            }
-
-            ch = source[index];
-            if (isDecimalDigit(ch)) {
-                number += nextChar();
-                while (index < length) {
-                    ch = source[index];
-                    if (!isDecimalDigit(ch)) {
-                        break;
-                    }
-                    number += nextChar();
-                }
-            } else {
-                ch = 'character ' + ch;
-                if (index >= length) {
-                    ch = '<end>';
-                }
-                throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-            }
-        }
-
-        if (index < length) {
-            ch = source[index];
-            if (isIdentifierStart(ch)) {
-                throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
-            }
-        }
-
-        return {
-            type: Token.NumericLiteral,
-            value: parseFloat(number),
-            lineNumber: lineNumber,
-            lineStart: lineStart,
-            range: [start, index]
-        };
-    }
-
 
 
 // #######################
@@ -372,7 +185,7 @@ export function ToInteger(argument){
 export function ToInt32(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
+  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
     return 0;
   }
 
@@ -389,7 +202,7 @@ export function ToInt32(argument){
 export function ToUint32(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
+  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
     return 0;
   }
 
@@ -404,7 +217,7 @@ export function ToUint32(argument){
 export function ToUint16(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
+  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
     return 0;
   }
 
@@ -439,9 +252,7 @@ export function ToString(argument){
 // ######################
 
 export function ToObject(argument){
-  const type = Type(argument);
-
-  switch (type) {
+  switch (Type(argument)) {
     case 'Object':
       return argument;
     case 'Undefined':
@@ -449,9 +260,11 @@ export function ToObject(argument){
     case 'Null':
       throw $$Exception('null_to_object', []);
     case 'Boolean':
+      return $$CreateObject('Boolean', argument);
     case 'Number':
+      return $$CreateObject('Number', argument);
     case 'String':
-      return $$CreateObject(type, argument);
+      return $$CreateObject('String', argument);
   }
 }
 
@@ -461,12 +274,9 @@ export function ToObject(argument){
 // ############################
 
 export function ToPropertyKey(argument){
-  if (!argument) {
-    return argument + '';
-  }
-
   const type = Type(argument);
-  if (type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol')) {
+
+  if (type === 'String' || type === 'Object' && hasBrand(argument, 'BuiltinSymbol')) {
     return argument;
   }
 
@@ -526,7 +336,7 @@ export function IsConstructor(argument){
 
 export function IsPropertyKey(argument){
   const type = Type(argument);
-  return type === 'String' || type === 'Object' && hasBuiltinBrand(argument, 'BuiltinSymbol');
+  return type === 'String' || type === 'Object' && hasBrand(argument, 'BuiltinSymbol');
 }
 
 

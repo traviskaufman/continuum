@@ -36,7 +36,7 @@ export function sign(x){
   return x < 0 ? -1 : 1;
 }
 
-export function hasBuiltinBrand(object, brand){
+export function hasBrand(object, brand){
   return $$Get(obj, 'BuiltinBrand') === brand;
 }
 
