@@ -107,9 +107,7 @@ var operations = (function(exports){
 
   function $$IsPropertyReference(v){
     var type = typeof v.base;
-    return v !== null
-        && type === 'string' || type === 'number' || type === 'boolean'
-        || type === 'object' && 'GetP' in v.base;
+    return type === 'string' || type === 'number' || type === 'boolean'|| type === 'object' && !!v.base.GetP;
   }
 
   exports.$$IsPropertyReference = $$IsPropertyReference;
@@ -237,11 +235,11 @@ var operations = (function(exports){
 
 
   function $$EvaluateCall(ref, func, args, tail){
-    if (typeof func !== 'object' || !$$IsCallable(func)) {
+    if (!func || !func.Call) {
       return $$ThrowException('called_non_callable', [ref && ref.name]);
     }
 
-    if (ref instanceof Reference) {
+    if (ref && ref.Reference) {
       var receiver = $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
     }
 
