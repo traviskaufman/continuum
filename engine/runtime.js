@@ -1370,8 +1370,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.yielded = undefined;
       this.completion = undefined;
       this.stacktrace = undefined;
-      this.ops = code.ops
-      this.cmds = thunk.instructions(this.ops);
+      this.ops = code.ops;
+      this.cmds = code.cmds || (code.cmds = thunk.instructions(code.ops));
     }
 
     define(ExecutionContext, [
