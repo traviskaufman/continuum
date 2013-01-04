@@ -1092,7 +1092,9 @@ var assembler = (function(exports){
   })();
 
 
-  var annotateTailPosition = (function(){
+  var isWrapped, isntWrapped, isTail, isntTail, wrap, tail, copyWrap, copyTail;
+
+  void function(){
     function set(name, value){
       return function(obj){
         obj && (obj[name] = value);
@@ -1111,126 +1113,15 @@ var assembler = (function(exports){
       };
     }
 
-
-    var isWrapped   = set('wrapped', true),
-        isntWrapped = set('wrapped', false),
-        isTail      = set('tail', true),
-        isntTail    = set('tail', false),
-        wrap        = either(isWrapped, isntWrapped),
-        tail        = either(isTail, isntTail),
-        copyWrap    = copier('wrapped'),
-        copyTail    = copier('tail');
-
-    function dispatcher(node){
-      return node.type || CONTINUE;
-    }
-
-    var tailVisitor = new Visitor(dispatcher, [
-      function __noSuchHandler__(node){
-        return RECURSE;
-      },
-      function ArrowFunctionExpression(node){
-        isntWrapped(node.body);
-        this.push(node.body);
-      },
-      function BlockStatement(node){
-        each(node.body, wrap(node.wrapped));
-        return RECURSE;
-      },
-      function CatchClause(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function ConditionalExpression(node){
-        each(node, tail(node.tail));
-        each(node, wrap(node.wrapped));
-        return RECURSE;
-      },
-      function DoWhileStatement(node){
-        each(node, isntTail);
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function ExpressionStatement(node){
-        copyWrap(node, node.expression);
-        return RECURSE;
-      },
-      function ForInStatement(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function ForOfStatement(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function ForStatement(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function FunctionDeclaration(node){
-        isntWrapped(node.body);
-        this.push(node.body);
-      },
-      function FunctionExpression(node){
-        isntWrapped(node.body);
-        this.push(node.body);
-      },
-      function IfStatement(node){
-        copyWrap(node, node.consequent);
-        copyWrap(node, node.alternate);
-        return RECURSE;
-      },
-      function LabeledStatement(node){
-        copyWrap(node, node.statement);
-        return RECURSE;
-      },
-      function ModuleDeclaration(node){
-        node.body && each(node.body, isntWrapped);
-        return RECURSE;
-      },
-      function Program(node){
-        each(node.body, isntWrapped);
-        return RECURSE;
-      },
-      function ReturnStatement(node){
-        tail(!node.wrapped)(node.argument);
-        return RECURSE;
-      },
-      function SequenceExpression(node){
-        each(node.expression, wrap(node.wrapped));
-        copyTail(node, node.expressions[node.expressions.length - 1]);
-        return RECURSE;
-      },
-      function SwitchCase(node){
-        each(node.consequent, wrap(node.wrapped))
-        return RECURSE;
-      },
-      function SwitchStatement(node){
-        each(node.cases, wrap(node.wrapped));
-        return RECURSE;
-      },
-      function TryStatement(node){
-        isWrapped(node.block);
-        each(node.handlers, wrap(node.finalizer || node.wrapped));
-        isntWrapped(node.finalizer);
-        return RECURSE;
-      },
-      function WhileStatement(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      },
-      function WithStatement(node){
-        copyWrap(node, node.body);
-        return RECURSE;
-      }
-      //function YieldExpression(node){},
-    ]);
-
-    return function annotateTailPosition(node){
-      tailVisitor.visit(node);
-      return node;
-    };
-  })();
+    isWrapped   = set('wrapped', true);
+    isntWrapped = set('wrapped', false);
+    isTail      = set('tail', true);
+    isntTail    = set('tail', false);
+    wrap        = either(isWrapped, isntWrapped);
+    tail        = either(isTail, isntTail);
+    copyWrap    = copier('wrapped');
+    copyTail    = copier('tail');
+  }();
 
 
 
@@ -1734,6 +1625,8 @@ var assembler = (function(exports){
   function ArrayPattern(node){}
 
   function ArrowFunctionExpression(node, name){
+    isntWrapped(node.body);
+
     var code = new Code(node, null, 'arrow', 'function');
     if (name) {
       code.name = name.name || name;
@@ -1782,7 +1675,12 @@ var assembler = (function(exports){
         });
         popNode();
       });
-      each(node.body, recurse);
+
+      var wrapper = wrap(node.wrapped);
+      each(node.body, function(child){
+        wrapper(child);
+        recurse(child);
+      });
     });
     popNode();
   }
@@ -1807,6 +1705,7 @@ var assembler = (function(exports){
   }
 
   function CatchClause(node){
+    copyWrap(node, node.body);
     pushNode(node.body);
     pushScope('block');
     pushNode(node.param);
@@ -1836,6 +1735,14 @@ var assembler = (function(exports){
   function ClassHeritage(node){}
 
   function ConditionalExpression(node){
+    var tailer = tail(node.tail),
+        wrapper = wrap(node.wrapped);
+
+    each(node, function(child){
+      tailer(child);
+      tailer(child);
+    });
+
     recurse(node.test);
     GET();
     var test = JFALSE(0);
@@ -1854,6 +1761,10 @@ var assembler = (function(exports){
 
   function DoWhileStatement(node){
     loop(function(){
+      isntTail(node.test);
+      isntTail(node.body);
+      copyWrap(node, node.body);
+
       var start = current();
       recurse(node.body);
       var cond = current();
@@ -1881,12 +1792,16 @@ var assembler = (function(exports){
   }
 
   function ExpressionStatement(node){
+    copyWrap(node, node.expression);
+
     recurse(node.expression);
     GET();
     isGlobalOrEval() ? SAVE() : POP();
   }
 
   function ForStatement(node){
+    copyWrap(node, node.body);
+
     loop(function(){
       if (node.init){
         if (node.init.type === 'VariableDeclaration') {
@@ -1929,14 +1844,17 @@ var assembler = (function(exports){
   }
 
   function ForInStatement(node){
+    copyWrap(node, node.body);
     iter(node, ENUM);
   }
 
   function ForOfStatement(node){
+    copyWrap(node, node.body);
     iter(node, ITERATE);
   }
 
   function FunctionDeclaration(node){
+    isntWrapped(node.body);
     if (!node.code) {
       context.currentScope.lexDeclare(node.id.name, 'function');
       node.code = new Code(node, null, 'normal', 'function');
@@ -1946,6 +1864,7 @@ var assembler = (function(exports){
   }
 
   function FunctionExpression(node, methodName){
+    isntWrapped(node.body);
     var code = new Code(node, null, 'normal', 'function');
     if (node.id) {
       code.scope.varDeclare(node.id.name, 'funcname');
@@ -1973,6 +1892,9 @@ var assembler = (function(exports){
   }
 
   function IfStatement(node){
+    copyWrap(node, node.consequent);
+    copyWrap(node, node.alternate);
+
     recurse(node.test);
     GET();
     var test = JFALSE(0);
@@ -2003,6 +1925,8 @@ var assembler = (function(exports){
   }
 
   function LabeledStatement(node){
+    copyWrap(node, node.statement);
+
     if (!context.labels){
       context.labels = new Hash;
     } else if (label in context.labels) {
@@ -2047,6 +1971,7 @@ var assembler = (function(exports){
 
   function ModuleDeclaration(node){
     if (node.body) {
+      each(node.body, isntWrapped);
       var code = node.imported.code = new Code(node, null, 'normal', 'module');
       code.path = context.code.path.concat(node.id.name);
       context.queue(code);
@@ -2075,7 +2000,10 @@ var assembler = (function(exports){
 
   function Program(node){
     pushNode(node.body);
-    each(node.body, recurse);
+    each(node.body, function(child){
+      isntWrapped(child);
+      recurse(child);
+    });
     popNode();
   }
 
@@ -2112,6 +2040,7 @@ var assembler = (function(exports){
 
   function ReturnStatement(node){
     if (node.argument){
+      tail(!node.wrapped)(node.argument);
       recurse(node.argument);
       GET();
     } else {
@@ -2122,13 +2051,18 @@ var assembler = (function(exports){
   }
 
   function SequenceExpression(node){
+    var wrapper = wrap(node.wrapped);
+
     each(node.expressions, function(item, i, a){
+      wrapper(item);
       recurse(item)
       GET();
       if (i < a.length - 1) {
         POP();
       }
     });
+
+    copyTail(node, node.expressions[node.expressions.length - 1]);
   }
 
   function SwitchStatement(node){
@@ -2160,9 +2094,14 @@ var assembler = (function(exports){
           var last = JUMP(0);
         }
 
+        var wrapper = wrap(node.wrapped);
         each(node.cases, function(item, i){
-          adjust(cases[i])
-          each(item.consequent, recurse);
+          adjust(cases[i]);
+          wrapper(item);
+          each(item.consequent, function(child){
+            wrapper(child);
+            recurse(child)
+          });
         });
 
         if (last) {
@@ -2260,19 +2199,22 @@ var assembler = (function(exports){
   }
 
   function TryStatement(node){
+    isWrapped(node.block);
     unwinder('try', function(){
       each(node.block.body, recurse);
     });
 
-    var tryer = JUMP(0),
-        handlers = [];
+    var tryer    = JUMP(0),
+        handlers = [],
+        wrapper  = wrap(node.finalizer || node.wrapped);
 
-    for (var i=0, handler; handler = node.handlers[i]; i++) {
+    each(node.handlers, function(handler, i){
+      wrapper(handler);
       recurse(handler);
       if (i < node.handlers.length - 1) {
         handlers.push(JUMP(0));
       }
-    }
+    });
 
     adjust(tryer);
     while (i--) {
@@ -2280,6 +2222,7 @@ var assembler = (function(exports){
     }
 
     if (node.finalizer) {
+      isntWrapped(node.finalizer);
       recurse(node.finalizer);
     }
   }
@@ -2337,6 +2280,8 @@ var assembler = (function(exports){
   function VariableDeclarator(node){}
 
   function WhileStatement(node){
+    copyWrap(node, node.body);
+
     loop(function(){
       var start = current();
       recurse(node.test);
@@ -2350,6 +2295,8 @@ var assembler = (function(exports){
   }
 
   function WithStatement(node){
+    copyWrap(node, node.object);
+
     recurse(node.object);
     pushScope('with');
     recurse(node.body);
@@ -2465,7 +2412,6 @@ var assembler = (function(exports){
           code.strict = false;
         }
 
-        annotateTailPosition(node);
         this.queue(code);
 
         while (this.pending.length) {
