@@ -76,11 +76,11 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Typed Arrays
 * Object.observe (es-next/es7)
 * Default parameters
+* Tail call optimization
 
 ### Not Yet Implemented
 
 * Array Comprehensions
-* Tail call optimization
 * Binary data api (structs, etc.)
 
 
