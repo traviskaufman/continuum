@@ -1,9 +1,9 @@
 import {
-  $$CallInternal,
+  $$Call,
   $$CreateObject,
   $$CreateInternalObject,
-  $$GetInternal,
-  $$SetInternal,
+  $$Get,
+  $$Set,
   $$NumberToString
 } from '@@internals';
 
@@ -37,46 +37,46 @@ export function sign(x){
 }
 
 export function hasBuiltinBrand(object, brand){
-  return $$GetInternal(obj, 'BuiltinBrand') === brand;
+  return $$Get(obj, 'BuiltinBrand') === brand;
 }
 
 const argsList  = [null, null],
-      emptyList = $$GetInternal([], 'array');
+      emptyList = $$Get([], 'array');
 
 export function call(func, receiver, args){
   argsList[0] = receiver;
-  argsList[1] = args ? $$GetInternal(args, 'array') : emptyList;
-  return $$CallInternal(func, 'Call', argsList);
+  argsList[1] = args ? $$Get(args, 'array') : emptyList;
+  return $$Call(func, 'Call', argsList);
 }
 
 
 
 function enumerate(object, inherited, onlyEnumerable){
-  return $$CreateObject('Array', $$CallInternal(object, 'Enumerate', [inherited, onlyEnumerable]));
+  return $$CreateObject('Array', $$Call(object, 'Enumerate', [inherited, onlyEnumerable]));
 }
 
 function getOwnPropertyInternal(object, key){
-  return $$CallInternal(object, 'GetOwnProperty', [key]);
+  return $$Call(object, 'GetOwnProperty', [key]);
 }
 
 function defineOwnPropertyInternal(object, key, Desc){
-  return $$CallInternal(object, 'DefineOwnProperty', [key, Desc]);
+  return $$Call(object, 'DefineOwnProperty', [key, Desc]);
 }
 
 function deleteProperty(object, key){
-  return $$CallInternal(object, 'remove', [key]);
+  return $$Call(object, 'remove', [key]);
 }
 
 function update(object, key, attr){
-  return $$CallInternal(object, 'update', [key, attr]);
+  return $$Call(object, 'update', [key, attr]);
 }
 
 function define(object, key, value, attr){
-  return $$CallInternal(object, 'define', [key, value, attr]);
+  return $$Call(object, 'define', [key, value, attr]);
 }
 
 function builtinFunction(func){
-  $$SetInternal(func, 'BuiltinFunction', true);
+  $$Set(func, 'BuiltinFunction', true);
   deleteProperty(func, 'prototype');
   update(func, 'name', 0);
   define(func, 'caller', null, 0);
@@ -91,12 +91,12 @@ export function extend(object, properties){
   while (index--) {
     const key   = keys[index],
           desc  = getOwnPropertyInternal(properties, key),
-          value = $$GetInternal(desc, 'Value');
+          value = $$Get(desc, 'Value');
 
-    $$SetInternal(desc, 'Enumerable', false);
+    $$Set(desc, 'Enumerable', false);
     if (typeof value === 'number') {
-      $$SetInternal(desc, 'Configurable', false);
-      $$SetInternal(desc, 'Writable', false);
+      $$Set(desc, 'Configurable', false);
+      $$Set(desc, 'Writable', false);
     } else if (typeof value === 'function') {
       builtinFunction(value);
     }
@@ -139,9 +139,9 @@ function builtinClass(Ctor, brand){
     $$SetIntrinsic(prototypeName, Ctor.prototype);
   }
 
-  $$SetInternal(Ctor, 'BuiltinConstructor', true);
-  $$SetInternal(Ctor, 'BuiltinFunction', true);
-  $$SetInternal(Ctor, 'strict', false);
+  $$Set(Ctor, 'BuiltinConstructor', true);
+  $$Set(Ctor, 'BuiltinFunction', true);
+  $$Set(Ctor, 'strict', false);
   update(Ctor, 'prototype', FROZEN);
   set(Ctor, 'length', 1);
   define(Ctor, 'caller', null, FROZEN);
@@ -159,13 +159,13 @@ function builtinClass(Ctor, brand){
 
 
 const hidden = $$CreateInternalObject();
-$$SetInternal(hidden, 'Writable', true);
-$$SetInternal(hidden, 'Enumerable', false);
-$$SetInternal(hidden, 'Configurable', true);
+$$Set(hidden, 'Writable', true);
+$$Set(hidden, 'Enumerable', false);
+$$Set(hidden, 'Configurable', true);
 
 function defineHidden(object, value){
-  $$SetInternal(hidden, 'Value', V);
-  const result = $$CallInternal(O, 'DefineOwnProperty', [P, hidden]);
-  $$SetInternal(hidden, 'Value', undefined);
+  $$Set(hidden, 'Value', V);
+  const result = $$Call(O, 'DefineOwnProperty', [P, hidden]);
+  $$Set(hidden, 'Value', undefined);
   return result;
 }

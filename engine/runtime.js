@@ -2236,7 +2236,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           return false;
         },
-        $$CallInternal: function(_, args){
+        $$Call: function(_, args){
           var obj = args[0],
               key = args[1],
               argv = args[2],
@@ -2259,10 +2259,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$CurrentRealm: function(){
           return realm;
         },
-        $$EnumerateInternal: function(_, args){
+        $$Enumerate: function(_, args){
           return new $Array(properties(args[0]));
         },
-        $$EnumerateAllInternal: function(_, args){
+        $$EnumerateAll: function(_, args){
           var obj   = args[0],
               seen  = new Hash,
               props = [];
@@ -2281,7 +2281,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$Exception: function(_, args){
           return $$MakeException(args[0], args[1] ? args[1].array : []);
         },
-        $$GetInternal: function(_, args){
+        $$Get: function(_, args){
           return args[0][args[1]];
         },
         $$GetIntrinsic: function(_, args){
@@ -2290,7 +2290,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$HasArgument: function(_, args){
           return context.hasArgument(args[0]);
         },
-        $$HasInternal: function(_, args){
+        $$Has: function(_, args){
           return args[1] in args[0];
         },
         $$IsConstruct: function(){
@@ -2318,7 +2318,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$NumberToString: function(_, args){
           return args[0].toString(args[1] || 10);
         },
-        $$SetInternal: function(_, args){
+        $$Set: function(_, args){
           args[0][args[1]] = args[2];
         }
       });

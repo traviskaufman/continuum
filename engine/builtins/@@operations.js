@@ -22,17 +22,17 @@ import {
   $$AssertIsInternalArray,
   $$AssertIsECMAScriptValue,
   $$AssertWontThrow,
-  $$CallInternal,
+  $$Call,
   $$CreateObject,
   $$CreateInternalObject,
   $$CurrentRealm,
   $$Exception,
-  $$GetInternal,
+  $$Get,
   $$GetIntrinsic,
+  $$Has,
   $$HasArgument,
-  $$HasInternal,
   $$StringToNumber,
-  $$SetInternal
+  $$Set
 } from '@@internals';
 
 import {
@@ -159,6 +159,193 @@ export function ToNumber(argument){
 }
 
 
+    function scanNumericLiteral() {
+        var number, start, ch, octal;
+
+        ch = source[index];
+        assert(isDecimalDigit(ch) || (ch === '.'),
+            'Numeric literal must start with a decimal digit or a decimal point');
+
+        start = index;
+        number = '';
+        if (ch !== '.') {
+            number = nextChar();
+            ch = source[index];
+
+            // Hex number starts with '0x'.
+            // Octal number starts with '0'.
+            // Octal number in ES6 starts with '0o'.
+            // Binary number in ES6 starts with '0b'.
+            if (number === '0') {
+                if (ch === 'x' || ch === 'X') {
+                    number += nextChar();
+                    while (index < length) {
+                        ch = source[index];
+                        if (!isHexDigit(ch)) {
+                            break;
+                        }
+                        number += nextChar();
+                    }
+
+                    if (number.length <= 2) {
+                        // only 0x
+                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                    }
+
+                    if (index < length) {
+                        ch = source[index];
+                        if (isIdentifierStart(ch)) {
+                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                        }
+                    }
+                    return {
+                        type: Token.NumericLiteral,
+                        value: parseInt(number, 16),
+                        lineNumber: lineNumber,
+                        lineStart: lineStart,
+                        range: [start, index]
+                    };
+                } else if (ch === 'b' || ch === 'B') {
+                    nextChar();
+                    number = '';
+
+                    while (index < length) {
+                        ch = source[index];
+                        if (ch !== '0' && ch !== '1') {
+                            break;
+                        }
+                        number += nextChar();
+                    }
+
+                    if (number.length === 0) {
+                        // only 0b or 0B
+                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                    }
+
+                    if (index < length) {
+                        ch = source[index];
+                        if (isIdentifierStart(ch) || isDecimalDigit(ch)) {
+                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                        }
+                    }
+                    return {
+                        type: Token.NumericLiteral,
+                        value: parseInt(number, 2),
+                        lineNumber: lineNumber,
+                        lineStart: lineStart,
+                        range: [start, index]
+                    };
+                } else if (ch === 'o' || ch === 'O' || isOctalDigit(ch)) {
+                    if (isOctalDigit(ch)) {
+                        octal = true;
+                        number = nextChar();
+                    } else {
+                        octal = false;
+                        nextChar();
+                        number = '';
+                    }
+
+                    while (index < length) {
+                        ch = source[index];
+                        if (!isOctalDigit(ch)) {
+                            break;
+                        }
+                        number += nextChar();
+                    }
+
+                    if (number.length === 0) {
+                        // only 0o or 0O
+                        throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                    }
+
+                    if (index < length) {
+                        ch = source[index];
+                        if (isIdentifierStart(ch) || isDecimalDigit(ch)) {
+                            throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                        }
+                    }
+
+                    return {
+                        type: Token.NumericLiteral,
+                        value: parseInt(number, 8),
+                        octal: octal,
+                        lineNumber: lineNumber,
+                        lineStart: lineStart,
+                        range: [start, index]
+                    };
+                }
+
+                // decimal number starts with '0' such as '09' is illegal.
+                if (isDecimalDigit(ch)) {
+                    throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+                }
+            }
+
+            while (index < length) {
+                ch = source[index];
+                if (!isDecimalDigit(ch)) {
+                    break;
+                }
+                number += nextChar();
+            }
+        }
+
+        if (ch === '.') {
+            number += nextChar();
+            while (index < length) {
+                ch = source[index];
+                if (!isDecimalDigit(ch)) {
+                    break;
+                }
+                number += nextChar();
+            }
+        }
+
+        if (ch === 'e' || ch === 'E') {
+            number += nextChar();
+
+            ch = source[index];
+            if (ch === '+' || ch === '-') {
+                number += nextChar();
+            }
+
+            ch = source[index];
+            if (isDecimalDigit(ch)) {
+                number += nextChar();
+                while (index < length) {
+                    ch = source[index];
+                    if (!isDecimalDigit(ch)) {
+                        break;
+                    }
+                    number += nextChar();
+                }
+            } else {
+                ch = 'character ' + ch;
+                if (index >= length) {
+                    ch = '<end>';
+                }
+                throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+            }
+        }
+
+        if (index < length) {
+            ch = source[index];
+            if (isIdentifierStart(ch)) {
+                throwError({}, Messages.UnexpectedToken, 'ILLEGAL');
+            }
+        }
+
+        return {
+            type: Token.NumericLiteral,
+            value: parseFloat(number),
+            lineNumber: lineNumber,
+            lineStart: lineStart,
+            range: [start, index]
+        };
+    }
+
+
+
 // #######################
 // ### 9.1.4 ToInteger ###
 // #######################
@@ -184,17 +371,14 @@ export function ToInteger(argument){
 
 export function ToInt32(argument){
   const number = ToNumber(argument);
+
   if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
     return 0;
   }
 
   const int = sign(number) * floor(abs(number)) & 0xffffffff;
 
-  if (int >= 0x80000000) {
-    return int - 0x80000000;
-  }
-
-  return int;
+  return int >= 0x80000000 ? int - 0x80000000 : int;
 }
 
 
@@ -204,11 +388,12 @@ export function ToInt32(argument){
 
 export function ToUint32(argument){
   const number = ToNumber(argument);
+
   if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
     return 0;
   }
 
-  return (sign(number) * floor(abs(number))) & 0xffffffff;
+  return sign(number) * floor(abs(number)) & 0xffffffff;
 }
 
 
@@ -218,11 +403,12 @@ export function ToUint32(argument){
 
 export function ToUint16(argument){
   const number = ToNumber(argument);
+
   if (number === 0 || number !== number || number === Infinity || number === -Infinity) {
     return 0;
   }
 
-  return (sign(number) * floor(abs(number))) & 0xffff;
+  return sign(number) * floor(abs(number)) & 0xffff;
 }
 
 
@@ -237,7 +423,7 @@ export function ToString(argument){
     case 'Undefined':
       return 'undefined';
     case 'Number':
-      return $$CallInternal(argument, 'toString');
+      return $$Call(argument, 'toString');
     case 'Null':
       return 'null';
     case 'Boolean':
@@ -313,7 +499,7 @@ export function CheckObjectCoercible(argument){
 // ########################
 
 export function IsCallable(argument){
-  return Type(argument) === 'Object' && $$HasInternal(argument, 'Call');
+  return Type(argument) === 'Object' && $$Has(argument, 'Call');
 }
 
 
@@ -331,7 +517,7 @@ export function SameValue(x, y){
 // ###########################
 
 export function IsConstructor(argument){
-  return Type(argument) === 'Object' && $$HasInternal(argument, 'Construct');
+  return Type(argument) === 'Object' && $$Has(argument, 'Construct');
 }
 
 // ###########################
@@ -359,7 +545,7 @@ export function Get(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  return $$CallInternal(O, 'GetP', [O, P]);
+  return $$Call(O, 'GetP', [O, P]);
 }
 
 
@@ -372,7 +558,7 @@ export function Put(O, P, V, Throw){
   $$Assert(IsPropertyKey(P) === true);
   $$Assert(Type(Throw) === 'Boolean');
 
-  const success = $$CallInternal(O, 'SetP', [O, P, V]);
+  const success = $$Call(O, 'SetP', [O, P, V]);
   if (Throw && !success) {
     throw $$Exception('strict_cannot_assign', [P]);
   }
@@ -386,23 +572,23 @@ export function Put(O, P, V, Throw){
 // ###################################
 
 const normal = $$CreateInternalObject();
-$$SetInternal(normal, 'Writable', true);
-$$SetInternal(normal, 'Enumerable', true);
-$$SetInternal(normal, 'Configurable', true);
+$$Set(normal, 'Writable', true);
+$$Set(normal, 'Enumerable', true);
+$$Set(normal, 'Configurable', true);
 
 export function CreateOwnDataProperty(O, P, V){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
   //$$Assert(!hasOwn(O, P));
 
-  const extensible = $$CallInternal(O, 'IsExtensible');
+  const extensible = $$Call(O, 'IsExtensible');
   if (!extensible) {
     return extensible;
   }
 
-  $$SetInternal(normal, 'Value', V);
-  const result = $$CallInternal(O, 'DefineOwnProperty', [P, normal]);
-  $$SetInternal(normal, 'Value', undefined);
+  $$Set(normal, 'Value', V);
+  const result = $$Call(O, 'DefineOwnProperty', [P, normal]);
+  $$Set(normal, 'Value', undefined);
 
   return result;
 }
@@ -416,7 +602,7 @@ export function DefinePropertyOrThrow(O, P, desc){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const success = $$CallInternal(O, 'DefineOwnProperty', [P, desc]);
+  const success = $$Call(O, 'DefineOwnProperty', [P, desc]);
   if (!success) {
     throw $$Exception('redefine_disallowed', [P]);
   }
@@ -433,7 +619,7 @@ export function DeletePropertyOrThrow(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const success = $$CallInternal(O, 'Delete', [P]); // TODO: rename to DeleteProperty
+  const success = $$Call(O, 'Delete', [P]); // TODO: rename to DeleteProperty
   if (!success) {
     throw $$Exception('strict_delete_property', [P, Type(O)]);
   }
@@ -449,7 +635,7 @@ export function HasProperty(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  return $$CallInternal(O, 'HasProperty', [P]);
+  return $$Call(O, 'HasProperty', [P]);
 }
 
 
@@ -461,7 +647,7 @@ export function GetMethod(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const func = $$CallInternal(O, 'GetP', [O, P]);
+  const func = $$Call(O, 'GetP', [O, P]);
   if (func === undefined) {
     return func;
   }
@@ -492,7 +678,7 @@ export function Invoke(O, P, args){
     throw $$Exception('property_not_function', [P]);
   }
 
-  return $$CallInternal(func, 'Call', [O, $$GetInternal(args, 'array')]);
+  return $$Call(func, 'Call', [O, $$Get(args, 'array')]);
 }
 
 
@@ -518,10 +704,10 @@ function CreateArrayFromList(elements){
   $$AssertIsInternalArray(elements);
 
   const array = ArrayCreate(0),
-        len   = $$GetInternal(elements, 'length');
+        len   = $$Get(elements, 'length');
 
   for (let n=0; n < len; n++) {
-    const element = $$GetInternal(elements, n);
+    const element = $$Get(elements, n);
     $$AssertIsECMAScriptValue(elements);
     $$AssertWontThrow(CreateOwnDataProperty(array, ToString(n), element));
   }
@@ -539,8 +725,8 @@ export function OrdinaryHasInstance(C, O){
     return false;
   }
 
-  if ($$HasInternal(C, 'BoundTargetFunction')) {
-    return O instanceof $$GetInternal(C, 'BoundTargetFunction');
+  if ($$Has(C, 'BoundTargetFunction')) {
+    return O instanceof $$Get(C, 'BoundTargetFunction');
   }
 
   if (Type(O) !== 'Object') {
@@ -553,7 +739,7 @@ export function OrdinaryHasInstance(C, O){
   }
 
   do {
-    O = $$CallInternal(O, 'GetInheritance');
+    O = $$Call(O, 'GetInheritance');
     if (O === P) {
       return true;
     }
@@ -593,8 +779,9 @@ export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto
   }
 
   let proto = Get(constructor, 'prototype');
+
   if (!proto) {
-    const realm = $$HasInternal(constructor, 'Realm') ? $$GetInternal('Realm') : $$CurrentRealm();
+    const realm = $$Has(constructor, 'Realm') ? $$Get(constructor, 'Realm') : $$CurrentRealm();
     proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto));
   }
 
