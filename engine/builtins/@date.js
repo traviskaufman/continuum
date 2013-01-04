@@ -218,7 +218,6 @@ const [
   DaylightSavingTA
 
 ] = (function(){
-
   function nextMonth(adjustment){
     return function(t, leap){
       t += daysInMonth(adjustment, leap) * msPerDay;
