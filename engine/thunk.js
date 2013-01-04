@@ -64,13 +64,9 @@ var thunk = (function(exports){
   var log = false;
 
 
-  function setOrigin(obj, filename, kind){
-    if (filename) {
-      obj.set('filename', filename);
-    }
-    if (kind) {
-      obj.set('kind', kind);
-    }
+  function setOrigin(obj, filename, name){
+    filename && obj.set('filename', filename);
+    name && obj.set('name', name);
   }
 
   function setCode(obj, loc, code){
@@ -179,29 +175,37 @@ var thunk = (function(exports){
       }
 
 
-      if (error) {
-        if (error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
-          var range = code.ops[ip].range,
-              loc = code.ops[ip].loc;
+      if (error && error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
+        var range = code.ops[ip].range,
+            loc   = code.ops[ip].loc,
+            err   = error.value;
 
-          if (!error.value.hasLocation) {
-            error.value.hasLocation = true;
-            setCode(error.value, loc, code.source);
-            setOrigin(error.value, code.filename, code.displayName || code.name);
-          }
+        if (!err.hasLocation) {
+          err.hasLocation = true;
+          setCode(err, loc, code.source);
+          var name = code.displayName || code.name;
+          setOrigin(err, code.filename, name);
 
-          if (stacktrace) {
-            if (error.value.trace) {
-              [].push.apply(error.value.trace, stacktrace);
-            } else {
-              error.value.trace = stacktrace;
-            }
-            error.value.context || (error.value.context = context);
+
+          if (name) {
+            name = 'in '+name+' ';
           }
+          console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
+                      err.Get('name')+': '+err.Get('message')+'\n'+
+                      err.Get('code'));
+          console.dir(err);
+        }
+
+        if (stacktrace) {
+          if (err.trace) {
+            [].push.apply(err.trace, stacktrace);
+          } else {
+            err.trace = stacktrace;
+          }
+          err.context || (err.context = context);
         }
       }
 
-      console.log(error);
       completion = error;
       return false;
     }

@@ -539,7 +539,7 @@ var debug = (function(exports){
       },
       function origin(){
         var file = this.getValue('filename') || '',
-            type = this.getValue('kind') || '';
+            type = this.getValue('origin') || '';
 
         return file && type ? type + ' ' + file : type + file;
       },
