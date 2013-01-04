@@ -25,7 +25,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       natives          = require('./natives'),
       Emitter          = require('./lib/Emitter'),
       PropertyList     = require('./lib/PropertyList'),
-      Thunk            = require('./thunk').Thunk,
+      thunk            = require('./thunk'),
       Stack            = require('./lib/Stack');
 
 
@@ -455,13 +455,10 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnv(receiver, this);
         }
 
-        var caller = context ? context.callee : null;
-        ExecutionContext.push(new ExecutionContext(context, local, realm, this.code, this, args, isConstruct));
+        var caller = context ? context.callee : null,
+            ctx    = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
 
-        if (!this.thunk) {
-          this.thunk = new Thunk(this.code);
-          hide(this, 'thunk');
-        }
+        ExecutionContext.push(ctx);
 
         if (!this.strict) {
           this.define('arguments', local.arguments, ___);
@@ -469,14 +466,14 @@ var runtime = (function(GLOBAL, exports, undefined){
           local.arguments = null;
         }
 
-        var result = this.thunk.run(context);
+        var result = context.run();
+        ctx === context && ctx.pop();
 
         if (!this.strict) {
           this.define('arguments', null, ___);
           this.define('caller', null, ___);
         }
 
-        ExecutionContext.pop();
         return result && result.type === Return ? result.value : result;
       },
       function Construct(args){
@@ -600,16 +597,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
 
         var ctx = new ExecutionContext(context, local, this.Realm, this.code, this, args, isConstruct);
-        ExecutionContext.push(ctx);
-
-        if (!this.thunk) {
-          this.thunk = new Thunk(this.code);
-          hide(this, 'thunk');
-        }
-
-        var result = new $Generator(this.Realm, local, ctx, this.thunk);
-        ExecutionContext.pop();
-        return result;
+        return new $Generator(this.Realm, local, ctx);
       }
     ]);
 
@@ -617,10 +605,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
   var $Generator = (function(){
-    var EXECUTING = 'executing',
-        CLOSED    = 'closed',
-        NEWBORN   = 'newborn';
-
     function setFunction(obj, name, func){
       obj.set(name, new $InternalFunction({
         name: name,
@@ -629,21 +613,32 @@ var runtime = (function(GLOBAL, exports, undefined){
       }));
     }
 
-    function $Generator(realm, scope, ctx, thunk){
+
+    function $$Resume(ctx, completionType, value){
+      ExecutionContext.push(ctx);
+      if (completionType !== Normal) {
+        value = new AbruptCompletion(completionType, value);
+      }
+      return ctx.send(value);
+    }
+
+
+    function $Generator(realm, scope, ctx){
       $Object.call(this);
       this.Realm = realm;
       this.Scope = scope;
-      this.code = thunk.code;
+      this.code = ctx.code;
       this.ExecutionContext = ctx;
-      this.State = NEWBORN;
-      this.thunk = thunk;
+      this.State = 'newborn';
 
       var self = this;
+      ExecutionContext.push(ctx);
       setFunction(this, iteratorSymbol, function(){ return self });
-      setFunction(this, 'next',   function(){ return self.Send() });
-      setFunction(this, 'close',  function(){ return self.Close() });
-      setFunction(this, 'send',   function(v){ return self.Send(v) });
-      setFunction(this, 'throw',  function(v){ return self.Throw(v) });
+      setFunction(this, 'next',         function(){ return self.Send() });
+      setFunction(this, 'close',        function(){ return self.Close() });
+      setFunction(this, 'send',         function(v){ return self.Send(v) });
+      setFunction(this, 'throw',        function(v){ return self.Throw(v) });
+      ctx.pop();
     }
 
     inherit($Generator, $Object, {
@@ -654,67 +649,55 @@ var runtime = (function(GLOBAL, exports, undefined){
       State: null
     }, [
       function Send(value){
-        if (this.State === EXECUTING) {
+        if (this.State === 'executing') {
           return $$ThrowException('generator_executing', 'send');
-        } else if (this.State === CLOSED) {
+        } else if (this.State === 'closed') {
           return $$ThrowException('generator_closed', 'send');
-        }
-        if (this.State === NEWBORN) {
+        } else if (this.State === 'newborn') {
           if (value !== undefined) {
             return $$ThrowException('generator_send_newborn');
           }
           this.ExecutionContext.currentGenerator = this;
-          this.State = EXECUTING;
+          this.State = 'executing';
           ExecutionContext.push(this.ExecutionContext);
-          return this.thunk.run(this.ExecutionContext);
+          return this.ExecutionContext.run();
         }
 
-        this.State = EXECUTING;
+        this.State = 'executing';
         return $$Resume(this.ExecutionContext, Normal, value);
       },
       function Throw(value){
-        if (this.State === EXECUTING) {
+        if (this.State === 'executing') {
           return $$ThrowException('generator_executing', 'throw');
-        } else if (this.State === CLOSED) {
+        } else if (this.State === 'closed') {
           return $$ThrowException('generator_closed', 'throw');
-        }
-        if (this.State === NEWBORN) {
-          this.State = CLOSED;
+        } else if (this.State === 'newborn') {
+          this.State = 'closed';
           this.code = null;
           return new AbruptCompletion(Throw, value);
         }
 
-        this.State = EXECUTING;
+        this.State = 'executing';
         return $$Resume(this.ExecutionContext, Throw, value);
       },
       function Close(value){
-        if (this.State === EXECUTING) {
+        if (this.State === 'executing') {
           return $$ThrowException('generator_executing', 'close');
-        } else if (this.State === CLOSED) {
+        } else if (this.State === 'closed') {
           return;
-        }
-
-        if (state === NEWBORN) {
-          this.State = CLOSED;
+        } else if (state === 'newborn') {
+          this.State = 'closed';
           this.code = null;
           return;
         }
 
-        this.State = EXECUTING;
+        this.State = 'executing';
         var result = $$Resume(this.ExecutionContext, Return, value);
-        this.State = CLOSED;
+        this.State = 'closed';
+
         return result;
       }
     ]);
-
-
-    function $$Resume(ctx, completionType, value){
-      ExecutionContext.push(ctx);
-      if (completionType !== Normal) {
-        value = new AbruptCompletion(completionType, value);
-      }
-      return ctx.currentGenerator.thunk.send(ctx, value);
-    }
 
     return $Generator;
   })();
@@ -1380,6 +1363,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.args = args || [];
       this.isConstruct = !!isConstruct;
       this.callee = func && !func.Builtin ? func : caller ? caller.callee : null;
+      this.stack = [];
+      this.ip = 0;
+      this.sp = 0;
+      this.error = undefined;
+      this.yielded = undefined;
+      this.completion = undefined;
+      this.stacktrace = undefined;
+      this.ops = code.ops
+      this.cmds = thunk.instructions(this.ops);
     }
 
     define(ExecutionContext, [
@@ -1405,8 +1397,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     define(ExecutionContext.prototype, {
       isGlobal: false,
-      strict: false,
-      isEval: false,
+      strict  : false,
+      isEval  : false,
       constructFunction: operations.$$EvaluateConstruct,
       callFunction     : operations.$$EvaluateCall,
       spreadArguments  : operations.$$SpreadArguments,
@@ -1415,6 +1407,27 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     define(ExecutionContext.prototype, [
+      function run(){
+        var f = this.cmds[this.ip];
+
+        if (!this.Realm.quiet && !this.code.natives || this.Realm.debugBuiltins) {
+          this.history = [];
+
+          while (f) {
+            this.history[this.history.length] = this.ops[this.ip];
+            this.Realm.emit('op', this.ops[this.ip], this.stack[this.sp - 1]);
+            f = f(this);
+          }
+        } else {
+          while (f) f = f(this);
+        }
+
+        return this.completion;
+      },
+      function send(value){
+        this.stack[this.sp++] = value;
+        return this.run();
+      },
       function pop(){
         if (this === context) {
           context = this.caller;
@@ -1956,7 +1969,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (this.ast) {
         this.bytecode = assemble(this);
         tag(this.bytecode);
-        this.thunk = new Thunk(this.bytecode);
       }
       return this;
     }
@@ -2033,12 +2045,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           if (direct) {
-            return script.thunk.run(context);
+            return context.run();
           }
 
-          ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
-          var result = script.thunk.run(context);
-          ExecutionContext.pop();
+          var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
+          ExecutionContext.push(ctx);
+          var result = context.run();
+          ctx === context && ctx.pop();
           return result;
         }
         builtinEval.isBuiltinEval = true;
@@ -2057,9 +2070,10 @@ var runtime = (function(GLOBAL, exports, undefined){
           return script.error;
         }
 
-        ExecutionContext.push(new ExecutionContext(context, realm.globalEnv, realm, script.bytecode));
-        var func = script.thunk.run(context);
-        ExecutionContext.pop();
+        var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
+        ExecutionContext.push(ctx);
+        var func = ctx.run();
+        ctx === context && ctx.pop();
         return func;
       },
       _BoundFunctionCreate: function(obj, args){
@@ -2370,21 +2384,22 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
-    function run(realm, thunk, bytecode){
-      realm.executing = thunk;
+    function run(realm, bytecode){
+      realm.executing = bytecode;
       realm.state = 'executing';
-      realm.emit('executing', thunk);
+      realm.emit('executing', bytecode);
 
-      var result = thunk.run(context);
+      var result = context.run();
 
       if (result === Pause) {
         var resume = function(){
           resume = function(){};
           delete realm.resume;
           realm.emit('resume');
-          return run(realm, thunk, bytecode);
+          return run(realm, bytecode);
         };
 
+        context.sp--;
         realm.resume = function(){ return resume() };
         realm.state = 'paused';
         realm.emit('pause', realm.resume);
@@ -2535,8 +2550,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         });
 
         ExecutionContext.push(ctx);
-        script.thunk || (script.thunk = new Thunk(script.bytecode));
-        var result = run(realm, script.thunk, script.bytecode);
+        var result = ctx.run();
         context === ctx && ExecutionContext.pop();
 
         if (result && result.Abrupt) {
@@ -2695,8 +2709,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         this.scripts.push(script);
 
-        var result = prepareToRun(script.bytecode, this.globalEnv)
-                  || run(this, script.thunk, script.bytecode);
+        var result = prepareToRun(script.bytecode, this.globalEnv) || run(this, script.bytecode);
 
         var completionType = result && result.Abrupt ? 'throw' : 'complete';
         this.emit(completionType, result);

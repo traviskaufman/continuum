@@ -61,7 +61,79 @@ var thunk = (function(exports){
     return d;
   })([], 8);
 
-  var log = false;
+
+  function getKey(context, v){
+    if (typeof v === 'string') {
+      return v;
+    }
+    if (v[0] !== '@') {
+      return v[1];
+    }
+
+    return context.getSymbol(v[1]);
+  }
+
+
+  function unwind(context){
+    var error = context.error;
+
+    for (var i = 0, entry; entry = context.code.unwinders[i]; i++) {
+      if (entry.begin <= context.ip && context.ip <= entry.end) {
+        if (entry.type === 'scope') {
+          context.stacktrace || (context.stacktrace = []);
+          context.stacktrace.push(context.popScope());
+        } else if (entry.type === 'try') {
+          context.stack[context.sp++] = error.value;
+          context.error = undefined;
+          context.ip = entry.end + 1;
+          return context.cmds[context.ip];
+        } else if (entry.type === 'iteration') {
+          if (error && error.value && error.value.BuiltinBrand === 'StopIteration') {
+            context.ip = entry.end;
+            context.error = undefined;
+            return context.cmds[context.ip];
+          }
+        }
+      }
+    }
+
+
+    if (error && error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
+      var code  = context.code,
+          range = code.ops[context.ip].range,
+          loc   = code.ops[context.ip].loc,
+          err   = error.value;
+
+      if (!err.hasLocation) {
+        err.hasLocation = true;
+        setCode(err, loc, code.source);
+        var name = code.displayName || code.name;
+        setOrigin(err, code.filename, name);
+
+        if (name) {
+          name = 'in '+name+' ';
+        }
+
+        console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
+                    err.Get('name')+': '+err.Get('message')+'\n'+
+                    err.Get('code'));
+        console.dir(err);
+      }
+
+      if (context.stacktrace) {
+        if (err.trace) {
+          [].push.apply(err.trace, context.stacktrace);
+        } else {
+          err.trace = context.stacktrace;
+        }
+        err.context || (err.context = context);
+      }
+    }
+
+    context.completion = error;
+    context.error = undefined;
+    return false;
+  }
 
 
   function setOrigin(obj, filename, name){
@@ -77,24 +149,923 @@ var thunk = (function(exports){
     obj.set('code', line + '\n' + pad);
   }
 
-  function instructions(ops, opcodes){
-    var out = [],
-        traceNext;
 
-    for (var i=0; i < ops.length; i++) {
-      out[i] = opcodes[+ops[i].op];
-      out[i].ip = i;
-      if (out[i].name === 'LOG') {
-        out.log = true;
-      } else if (out[i].name === 'LOOP' ) {
-        traceNext = true;
-      } else if (traceNext) {
-        out[i].count = out[i].total = 0;
-        traceNext = false;
-      }
-    }
-    return out;
+
+
+  function ADD(context){
+    context.stack[context.sp - 1] += context.ops[context.ip][0];
+    return context.cmds[++context.ip];
   }
+
+  function AND(context){
+    if (isFalsey(context.stack[context.sp - 1])) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    context.sp--;
+    return context.cmds[++context.ip];
+  }
+
+  function ARGS(context){
+    context.stack[context.sp++] = [];
+    return context.cmds[++context.ip];
+  }
+
+  function ARG(context){
+    var arg = context.stack[--context.sp];
+    context.stack[context.sp - 1].push(arg);
+    return context.cmds[++context.ip];
+  }
+
+  function ARGUMENTS(context){
+    if (context.code.flags.strict) {
+      var args = context.args;
+      context.stack[context.sp++] = context.createArguments(args);
+      context.stack[context.sp++] = args;
+    } else {
+      var params = context.code.params.boundNames,
+          env    = context.LexicalEnvironment,
+          args   = context.args,
+          func   = context.callee;
+
+      context.stack[context.sp++] = context.arguments = context.createArguments(args, env, params, func);
+      context.stack[context.sp++] = args;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function ARRAY(context){
+    context.stack[context.sp++] = context.createArray(0);
+    context.stack[context.sp++] = 0;
+    return context.cmds[++context.ip];
+  }
+
+  function ARRAY_DONE(context){
+    var len = context.stack[--context.sp];
+    context.stack[context.sp - 1].set('length', len);
+    return context.cmds[++context.ip];
+  }
+
+  function BINARY(context){
+    var right  = context.stack[--context.sp],
+        left   = context.stack[--context.sp],
+        result = BinaryOperation(context.ops[context.ip][0], $$GetValue(left), $$GetValue(right));
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function BINDING(context){
+    var result = context.createBinding(context.ops[context.ip][0], context.ops[context.ip][1]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function CALL(context){
+    var args     = context.stack[--context.sp],
+        func     = context.stack[--context.sp],
+        receiver = context.stack[--context.sp],
+        result   = context.callFunction(receiver, func, args, context.ops[context.ip][0]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function CASE(context){
+    var result = EQUAL(context.stack[--context.sp], context.stack[context.sp - 1]);
+
+    if (result) {
+      if (result.Abrupt) {
+        context.error = result;
+        return unwind;
+      }
+      context.sp--;
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function CLASS_DECL(context){
+    var def    = context.ops[context.ip][0],
+        sup    = def.hasSuper ? context.stack[--context.sp] : undefined,
+        result = context.createClass(def, sup);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    result = context.initializeBinding(getKey(context, def.name), result);
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function CLASS_EXPR(context){
+    var def    = context.ops[context.ip][0],
+        sup    = def.hasSuper ? context.stack[--context.sp] : undefined,
+        result = context.createClass(def, sup);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function COMPLETE(context){
+    return false;
+  }
+
+  function CONST(context){
+    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
+    return context.cmds[++context.ip];
+  }
+
+  function CONSTRUCT(context){
+    var args   = context.stack[--context.sp],
+        func   = context.stack[--context.sp],
+        result = context.constructFunction(func, args);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function DEBUGGER(context){
+    context.ip++;
+    context.completion = Pause;
+    console.log(context);
+    return false;
+  }
+
+  function DEFAULT(context){
+    context.sp--;
+    context.ip = context.ops[context.ip][0];
+    return context.cmds[++context.ip];
+  }
+
+  function DEFINE(context){
+    var attrs  = context.ops[context.ip][0],
+        val    = context.stack[--context.sp],
+        key    = context.stack[context.sp - 1],
+        obj    = context.stack[context.sp - 2],
+        result = obj.DefineOwnProperty(key, new D[attrs](val));
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function DUP(context){
+    context.stack[context.sp] = context.stack[context.sp++ - 1];
+    return context.cmds[++context.ip];
+  }
+
+  function ELEMENT(context){
+    var key    = context.stack[--context.sp],
+        obj    = context.stack[--context.sp],
+        result = context.getPropertyReference(key, obj);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function ENUM(context){
+    context.stack[context.sp - 1] = context.stack[context.sp - 1].enumerator();
+    return context.cmds[++context.ip];
+  }
+
+  function EXTENSIBLE(context){
+    context.stack[context.sp - 1].SetExtensible(!!context.ops[context.ip][0]);
+    return context.cmds[++context.ip];
+  }
+
+
+  function EVAL(context){
+    var args     = context.stack[--context.sp],
+        func     = context.stack[--context.sp],
+        receiver = context.stack[--context.sp];
+
+    if (func && func.Call && func.Call.isBuiltinEval) {
+      if (context.strict) {
+        var scope = context.cloneScope();
+      }
+      var result = func.Call(null, args, true);
+      scope && context.replaceScope(scope);
+    } else {
+      var result = context.callFunction(receiver, func, args, context.ops[context.ip][0]);
+    }
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function FUNCTION(context){
+    var op     = context.ops[context.ip],
+        isExpr = op[0],
+        name   = op[1],
+        code   = op[2];
+
+    context.stack[context.sp++] = context.createFunction(isExpr, name, code);
+    return context.cmds[++context.ip];
+  }
+
+  function FLIP(context){
+    var buffer = [],
+        index  = 0,
+        count  = context.ops[context.ip][0];
+
+    while (index < count) {
+      buffer[index] = context.stack[context.sp - index++];
+    }
+
+    index = 0;
+    while (index < count) {
+      context.stack[context.sp - index] = buffer[count - ++index];
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+
+  function GET(context){
+    var result = $$GetValue(context.stack[--context.sp]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function HAS_BINDING(context){
+    context.stack[context.sp++] = context.hasBinding(context.ops[context.ip][0]);
+    return context.cmds[++context.ip];
+  }
+
+  function GET_GLOBAL(context){
+    var result = context.getOwnGlobal(context.ops[context.ip][0]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function HAS_GLOBAL(context){
+    var result = context.hasOwnGlobal(context.ops[context.ip][0]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function PUT_GLOBAL(context){
+    var val    = context.stack[--context.sp],
+        result = context.putOwnGlobal(context.ops[context.ip][0], val, context.ops[context.ip][1]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function INC(context){
+    context.stack[context.sp - 1]++;
+    return context.cmds[++context.ip];
+  }
+
+  function INDEX(context){
+    var val   = context.stack[--context.sp],
+        index = context.stack[--context.sp] + context.ops[context.ip][0],
+        array = context.stack[context.sp - 1];
+
+    array.DefineOwnProperty(index+'', new Desc(val));
+    context.stack[context.sp++] = index + 1;
+
+    return context.cmds[++context.ip];
+  }
+
+  function INTERNAL_MEMBER(context){
+    var item = context.stack[--context.sp];
+    context.stack[context.sp++] = item[context.ops[context.ip][0]];
+    return context.cmds[++context.ip];
+  }
+
+  function ITERATE(context){
+    context.stack[context.sp - 1] = context.stack[context.sp - 1].Iterate();
+    return context.cmds[++context.ip];
+  }
+
+  function LITERAL(context){
+    context.stack[context.sp++] = context.ops[context.ip][0];
+    return context.cmds[++context.ip];
+  }
+
+  function JUMP(context){
+    context.ip = context.ops[context.ip][0];
+    return context.cmds[context.ip];
+  }
+
+  function JTRUE(context){
+    var cmp = context.stack[--context.sp];
+    if (!isFalsey(cmp)) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JFALSE(context){
+    var cmp = context.stack[--context.sp];
+    if (isFalsey(cmp)) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JEQ_UNDEFINED(context){
+    if (isUndefined(context.stack[context.sp - 1])) {
+      context.sp--;
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JNEQ_UNDEFINED(context){
+    if (!isUndefined(context.stack[context.sp - 1])) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    context.sp--;
+    return context.cmds[++context.ip];
+  }
+
+  function JEQ_NULL(context){
+    if (context.stack[context.sp - 1] === null) {
+      context.sp--;
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JNEQ_NULL(context){
+    if (context.stack[context.sp - 1] !== null) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    context.sp--;
+    return context.cmds[++context.ip];
+  }
+
+  function JLT(context){
+    var cmp = context.stack[--context.sp];
+    if (cmp < context.ops[context.ip][1]) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JLTE(context){
+    var cmp = context.stack[--context.sp];
+    if (cmp <= context.ops[context.ip][1]) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JGT(context){
+    var cmp = context.stack[--context.sp];
+    if (cmp > context.ops[context.ip][1]) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function JGTE(context){
+    var cmp = context.stack[--context.sp];
+    if (cmp >= context.ops[context.ip][1]) {
+      context.ip = context.ops[context.ip][0];
+      return context.cmds[context.ip];
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function LET(context){
+    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
+    return context.cmds[++context.ip];
+  }
+
+  function LOG(context){
+    context.Realm.emit('debug', context.sp, context.stack);
+    return context.cmds[++context.ip];
+  }
+
+  function LOOP(context){
+    var jump = context.cmds[++context.ip];
+    return jump;
+
+    if (jump.count++ > 50) {
+      jump.total += jump.count;
+      jump.count = 0;
+      return TRACE_STACK;
+    }
+    return jump;
+  }
+
+  function MEMBER(context){
+    var obj = context.stack[--context.sp],
+        key = getKey(context, context.ops[context.ip][0]);
+
+    if (key && key.Abrupt) {
+      context.error = key;
+      return unwind;
+    }
+
+    var result = context.getPropertyReference(key, obj);
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function METHOD(context){
+    var kind = context.ops[context.ip][0],
+        obj  = context.stack[context.sp - 1],
+        code = context.ops[context.ip][1],
+        key  = getKey(context, context.ops[context.ip][2]);
+
+    if (key && key.Abrupt) {
+      context.error = key;
+      return unwind;
+    }
+
+    var status = context.defineMethod(kind, obj, key, context.code);
+
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+    return context.cmds[++context.ip];
+  }
+
+  function NATIVE_CALL(context){
+    return CALL();
+  }
+
+  function NATIVE_REF(context){
+    if (!context.code.natives) {
+      context.error = 'invalid native reference';
+      return unwind;
+    }
+    context.stack[context.sp++] = context.Realm.natives.reference(context.code.lookup(context.ops[context.ip][0]), false);
+    return context.cmds[++context.ip];
+
+
+    // context.LexicalEnvironment = context.Realm.natives;
+    // var ret = REF(context);
+    // context.LexicalEnvironment = scope;
+    // return ret;
+  }
+
+  function OBJECT(context){
+    context.stack[context.sp++] = context.createObject();
+    return context.cmds[++context.ip];
+  }
+
+  function OR(context){
+    if (isFalsey(context.stack[context.sp - 1])) {
+      context.sp--;
+      return context.cmds[++context.ip];
+    }
+    context.ip = context.ops[context.ip][0];
+    return context.cmds[context.ip];
+  }
+
+  function POP(context){
+    context.sp--;
+    return context.cmds[++context.ip];
+  }
+
+  function POPN(context){
+    context.sp -= context.ops[context.ip][0];
+    return context.cmds[++context.ip];
+  }
+
+  function PROPERTY(context){
+    var val = context.stack[--context.sp],
+        obj = context.stack[context.sp - 1],
+        key = getKey(context, context.ops[context.ip][0]);
+
+    if (key && key.Abrupt) {
+      context.error = key;
+      return unwind;
+    }
+
+    if (val && val.Abrupt) {
+      context.error = val;
+      return unwind;
+    }
+
+    var status = obj.DefineOwnProperty(key, new Desc(val), false);
+
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function PROTO(context){
+    var proto = context.stack[--context.sp],
+        obj   = context.stack[context.sp - 1];
+
+    if (proto && proto.Abrupt) {
+      context.error = proto;
+      return unwind;
+    }
+
+    if (obj && obj.Abrupt) {
+      context.error = obj;
+      return unwind;
+    }
+
+    var status = obj.SetInheritance(proto);
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function PUT(context){
+    var val    = context.stack[--context.sp],
+        ref    = context.stack[--context.sp],
+        status = $$PutValue(ref, val);
+
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = val;
+    return context.cmds[++context.ip];
+  }
+
+  function REGEXP(context){
+    context.stack[context.sp++] = context.createRegExp(context.ops[context.ip][0]);
+    return context.cmds[++context.ip];
+  }
+
+  function REF(context){
+    var ident = context.code.lookup(context.ops[context.ip][0]);
+    context.stack[context.sp++] = context.getReference(ident);
+    return context.cmds[++context.ip];
+  }
+
+
+  function REFSYMBOL(context){
+    var symbol = context.code.lookup(context.ops[context.ip][0]);
+    context.stack[context.sp++] = context.getSymbol(symbol);
+    return context.cmds[++context.ip];
+  }
+
+  function REST(context){
+    var args   = context.stack[--context.sp],
+        offset = context.ops[context.ip][0],
+        count  = args.length - offset,
+        array  = context.createArray(0);
+
+    for (var i=0; i < count; i++) {
+      array.set(i+'', args[offset + i]);
+    }
+    array.set('length', i);
+    context.stack[context.sp++] = array;
+
+    return context.cmds[++context.ip];
+  }
+
+  function RETURN(context){
+    context.completion = context.stack[--context.sp];
+    context.ip++;
+
+    if (context.code.flags.generator) {
+      context.currentGenerator.ExecutionContext = context;
+      context.currentGenerator.State = 'closed';
+      context.error = new AbruptCompletion('throw', context.Realm.intrinsics.StopIteration);
+      unwind(context);
+    }
+
+    return false;
+  }
+
+  function ROTATE(context){
+    var buffer = [],
+        item   = context.stack[--context.sp],
+        index  = 0,
+        count  = context.ops[context.ip][0];
+
+    while (index < count) {
+      buffer[index++] = context.stack[--context.sp];
+    }
+
+    buffer[index++] = item;
+
+    while (index--) {
+      context.stack[context.sp++] = buffer[index];
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function SAVE(context){
+    context.completion = context.stack[--context.sp];
+    return context.cmds[++context.ip];
+  }
+
+  function SCOPE_CLONE(context){
+    context.cloneScope();
+    return context.cmds[++context.ip];
+  }
+
+  function SCOPE_POP(context){
+    context.popScope();
+    return context.cmds[++context.ip];
+  }
+
+  function SCOPE_PUSH(context){
+    context.pushScope();
+    return context.cmds[++context.ip];
+  }
+
+  function SPREAD(context){
+    var obj    = context.stack[--context.sp],
+        index  = context.ops[context.ip][0],
+        result = context.destructureSpread(obj, index);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function SPREAD_ARG(context){
+    var spread = context.stack[--context.sp],
+        args   = context.stack[context.sp - 1],
+        status = context.context.spreadArguments(args, context.spread);
+
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function SPREAD_ARRAY(context){
+    var val    = context.stack[--context.sp],
+        index  = context.stack[--context.sp] + context.ops[context.ip][0],
+        array  = context.stack[context.sp - 1],
+        status = context.context.spreadArray(array, index, val);
+
+    if (status && status.Abrupt) {
+      context.error = status;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = status;
+    return context.cmds[++context.ip];
+  }
+
+
+  function STRING(context){
+    context.stack[context.sp++] = context.code.lookup(context.ops[context.ip][0]);
+    return context.cmds[++context.ip];
+  }
+
+  function SUPER_ELEMENT(context){
+    var result = context.getSuperReference(context.stack[--context.sp]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function SUPER_MEMBER(context){
+    var key = getKey(context, context.ops[context.ip][0]);
+
+    if (key && key.Abrupt) {
+      context.error = key;
+      return unwind;
+    }
+
+    var result = context.getSuperReference(key);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function SYMBOL(context){
+    var name = context.ops[context.ip][0],
+        isPublic = context.ops[context.ip][1],
+        hasInit = context.ops[context.ip][2];
+
+    if (hasInit) {
+      var init = context.stack[--context.sp];
+      if (init && init.Abrupt) {
+        context.error = init;
+        return unwind;
+      }
+    } else {
+      var init = context.createSymbol(name, isPublic);
+    }
+
+    var result = context.initializeSymbolBinding(name, init);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function TEMPLATE(context){
+    context.stack[context.sp++] = context.getTemplateCallSite(context.ops[context.ip][0]);
+    return context.cmds[++context.ip];
+  }
+
+  function THIS(context){
+    var result = context.getThis();
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function THROW(context){
+    context.error = new AbruptCompletion('throw', context.stack[--context.sp]);
+    return unwind;
+  }
+
+  function TO_OBJECT(context){
+    var result = context.stack[context.sp - 1] = ToObject(context.stack[context.sp - 1]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function UNARY(context){
+    var result = UnaryOperation(context.ops[context.ip][0], context.stack[--context.sp]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function UNDEFINED(context){
+    context.stack[context.sp++] = undefined;
+    return context.cmds[++context.ip];
+  }
+
+  var updaters = [POST_DEC, PRE_DEC, POST_INC, PRE_INC];
+
+  function UPDATE(context){
+    var update = updaters[context.ops[context.ip][0]],
+        result = update(context.stack[--context.sp]);
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function VAR(context){
+    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], false);
+    return context.cmds[++context.ip];
+  }
+
+  function WITH(context){
+    var result = ToObject($$GetValue(context.stack[--context.sp]));
+
+    if (result && result.Abrupt) {
+      context.error = result;
+      return unwind;
+    }
+
+    context.pushWith(result);
+    return context.cmds[++context.ip];
+  }
+
+  function YIELD(context){
+    context.currentGenerator.ExecutionContext = context;
+    context.currentGenerator.State = 'suspended';
+    context.completion = context.stack[--context.sp];
+    context.ip++;
+    context.pop();
+    return false;
+  }
+
+  function trace(unwound){
+    stacktrace || (stacktrace = []);
+    stacktrace.push(unwound);
+  }
+
+
+
+/*
 
   function Action(op, result){
     this.ip = op.ip;
@@ -127,9 +1098,130 @@ var thunk = (function(exports){
     }
   ]);
 
-  function Thunk(code, instrumented){
+  function Change(type, from, to){
+    this.type = type;
+    if (to === undefined) {
+      this.index = from;
+    } else {
+      this.from = from;
+      this.to = to;
+    }
+  }
 
-    var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE, CLASS_DECL,
+  define(Change.prototype, [
+    function compare(change){
+      if (change.type === this.type) {
+        if ('index' in this) {
+          return change.index === this.index;
+        } else {
+          return change.from - change.to === this.from - this.to;
+        }
+      }
+      return false;
+    }
+  ]);
+
+  function StackTrace(sp, stack){
+    this.stack = stack.slice(0, sp);
+    this.sp = sp;
+    this.ops = new Hash;
+  }
+
+  define(StackTrace.prototype, [
+    function record(op, sp, stack){
+      var ops = this.ops[op.op.name] || (this.ops[op.op.name] = []);
+      ops.push(this.diff(sp, stack));
+    },
+    function diff(sp, stack){
+      var max = Math.max(sp, this.sp),
+          diffs = [];
+
+      stack = stack.slice(0, sp);
+
+      for (var i=0; i < max; i++) {
+        if (this.stack[i] !== stack[i]) {
+          diffs.push(i);
+        }
+      }
+
+      if (!diffs.length) {
+        return diffs;
+      }
+
+      var changes = [];
+
+      for (var i=0; i < diffs.length; i++) {
+        if (diffs[i] > sp) {
+          var index = stack.indexOf(this.stack[diffs[i]]);
+          if (~index) {
+            changes.push(new Change('move', diffs[i], index));
+          } else {
+            changes.push(new Change('remove', diffs[i]));
+          }
+        } else if (diffs[i] > this.sp) {
+          var index = this.stack.indexOf(stack[diffs[i]]);
+          if (~index) {
+            changes.push(new Change('move', index, diffs[i]));
+          } else {
+            changes.push(new Change('add', diffs[i]));
+          }
+        } else {
+          var index1 = this.stack.indexOf(stack[diffs[i]]);
+          var index2 = stack.indexOf(this.stack[diffs[i]]);
+          if (~index1) {
+            if (~index2) {
+              if (index1 === index2) {
+                changes.push(new Change('replace', index1));
+              } else {
+                changes.push(new Change('swap', index1, diffs[i]));
+              }
+            } else {
+              changes.push(new Change('remove', index1));
+            }
+          } else if (~index2) {
+            changes.push(new Change('add', index2));
+          } else if (this.sp < sp) {
+            changes.push(new Change('push', sp));
+          } else {
+            changes.push(new Change('pop', this.sp));
+          }
+        }
+      }
+
+      this.sp = sp;
+      this.stack = stack.slice(0, sp);
+      return changes;
+    },
+    function summary(){
+      for (var k in this.ops) {
+
+      }
+    }
+  ]);
+
+  function TRACE_STACK(){
+    var tracer = new StackTrace(sp, stack);
+    var f = cmds[context.ip],
+        lastip;
+    while (f) {
+      lastip = ip;
+      f = f();
+      tracer.record(ops[lastip], sp, stack);
+    }
+    console.log(tracer);
+  }
+
+  function TRACE(){
+    var tracer = new Trace(context, ip, cmds[context.ip]),
+        _stack = stack.slice(0, sp);
+    var f = cmds[context.ip];
+
+    while (f) f = f();
+  }
+
+*/
+
+  var opcodes = [ADD, AND, ARRAY, ARG, ARGS, ARGUMENTS, ARRAY_DONE, BINARY, BINDING, CALL, CASE, CLASS_DECL,
     CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP, ELEMENT, ENUM, EXTENSIBLE, EVAL,
     FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
@@ -138,1241 +1230,25 @@ var thunk = (function(exports){
     SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
+  exports.instructions = function instructions(ops){
+    var out = [],
+        traceNext;
+
+    for (var i=0; i < ops.length; i++) {
+      out[i] = opcodes[+ops[i].op];
+      out[i].ip = i;
+      if (out[i].name === 'LOG') {
+        out.log = true;
+      } else if (out[i].name === 'LOOP' ) {
+        traceNext = true;
+      } else if (traceNext) {
+        out[i].count = out[i].total = 0;
+        traceNext = false;
+      }
+    }
+    return out;
+  };
 
-
-
-    var thunk = this,
-        ops = code.ops,
-        cmds = instructions(ops, opcodes);
-
-    function getKey(v){
-      if (typeof v === 'string') {
-        return v;
-      }
-      if (v[0] !== '@') {
-        return v[1];
-      }
-
-      return context.getSymbol(v[1]);
-    }
-
-    function unwind(){
-      for (var i = 0, entry; entry = code.unwinders[i]; i++) {
-        if (entry.begin <= ip && ip <= entry.end) {
-          if (entry.type === 'scope') {
-            trace(context.popScope());
-          } else if (entry.type === 'try') {
-            stack[sp++] = error.value;
-            ip = entry.end + 1;
-            return cmds[ip];
-          } else if (entry.type === 'iteration') {
-            if (error && error.value && error.value.BuiltinBrand === 'StopIteration') {
-              ip = entry.end;
-              return cmds[ip];
-            }
-          }
-        }
-      }
-
-
-      if (error && error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
-        var range = code.ops[ip].range,
-            loc   = code.ops[ip].loc,
-            err   = error.value;
-
-        if (!err.hasLocation) {
-          err.hasLocation = true;
-          setCode(err, loc, code.source);
-          var name = code.displayName || code.name;
-          setOrigin(err, code.filename, name);
-
-
-          if (name) {
-            name = 'in '+name+' ';
-          }
-          console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
-                      err.Get('name')+': '+err.Get('message')+'\n'+
-                      err.Get('code'));
-          console.dir(err);
-        }
-
-        if (stacktrace) {
-          if (err.trace) {
-            [].push.apply(err.trace, stacktrace);
-          } else {
-            err.trace = stacktrace;
-          }
-          err.context || (err.context = context);
-        }
-      }
-
-      completion = error;
-      return false;
-    }
-
-
-
-    function ADD(){
-      stack[sp - 1] += ops[ip][0];
-      return cmds[++ip];
-    }
-
-
-    function AND(){
-      if (isFalsey(stack[sp - 1])) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      } else {
-        sp--;
-        return cmds[++ip];
-      }
-    }
-
-
-    function ARGS(){
-      stack[sp++] = [];
-      return cmds[++ip];
-    }
-
-    function ARG(){
-      var arg = stack[--sp];
-      stack[sp - 1].push(arg);
-      return cmds[++ip];
-    }
-
-    function ARGUMENTS(){
-      if (code.flags.strict) {
-        var args = context.args;
-        stack[sp++] = context.createArguments(args);
-        stack[sp++] = args;
-      } else {
-        var params = code.params.boundNames,
-            env = context.LexicalEnvironment,
-            args = context.args,
-            func = context.callee;
-        stack[sp++] = context.arguments = context.createArguments(args, env, params, func);
-        stack[sp++] = args;
-      }
-
-      return cmds[++ip];
-    }
-
-    function ARRAY(){
-      stack[sp++] = context.createArray(0);
-      stack[sp++] = 0;
-      return cmds[++ip];
-    }
-
-    function ARRAY_DONE(){
-      var len = stack[--sp];
-      stack[sp - 1].set('length', len);
-      return cmds[++ip];
-    }
-
-    function BINARY(){
-      var right  = stack[--sp],
-          left   = stack[--sp],
-          result = BinaryOperation(ops[ip][0], $$GetValue(left), $$GetValue(right));
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function BINDING(){
-      var result = context.createBinding(ops[ip][0], ops[ip][1]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function CALL(){
-      var args     = stack[--sp],
-          func     = stack[--sp],
-          receiver = stack[--sp],
-          result   = context.callFunction(receiver, func, args, ops[ip][0]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function CASE(){
-      var result = EQUAL(stack[--sp], stack[sp - 1]);
-
-
-      if (result) {
-        if (result.Abrupt) {
-          error = result;
-          return unwind;
-        }
-        sp--;
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-
-      return cmds[++ip];
-    }
-
-    function CLASS_DECL(){
-      var def  = ops[ip][0],
-          sup  = def.hasSuper ? stack[--sp] : undefined,
-          result = context.createClass(def, sup);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      result = context.initializeBinding(getKey(def.name), result);
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function CLASS_EXPR(){
-      var def  = ops[ip][0],
-          sup  = def.hasSuper ? stack[--sp] : undefined,
-          result = context.createClass(def, sup);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function COMPLETE(){
-      return false;
-    }
-
-    function CONST(){
-      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
-      return cmds[++ip];
-    }
-
-    function CONSTRUCT(){
-      var args   = stack[--sp],
-          func   = stack[--sp],
-          result = context.constructFunction(func, args);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function DEBUGGER(){
-      cleanup = pauseCleanup;
-      ip++;
-      console.log(context, thunk);
-      return false;
-    }
-
-    function DEFAULT(){
-      sp--;
-      ip = ops[ip][0];
-      return cmds[++ip];
-    }
-
-    function DEFINE(){
-      var attrs  = ops[ip][0],
-          val    = stack[--sp],
-          key    = stack[sp - 1],
-          obj    = stack[sp - 2],
-          result = obj.DefineOwnProperty(key, new D[attrs](val));
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function DUP(){
-      stack[sp] = stack[sp++ - 1];
-      return cmds[++ip];
-    }
-
-    function ELEMENT(){
-      var key    = stack[--sp],
-          obj    = stack[--sp],
-          result = context.getPropertyReference(key, obj);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function ENUM(){
-      stack[sp - 1] = stack[sp - 1].enumerator();
-      return cmds[++ip];
-    }
-
-    function EXTENSIBLE(){
-      stack[sp - 1].SetExtensible(!!ops[ip][0]);
-      return cmds[++ip];
-    }
-
-
-    function EVAL(){
-      var args     = stack[--sp],
-          func     = stack[--sp],
-          receiver = stack[--sp];
-
-      if (func && func.Call && func.Call.isBuiltinEval) {
-        if (context.strict) {
-          var scope = context.cloneScope();
-        }
-        var result = func.Call(null, args, true);
-        scope && context.replaceScope(scope);
-      } else {
-        var result = context.callFunction(receiver, func, args, ops[ip][0]);
-      }
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function FUNCTION(){
-      stack[sp++] = context.createFunction(ops[ip][0], ops[ip][1], ops[ip][2]);
-      return cmds[++ip];
-    }
-
-    function FLIP(){
-      var buffer = [],
-          index  = 0,
-          count  = ops[ip][0];
-
-      while (index < count) {
-        buffer[index] = stack[sp - index++];
-      }
-
-      index = 0;
-      while (index < count) {
-        stack[sp - index] = buffer[count - ++index];
-      }
-
-      return cmds[++ip];
-    }
-
-
-    function GET(){
-      var result = $$GetValue(stack[--sp]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function HAS_BINDING(){
-      stack[sp++] = context.hasBinding(ops[ip][0]);
-      return cmds[++ip];
-    }
-
-    function GET_GLOBAL(){
-      var result = context.getOwnGlobal(ops[ip][0]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function HAS_GLOBAL(){
-      var result = context.hasOwnGlobal(ops[ip][0]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function PUT_GLOBAL(){
-      var val    = stack[--sp],
-          result = context.putOwnGlobal(ops[ip][0], val, ops[ip][1]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function INC(){
-      stack[sp - 1]++;
-      return cmds[++ip];
-    }
-
-    function INDEX(){
-      var val   = stack[--sp],
-          index = stack[--sp] + ops[ip][0],
-          array = stack[sp - 1];
-
-      array.DefineOwnProperty(index+'', new Desc(val));
-      stack[sp++] = index + 1;
-
-      return cmds[++ip];
-    }
-
-    function INTERNAL_MEMBER(){
-      var item = stack[--sp];
-      stack[sp++] = item[ops[ip][0]];
-      return cmds[++ip];
-    }
-
-    function ITERATE(){
-      stack[sp - 1] = stack[sp - 1].Iterate();
-      return cmds[++ip];
-    }
-
-    function LITERAL(){
-      stack[sp++] = ops[ip][0];
-      return cmds[++ip];
-    }
-
-    function JUMP(){
-      ip = ops[ip][0];
-      return cmds[ip];
-    }
-
-    function JTRUE(){
-      var cmp = stack[--sp];
-      if (!isFalsey(cmp)) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JFALSE(){
-      var cmp = stack[--sp];
-      if (isFalsey(cmp)) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JEQ_UNDEFINED(){
-      if (isUndefined(stack[sp - 1])) {
-        sp--;
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JNEQ_UNDEFINED(){
-      if (!isUndefined(stack[sp - 1])) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      sp--;
-      return cmds[++ip];
-    }
-
-    function JEQ_NULL(){
-      if (stack[sp - 1] === null) {
-        sp--;
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JNEQ_NULL(){
-      if (stack[sp - 1] !== null) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      sp--;
-      return cmds[++ip];
-    }
-
-    function JLT(){
-      var cmp = stack[--sp];
-      if (cmp < ops[ip][1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JLTE(){
-      var cmp = stack[--sp];
-      if (cmp <= ops[ip][1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JGT(){
-      var cmp = stack[--sp];
-      if (cmp > ops[ip][1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function JGTE(){
-      var cmp = stack[--sp];
-      if (cmp >= ops[ip][1]) {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-      return cmds[++ip];
-    }
-
-    function LET(){
-      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], true);
-      return cmds[++ip];
-    }
-
-    function LOG(){
-      context.Realm.emit('debug', sp, stack);
-      return cmds[++ip];
-    }
-
-    function LOOP(){
-      var jump = cmds[++ip];
-      return jump;
-
-      if (jump.count++ > 50) {
-        jump.total += jump.count;
-        jump.count = 0;
-        return TRACE_STACK;
-      }
-      return jump;
-    }
-
-    function MEMBER(){
-      var obj = stack[--sp],
-          key = getKey(ops[ip][0]);
-
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
-
-      var result = context.getPropertyReference(key, obj);
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function METHOD(){
-      var kind = ops[ip][0],
-          obj  = stack[sp - 1],
-          code = ops[ip][1],
-          key  = getKey(ops[ip][2]);
-
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
-
-      var status = context.defineMethod(kind, obj, key, code);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-      return cmds[++ip];
-    }
-
-    function NATIVE_CALL(){
-      return CALL();
-    }
-
-    function NATIVE_REF(){
-      if (!code.natives) {
-        error = 'invalid native reference';
-        return unwind;
-      }
-      stack[sp++] = context.Realm.natives.reference(code.lookup(ops[ip][0]), false);
-      return cmds[++ip];
-    }
-
-    function OBJECT(){
-      stack[sp++] = context.createObject();
-      return cmds[++ip];
-    }
-
-    function OR(){
-      if (isFalsey(stack[sp - 1])) {
-        sp--;
-        return cmds[++ip];
-      } else {
-        ip = ops[ip][0];
-        return cmds[ip];
-      }
-    }
-
-    function POP(){
-      sp--;
-      return cmds[++ip];
-    }
-
-    function POPN(){
-      sp -= ops[ip][0];
-      return cmds[++ip];
-    }
-
-    function PROPERTY(){
-      var val = stack[--sp],
-          obj = stack[sp - 1],
-          key = getKey(ops[ip][0]);
-
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
-
-      if (val && val.Abrupt) {
-        error = val;
-        return unwind;
-      }
-
-      var status = obj.DefineOwnProperty(key, new Desc(val), false);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function PROTO(){
-      var proto = stack[--sp],
-          obj = stack[sp - 1];
-
-      if (proto && proto.Abrupt) {
-        error = proto;
-        return unwind;
-      }
-
-      if (obj && obj.Abrupt) {
-        error = obj;
-        return unwind;
-      }
-
-      var status = obj.SetInheritance(proto);
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function PUT(){
-      var val    = stack[--sp],
-          ref    = stack[--sp],
-          status = $$PutValue(ref, val);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      stack[sp++] = val;
-      return cmds[++ip];
-    }
-
-    function REGEXP(){
-      stack[sp++] = context.createRegExp(ops[ip][0]);
-      return cmds[++ip];
-    }
-
-    function REF(){
-      var ident = code.lookup(ops[ip][0]);
-      stack[sp++] = context.getReference(ident);
-      return cmds[++ip];
-    }
-
-
-    function REFSYMBOL(){
-      var symbol = code.lookup(ops[ip][0]);
-      stack[sp++] = context.getSymbol(symbol);
-      return cmds[++ip];
-    }
-
-    function REST(){
-      var args = stack[--sp],
-          offset = ops[ip][0],
-          count = args.length - offset,
-          array = context.createArray(0);
-
-      for (var i=0; i < count; i++) {
-        array.set(i+'', args[offset + i]);
-      }
-      array.set('length', i);
-      stack[sp++] = array;
-      return cmds[++ip];
-    }
-
-    function RETURN(){
-      completion = stack[--sp];
-      ip++;
-      if (code.flags.generator) {
-        context.currentGenerator.ExecutionContext = context;
-        context.currentGenerator.State = 'closed';
-        error = new AbruptCompletion('throw', context.Realm.intrinsics.StopIteration);
-        unwind();
-      }
-      return false;
-    }
-
-    function ROTATE(){
-      var buffer = [],
-          item   = stack[--sp],
-          index  = 0,
-          count  = ops[ip][0];
-
-      while (index < count) {
-        buffer[index++] = stack[--sp];
-      }
-
-      buffer[index++] = item;
-
-      while (index--) {
-        stack[sp++] = buffer[index];
-      }
-
-      return cmds[++ip];
-    }
-
-    function SAVE(){
-      completion = stack[--sp];
-      return cmds[++ip];
-    }
-
-    function SCOPE_CLONE(){
-      context.cloneScope();
-      return cmds[++ip];
-    }
-
-    function SCOPE_POP(){
-      context.popScope();
-      return cmds[++ip];
-    }
-
-    function SCOPE_PUSH(){
-      context.pushScope();
-      return cmds[++ip];
-    }
-
-    function SPREAD(){
-      var obj    = stack[--sp],
-          index  = ops[ip][0],
-          result = context.destructureSpread(obj, index);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function SPREAD_ARG(){
-      var spread = stack[--sp],
-          args   = stack[sp - 1],
-          status = context.spreadArguments(args, spread);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function SPREAD_ARRAY(){
-      var val = stack[--sp],
-          index = stack[--sp] + ops[ip][0],
-          array = stack[sp - 1],
-          status = context.spreadArray(array, index, val);
-
-      if (status && status.Abrupt) {
-        error = status;
-        return unwind;
-      }
-
-      stack[sp++] = status;
-      return cmds[++ip];
-    }
-
-
-    function STRING(){
-      stack[sp++] = code.lookup(ops[ip][0]);
-      return cmds[++ip];
-    }
-
-    function SUPER_ELEMENT(){
-      var result = context.getSuperReference(stack[--sp]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function SUPER_MEMBER(){
-      var key = getKey(ops[ip][0]);
-
-      if (key && key.Abrupt) {
-        error = key;
-        return unwind;
-      }
-
-      var result = context.getSuperReference(key);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function SYMBOL(){
-      var name = ops[ip][0],
-          isPublic = ops[ip][1],
-          hasInit = ops[ip][2];
-
-      if (hasInit) {
-        var init = stack[--sp];
-        if (init && init.Abrupt) {
-          error = init;
-          return unwind;
-        }
-      } else {
-        var init = context.createSymbol(name, isPublic);
-      }
-
-      var result = context.initializeSymbolBinding(name, init);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function TEMPLATE(){
-      stack[sp++] = context.getTemplateCallSite(ops[ip][0]);
-      return cmds[++ip];
-    }
-
-    function THIS(){
-      var result = context.getThis();
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function THROW(){
-      error = new AbruptCompletion('throw', stack[--sp]);
-      return unwind;
-    }
-
-    function TO_OBJECT(){
-      var result = stack[sp - 1] = ToObject(stack[sp - 1]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      return cmds[++ip];
-    }
-
-    function UNARY(){
-      var result = UnaryOperation(ops[ip][0], stack[--sp]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function UNDEFINED(){
-      stack[sp++] = undefined;
-      return cmds[++ip];
-    }
-
-    var updaters = [POST_DEC, PRE_DEC, POST_INC, PRE_INC];
-
-    function UPDATE(){
-      var update = updaters[ops[ip][0]],
-          result = update(stack[--sp]);
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      stack[sp++] = result;
-      return cmds[++ip];
-    }
-
-    function VAR(){
-      context.initializeBinding(code.lookup(ops[ip][0]), stack[--sp], false);
-      return cmds[++ip];
-    }
-
-    function WITH(){
-      var result = ToObject($$GetValue(stack[--sp]));
-
-      if (result && result.Abrupt) {
-        error = result;
-        return unwind;
-      }
-
-      context.pushWith(result);
-      return cmds[++ip];
-    }
-
-    function YIELD(){
-      var generator = context.currentGenerator;
-      generator.ExecutionContext = context;
-      generator.State = 'suspended';
-      context.pop();
-      cleanup = yieldCleanup;
-      yielded = stack[--sp];
-      ip++;
-      return false;
-    }
-
-    function trace(unwound){
-      stacktrace || (stacktrace = []);
-      stacktrace.push(unwound);
-    }
-
-    function Change(type, from, to){
-      this.type = type;
-      if (to === undefined) {
-        this.index = from;
-      } else {
-        this.from = from;
-        this.to = to;
-      }
-    }
-
-    define(Change.prototype, [
-      function compare(change){
-        if (change.type === this.type) {
-          if ('index' in this) {
-            return change.index === this.index;
-          } else {
-            return change.from - change.to === this.from - this.to;
-          }
-        }
-        return false;
-      }
-    ]);
-
-    function StackTrace(sp, stack){
-      this.stack = stack.slice(0, sp);
-      this.sp = sp;
-      this.ops = new Hash;
-    }
-
-    define(StackTrace.prototype, [
-      function record(op, sp, stack){
-        var ops = this.ops[op.op.name] || (this.ops[op.op.name] = []);
-        ops.push(this.diff(sp, stack));
-      },
-      function diff(sp, stack){
-        var max = Math.max(sp, this.sp),
-            diffs = [];
-
-        stack = stack.slice(0, sp);
-
-        for (var i=0; i < max; i++) {
-          if (this.stack[i] !== stack[i]) {
-            diffs.push(i);
-          }
-        }
-
-        if (!diffs.length) {
-          return diffs;
-        }
-
-        var changes = [];
-
-        for (var i=0; i < diffs.length; i++) {
-          if (diffs[i] > sp) {
-            var index = stack.indexOf(this.stack[diffs[i]]);
-            if (~index) {
-              changes.push(new Change('move', diffs[i], index));
-            } else {
-              changes.push(new Change('remove', diffs[i]));
-            }
-          } else if (diffs[i] > this.sp) {
-            var index = this.stack.indexOf(stack[diffs[i]]);
-            if (~index) {
-              changes.push(new Change('move', index, diffs[i]));
-            } else {
-              changes.push(new Change('add', diffs[i]));
-            }
-          } else {
-            var index1 = this.stack.indexOf(stack[diffs[i]]);
-            var index2 = stack.indexOf(this.stack[diffs[i]]);
-            if (~index1) {
-              if (~index2) {
-                if (index1 === index2) {
-                  changes.push(new Change('replace', index1));
-                } else {
-                  changes.push(new Change('swap', index1, diffs[i]));
-                }
-              } else {
-                changes.push(new Change('remove', index1));
-              }
-            } else if (~index2) {
-              changes.push(new Change('add', index2));
-            } else if (this.sp < sp) {
-              changes.push(new Change('push', sp));
-            } else {
-              changes.push(new Change('pop', this.sp));
-            }
-          }
-        }
-
-        this.sp = sp;
-        this.stack = stack.slice(0, sp);
-        return changes;
-      },
-      function summary(){
-        for (var k in this.ops) {
-
-        }
-      }
-    ]);
-
-    function TRACE_STACK(){
-      var tracer = new StackTrace(sp, stack);
-      var f = cmds[ip],
-          lastip;
-      while (f) {
-        lastip = ip;
-        f = f();
-        tracer.record(ops[lastip], sp, stack);
-      }
-      console.log(tracer);
-    }
-
-    function TRACE(){
-      var tracer = new Trace(context, ip, cmds[ip]),
-          _stack = stack.slice(0, sp);
-      var f = cmds[ip];
-      while (f) {
-        f = f();
-      }
-
-    }
-
-    function normalPrepare(newContext){
-      thunkStack.push({
-        ip: ip,
-        sp: sp,
-        stack: stack,
-        error: error,
-        prepare: prepare,
-        execute: execute,
-        cleanup: cleanup,
-        history: history,
-        completion: completion,
-        stacktrace: stacktrace,
-        context: context,
-        log: log,
-        ctx: ctx,
-        yielded: yielded
-      });
-      ip = 0;
-      sp = 0;
-      stack = [];
-      error = completion = stacktrace = yielded = undefined;
-      log = log || cmds.log;
-      context = newContext;
-      var realm = context.Realm;
-      if (!realm.quiet && !code.natives || realm.debugBuiltins) {
-        history = context.history = [];
-        execute = instrumentedExecute;
-      } else {
-        execute = normalExecute;
-      }
-    }
-
-    function normalCleanup(){
-      var result = $$GetValue(completion);
-      if (thunkStack.length) {
-        var v = thunkStack.pop();
-        ip = v.ip;
-        sp = v.sp;
-        stack = v.stack;
-        error = v.error;
-        prepare = v.prepare;
-        execute = v.execute;
-        cleanup = v.cleanup;
-        completion = v.completion;
-        stacktrace = v.stacktrace;
-        context = v.context;
-        log = v.log;
-        ctx = v.ctx;
-        yielded = v.yielded;
-        if (context) {
-          history = context.history;
-        }
-      }
-      return result;
-    }
-
-
-    function normalExecute(){
-      var f = cmds[ip];
-      while (f) f = f();
-    }
-
-    function instrumentedExecute(){
-      var f = cmds[ip],
-          ips = 0,
-          realm = context.Realm;
-
-      while (f) {
-        history[ips++] = ops[ip];
-        realm.emit('op', ops[ip], stack[sp - 1]);
-        f = f();
-      }
-    }
-
-    function resumePrepare(){
-      delete thunk.ip;
-      delete thunk.stack;
-      prepare = normalPrepare;
-      context = ctx;
-      ctx = undefined;
-    }
-
-    function pauseCleanup(){
-      thunk.ip = ip;
-      thunk.stack = stack;
-      stack.length = sp;
-      prepare = resumePrepare;
-      cleanup = normalCleanup;
-      ctx = context;
-      return Pause;
-    }
-
-    function yieldPrepare(ctx){
-      prepare = normalPrepare;
-      context = ctx;
-    }
-
-    function yieldCleanup(){
-      prepare = yieldPrepare;
-      cleanup = normalCleanup;
-      return yielded;
-    }
-
-    function run(ctx){
-      prepare(ctx);
-      execute();
-      return cleanup();
-    }
-
-    function send(ctx, value){
-      prepare(ctx);
-      stack[sp++] = value;
-      execute();
-      return cleanup();
-    }
-
-
-    var completion, yielded, stack, ip, sp, error, ctx, context, stacktrace, history;
-
-    var executing = false, thunkStack = [];
-
-
-    var prepare = normalPrepare,
-        execute = normalExecute,
-        cleanup = normalCleanup;
-
-    this.run = run;
-    this.send = send;
-    this.code = code;
-    Emitter.call(this);
-  }
-
-  inherit(Thunk, Emitter, []);
-
-  exports.Thunk = Thunk;
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
 
