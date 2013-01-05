@@ -4935,19 +4935,20 @@ parseYieldExpression: true
     }
 
     function trackGroupExpression() {
-        var marker, expr;
+        var marker, expr, parenCount;
 
         skipComment();
         marker = createLocationMarker();
         expect('(');
 
-        ++state.parenthesizedCount;
+        parenCount = ++state.parenthesizedCount;
 
         state.allowArrowFunction = !state.allowArrowFunction;
         expr = parseExpression();
         state.allowArrowFunction = false;
 
-        if (expr.type === 'ArrowFunctionExpression') {
+        if (parenCount !== state.parenthesizedCount && expr.type === 'ArrowFunctionExpression') {
+            --state.parenthesizedCount;
             marker.end();
             marker.apply(expr);
         } else {
@@ -10738,7 +10739,7 @@ exports.assembler = (function(exports){
     comprehension(node, 0);
     MOVE(false);
     MOVE(false);
-    ARRAY_DONE();
+    POP();
   }
 
   function ComprehensionBlock(node){}
@@ -10746,10 +10747,7 @@ exports.assembler = (function(exports){
   function ConditionalExpression(node){
     copyTail(node, node.consequent);
     copyTail(node, node.alternate);
-    copyWrap(node, node.consequent);
-    copyWrap(node, node.alternate);
-    copyWrap(node, node.test);
-
+    each(node, wrap(node.wrapped));
 
     recurse(node.test);
     GET();
