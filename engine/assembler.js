@@ -173,6 +173,7 @@ var assembler = (function(exports){
       LOOP             = new StandardOpCode(0, 'LOOP'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
+      MOVE             = new StandardOpCode(1, 'MOVE'),
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
@@ -199,6 +200,7 @@ var assembler = (function(exports){
       STRING           = new InternedOpCode(1, 'STRING'),
       SUPER_ELEMENT    = new StandardOpCode(0, 'SUPER_ELEMENT'),
       SUPER_MEMBER     = new StandardOpCode(1, 'SUPER_MEMBER'),
+      SWAP             = new StandardOpCode(0, 'SWAP'),
       SYMBOL           = new InternedOpCode(3, 'SYMBOL'),
       TEMPLATE         = new StandardOpCode(1, 'TEMPLATE'),
       THIS             = new StandardOpCode(0, 'THIS'),
@@ -1453,9 +1455,8 @@ var assembler = (function(exports){
 
 
   function iter(node, KIND){
-    loop(function(){
-      var update;
-      unwinder('iteration', function(){
+    unwinder('iteration', function(){
+      loop(function(){
         if (isLexicalDeclaration(node.left)) {
           var lexical = true;
           pushScope('block');
@@ -1465,7 +1466,7 @@ var assembler = (function(exports){
         GET();
         KIND();
         MEMBER('next');
-        update = current();
+        var update = current();
         DUP();
         DUP();
         GET();
@@ -1483,8 +1484,8 @@ var assembler = (function(exports){
         lexical && SCOPE_CLONE();
         JUMP(update);
         lexical && popScope();
+        return update;
       });
-      return update;
     });
   }
 
@@ -1733,6 +1734,70 @@ var assembler = (function(exports){
   }
 
   function ClassHeritage(node){}
+
+  function comprehension(expression, index){
+    var node = expression.blocks[index++];
+    unwinder('iteration', function(){
+      loop(function(){
+        pushScope('block');
+        var fakeLeft = {
+          type: 'VariableDeclaration',
+          declarations: [{
+            type: 'VariableDeclarator',
+            kind: 'let',
+            id: node.left
+          }]
+        };
+        initLexicalDecls(fakeLeft);
+        recurse(node.right);
+        GET();
+        node.of ? ITERATE() : ENUM();
+        MEMBER('next');
+        var update = current();
+        DUP();
+        DUP();
+        GET();
+        ARGS();
+        CALL(false);
+        VariableDeclaration(fakeLeft, true);
+
+        if (expression.blocks[index]) {
+          comprehension(expression, index);
+        } else {
+          if (expression.filter) {
+            recurse(expression.filter);
+            GET();
+            var test = JFALSE(0);
+          }
+          MOVE(false);
+          MOVE(false);
+          recurse(expression.body);
+          GET();
+          INDEX(0);
+          MOVE(true);
+          MOVE(true);
+          expression.filter && adjust(test);
+        }
+
+        SCOPE_CLONE();
+        JUMP(update);
+        popScope();
+        return update;
+      });
+    });
+  }
+
+  function ComprehensionExpression(node){
+    ARRAY();
+    MOVE(true);
+    MOVE(true);
+    comprehension(node, 0);
+    MOVE(false);
+    MOVE(false);
+    ARRAY_DONE();
+  }
+
+  function ComprehensionBlock(node){}
 
   function ConditionalExpression(node){
     var tailer = tail(node.tail),
@@ -2185,7 +2250,7 @@ var assembler = (function(exports){
       GET();
       ARG();
     });
-    CALL();
+    CALL(false);
   }
 
   function ThisExpression(node){
@@ -2318,7 +2383,8 @@ var assembler = (function(exports){
 
   each([ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
     AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
-    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression, ContinueStatement,
+    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ComprehensionExpression,
+    ConditionalExpression, ContinueStatement,
     DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
     ExportSpecifierSet, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement,
     FunctionDeclaration, FunctionExpression, Glob, Identifier, IfStatement, ImportDeclaration,

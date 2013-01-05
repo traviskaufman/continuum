@@ -4,7 +4,8 @@ var thunk = (function(exports){
       constants = require('./constants'),
       operators = require('./object-model/operators'),
       Nil       = require('./object-model/$Nil'),
-      Emitter   = require('./lib/Emitter');
+      Emitter   = require('./lib/Emitter'),
+      errors    = require('./errors');
 
   var isFalsey        = Nil.isFalsey,
       isNullish       = Nil.isNullish,
@@ -26,9 +27,10 @@ var thunk = (function(exports){
       Empty           = constants.SYMBOLS.Empty,
       Resume          = constants.SYMBOLS.Resume;
 
-  var AbruptCompletion = require('./errors').AbruptCompletion;
+  var AbruptCompletion = errors.AbruptCompletion,
+      $$ThrowException = errors.$$ThrowException;
 
-
+  var push = [].push;
 
   function Desc(v){
     this.Value = v;
@@ -110,9 +112,7 @@ var thunk = (function(exports){
         var name = code.displayName || code.name;
         setOrigin(err, code.filename, name);
 
-        if (name) {
-          name = 'in '+name+' ';
-        }
+        name = name ? 'in '+name+' ' : '';
 
         console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
                     err.Get('name')+': '+err.Get('message')+'\n'+
@@ -122,7 +122,7 @@ var thunk = (function(exports){
 
       if (context.stacktrace) {
         if (err.trace) {
-          [].push.apply(err.trace, context.stacktrace);
+          push.apply(err.trace, context.stacktrace);
         } else {
           err.trace = context.stacktrace;
         }
@@ -645,7 +645,7 @@ var thunk = (function(exports){
   }
 
   function LOG(context){
-    context.Realm.emit('debug', context.sp, context.stack);
+    context.Realm.emit('debug', context.sp, context.stack.slice(0, context.sp));
     return context.cmds[++context.ip];
   }
 
@@ -697,6 +697,21 @@ var thunk = (function(exports){
       context.error = status;
       return unwind;
     }
+    return context.cmds[++context.ip];
+  }
+
+  function MOVE(context){
+    if (!context.stackB) {
+      context.stackB = [];
+      context.spB = 0;
+    }
+
+    if (context.ops[context.ip][0]) {
+      context.stackB[context.spB++] = context.stack[--context.sp];
+    } else {
+      context.stack[context.sp++] = context.stackB[--context.spB];
+    }
+
     return context.cmds[++context.ip];
   }
 
@@ -967,6 +982,16 @@ var thunk = (function(exports){
     }
 
     context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function SWAP(context){
+    var stack = context.stack,
+        sp    = context.sp;
+    context.stack = context.stackB || [];
+    context.sp = context.spB || 0;
+    context.stackB = stack;
+    context.spB = sp;
     return context.cmds[++context.ip];
   }
 
@@ -1254,9 +1279,9 @@ var thunk = (function(exports){
     CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP, ELEMENT, ENUM, EXTENSIBLE, EVAL,
     FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
-    LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
+    LOG, LOOP, MEMBER, METHOD, MOVE, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
     REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
   exports.instructions = function instructions(ops){

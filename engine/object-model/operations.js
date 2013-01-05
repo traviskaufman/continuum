@@ -243,11 +243,6 @@ var operations = (function(exports){
       var receiver = $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
     }
 
-    // if (tail) {
-    //   var leafContext = context;
-    //   leafContext.pop();
-    // }
-
     return func.Call(receiver, args);
   }
 
