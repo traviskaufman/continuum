@@ -332,4 +332,4 @@ var $Array = (function(exports){
   ]);
 
   return exports;
-})(typeof module !== 'undefined' ? module : {});
+})(typeof module !== 'undefined' ? exports : {});
