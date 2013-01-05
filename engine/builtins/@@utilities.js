@@ -7,8 +7,19 @@ import {
   $$NumberToString
 } from '@@internals';
 
+import {
+  MAX_INTEGER,
+  MAX_VALUE,
+  MIN_VALUE,
+  NaN,
+  POSITIVE_INFINITY,
+  NEGATIVE_INFINITY
+} from '@@constants';
+
+
 const FROZEN = 0,
       HIDDEN = 6;
+
 
 const padding = ['', '0', '00', '000', '0000', '00000', '000000'];
 
@@ -29,19 +40,38 @@ export function abs(x){
 }
 
 export function floor(x){
-  return x | 0;
+  return x >> 0;
 }
 
 export function sign(x){
   return x < 0 ? -1 : 1;
 }
 
+export function isZeroOrInfinite(x){
+  return x === 0 || x === POSITIVE_INFINITY || x === NEGATIVE_INFINITY;
+}
+
 export function isNaN(x){
   return x !== x;
 }
 
+export function isFinite(value){
+  return typeof value === 'number'
+      && !isNaN(value)
+      && value < POSITIVE_INFINITY
+      && value > NEGATIVE_INFINITY;
+}
+
+export function isInteger(value) {
+  return typeof value === 'number'
+      && !isNaN(value)
+      && value > -MAX_INTEGER
+      && value < MAX_INTEGER
+      && value | 0 === value;
+}
+
 export function hasBrand(object, brand){
-  return $$Get(obj, 'BuiltinBrand') === brand;
+  return $$Get(object, 'BuiltinBrand') === brand;
 }
 
 const argsList  = [null, null],

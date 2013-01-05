@@ -9,6 +9,7 @@ import {
   floor,
   hasBrand,
   isNaN,
+  isZeroOrInfinite,
   sign
 } from '@@utilities';
 
@@ -35,6 +36,10 @@ import {
   $$StringToNumber,
   $$Set
 } from '@@internals';
+
+import {
+  NaN
+} from '@@constants';
 
 import {
   @@ToPrimitive: ToPrimitive
@@ -171,7 +176,7 @@ export function ToInteger(argument){
     return 0;
   }
 
-  if (number === 0 || number === Infinity || number === -Infinity) {
+  if (isZeroOrInfinite(number)) {
     return number;
   }
 
@@ -186,7 +191,7 @@ export function ToInteger(argument){
 export function ToInt32(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
+  if (isNaN(number) || isZeroOrInfinite(number)) {
     return 0;
   }
 
@@ -203,7 +208,7 @@ export function ToInt32(argument){
 export function ToUint32(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
+  if (isNaN(number) || isZeroOrInfinite(number)) {
     return 0;
   }
 
@@ -218,7 +223,7 @@ export function ToUint32(argument){
 export function ToUint16(argument){
   const number = ToNumber(argument);
 
-  if (number === 0 || isNaN(number) || number === Infinity || number === -Infinity) {
+  if (isNaN(number) || isZeroOrInfinite(number)) {
     return 0;
   }
 
@@ -319,7 +324,7 @@ export function IsCallable(argument){
 // #######################
 
 export function SameValue(x, y){
-  return x === y ? x !== 0 || 1 / x === 1 / y : x !== x && y !== y;
+  return x === y ? x !== 0 || 1 / x === 1 / y : isNaN(x) && isNaN(y);
 }
 
 

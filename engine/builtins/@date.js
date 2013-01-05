@@ -36,15 +36,11 @@ import {
   define,
   extend,
   hideEverything,
+  isFinite,
+  isNaN,
   floor,
   zeroPad
 } from '@@utilities';
-
-import {
-  NaN,
-  isFinite,
-  isNaN
-} from '@number';
 
 import {
   DST_START_MONTH,
@@ -53,7 +49,8 @@ import {
   DST_END_MONTH,
   DST_END_SUNDAY,
   DST_END_OFFSET,
-  LOCAL_TZ
+  LOCAL_TZ,
+  NaN
 } from '@@constants';
 
 import {
@@ -539,7 +536,7 @@ export function parse(date){
   let [, year, month, day, hours, minutes, seconds, ms, tzSep, tzSign, tzHours, tzMinutes] = match;
 
   if (tzSep !== 'Z' && tzSign !== undefined) {
-    minutes += (tzHours * 60 + tzMinutes) * -(tzSign === '+');
+    minutes = ToNumber(minutes) + (ToNumber(tzHours) * 60 + ToNumber(tzMinutes)) * -(tzSign === '+');
   }
 
   return UTC(ToNumber(year) || 0, (ToNumber(month) || 1) - 1, day, hours, minutes, seconds, ms);

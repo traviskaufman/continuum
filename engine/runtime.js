@@ -2381,13 +2381,19 @@ var runtime = (function(GLOBAL, exports, undefined){
     }();
 
     internalModules.set('@@constants', {
-      DST_START_MONTH : natives.get('DST_START_MONTH'),
-      DST_START_SUNDAY: natives.get('DST_START_SUNDAY'),
-      DST_START_OFFSET: natives.get('DST_START_OFFSET'),
-      DST_END_MONTH   : natives.get('DST_END_MONTH'),
-      DST_END_SUNDAY  : natives.get('DST_END_SUNDAY'),
-      DST_END_OFFSET  : natives.get('DST_END_OFFSET'),
-      LOCAL_TZ        : natives.get('LOCAL_TZ')
+      DST_START_MONTH  : natives.get('DST_START_MONTH'),
+      DST_START_SUNDAY : natives.get('DST_START_SUNDAY'),
+      DST_START_OFFSET : natives.get('DST_START_OFFSET'),
+      DST_END_MONTH    : natives.get('DST_END_MONTH'),
+      DST_END_SUNDAY   : natives.get('DST_END_SUNDAY'),
+      DST_END_OFFSET   : natives.get('DST_END_OFFSET'),
+      LOCAL_TZ         : natives.get('LOCAL_TZ'),
+      MAX_INTEGER      : 9007199254740992,
+      MAX_VALUE        : 1.7976931348623157e+308,
+      MIN_VALUE        : 5e-324,
+      NaN              : +'NaN',
+      POSITIVE_INFINITY: 1 / 0,
+      NEGATIVE_INFINITY: 1 / -0
     });
 
     internalModules.set('@@symbols', symbols);
