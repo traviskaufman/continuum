@@ -150,33 +150,33 @@ function MonthFromTime(t){
   const days = getDays(t),
         day  = DayWithinYear(t);
 
-  if (day <= days[6]) {
-    if (day <= days[3]) {
-      if (day <= days[1]) {
+  if (day < days[6]) {
+    if (day < days[3]) {
+      if (day < days[1]) {
         return 0;
-      } else if (day <= days[2]) {
+      } else if (day < days[2]) {
         return 1;
       } else {
         return 2;
       }
-    } else if (day <= days[4]) {
+    } else if (day < days[4]) {
       return 3;
-    } else if (day <= days[5]) {
+    } else if (day < days[5]) {
       return 4;
     } else {
       return 5;
     }
-  } else if (day <= days[9]) {
-    if (day <= days[7]) {
+  } else if (day < days[9]) {
+    if (day < days[7]) {
       return 6;
-    } else if (day <= days[8]) {
+    } else if (day < days[8]) {
       return 7;
     } else {
       return 8;
     }
-  } else if (day <= days[10]) {
+  } else if (day < days[10]) {
     return 9;
-  } else if (day <= days[11]) {
+  } else if (day < days[11]) {
     return 10;
   } else {
     return 11;
@@ -539,7 +539,7 @@ export function parse(date){
   let [, year, month, date, hours, minutes, seconds, ms, tzSep, tzSign, tzHours, tzMinutes] = match;
 
   if (tzSep !== 'Z' && tzSign !== undefined) {
-    minutes += (tzHours * 60 + tzMinute) * -(tzSign === '+');
+    minutes += (tzHours * 60 + tzMinutes) * -(tzSign === '+');
   }
 
   return UTC(ToNumber(year) || 0, (ToNumber(month) || 1) - 1, date, hours, minutes, seconds, ms);
