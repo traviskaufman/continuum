@@ -536,14 +536,10 @@ export function parse(date){
     return $$ParseDate(date);
   }
 
-  let [, year, month, date, hours, minutes, seconds, ms, tzsep, sign, tzhours, tzminutes] = match;
+  let [, year, month, date, hours, minutes, seconds, ms, tzSep, tzSign, tzHours, tzMinutes] = match;
 
-  if (tzsep !== 'Z' && sign !== undefined) {
-    let tz = tzhours * 60 + tzminutes;
-    if (sign === '+') {
-      tz = 0 - tz;
-    }
-    minutes += tz;
+  if (tzSep !== 'Z' && tzSign !== undefined) {
+    minutes += (tzHours * 60 + tzMinute) * -(tzSign === '+');
   }
 
   return UTC(ToNumber(year) || 0, (ToNumber(month) || 1) - 1, date, hours, minutes, seconds, ms);
