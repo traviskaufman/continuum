@@ -154,7 +154,7 @@ function MonthFromTime(t){
     if (day <= days[3]) {
       if (day <= days[1]) {
         return 0;
-      } else if (day < days[2]) {
+      } else if (day <= days[2]) {
         return 1;
       } else {
         return 2;
@@ -167,7 +167,7 @@ function MonthFromTime(t){
       return 5;
     }
   } else if (day <= days[9]) {
-    if (day < days[7]) {
+    if (day <= days[7]) {
       return 6;
     } else if (day <= days[8]) {
       return 7;
