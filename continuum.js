@@ -9112,6 +9112,7 @@ exports.assembler = (function(exports){
       LOOP             = new StandardOpCode(0, 'LOOP'),
       MEMBER           = new InternedOpCode(1, 'MEMBER'),
       METHOD           = new StandardOpCode(3, 'METHOD'),
+      MOVE             = new StandardOpCode(1, 'MOVE'),
       NATIVE_CALL      = new StandardOpCode(1, 'NATIVE_CALL'),
       NATIVE_REF       = new InternedOpCode(1, 'NATIVE_REF'),
       OBJECT           = new StandardOpCode(0, 'OBJECT'),
@@ -9138,6 +9139,7 @@ exports.assembler = (function(exports){
       STRING           = new InternedOpCode(1, 'STRING'),
       SUPER_ELEMENT    = new StandardOpCode(0, 'SUPER_ELEMENT'),
       SUPER_MEMBER     = new StandardOpCode(1, 'SUPER_MEMBER'),
+      SWAP             = new StandardOpCode(0, 'SWAP'),
       SYMBOL           = new InternedOpCode(3, 'SYMBOL'),
       TEMPLATE         = new StandardOpCode(1, 'TEMPLATE'),
       THIS             = new StandardOpCode(0, 'THIS'),
@@ -10673,6 +10675,71 @@ exports.assembler = (function(exports){
 
   function ClassHeritage(node){}
 
+  function comprehension(expression, index){
+    var node = expression.blocks[index++];
+    unwinder('iteration', function(){
+      loop(function(){
+        pushScope('block');
+        var fakeLeft = {
+          type: 'VariableDeclaration',
+          declarations: [{
+            type: 'VariableDeclarator',
+            kind: 'let',
+            id: node.left
+          }]
+        };
+        initLexicalDecls(fakeLeft);
+        recurse(node.right);
+        GET();
+        node.of ? ITERATE() : ENUM();
+        MEMBER('next');
+        var update = current();
+        DUP();
+        DUP();
+        GET();
+        ARGS();
+        CALL(false);
+        VariableDeclaration(fakeLeft, true);
+
+        if (expression.blocks[index]) {
+          comprehension(expression, index);
+        } else {
+          if (expression.filter) {
+            recurse(expression.filter);
+            GET();
+            var test = JFALSE(0);
+          }
+          MOVE(false);
+          MOVE(false);
+          recurse(expression.body);
+          GET();
+          INDEX(0);
+          MOVE(true);
+          MOVE(true);
+          expression.filter && adjust(test);
+        }
+
+        SCOPE_CLONE();
+        JUMP(update);
+        popScope();
+        return update;
+      });
+    });
+  }
+
+  function ComprehensionExpression(node){
+    ARRAY();
+    MOVE(true);
+    MOVE(true);
+    comprehension(node, 0);
+    MOVE(false);
+    MOVE(false);
+          LOG();
+    ARRAY_DONE();
+  }
+
+  function ComprehensionBlock(node){}
+
   function ConditionalExpression(node){
     var tailer = tail(node.tail),
         wrapper = wrap(node.wrapped);
@@ -11124,7 +11191,7 @@ exports.assembler = (function(exports){
       GET();
       ARG();
     });
-    CALL();
+    CALL(false);
   }
 
   function ThisExpression(node){
@@ -11257,7 +11324,8 @@ exports.assembler = (function(exports){
 
   each([ArrayExpression, ArrayPattern, ArrowFunctionExpression, AssignmentExpression,
     AtSymbol, BinaryExpression, BlockStatement, BreakStatement, CallExpression, CatchClause,
-    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ConditionalExpression, ContinueStatement,
+    ClassBody, ClassDeclaration, ClassExpression, ClassHeritage, ComprehensionExpression,
+    ConditionalExpression, ContinueStatement,
     DebuggerStatement, DoWhileStatement, EmptyStatement, ExportDeclaration, ExportSpecifier,
     ExportSpecifierSet, ExpressionStatement, ForInStatement, ForOfStatement, ForStatement,
     FunctionDeclaration, FunctionExpression, Glob, Identifier, IfStatement, ImportDeclaration,
@@ -13619,11 +13687,6 @@ exports.operations = (function(exports){
       var receiver = $$IsPropertyReference(ref) ? $$GetThisValue(ref) : ref.base.WithBaseObject();
     }
 
-    // if (tail) {
-    //   var leafContext = context;
-    //   leafContext.pop();
-    // }
-
     return func.Call(receiver, args);
   }
 
@@ -15198,7 +15261,7 @@ exports.$Array = (function(exports){
   ]);
 
   return exports;
-})(typeof module !== 'undefined' ? module : {});
+})(typeof module !== 'undefined' ? exports : {});
 
 
 exports.$Proxy = (function(module){
@@ -16623,7 +16686,8 @@ exports.thunk = (function(exports){
       constants = require('./constants'),
       operators = require('./object-model/operators'),
       Nil       = require('./object-model/$Nil'),
-      Emitter   = require('./lib/Emitter');
+      Emitter   = require('./lib/Emitter'),
+      errors    = require('./errors');
 
   var isFalsey        = Nil.isFalsey,
       isNullish       = Nil.isNullish,
@@ -16645,9 +16709,10 @@ exports.thunk = (function(exports){
       Empty           = constants.SYMBOLS.Empty,
       Resume          = constants.SYMBOLS.Resume;
 
-  var AbruptCompletion = require('./errors').AbruptCompletion;
+  var AbruptCompletion = errors.AbruptCompletion,
+      $$ThrowException = errors.$$ThrowException;
 
-
+  var push = [].push;
 
   function Desc(v){
     this.Value = v;
@@ -16729,9 +16794,7 @@ exports.thunk = (function(exports){
         var name = code.displayName || code.name;
         setOrigin(err, code.filename, name);
 
-        if (name) {
-          name = 'in '+name+' ';
-        }
+        name = name ? 'in '+name+' ' : '';
 
         console.log('Uncaught Exception '+name+'at line '+err.Get('line')+'\n'+
                     err.Get('name')+': '+err.Get('message')+'\n'+
@@ -16741,7 +16804,7 @@ exports.thunk = (function(exports){
 
       if (context.stacktrace) {
         if (err.trace) {
-          [].push.apply(err.trace, context.stacktrace);
+          push.apply(err.trace, context.stacktrace);
         } else {
           err.trace = context.stacktrace;
         }
@@ -17264,7 +17327,7 @@ exports.thunk = (function(exports){
   }
 
   function LOG(context){
-    context.Realm.emit('debug', context.sp, context.stack);
+    context.Realm.emit('debug', context.sp, context.stack.slice(0, context.sp));
     return context.cmds[++context.ip];
   }
 
@@ -17316,6 +17379,21 @@ exports.thunk = (function(exports){
       context.error = status;
       return unwind;
     }
+    return context.cmds[++context.ip];
+  }
+
+  function MOVE(context){
+    if (!context.stackB) {
+      context.stackB = [];
+      context.spB = 0;
+    }
+
+    if (context.ops[context.ip][0]) {
+      context.stackB[context.spB++] = context.stack[--context.sp];
+    } else {
+      context.stack[context.sp++] = context.stackB[--context.spB];
+    }
+
     return context.cmds[++context.ip];
   }
 
@@ -17586,6 +17664,16 @@ exports.thunk = (function(exports){
     }
 
     context.stack[context.sp++] = result;
+    return context.cmds[++context.ip];
+  }
+
+  function SWAP(context){
+    var stack = context.stack,
+        sp    = context.sp;
+    context.stack = context.stackB || [];
+    context.sp = context.spB || 0;
+    context.stackB = stack;
+    context.spB = sp;
     return context.cmds[++context.ip];
   }
 
@@ -17873,9 +17961,9 @@ exports.thunk = (function(exports){
     CLASS_EXPR, COMPLETE, CONST, CONSTRUCT, DEBUGGER, DEFAULT, DEFINE, DUP, ELEMENT, ENUM, EXTENSIBLE, EVAL,
     FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
-    LOG, LOOP, MEMBER, METHOD, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
+    LOG, LOOP, MEMBER, METHOD, MOVE, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
     REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
   exports.instructions = function instructions(ops){
