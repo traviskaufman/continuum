@@ -1804,13 +1804,12 @@ var assembler = (function(exports){
   function ComprehensionBlock(node){}
 
   function ConditionalExpression(node){
-    var tailer = tail(node.tail),
-        wrapper = wrap(node.wrapped);
+    copyTail(node, node.consequent);
+    copyTail(node, node.alternate);
+    copyWrap(node, node.consequent);
+    copyWrap(node, node.alternate);
+    copyWrap(node, node.test);
 
-    each(node, function(child){
-      tailer(child);
-      tailer(child);
-    });
 
     recurse(node.test);
     GET();
