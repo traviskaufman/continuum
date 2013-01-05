@@ -10394,9 +10394,8 @@ exports.assembler = (function(exports){
 
 
   function iter(node, KIND){
-    loop(function(){
-      var update;
-      unwinder('iteration', function(){
+    unwinder('iteration', function(){
+      loop(function(){
         if (isLexicalDeclaration(node.left)) {
           var lexical = true;
           pushScope('block');
@@ -10406,7 +10405,7 @@ exports.assembler = (function(exports){
         GET();
         KIND();
         MEMBER('next');
-        update = current();
+        var update = current();
         DUP();
         DUP();
         GET();
@@ -10424,8 +10423,8 @@ exports.assembler = (function(exports){
         lexical && SCOPE_CLONE();
         JUMP(update);
         lexical && popScope();
+        return update;
       });
-      return update;
     });
   }
 
@@ -10734,7 +10733,6 @@ exports.assembler = (function(exports){
     comprehension(node, 0);
     MOVE(false);
     MOVE(false);
-          LOG();
     ARRAY_DONE();
   }
 
