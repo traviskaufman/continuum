@@ -29,11 +29,15 @@ export function abs(x){
 }
 
 export function floor(x){
-  return x >> 0;
+  return x | 0;
 }
 
 export function sign(x){
   return x < 0 ? -1 : 1;
+}
+
+export function isNaN(x){
+  return x !== x;
 }
 
 export function hasBrand(object, brand){

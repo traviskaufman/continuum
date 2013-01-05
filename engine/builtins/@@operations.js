@@ -5,10 +5,11 @@
 
 import {
   abs,
+  call,
   floor,
-  sign,
   hasBrand,
-  call
+  isNaN,
+  sign
 } from '@@utilities';
 
 import {
@@ -152,7 +153,7 @@ export function ToNumber(argument){
     case 'Boolean':
       return argument === true ? 1 : 0;
     case 'String':
-      return StringToNumber(argument);
+      return $$StringToNumber(argument);
     case 'Object':
       return ToNumber(ToPrimitive(argument), 'Number');
   }
