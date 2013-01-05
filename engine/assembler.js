@@ -1099,7 +1099,9 @@ var assembler = (function(exports){
   void function(){
     function set(name, value){
       return function(obj){
-        obj && (obj[name] = value);
+        if (isObject(obj)) {
+          obj[name] = value;
+        }
       };
     }
 
@@ -1111,7 +1113,9 @@ var assembler = (function(exports){
 
     function copier(field){
       return function(a, b){
-        a && b && (b[field] = a[field]);
+        if (isObject(a) && isObject(b)) {
+          b[field] = a[field];
+        }
       };
     }
 
