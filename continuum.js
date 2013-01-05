@@ -1959,9 +1959,9 @@ parseYieldExpression: true
             property = parseObjectProperty();
 
             if (property.key.type === Syntax.Identifier || property.key.type === Syntax.AtSymbol) {
-                name = property.key.name;
+                name = '$'+property.key.name;
             } else {
-                name = toString(property.key.value);
+                name = '$'+toString(property.key.value);
             }
             kind = (property.kind === 'init') ? PropertyKind.Data : (property.kind === 'get') ? PropertyKind.Get : PropertyKind.Set;
             if (Object.prototype.hasOwnProperty.call(map, name)) {
@@ -3581,7 +3581,7 @@ parseYieldExpression: true
         if (token.type === Token.Identifier) {
             label = parseVariableIdentifier();
 
-            if (!Object.prototype.hasOwnProperty.call(state.labelSet, label.name)) {
+            if (!Object.prototype.hasOwnProperty.call(state.labelSet, '$'+label.name)) {
                 throwError({}, Messages.UnknownLabel, label.name);
             }
         }
@@ -3634,7 +3634,7 @@ parseYieldExpression: true
         if (token.type === Token.Identifier) {
             label = parseVariableIdentifier();
 
-            if (!Object.prototype.hasOwnProperty.call(state.labelSet, label.name)) {
+            if (!Object.prototype.hasOwnProperty.call(state.labelSet, '$'+label.name)) {
                 throwError({}, Messages.UnknownLabel, label.name);
             }
         }
@@ -3968,13 +3968,13 @@ parseYieldExpression: true
         if ((expr.type === Syntax.Identifier) && match(':')) {
             lex();
 
-            if (Object.prototype.hasOwnProperty.call(state.labelSet, expr.name)) {
+            if (Object.prototype.hasOwnProperty.call(state.labelSet, '$'+expr.name)) {
                 throwError({}, Messages.Redeclaration, 'Label', expr.name);
             }
 
-            state.labelSet[expr.name] = true;
+            state.labelSet['$'+expr.name] = true;
             labeledBody = parseStatement();
-            delete state.labelSet[expr.name];
+            delete state.labelSet['$'+expr.name];
 
             return {
                 type: Syntax.LabeledStatement,
@@ -4071,6 +4071,7 @@ parseYieldExpression: true
 
 
     function validateParam(options, param, name) {
+        name = '$'+name;
         if (strict) {
             if (isRestrictedWord(name)) {
                 options.stricted = param;
