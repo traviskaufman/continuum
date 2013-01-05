@@ -1,11 +1,11 @@
 # Continuum - A JavaScript Virtual Machine Built in JavaScript
 
-Continuum is a JavaScript virtual machine built in JavaScript. It assembles bytecode from sourcecode and executes it an ES6 runtime environment. The code of the VM is written in ES3 level JavaScript, which means it can run in browsers as old as IE6. (though currently it's only regularly tested in IE8+ and there's probably some kinks to work out in older IE's).
+Continuum is a JavaScript virtual machine built in JavaScript. It assembles bytecode from sourcecode and executes it in an ES6 runtime environment. The code of the VM is written in ES3, which means it can run in browsers as old as IE6 (though currently it's only regularly tested in IE8+ and there's probably some kinks to work out in older IE's).
 
 *ES6 is an incomplete and still changing draft*
 
 # Compatibility
-Continuum probably works in every modern engine, but has not been tested.
+Continuum should work in every modern engine, but has not been tested.
 
 Currently known to work in:
 
@@ -13,6 +13,7 @@ Currently known to work in:
 * Chrome 23+
 * Firefox 15+
 * Opera 12+
+* Safari 5+
 
 Usually works in but sometimes doesn't (the debugger interface doesn't work, but the engine can):
 
@@ -21,15 +22,15 @@ Usually works in but sometimes doesn't (the debugger interface doesn't work, but
 ![screenshot](https://raw.github.com/Benvie/continuum/gh-pages/docs/screenshot.png)
 
 # Installation
-In the browser, use the combined continuum.js or continuum.min.js. In node
+In the browser, use the combined continuum.js or continuum.min.js. In Node.js:
 
     npm install continuum
 
 
 # Quickstart Usage Overview
-In the browser an object named `continuum` is added to the window, or in node it's the object returned by `require('continuum')`.
+In the browser an object named `continuum` is added to the window, or in node `continuum` is the object returned by `require('continuum')`.
 
-Usage of continuum is quite simple and can basically be treated like using `eval` in iframe or node's `vm.runInContext`. Supply the code, get the result. In ES6 a "Realm" is basically the container for a context. A Realm has a 'global' property which is its global object, and a number of properties that specific to each Realm instance, such as the list of builtins like Array, Function, Object, etc.
+Basic usage of continuum is can be treated like using `eval` in an iframe or Node.js's `vm.runInContext`. In ES6 a "Realm" is basically the container for a global context. A Realm has a 'global' property (which is its global object), and a number of properties that are specific to each Realm instance, such as the set of intrinsic builtin objects like `Array`, `Function`, `Object`, etc.
 
     var realm = continuum.createRealm();
 
@@ -42,6 +43,10 @@ Usage of continuum is quite simple and can basically be treated like using `eval
     // these two lines have the same result
     var $Function = realm.evaluate('Function');
     var $Function = realm.global.Get('Function');
+
+    // like eval, code starts out executing in global scope
+    realm.evaluate('var x = 500');
+    console.log(realm.evaluate('x')); // 500
 
     // if your code uses the module system then it must be run asynchronously
     realm.evaluateAsync('module F = "@function"; F', function(result){
