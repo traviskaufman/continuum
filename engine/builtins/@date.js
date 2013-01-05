@@ -527,7 +527,7 @@ function toLocaleTimeString(t){
 // ### 15.9.4.2 Date.parse ###
 // ###########################
 
-const dateParser = /^(\d{4}|[+\-]\d{6})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
+const dateParser = /^(\d{4}|(?:[+\-]\d{6}))(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?(?:(Z)|([+\-])(\d{2})(?::(\d{2}))?)?)?$/;
 
 export function parse(date){
   const match = $$RegExpExec(dateParser, ToString(date));
@@ -536,13 +536,13 @@ export function parse(date){
     return $$ParseDate(date);
   }
 
-  let [, year, month, date, hours, minutes, seconds, ms, tzSep, tzSign, tzHours, tzMinutes] = match;
+  let [, year, month, day, hours, minutes, seconds, ms, tzSep, tzSign, tzHours, tzMinutes] = match;
 
   if (tzSep !== 'Z' && tzSign !== undefined) {
     minutes += (tzHours * 60 + tzMinutes) * -(tzSign === '+');
   }
 
-  return UTC(ToNumber(year) || 0, (ToNumber(month) || 1) - 1, date, hours, minutes, seconds, ms);
+  return UTC(ToNumber(year) || 0, (ToNumber(month) || 1) - 1, day, hours, minutes, seconds, ms);
 }
 
 
