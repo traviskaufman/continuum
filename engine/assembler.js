@@ -1798,7 +1798,7 @@ var assembler = (function(exports){
     comprehension(node, 0);
     MOVE(false);
     MOVE(false);
-    ARRAY_DONE();
+    POP();
   }
 
   function ComprehensionBlock(node){}
@@ -1806,10 +1806,7 @@ var assembler = (function(exports){
   function ConditionalExpression(node){
     copyTail(node, node.consequent);
     copyTail(node, node.alternate);
-    copyWrap(node, node.consequent);
-    copyWrap(node, node.alternate);
-    copyWrap(node, node.test);
-
+    each(node, wrap(node.wrapped));
 
     recurse(node.test);
     GET();
