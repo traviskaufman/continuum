@@ -48,6 +48,7 @@ Usage of continuum is quite simple and can basically be treated like using `eval
       console.log(result) // $Module { Function, call, apply, bind }
     });
 
+
 ## [Documentation](continuum/tree/gh-pages/docs/index.md)
 
 # ES6 Implementation Status
@@ -70,17 +71,18 @@ Usage of continuum is quite simple and can basically be treated like using `eval
 * Templates
 * Module system with imports and exports
 * builtin '@std' modules `module std = '@std'` or `import call from '@function'`
-* Generators (kind of broken at the moment though)
-* Proxy and Reflect (also buggy)
+* Generators
+* Proxy and Reflect
 * Symbols with syntactic @name support
 * Typed Arrays
 * Object.observe (es-next/es7)
 * Default parameters
 * Tail call optimization
+* Array Comprehensions (partial implementation)
 
 ### Not Yet Implemented
 
-* Array Comprehensions
+* Generator Expressions
 * Binary data api (structs, etc.)
 
 
