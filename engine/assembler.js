@@ -2282,6 +2282,8 @@ var assembler = (function(exports){
     });
 
     adjust(tryer);
+
+    var i = handlers.length;
     while (i--) {
       handlers[i] && adjust(handlers[i]);
     }
