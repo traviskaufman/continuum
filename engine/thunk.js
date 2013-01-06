@@ -178,7 +178,7 @@ var thunk = (function(exports){
   }
 
   function ARGUMENTS(context){
-    if (context.code.flags.strict) {
+    if (context.callee ? context.callee.Strict : context.code.flags.strict) {
       var args = context.args;
       context.stack[context.sp++] = context.createArguments(args);
       context.stack[context.sp++] = args;
@@ -259,7 +259,7 @@ var thunk = (function(exports){
 
     var receiver = context.resolveReceiver(ref);
 
-    if (func.code && tail) {
+    if (tail && func.code && !func.generator) {
       func.prepare(receiver, args, context);
       return context.cmds[context.ip];
     } else {
@@ -412,7 +412,7 @@ var thunk = (function(exports){
         receiver = context.stack[--context.sp];
 
     if (func && func.Call && func.Call.isBuiltinEval) {
-      if (context.strict) {
+      if (context.callee ? context.callee.Strict : context.code.flags.strict) {
         var scope = context.cloneScope();
       }
       var result = func.Call(null, args, true);

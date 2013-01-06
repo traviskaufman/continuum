@@ -1323,7 +1323,7 @@ var assembler = (function(exports){
     pushNode(code.body);
     var decls  = code.VarScopedDeclarations,
         len    = decls.length,
-        strict = code.strict,
+        strict = code.flags.strict,
         funcs  = [],
         noArgs = true;
 
@@ -2475,7 +2475,7 @@ var assembler = (function(exports){
 
         if (this.options.natives) {
           code.natives = true;
-          code.strict = false;
+          code.flags.strict = false;
         }
 
         this.queue(code);

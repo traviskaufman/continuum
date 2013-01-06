@@ -82,7 +82,7 @@ var $Arguments = (function(exports){
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
-          if (key === 'caller' && $$IsCallable(val) && val.strict) {
+          if (key === 'caller' && $$IsCallable(val) && val.Strict) {
             return $$ThrowException('strict_poison_pill');
           }
           return val;

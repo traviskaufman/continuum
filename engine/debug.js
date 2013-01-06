@@ -604,7 +604,7 @@ var debug = (function(exports){
         return introspect(this.subject.Scope);
       },
       function isStrict(){
-        return !!this.subject.strict;
+        return !!this.subject.Strict;
       },
       function isClass(){
         return !!this.subject.IsClass;

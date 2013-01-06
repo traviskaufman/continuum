@@ -405,7 +405,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, proto);
       this.FormalParameters = params;
       this.ThisMode = kind === 'arrow' ? 'lexical' : strict ? 'strict' : 'global';
-      this.strict = !!strict;
+      this.Strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
       this.code = code;
@@ -458,23 +458,24 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnv(receiver, this);
         }
 
+        var caller = context ? context.callee : null;
+
         if (ctx) {
           ExecutionContext.call(ctx, ctx.caller, local, realm, this.code, this, args, isConstruct);
         } else {
-          var caller = context ? context.callee : null;
           ctx = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
+        }
 
-          if (this.define && !this.strict) {
-            this.define('arguments', local.arguments, ___);
-            this.define('caller', caller, ___);
-            local.arguments = null;
-          }
+        if (this.define && !this.Strict) {
+          this.define('arguments', local.arguments, ___);
+          this.define('caller', caller, ___);
+          local.arguments = null;
         }
 
         return ctx;
       },
       function cleanup(){
-        if (this.define && !this.strict) {
+        if (this.define && !this.Strict) {
           this.define('arguments', null, ___);
           this.define('caller', null, ___);
         }
@@ -574,7 +575,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Function.apply(this, arguments);
     }
 
-    inherit($GeneratorFunction, $Function, [
+    inherit($GeneratorFunction, $Function, {
+      generator: true
+    }, [
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
@@ -1600,7 +1603,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
         var lex = origin,
-            strict = this.strict;
+            strict = this.callee ? this.callee.Strict : this.code.flags.strict;
 
         do {
           if (lex.HasBinding(name)) {
@@ -1774,7 +1777,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       thrower.Realm = realm;
       thrower.Extensible = false;
       thrower.IsStrictThrower = true;
-      thrower.strict = true;
+      thrower.Strict = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);
     }
@@ -2067,7 +2070,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var script = new Script({
             scope: 'eval',
             natives: false,
-            strict: context.strict,
+            strict: context.callee ? context.callee.Strict : context.code.flags.strict,
             source: code
           });
 
