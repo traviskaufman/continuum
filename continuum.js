@@ -10263,7 +10263,7 @@ exports.assembler = (function(exports){
     pushNode(code.body);
     var decls  = code.VarScopedDeclarations,
         len    = decls.length,
-        strict = code.strict,
+        strict = code.flags.strict,
         funcs  = [],
         noArgs = true;
 
@@ -11415,7 +11415,7 @@ exports.assembler = (function(exports){
 
         if (this.options.natives) {
           code.natives = true;
-          code.strict = false;
+          code.flags.strict = false;
         }
 
         this.queue(code);
@@ -13603,7 +13603,7 @@ exports.operations = (function(exports){
 
     var name = $$ToPropertyKey(prop);
     if (name && name.Abrupt) return name;
-    return new Reference(base, name, context.strict);
+    return new Reference(base, name, context.callee ? context.callee.Strict : context.code.flags.strict);
   }
 
   exports.$$Element = $$Element;
@@ -13625,7 +13625,7 @@ exports.operations = (function(exports){
     var key = $$ToPropertyKey(prop);
     if (key && key.Abrupt) return key;
 
-    var ref = new Reference(baseValue, key, context.strict);
+    var ref = new Reference(baseValue, key, context.callee ? context.callee.Strict : context.code.flags.strict);
     ref.thisValue = env.GetThisBinding();
     return ref;
   }
@@ -13654,7 +13654,7 @@ exports.operations = (function(exports){
 
 
   function $$IdentifierResolution(context, name) {
-    return $$GetIdentifierReference(context.LexicalEnvironment, name, context.strict);
+    return $$GetIdentifierReference(context.LexicalEnvironment, name, context.callee ? context.callee.Strict : context.code.flags.strict);
   }
 
   exports.$$IdentifierResolution = $$IdentifierResolution;
@@ -14757,7 +14757,7 @@ exports.$Arguments = (function(exports){
           return this.ParameterMap.Get(key);
         } else {
           var val = this.GetP(this, key);
-          if (key === 'caller' && $$IsCallable(val) && val.strict) {
+          if (key === 'caller' && $$IsCallable(val) && val.Strict) {
             return $$ThrowException('strict_poison_pill');
           }
           return val;
@@ -16880,7 +16880,7 @@ exports.thunk = (function(exports){
   }
 
   function ARGUMENTS(context){
-    if (context.code.flags.strict) {
+    if (context.callee ? context.callee.Strict : context.code.flags.strict) {
       var args = context.args;
       context.stack[context.sp++] = context.createArguments(args);
       context.stack[context.sp++] = args;
@@ -16961,7 +16961,7 @@ exports.thunk = (function(exports){
 
     var receiver = context.resolveReceiver(ref);
 
-    if (func.code && tail) {
+    if (tail && func.code && !func.generator) {
       func.prepare(receiver, args, context);
       return context.cmds[context.ip];
     } else {
@@ -17114,7 +17114,7 @@ exports.thunk = (function(exports){
         receiver = context.stack[--context.sp];
 
     if (func && func.Call && func.Call.isBuiltinEval) {
-      if (context.strict) {
+      if (context.callee ? context.callee.Strict : context.code.flags.strict) {
         var scope = context.cloneScope();
       }
       var result = func.Call(null, args, true);
@@ -18411,7 +18411,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this, proto);
       this.FormalParameters = params;
       this.ThisMode = kind === 'arrow' ? 'lexical' : strict ? 'strict' : 'global';
-      this.strict = !!strict;
+      this.Strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
       this.code = code;
@@ -18464,23 +18464,24 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnv(receiver, this);
         }
 
+        var caller = context ? context.callee : null;
+
         if (ctx) {
           ExecutionContext.call(ctx, ctx.caller, local, realm, this.code, this, args, isConstruct);
         } else {
-          var caller = context ? context.callee : null;
           ctx = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
+        }
 
-          if (this.define && !this.strict) {
-            this.define('arguments', local.arguments, ___);
-            this.define('caller', caller, ___);
-            local.arguments = null;
-          }
+        if (this.define && !this.Strict) {
+          this.define('arguments', local.arguments, ___);
+          this.define('caller', caller, ___);
+          local.arguments = null;
         }
 
         return ctx;
       },
       function cleanup(){
-        if (this.define && !this.strict) {
+        if (this.define && !this.Strict) {
           this.define('arguments', null, ___);
           this.define('caller', null, ___);
         }
@@ -18580,7 +18581,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $Function.apply(this, arguments);
     }
 
-    inherit($GeneratorFunction, $Function, [
+    inherit($GeneratorFunction, $Function, {
+      generator: true
+    }, [
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
@@ -19606,7 +19609,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
         var lex = origin,
-            strict = this.strict;
+            strict = this.callee ? this.callee.Strict : this.code.flags.strict;
 
         do {
           if (lex.HasBinding(name)) {
@@ -19780,7 +19783,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       thrower.Realm = realm;
       thrower.Extensible = false;
       thrower.IsStrictThrower = true;
-      thrower.strict = true;
+      thrower.Strict = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);
     }
@@ -20073,7 +20076,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           var script = new Script({
             scope: 'eval',
             natives: false,
-            strict: context.strict,
+            strict: context.callee ? context.callee.Strict : context.code.flags.strict,
             source: code
           });
 
@@ -21428,7 +21431,7 @@ exports.debug = (function(exports){
         return introspect(this.subject.Scope);
       },
       function isStrict(){
-        return !!this.subject.strict;
+        return !!this.subject.Strict;
       },
       function isClass(){
         return !!this.subject.IsClass;
@@ -22694,7 +22697,7 @@ exports.builtins["@@utilities"] = "import {\n  $$Call,\n  $$CreateObject,\n  $$C
 
 exports.builtins["@array"] = "import {\n  @@toStringTag: toStringTag,\n  @@iterator   : iterator\n} from '@@symbols';\n\nimport {\n  Iterator\n} from '@iter';\n\nimport {\n  Set,\n  add,\n  has\n} from '@set';\n\nimport {\n  min,\n  max,\n  floor\n} from '@math';\n\nconst arrays = new Set;\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = $__ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    ensureObject(this);\n\n    if (!$__has(this, @array) || !$__has(this, @index) || !$__has(this, @kind)) {\n      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = $__ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = $__ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\n\nbuiltinClass(ArrayIterator);\n\n\n\nfunction defaultComparefn(x, y){\n  return 1 - ($__ToString(x) < $__ToString(y));\n}\n\ninternalFunction(defaultComparefn);\n\n\nfunction truncate(value, shift){\n  return value >> shift << shift;\n}\n\ninternalFunction(truncate);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    let obj   = $__ToObject(this),\n        n     = 0,\n        index = 0;\n\n    do {\n      if (isArray(obj)) {\n        let len = $__ToInt32(obj.length),\n            i   = 0;\n\n        do {\n          if (i in obj) {\n            array[n++] = obj[i];\n          }\n        } while (++i < len)\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[index];\n    } while (index++ < count)\n\n    return array;\n  }\n\n  entries(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  every(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && !$__Call(callbackfn, context, [array[index], index, array])) {\n          return false;\n        }\n      } while (++index < len)\n    }\n\n    return true;\n  }\n\n  filter(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array) {\n          let element = array[index];\n          if ($__Call(callbackfn, context, [element, index, array])) {\n            result[result.length] = element;\n          }\n        }\n      } while (++index < len)\n    }\n\n    return result;\n  }\n\n  forEach(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    for (let i=0; i < len; i++) {\n      if (i in array) {\n        $__Call(callbackfn, context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex = 0){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      return -1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (++index < len)\n\n    return -1;\n  }\n\n  join(...separator){\n    const array = $__ToObject(this);\n\n    if (has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    const sep = separator.length ? $__ToString(separator[0]) : ',',\n          len = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return '';\n    }\n\n    let result = '0' in array ? $__ToString(array[0]) : '',\n        index  = 0;\n\n    while (++index < len) {\n      result += index in array ? sep + $__ToString(array[index]) : sep;\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex = this.length){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = $__ToInteger(fromIndex);\n    if (index >= len) {\n      index = len - 1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (index--)\n\n    return -1;\n  }\n\n  map(callbackfn, context = undefined){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = $__Call(callbackfn, context, [array[i], i, this]);\n      }\n    }\n\n    return result;\n  }\n\n  pop(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length) - 1;\n\n    if (len >= 0) {\n      const result = array[len];\n      array.length = len;\n      return result;\n    }\n  }\n\n  push(...values){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length),\n          count = values.length;\n\n    let index = len;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[index++] = values[i];\n    }\n\n    return index;\n  }\n\n  reduce(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    let accumulator, index;\n\n    ensureCallback(callbackfn);\n\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = 0;\n    } else {\n      accumulator = array[0];\n      index = 1;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);\n      }\n    } while (++index < len)\n\n    return accumulator;\n  }\n\n  reduceRight(callbackfn, ...initialValue){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    let accumulator, index;\n\n    ensureCallback(callbackfn);\n\n    if (initialValue.length) {\n      accumulator = initialValue[0];\n      index = len - 1;\n    } else {\n      accumulator = array[len - 1];\n      index = len - 2;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);\n      }\n    } while (--index >= 0)\n\n    return accumulator;\n  }\n\n  reverse(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          middle = floor(len / 2);\n\n    let lower = -1;\n    while (++lower !== middle) {\n      const upper       = len - lower - 1,\n            lowerP      = $__ToString(lower),\n            upperP      = $__ToString(upper),\n            lowerValue  = array[lowerP],\n            upperValue  = array[upperP];\n\n      if (upperP in array) {\n        PutPropertyOrThrow(array, lowerP, upperValue, 'Array.prototype.reverse');\n        if (lowerP in array) {\n          PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');\n        } else {\n          DeletePropertyOrThrow(array, upperP, 'Array.prototype.reverse');\n        }\n      } else if (lowerP in array) {\n        PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');\n      } else {\n        DeletePropertyOrThrow(array, lowerP, 'Array.prototype.reverse');\n      }\n    }\n\n    return array;\n  }\n\n  slice(start = 0, end = this.length){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = [];\n\n    start = $__ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    }\n\n    end = $__ToInteger(end);\n    if (end < 0) {\n      end = max(len + end, 0);\n    } else {\n      end = min(end, len);\n    }\n\n    if (start < end) {\n      let newIndex = 0,\n          oldIndex = start;\n\n      do {\n        result[newIndex++] = array[oldIndex++];\n      } while (oldIndex < end)\n    }\n\n    return result;\n  }\n\n  shift(){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          result = array[0];\n\n    if (!len) {\n      return result;\n    }\n\n    let oldIndex = 1,\n        newIndex = 0;\n\n    do {\n      if (oldIndex in array) {\n        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.shift');\n      } else {\n        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.shift');\n      }\n      newIndex++;\n    } while (++oldIndex < len)\n\n    PutPropertyOrThrow(array, 'length', len - 1, 'Array.prototype.shift');\n    return result;\n  }\n\n  some(callbackfn, context = undefined){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && $__Call(callbackfn, context, [array[index], index, array])) {\n          return true;\n        }\n      } while (++index < len)\n    }\n\n    return false;\n  }\n\n  sort(comparefn = defaultComparefn){\n    const array = $__ToObject(this),\n          len   = array.length;\n\n    ensureCallback(comparefn);\n\n    if (len >= 2) {\n      let trunc = 1;\n\n      for (var start = truncate(len - 2, trunc); start >= 0; start -= 2) {\n        if (comparefn(array[start], array[start + 1]) > 0) {\n          [array[start], array[start + 1]] = [array[start + 1], array[start]];\n        }\n      }\n\n      if (len > 2) {\n        let arrayA = array,\n            arrayB = new Array(len),\n            size   = 2;\n\n        do {\n          let start  = truncate(len - 1, ++trunc),\n              countA = start + size,\n              countB = len;\n\n          countA = min(countA, len);\n\n          while (start >= 0) {\n            let toIndex   = start,\n                fromA     = toIndex,\n                fromB     = countA,\n                continues = true;\n\n            do {\n              if (fromA < countA) {\n                if (fromB < countB) {\n                  if (comparefn(arrayA[fromA], arrayA[fromB]) > 0) {\n                    arrayB[toIndex++] = arrayA[fromB++];\n                  } else {\n                    arrayB[toIndex++] = arrayA[fromA++];\n                  }\n                } else {\n                  while (fromA < countA) {\n                    arrayB[toIndex++] = arrayA[fromA++];\n                  }\n                  continues = false;\n                }\n              } else {\n                while (fromB < countB) {\n                  arrayB[toIndex++] = arrayA[fromB++];\n                }\n                continues = false;\n              }\n            } while (continues)\n\n            countB = start;\n            start -= 2 * size;\n            countA = start + size;\n          }\n\n          [arrayA, arrayB] = [arrayB, arrayA];\n          size *= 2;\n        } while (len > size);\n\n        if (!(trunc & 1)) {\n          for (var i = len - 1; i >= 0; i--) {\n            array[i] = arrayA[i];\n          }\n        }\n      }\n    }\n\n    return array;\n  }\n\n  splice(start, deleteCount, ...items){\n    const array     = $__ToObject(this),\n          len       = $__ToUint32(array.length),\n          itemCount = items.length,\n          result    = [];\n\n    start = $__ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    } else {\n      start = min(start, len);\n    }\n\n    deleteCount = min(max($__ToInteger(deleteCount), 0), len - start);\n\n    if (deleteCount > 0) {\n      let index = 0;\n\n      do {\n        let from = index + start;\n\n        if (from in array) {\n          PutPropertyOrThrow(result, index, array[from], 'Array.prototype.splice');\n        }\n        index++;\n      } while (index < deleteCount)\n\n      PutPropertyOrThrow(result, 'length', deleteCount, 'Array.prototype.splice');\n    }\n\n    const count = len - deleteCount;\n\n    if (itemCount < deleteCount) {\n      let index = start;\n\n      while (index < count) {\n        let from = index + deleteCount,\n            to   = index + itemCount;\n\n        if (from in array) {\n          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');\n        } else {\n          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');\n        }\n        index++;\n      }\n    } else if (itemCount > deleteCount) {\n      let index = count;\n\n      while (index > start) {\n        let from = index + deleteCount - 1,\n            to   = index + itemCount - 1;\n\n        if (from in array) {\n          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');\n        } else {\n          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');\n        }\n\n        index--;\n      }\n    }\n\n    if (itemCount) {\n      let itemIndex = 0,\n          index     = start;\n\n      do {\n        PutPropertyOrThrow(array, index++, items[itemIndex++], 'Array.prototype.splice');\n      } while (itemIndex < itemCount)\n    }\n\n    PutPropertyOrThrow(array, 'length', len - deleteCount + itemCount, 'Array.prototype.splice');\n\n    return result;\n  }\n\n  toLocaleString(){\n    const array = $__ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    if (len === 0 || has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    let nextElement = array[0],\n        result = nextElement == null ? '' : nextElement.toLocaleString(),\n        index  = 0;\n\n    while (++index < len) {\n      result += ',';\n      nextElement = array[index];\n      if (nextElement != null) {\n        result += nextElement.toLocaleString();\n      }\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  toString(){\n    const array = $__ToObject(this);\n    let func = array.join;\n\n    if (typeof func !== 'function') {\n      func = $__ObjectToString;\n    }\n\n    return $__Call(func, array, []);\n  }\n\n  unshift(...values){\n    const array  = $__ToObject(this),\n          len    = $__ToUint32(array.length),\n          newLen = len + values.length;\n\n    if (len === newLen) {\n      return newLen;\n    }\n\n    PutPropertyOrThrow(array, 'length', newLen, 'Array.prototype.unshift');\n\n    let oldIndex = len,\n        newIndex = newLen;\n\n    while (oldIndex-- > 0) {\n      newIndex--;\n      if (oldIndex in array) {\n        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.unshift');\n      } else {\n        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.unshift');\n      }\n    }\n\n    while (newIndex-- > 0) {\n      PutPropertyOrThrow(array, newIndex, values[newIndex], 'Array.prototype.unshift');\n    }\n\n    return newLen;\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n}\n\nbuiltinClass(Array);\nconst ArrayPrototype = Array.prototype;\n$__define(ArrayPrototype, @@iterator, ArrayPrototype.values);\n\n['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));\n\nexport function isArray(array){\n  return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'BuiltinArray' : false;\n}\n\nexport function from(arrayLike){\n  arrayLike = $__ToObject(arrayLike);\n\n  const len  = $__ToUint32(arrayLike.length),\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in arrayLike) {\n      out[i] = arrayLike[i];\n    }\n  }\n\n  out.length = len;\n  return out;\n}\n\nexport function of(...items){\n  const len  = items.length,\n        Ctor = $__IsConstructor(this) ? this : Array,\n        out  = new Ctor(len);\n\n\n  for (var i=0; i < len; i++) {\n    out[i] = items[i];\n  }\n\n  out.length = len;\n  return out;\n}\n\nextend(Array, { isArray, from, of });\n";
 
-exports.builtins["@binary-data"] = "import {\n  $$Call,\n  $$Exception,\n  $$Get,\n  $$Set\n} from '@@internals';\n\nimport {\n  builtinClass,\n  define,\n  extend,\n  set\n} from '@@utilities';\n\nimport {\n  Type\n} from '@@types';\n\n\nclass Data {\n  constructor(){\n    throw $$Exception('abstract', 'Data');\n  }\n\n  update(value){\n    if (Type(this) !== 'Object' || $$Get(this, 'BuiltinBrand') !== 'BuiltinData') {\n      throw $$Exception('not_generic', ['Data.prototype.update']);\n    }\n\n    const R = $$Call($$Get(this, 'DataType'), 'Convert', [val]);\n    $$Call(this, 'SetValue', [Dereference(R)]);\n  }\n}\n\nextend(Data, {\n  array(number){\n    if (Type(this) !== 'Object' || $$Get(this, 'BuiltinBrand') !== 'BuiltinDataType') {\n      throw $$Exception('not_generic', ['DataType.prototype.array']);\n    }\n\n    return new ArrayType(this, number);\n  }\n});\n\nbuiltinClass(Data);\n\n\nexport class DataType extends Function {\n\n}\n\nset(DataType, 'prototype', Data);\nbuiltinClass(DataType);\n\n\n\nexport class ArrayType extends DataType {\n\n}\n\nbuiltinClass(ArrayType);\n\n\n\nexport class StructType extends DataType {\n\n}\n\nbuiltinClass(StructType);\n";
+exports.builtins["@binary-data"] = "import {\n  $$Call,\n  $$Exception,\n  $$Get,\n  $$Set\n} from '@@internals';\n\nimport {\n  builtinClass,\n  define,\n  extend,\n  hasBrand,\n  set\n} from '@@utilities';\n\nimport {\n  Type\n} from '@@types';\n\n\nclass Data {\n  constructor(){\n    throw $$Exception('abstract', 'Data');\n  }\n\n  update(value){\n    if (Type(this) !== 'Object' || !hasBrand(this, 'BuiltinData')) {\n      throw $$Exception('not_generic', ['Data.prototype.update']);\n    }\n\n    const R = $$Call($$Get(this, 'DataType'), 'Convert', [val]);\n    $$Call(this, 'SetValue', [Dereference(R)]);\n  }\n}\n\nextend(Data, {\n  array(number){\n    if (Type(this) !== 'Object' || !hasBrand(this, 'BuiltinDataType')) {\n      throw $$Exception('not_generic', ['DataType.prototype.array']);\n    }\n\n    return new ArrayType(this, number);\n  }\n});\n\nbuiltinClass(Data);\n\n\nexport class DataType extends Function {\n  constructor(){\n\n  }\n}\n\nset(DataType, 'prototype', Data);\nbuiltinClass(DataType);\n\n\n\nexport class ArrayType extends DataType {\n\n}\n\nbuiltinClass(ArrayType);\n\n\n\nexport class StructType extends DataType {\n\n}\n\nbuiltinClass(StructType);\n\n\nvar uint8, uint16, uint32 : Type\nvar int8, int16, int32 : Type\nvar float32, float64 : Type\n\n\nfunction uint8(){}\n\n$$Set(uint8, 'DataType', uint8.name);\n\nfunction Convert(){}\n\nLet t be one of the above built-in data type objects.\n\nt.[[Prototype]] = Function.prototype\n\nt.[[DataType]] = the name of t as a string (e.g., “uint8” for uint8)\n\nt.[[Convert]](val : Any) → reference[block]\n    Let R = a reference to a new number-block of the appropriate size for t\n    If val = true\n        R := 1\n    Else If val = false\n        R := 0\n    Else If val is an ECMAScript number in the domain of this type\n        R := val\n    Else If val is a UInt64 or Int64 and val.[[Value]] is in the domain of t\n        R := val.[[Value]]\n    Else Throw TypeError\n    Return R\nt.[[IsSame]](u : Type)\n    Return t.[[DataType]] = u.[[Type]]\n\nt.[[Cast]](val : Any) → number-block\n    Let V = t.[[Convert]](val)\n    If !IsError(V)\n        Return Dereference(V.value)\n    If val = Infinity or val = NaN\n        Return 0\n    If val is an ECMAScript number\n        Return t.[[CCast]](val)\n    If val is a UInt64 or Int64\n        Return t.[[CCast]](val.[[Value]])\n    If val is a numeric string, possibly prefixed by “0x” or “0X” for uints or /(-)?(0[xX])?/ for ints\n        Let V = ParseNumber(val)\n        Return uintk.[[CCast]](V)\n    Throw TypeError\n\nt.[[CCast]](n : number) → number-block\n    TODO: do roughly what C does\n\nt.[[Call]](val : Any) → Number\n    Let x ?= t.[[Cast]](x)\n    Let R = a reference to a new number block with value x\n    Return t.[[Reify]](R)\n\nt.[[Reify]](R : reference[number-block])\n    Let x = Dereference(R)\n    If t.[[DataType]] = “uint64”\n        Return a new UInt64 with [[Value]] x\n    If t.[[DataType]] = “int64”\n        Return a new Int64 with [[Value]] x\n    Return x\n\nFor each built-in type object t with suffix k (e.g., for uint32, k = 32):\n\nt.bytes = k / 8\n";
 
 exports.builtins["@boolean"] = "export class Boolean {\n  constructor(value){\n    value = $__ToBoolean(value);\n    return $__isConstruct() ? $__BooleanCreate(value) : value;\n  }\n\n  toString(){\n    let type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'BooleanWrapper') {\n      return this.@@BooleanValue ? 'true' : 'false';\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.toString']);\n    }\n  }\n\n  valueOf(){\n    let type = $__Type(this);\n    if (type === 'Boolean') {\n      return this;\n    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'BooleanWrapper') {\n      return this.@@BooleanValue;\n    } else {\n      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);\n    }\n  }\n}\n\nbuiltinClass(Boolean);\n\n$__define(Boolean.prototype, @@BooleanValue, false);\n";
 
