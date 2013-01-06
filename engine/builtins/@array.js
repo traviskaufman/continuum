@@ -4,6 +4,10 @@ import {
 } from '@@symbols';
 
 import {
+  $$ArgumentCount
+} from '@@internals';
+
+import {
   Iterator
 } from '@iter';
 
@@ -219,7 +223,7 @@ export class Array {
     return -1;
   }
 
-  join(...separator){
+  join(separator){
     const array = $__ToObject(this);
 
     if (has(arrays, array)) {
@@ -227,7 +231,7 @@ export class Array {
     }
     add(arrays, array);
 
-    const sep = separator.length ? $__ToString(separator[0]) : ',',
+    const sep = $$ArgumentCount() ? $__ToString(separator) : ',',
           len = $__ToUint32(array.length);
 
     if (len === 0) {
@@ -319,17 +323,15 @@ export class Array {
     return index;
   }
 
-  reduce(callbackfn, ...initialValue){
+  reduce(callbackfn, initialValue){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
-    let accumulator, index;
-
     ensureCallback(callbackfn);
 
-
-    if (initialValue.length) {
-      accumulator = initialValue[0];
+    let accumulator, index;
+    if ($$ArgumentCount() > 1) {
+      accumulator = initialValue;
       index = 0;
     } else {
       accumulator = array[0];
@@ -345,16 +347,15 @@ export class Array {
     return accumulator;
   }
 
-  reduceRight(callbackfn, ...initialValue){
+  reduceRight(callbackfn, initialValue){
     const array = $__ToObject(this),
           len   = $__ToUint32(array.length);
 
-    let accumulator, index;
-
     ensureCallback(callbackfn);
 
-    if (initialValue.length) {
-      accumulator = initialValue[0];
+    let accumulator, index;
+    if ($$ArgumentCount() > 1) {
+      accumulator = initialValue;
       index = len - 1;
     } else {
       accumulator = array[len - 1];
@@ -699,7 +700,7 @@ builtinClass(Array);
 const ArrayPrototype = Array.prototype;
 $__define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 
-['push'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
+['push', 'reduce', 'reduceRight'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
 
 export function isArray(array){
   return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'BuiltinArray' : false;
