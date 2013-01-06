@@ -1,18 +1,69 @@
 import {
+  $$Call,
+  $$Exception,
+  $$Get,
   $$Set
 } from '@@internals';
 
 import {
-  define
+  builtinClass,
+  define,
+  extend,
+  set
 } from '@@utilities';
 
-class Type {}
+import {
+  Type
+} from '@@types';
 
-define(Type, @@toStringTag, 'DataType');
-$$Set(Type, 'BuiltinBrand', 'BuiltinDataType');
 
-define(Type.prototype, @@toStringTag, 'Data');
-$$Set(Type.prototype, 'BuiltinBrand', 'BuiltinData');
+class Data {
+  constructor(){
+    throw $$Exception('abstract', 'Data');
+  }
 
-class ArrayType extends Type {}
-class StructType extends Type {}
+  update(value){
+    if (Type(this) !== 'Object' || $$Get(this, 'BuiltinBrand') !== 'BuiltinData') {
+      throw $$Exception('not_generic', ['Data.prototype.update']);
+    }
+
+    const R = $$Call($$Get(this, 'DataType'), 'Convert', [val]);
+    $$Call(this, 'SetValue', [Dereference(R)]);
+  }
+}
+
+extend(Data, {
+  array(number){
+    if (Type(this) !== 'Object' || $$Get(this, 'BuiltinBrand') !== 'BuiltinDataType') {
+      throw $$Exception('not_generic', ['DataType.prototype.array']);
+    }
+
+    return new ArrayType(this, number);
+  }
+});
+
+builtinClass(Data);
+
+
+export class DataType extends Function {
+
+}
+
+set(DataType, 'prototype', Data);
+builtinClass(DataType);
+
+
+
+export class ArrayType extends DataType {
+
+}
+
+builtinClass(ArrayType);
+
+
+
+export class StructType extends DataType {
+
+}
+
+builtinClass(StructType);
