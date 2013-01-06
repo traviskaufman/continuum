@@ -189,6 +189,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     return function $$PropertyDefinitionEvaluation(kind, obj, key, code){
+      if (key && key.Abrupt) return key;
+
       if (kind === 'get') {
         return DefineGetter(obj, key, code);
       } else if (kind === 'set') {
@@ -2491,8 +2493,9 @@ var runtime = (function(GLOBAL, exports, undefined){
             if (!--count) {
               if (errors.length) {
                 ƒ(errors);
+              } else {
+                Ω(modules);
               }
-              Ω(modules);
             }
           }
         };
@@ -2502,7 +2505,6 @@ var runtime = (function(GLOBAL, exports, undefined){
             errors.push(args[0]);
             if (!--count) {
               ƒ(errors);
-              Ω(modules);
             }
           }
         };
@@ -2515,7 +2517,9 @@ var runtime = (function(GLOBAL, exports, undefined){
               var module = new $Module(sandbox.globalEnv, imported.code.exportedNames);
               module.mrl = imported.code.name;
               callback.Call(null, [module]);
-            }, errback.Call);
+            }, function(err){
+              errback.Call(null, [err]);
+            });
           } else if (imported.origin instanceof Array) {
 
           } else if (internalModules.has(imported.origin)) {
@@ -2601,7 +2605,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else {
           Ω(result);
         }
-      }, ƒ);
+      }, function(errors){
+        each(errors, ƒ);
+      });
     }
 
     function resolveModule(loader, source, name, Ω, ƒ){
