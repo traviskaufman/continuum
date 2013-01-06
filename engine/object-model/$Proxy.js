@@ -159,6 +159,9 @@ var $Proxy = (function(module){
   inherit($Proxy, $Object, {
     Proxy: true
   }, [
+    function toStringTag(){
+      return this.Get(symbols.toStringTag);
+    },
     function GetInheritance(){
       var trap = $$GetMethod(this.ProxyHandler, 'getPrototypeOf');
       if (trap && trap.Abrupt) return trap;

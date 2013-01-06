@@ -45,7 +45,10 @@ var $Symbol = (function(exports){
       type: '$Symbol'
     });
 
-    define($Symbol.prototype, [
+    define($Symbol.prototype, [,
+      function toStringTag(){
+        return 'Symbol';
+      },
       function each(){},
       function get(){},
       function set(){},

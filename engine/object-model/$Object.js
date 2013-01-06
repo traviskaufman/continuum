@@ -1,13 +1,13 @@
 var $Object = (function(exports){
-  var objects        = require('../lib/objects'),
-      errors         = require('../errors'),
-      constants      = require('../constants'),
-      operators      = require('./operators'),
-      descriptors    = require('./descriptors'),
-      operations     = require('./operations'),
-      PropertyList   = require('../lib/PropertyList'),
-      utility        = require('../lib/utility'),
-      iteratorSymbol = require('./$Symbol').wellKnownSymbols.iterator;
+  var objects      = require('../lib/objects'),
+      errors       = require('../errors'),
+      constants    = require('../constants'),
+      operators    = require('./operators'),
+      descriptors  = require('./descriptors'),
+      operations   = require('./operations'),
+      PropertyList = require('../lib/PropertyList'),
+      utility      = require('../lib/utility'),
+      symbols      = require('./$Symbol').wellKnownSymbols;
 
   var inherit = objects.inherit,
       define  = objects.define,
@@ -343,6 +343,9 @@ var $Object = (function(exports){
             this[k].destroy();
           }
         }
+      },
+      function toStringTag(){
+        return this.get(symbols.toStringTag);
       }
     ]);
   }();
@@ -501,7 +504,7 @@ var $Object = (function(exports){
       }
     },
     function Iterate(){
-      return $$Invoke(this, iteratorSymbol);
+      return $$Invoke(this, symbols.iterator);
     },
     function enumerator(){
       return new $Enumerator(this.Enumerate(true, true));

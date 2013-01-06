@@ -73,6 +73,9 @@ var $Nil = (function(exports){
     function valueOf(){
       return 0;
     },
+    function toStringTag(){
+      return 'Nil';
+    },
     function each(){},
     function get(key){
       return this;

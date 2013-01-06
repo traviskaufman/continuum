@@ -316,6 +316,13 @@ var debug = (function(exports){
         return attrs === null ? this.getPrototype().query(key) : attrs;
       },
       function label(){
+        if (this.subject.toStringTag) {
+          var tag = this.subject.toStringTag();
+          if (tag) {
+            return tag;
+          }
+        }
+
         var brand = this.subject.BuiltinBrand;
         if (brand && brand !== 'BuiltinObject') {
           return brandMap[brand];
