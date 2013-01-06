@@ -4,6 +4,10 @@ import {
 } from '@@symbols';
 
 import {
+  $$Set
+} from '@@internals';
+
+import {
   Type
 } from '@@types';
 
@@ -106,7 +110,9 @@ export class Set {
 
 $__extend(Set, {
   @@create(){
-    return OrdinaryCreateFromConstructor(this, '%SetPrototype%');
+    var obj = OrdinaryCreateFromConstructor(this, '%SetPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'BuiltinSet');
+    return obj;
   }
 });
 

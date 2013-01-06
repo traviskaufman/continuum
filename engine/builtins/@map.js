@@ -4,6 +4,10 @@ import {
 } from '@@symbols';
 
 import {
+  $$Set
+} from '@@internals';
+
+import {
   Type
 } from '@@types';
 
@@ -124,7 +128,9 @@ export class Map {
 
 $__extend(Map, {
   @@create(){
-    return OrdinaryCreateFromConstructor(this, '%MapPrototype%');
+    var obj = OrdinaryCreateFromConstructor(this, '%MapPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'BuiltinMap');
+    return obj;
   }
 });
 

@@ -3,7 +3,9 @@ import {
   $$CreateObject,
   $$CreateInternalObject,
   $$Get,
+  $$GetIntrinsic,
   $$Set,
+  $$SetIntrinsic,
   $$NumberToString
 } from '@@internals';
 
@@ -85,7 +87,7 @@ export function call(func, receiver, args){
 
 
 
-function enumerate(object, inherited, onlyEnumerable){
+export function enumerate(object, inherited, onlyEnumerable){
   return $$CreateObject('Array', $$Call(object, 'Enumerate', [inherited, onlyEnumerable]));
 }
 
@@ -97,7 +99,7 @@ function defineOwnPropertyInternal(object, key, Desc){
   return $$Call(object, 'DefineOwnProperty', [key, Desc]);
 }
 
-function deleteProperty(object, key){
+export function deleteProperty(object, key){
   return $$Call(object, 'remove', [key]);
 }
 
@@ -109,12 +111,54 @@ export function define(object, key, value, attr){
   return $$Call(object, 'define', [key, value, attr]);
 }
 
-function builtinFunction(func){
+export function get(object, key){
+  return $$Call(object, 'get', [key]);
+}
+
+export function set(object, key, value){
+  return $$Call(object, 'set', [key, value]);
+}
+
+export function builtinFunction(func){
   $$Set(func, 'BuiltinFunction', true);
   deleteProperty(func, 'prototype');
   update(func, 'name', 0);
   define(func, 'caller', null, 0);
   define(func, 'arguments', null, 0);
+}
+
+export function builtinClass(Ctor, brand){
+  var prototypeName = Ctor.name + 'Proto',
+      prototype = $$GetIntrinsic(prototypeName),
+      isSymbol = Ctor.name === 'Symbol';
+
+  if (prototype) {
+    if (!isSymbol) {
+      extend(prototype, Ctor.prototype);
+    }
+    set(Ctor, 'prototype', prototype);
+  } else {
+    $$SetIntrinsic(prototypeName, Ctor.prototype);
+  }
+
+  $$Set(Ctor, 'BuiltinConstructor', true);
+  $$Set(Ctor, 'BuiltinFunction', true);
+  $$Set(Ctor, 'strict', false);
+  update(Ctor, 'prototype', FROZEN);
+  set(Ctor, 'length', 1);
+  define(Ctor, 'caller', null, FROZEN);
+  define(Ctor, 'arguments', null, FROZEN);
+
+  if (!isSymbol) {
+    brand || (brand = 'Builtin'+Ctor.name);
+    if (brand in brands) {
+      brand = brands[brand];
+    }
+
+    $$Set(Ctor.prototype, 'BuiltinBrand', brand);
+    define(Ctor.prototype, @@toStringTag, Ctor.name);
+    hideEverything(Ctor);
+  }
 }
 
 

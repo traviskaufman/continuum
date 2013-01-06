@@ -12,7 +12,8 @@ import {
   $$IsConstruct,
   $$Now,
   $$ParseDate,
-  $$RegExpExec
+  $$RegExpExec,
+  $$Set
 } from '@@internals';
 
 import {
@@ -970,10 +971,7 @@ extend(Date, {
   // 15.9.4.6 Date.@@create
   @@create(){
     const obj = OrdinaryCreateFromConstructor(this, '%DatePrototype%');
-
-    define(obj, @@DateValue, undefined);
-    $$SetInternal(obj, 'BuiltinBrand', 'BuiltinDate');
-
+    $$Set(obj, 'BuiltinBrand', 'BuiltinDate');
     return obj;
   }
 });

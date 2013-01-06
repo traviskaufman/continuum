@@ -488,21 +488,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return result && result.type === Return ? result.value : result;
       },
       function Construct(args){
-        // return $$OrdinaryConstruct(this, args);
-        if (this.ThisMode === 'lexical') {
-          return $$ThrowException('construct_arrow_function');
-        }
-        var prototype = this.Get('prototype');
-        if (prototype && prototype.Abrupt) return prototype;
-
-        var instance = typeof prototype === 'object' ? new $Object(prototype) : new $Object;
-        if (prototype && this.BuiltinConstructor) {
-          instance.BuiltinBrand = prototype.BuiltinBrand;
-        }
-
-        var result = this.Call(instance, args, true);
-        if (result && result.Abrupt) return result;
-        return typeof result === 'object' ? result : instance;
+        return $$OrdinaryConstruct(this, args);
       },
       function HasInstance(arg){
         if (typeof arg !== 'object' || arg === null) {
@@ -530,10 +516,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       var creator = F.Get(createSymbol);
       if (creator && creator.Abrupt) return creator;
 
-      var obj = creator ? creator.Call(F, []) : $$OrdinaryCreateFromConstructor(F, '%ObjectPrototype%');
+      var obj = creator ? creator.Call(F, argumentsList) : $$OrdinaryCreateFromConstructor(F, '%ObjectPrototype%');
       if (obj && obj.Abrupt) return obj;
 
-      var result = F.Call(obj, argumentsList);
+      var result = F.Call(obj, argumentsList, true);
       if (result && result.Abrupt) return result;
 
       return $$Type(result) === 'Object' ? result : obj;
@@ -2355,6 +2341,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$Now: Date.now
           ? Date.now
           : function(){ return +new Date },
+        $$NumberToString: function(_, args){
+          return args[0].toString(args[1] || 10);
+        },
         $$ParseDate: Date.parse
           ? function(_, args){ return Date.parse(args[0]) }
           : function(_, args){ return NaN },
@@ -2368,14 +2357,14 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           return null;
         },
-        $$StringToNumber: function(_, args){
-          return +args[0];
-        },
-        $$NumberToString: function(_, args){
-          return args[0].toString(args[1] || 10);
-        },
         $$Set: function(_, args){
           args[0][args[1]] = args[2];
+        },
+        $$SetIntrinsic: function(_, args){
+          realm.intrinsics[args[0]] = args[1];
+        },
+        $$StringToNumber: function(_, args){
+          return +args[0];
         }
       });
     }();

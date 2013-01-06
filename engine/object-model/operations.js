@@ -18,6 +18,7 @@ var operations = (function(exports){
       create                 = objects.create,
       define                 = objects.define,
       inherit                = objects.inherit,
+      Hash                   = objects.Hash,
       each                   = iteration.each,
       AbruptCompletion       = errors.AbruptCompletion,
       $$ThrowException       = errors.$$ThrowException,
@@ -77,7 +78,15 @@ var operations = (function(exports){
 
     define(environments.EnvironmentRecord.prototype, [
       function reference(key, strict){
-        return new Reference(this, key, strict);
+        var cache = this.cache;
+        if (cache) {
+          if (key in cache) {
+            return cache[key];
+          }
+        } else {
+          cache = this.cache = new Hash;
+        }
+        return cache[key] = new Reference(this, key, strict);
       }
     ]);
 
@@ -558,7 +567,7 @@ var operations = (function(exports){
       return $$ThrowException('construct_non_constructor', [$$Type(constructor)]);
     }
 
-    var proto = constructor.prototype;
+    var proto = constructor.Get('prototype');
     if ($$Type(proto) !== 'Object') {
       proto = (constructor.Realm || realm).intrinsics[protos[intrinsicDefaultProto]];
     }

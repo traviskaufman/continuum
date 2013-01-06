@@ -726,12 +726,6 @@ var thunk = (function(exports){
     }
     context.stack[context.sp++] = context.Realm.natives.reference(context.code.lookup(context.ops[context.ip][0]), false);
     return context.cmds[++context.ip];
-
-
-    // context.LexicalEnvironment = context.Realm.natives;
-    // var ret = REF(context);
-    // context.LexicalEnvironment = scope;
-    // return ret;
   }
 
   function OBJECT(context){

@@ -4,6 +4,10 @@ import {
 } from '@@symbols';
 
 import {
+  $$Set
+} from '@@internals';
+
+import {
   OrdinaryCreateFromConstructor
 } from '@@operations';
 
@@ -49,7 +53,9 @@ export class WeakMap {
 
 $__extend(WeakMap, {
   @@create(){
-    return OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
+    var obj = OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'BuiltinWeakMap');
+    return obj;
   }
 });
 
