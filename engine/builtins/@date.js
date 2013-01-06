@@ -501,6 +501,10 @@ function toTimeString(t){
   return `${hour}:${min}:${sec} GMT${tz}`;
 }
 
+function toLocaleString(t){
+  return `${toLocaleDateString(t)} ${toLocaleTimeString(t)}`;
+}
+
 function toLocaleDateString(t){
   const month = zeroPad(getTime(t, false, MonthFromTime) + 1),
         date  = zeroPad(getTime(t, false, DateFromTime)),
@@ -529,7 +533,7 @@ const dateParser = /^(\d{4}|[+\-]\d{6})(?:-(\d\d)(?:-(\d\d))?)?(?:T(\d\d):(\d\d)
 export function parse(date){
   const match = $$RegExpExec(dateParser, ToString(date));
 
-  if (!match) {
+  if (match === null) {
     return $$ParseDate(date);
   }
 
@@ -618,78 +622,60 @@ export class Date {
   // ########################################
   toString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return toString(t);
+    return isNaN(t) ? 'Invalid Date' : toString(t);
   }
   // ############################################
   // ### 15.9.5.3 Date.prototype.toDateString ###
   // ############################################
   toDateString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return toDateString(t);
+    return isNaN(t) ? 'Invalid Date' : toDateString(t);
   }
   // ############################################
   // ### 15.9.5.4 Date.prototype.toTimeString ###
   // ############################################
   toTimeString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return toTimeString(t);
+    return isNaN(t) ? 'Invalid Date' : toTimeString(t);
   }
   // ##############################################
   // ### 15.9.5.5 Date.prototype.toLocaleString ###
   // ##############################################
   toLocaleString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return `${toLocaleDateString(t)} ${toLocaleTimeString(t)}`;
+    return isNaN(t) ? 'Invalid Date' : toLocaleString(t);
   }
   // ##################################################
   // ### 15.9.5.6 Date.prototype.toLocaleDateString ###
   // ##################################################
   toLocaleDateString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return toLocaleDateString(t);
+    return isNaN(t) ? 'Invalid Date' : toLocaleDateString(t);
   }
   // ##################################################
   // ### 15.9.5.7 Date.prototype.toLocaleTimeString ###
   // ##################################################
   toLocaleTimeString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
-    if (isNaN(t)) {
-      return 'Invalid Date';
-    }
-
-    return toLocaleTimeString(t);
+    return isNaN(t) ? 'Invalid Date' : toLocaleTimeString(t);
   }
   // #######################################
   // ### 15.9.5.8 Date.prototype.valueOf ###
@@ -904,6 +890,7 @@ export class Date {
   // ############################################
   toUTCString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
     if (isNaN(t)) {
@@ -925,6 +912,7 @@ export class Date {
   // ############################################
   toISOString(){
     const t = this.@@DateValue;
+
     ensureDate(t);
 
     if (isNaN(t)) {
@@ -982,9 +970,10 @@ extend(Date, {
   // 15.9.4.6 Date.@@create
   @@create(){
     const obj = OrdinaryCreateFromConstructor(this, '%DatePrototype%');
-    define(obj, @@DateValue);
-    $$SetInternal('BuiltinBrand', 'BuiltinDate');
+
+    define(obj, @@DateValue, undefined);
+    $$SetInternal(obj, 'BuiltinBrand', 'BuiltinDate');
+
     return obj;
   }
 });
-
