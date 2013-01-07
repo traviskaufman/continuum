@@ -2049,13 +2049,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       if (f._wrapper) {
         return f._wrapper;
       }
-      return f._wrapper = function(){
-        var receiver = this;
-        if (isObject(receiver) && !(receiver instanceof $Object)) {
-          receiver = undefined
-        }
-        return f.Call(receiver, arguments);
-      };
+
+      f._wrapper = function(){ return f.Call(this, arguments) };
+      f._wrapper._wraps = f;
+      return f._wrapper;
     }
 
     natives.add({
@@ -2329,7 +2326,17 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$MakeException(args[0], args[1] ? args[1].array : []);
         },
         $$Get: function(_, args){
-          return args[0][args[1]];
+          var val = args[0][args[1]];
+
+          if (typeof val === 'function') {
+            return val._wraps || (val._wraps = new $NativeFunction({
+              length: val.length,
+              name  : val.name,
+              call  : val
+            }));
+          }
+
+          return val;
         },
         $$GetIntrinsic: function(_, args){
           return realm.intrinsics[args[0]];
@@ -2363,7 +2370,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           return null;
         },
         $$Set: function(_, args){
-          args[0][args[1]] = args[2];
+          var val = args[2];
+
+          if (val && val.Call) {
+            val = wrapFunction(val);
+          }
+
+          args[0][args[1]] = val;
         },
         $$SetIntrinsic: function(_, args){
           realm.intrinsics[args[0]] = args[1];
