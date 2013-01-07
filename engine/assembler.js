@@ -498,7 +498,10 @@ var assembler = (function(exports){
       function defineMethod(node){
         var code = new Code(node.value, context.source, 'method', 'class', context.code.flags.strict),
             name = code.name = symbol(node.key);
+
         code.scope.outer = this.scope;
+        code.range = node.range;
+        code.loc = node.loc;
 
         context.queue(code);
         code.displayName = this.name ? this.name+'#'+name.join('') : name.join('');
@@ -1283,7 +1286,7 @@ var assembler = (function(exports){
         HAS_BINDING(name);
         var jump = JTRUE(0);
         BINDING(name, configurable);
-        var jump2 = JUMP(0);
+        var jump2 = JUMP();
         adjust(jump);
         HAS_GLOBAL(name);
         var jump3 = JTRUE(0);
@@ -1303,7 +1306,7 @@ var assembler = (function(exports){
           BINDING(name);
           UNDEFINED();
           VAR(name);
-          var jump2 = JUMP(0);
+          var jump2 = JUMP();
           adjust(jump);
           HAS_GLOBAL(name);
           var jump3 = JTRUE(0);
@@ -1661,7 +1664,7 @@ var assembler = (function(exports){
   }
 
   function BreakStatement(node){
-    move(node, 'breaks', JUMP(0));
+    move(node, 'breaks', JUMP());
   }
 
   function BlockStatement(node){
@@ -1812,7 +1815,7 @@ var assembler = (function(exports){
     var test = JFALSE(0);
     recurse(node.consequent)
     GET();
-    var alt = JUMP(0);
+    var alt = JUMP();
     adjust(test);
     recurse(node.alternate);
     GET();
@@ -1820,7 +1823,7 @@ var assembler = (function(exports){
   }
 
   function ContinueStatement(node){
-    move(node, 'continues', JUMP(0));
+    move(node, 'continues', JUMP());
   }
 
   function DoWhileStatement(node){
@@ -1965,7 +1968,7 @@ var assembler = (function(exports){
     recurse(node.consequent);
 
     if (node.alternate) {
-      var alt = JUMP(0);
+      var alt = JUMP();
       adjust(test);
       recurse(node.alternate);
       adjust(alt);
@@ -2155,7 +2158,7 @@ var assembler = (function(exports){
           DEFAULT(cases[defaultFound]);
         } else {
           POP();
-          var last = JUMP(0);
+          var last = JUMP();
         }
 
         var wrapper = wrap(node.wrapped);
@@ -2261,30 +2264,30 @@ var assembler = (function(exports){
 
   function TryStatement(node){
     isWrapped(node.block);
+
+    if (node.finalizer) {
+      PUSH_FINALLY();
+    }
+    var begin = current();
+
     unwinder('try', function(){
       each(node.block.body, recurse);
     });
 
-    var tryer    = JUMP(0),
-        handlers = [],
+    var handlers = [JUMP()],
         wrapper  = wrap(node.finalizer || node.wrapped);
 
-    each(node.handlers, function(handler, i){
+    each(node.handlers, function(handler){
       wrapper(handler);
       recurse(handler);
-      if (i < node.handlers.length - 1) {
-        handlers.push(JUMP(0));
-      }
+      handlers.push(JUMP());
     });
 
-    adjust(tryer);
-
-    var i = handlers.length;
-    while (i--) {
-      handlers[i] && adjust(handlers[i]);
-    }
+    each(handlers, adjust)
 
     if (node.finalizer) {
+      POP_FINALLY();
+      context.code.unwinders.push(new Unwinder('finally', begin, current()));
       isntWrapped(node.finalizer);
       recurse(node.finalizer);
     }
