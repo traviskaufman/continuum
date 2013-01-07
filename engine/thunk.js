@@ -917,7 +917,7 @@ var thunk = (function(exports){
   function SPREAD_ARG(context){
     var spread = context.stack[--context.sp],
         args   = context.stack[context.sp - 1],
-        status = context.context.spreadArguments(args, context.spread);
+        status = context.spreadArguments(args, spread);
 
     if (status && status.Abrupt) {
       context.error = status;
@@ -931,7 +931,7 @@ var thunk = (function(exports){
     var val    = context.stack[--context.sp],
         index  = context.stack[--context.sp] + context.ops[context.ip][0],
         array  = context.stack[context.sp - 1],
-        status = context.context.spreadArray(array, index, val);
+        status = context.spreadArray(array, index, val);
 
     if (status && status.Abrupt) {
       context.error = status;
