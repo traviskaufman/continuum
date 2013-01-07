@@ -604,6 +604,9 @@ var operators = (function(exports){
         if (val.Abrupt) return val;
 
         if (val.Reference) {
+          if (isUndefined(val.base)) {
+            return 'undefined';
+          }
           return TYPEOF($$GetValue(val));
         }
 
@@ -611,7 +614,7 @@ var operators = (function(exports){
           return 'function';
         }
 
-        if (isUndetectable(val)) {
+        if (isUndefined(val)) {
           return 'undefined';
         }
 
