@@ -1,6 +1,6 @@
-import now from '@date';
-import Map from '@map';
-import Error from '@error';
+import { now } from '@date';
+import { Map } from '@map';
+import { Error } from '@error';
 
 const QUIET = $__createUndetectable('quiet');
 
