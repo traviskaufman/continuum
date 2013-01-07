@@ -9495,7 +9495,9 @@ exports.assembler = (function(exports){
       },
       function updateBreaks(ip){
         if (ip !== undefined) {
-          each(this.breaks, function(item){ item[0] = ip });
+          each(this.breaks, function(item){
+            item[0] = ip;
+          });
         }
       }
     ]);
@@ -10438,10 +10440,9 @@ exports.assembler = (function(exports){
       var transfer = context.jumps.find(function(jump){
         return node.label.name in jump.labels;
       });
-
     } else {
       var transfer = context.jumps.find(function(jump){
-        return transfer && jump.continues;
+        return jump.continues;
       });
     }
     transfer && transfer[set].push(pos);
@@ -11071,8 +11072,8 @@ exports.assembler = (function(exports){
   }
 
   function SwitchStatement(node){
-    loop(function(){
-      var defaultFound;
+    block(function(){
+      var defaultFound = null;
       recurse(node.discriminant);
       GET();
 
@@ -11092,7 +11093,7 @@ exports.assembler = (function(exports){
           }
         });
 
-        if (defaultFound != null){
+        if (defaultFound !== null){
           DEFAULT(cases[defaultFound]);
         } else {
           POP();
@@ -11105,18 +11106,15 @@ exports.assembler = (function(exports){
           wrapper(item);
           each(item.consequent, function(child){
             wrapper(child);
-            recurse(child)
+            recurse(child);
           });
         });
 
-        if (last) {
-          adjust(last);
-        }
+        last && adjust(last);
       } else {
         POP();
       }
 
-      popScope();
     });
   }
 
