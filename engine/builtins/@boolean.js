@@ -1,32 +1,61 @@
+import {
+  @@BooleanValue: BooleanValue
+} from '@@symbols';
+
+import {
+  $$Exception,
+  $$Get,
+  $$IsConstruct
+} from '@@internals';
+
+import {
+  ToBoolean
+} from '@@operations';
+
+import {
+  Type
+} from '@@types';
+
+import {
+  builtinClass,
+  define,
+  hasBrand
+} from '@@utilities';
+
+
+
 export class Boolean {
   constructor(value){
-    value = $__ToBoolean(value);
-    return $__isConstruct() ? $__BooleanCreate(value) : value;
+    value = ToBoolean(value);
+    return $$IsConstruct() ? $__BooleanCreate(value) : value;
   }
 
   toString(){
-    let type = $__Type(this);
+    const type = Type(this);
+
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'BooleanWrapper') {
+    } else if (type === 'Object' && hasBrand(this, 'BooleanWrapper')) {
       return this.@@BooleanValue ? 'true' : 'false';
-    } else {
-      throw $__Exception('not_generic', ['Boolean.prototype.toString']);
     }
+
+    throw $$Exception('not_generic', ['Boolean.prototype.toString']);
   }
 
   valueOf(){
-    let type = $__Type(this);
+    const type = Type(this);
+
     if (type === 'Boolean') {
       return this;
-    } else if (type === 'Object' && $__GetBuiltinBrand(this) === 'BooleanWrapper') {
+    } else if (type === 'Object' && hasBrand(this, 'BooleanWrapper')) {
       return this.@@BooleanValue;
-    } else {
-      throw $__Exception('not_generic', ['Boolean.prototype.valueOf']);
     }
+
+    throw $$Exception('not_generic', ['Boolean.prototype.valueOf']);
   }
 }
 
+
 builtinClass(Boolean);
 
-$__define(Boolean.prototype, @@BooleanValue, false);
+define(Boolean.prototype, @@BooleanValue, false);
