@@ -1,52 +1,87 @@
+import {
+  @@NumberValue: NumberValue
+} from '@@symbols';
+
+import {
+  $$ArgumentCount,
+  $$Exception,
+  $$Get,
+  $$IsConstruct,
+  $$NumberToString
+} from '@@internals';
+
+import {
+  ToInteger,
+  ToNumber
+} from '@@operations';
+
+import {
+  Type
+} from '@@types';
+
+import {
+  builtinClass,
+  define,
+  extend,
+  floor,
+  hasBrand
+} from '@@utilities';
+
+
+
 export const EPSILON           = 2.220446049250313e-16,
              MAX_INTEGER       = 9007199254740992,
              MAX_VALUE         = 1.7976931348623157e+308,
              MIN_VALUE         = 5e-324,
-             NaN               = NaN,
-             NEGATIVE_INFINITY = -Infinity,
-             POSITIVE_INFINITY = Infinity;
+             NaN               = +'NaN',
+             NEGATIVE_INFINITY = 1 / -0,
+             POSITIVE_INFINITY = 1 / 0;
+
+
 
 
 export class Number {
-  constructor(...value){
-    value = value.length ? $__ToNumber(value[0]) : 0;
-    return $__isConstruct() ? $__NumberCreate(value) : value;
+  constructor(value){
+    value = $$ArgumentCount() ? ToNumber(value) : 0;
+    return $$IsConstruct() ? $__NumberCreate(value) : value;
   }
 
-  toString(radix){
-    radix = $__ToInteger(radix || 10);
+  toString(radix = 10){
     if (typeof this === 'number') {
-      return $__NumberToString(this, radix);
-    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {
-      return $__NumberToString(this.@@NumberValue, radix);
+      return $$NumberToString(this, ToInteger(radix));
+    } else if (hasBrand(this, 'NumberWrapper')) {
+      return $$NumberToString(this.@@NumberValue, ToInteger(radix));
     }
-    throw $__Exception('not_generic', ['Number.prototype.toString']);
+
+    throw $$Exception('not_generic', ['Number.prototype.toString']);
   }
 
   valueOf(){
     if (typeof this === 'number') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'NumberWrapper') {
+    } else if (hasBrand(this, 'NumberWrapper')) {
       return this.@@NumberValue;
     }
-    throw $__Exception('not_generic', ['Number.prototype.valueOf']);
+
+    throw $$Exception('not_generic', ['Number.prototype.valueOf']);
   }
 
-  clz() {
-    let x = $__ToNumber(this);
+  clz(){
+    let x = ToNumber(this);
+
     if (!x || !isFinite(x)) {
       return 32;
-    } else {
-      x = x < 0 ? x + 1 | 0 : x | 0;
-      x -= (x / 0x100000000 | 0) * 0x100000000;
-      return 32 - $__NumberToString(x, 2).length;
     }
+
+    x = x < 0 ? floor(x + 1) : floor(x);
+    x -= floor(x / 0x100000000) * 0x100000000;
+    return 32 - $$NumberToString(x, 2).length;
   }
 }
 
 builtinClass(Number);
 
-$__define(Number.prototype, @@NumberValue, 0);
+define(Number.prototype, @@NumberValue, 0);
 
 
 export function isNaN(value){
