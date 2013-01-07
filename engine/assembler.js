@@ -1498,10 +1498,9 @@ var assembler = (function(exports){
       var transfer = context.jumps.find(function(jump){
         return node.label.name in jump.labels;
       });
-
     } else {
       var transfer = context.jumps.find(function(jump){
-        return transfer && jump.continues;
+        return jump.continues;
       });
     }
     transfer && transfer[set].push(pos);
@@ -2131,8 +2130,8 @@ var assembler = (function(exports){
   }
 
   function SwitchStatement(node){
-    loop(function(){
-      var defaultFound;
+    block(function(){
+      var defaultFound = null;
       recurse(node.discriminant);
       GET();
 
@@ -2152,7 +2151,7 @@ var assembler = (function(exports){
           }
         });
 
-        if (defaultFound != null){
+        if (defaultFound !== null){
           DEFAULT(cases[defaultFound]);
         } else {
           POP();
@@ -2165,18 +2164,15 @@ var assembler = (function(exports){
           wrapper(item);
           each(item.consequent, function(child){
             wrapper(child);
-            recurse(child)
+            recurse(child);
           });
         });
 
-        if (last) {
-          adjust(last);
-        }
+        last && adjust(last);
       } else {
         POP();
       }
 
-      popScope();
     });
   }
 
