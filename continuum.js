@@ -9495,9 +9495,7 @@ exports.assembler = (function(exports){
       },
       function updateBreaks(ip){
         if (ip !== undefined) {
-          each(this.breaks, function(item){
-            item[0] = ip;
-          });
+          each(this.breaks, function(item){ item[0] = ip });
         }
       }
     ]);
@@ -13015,6 +13013,9 @@ exports.operators = (function(exports){
         if (val.Abrupt) return val;
 
         if (val.Reference) {
+          if (isUndefined(val.base)) {
+            return 'undefined';
+          }
           return TYPEOF($$GetValue(val));
         }
 
@@ -13022,7 +13023,7 @@ exports.operators = (function(exports){
           return 'function';
         }
 
-        if (isUndetectable(val)) {
+        if (isUndefined(val)) {
           return 'undefined';
         }
 
