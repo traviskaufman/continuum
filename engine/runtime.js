@@ -924,6 +924,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var $Module = (function(){
+    var $Enumerator = require('./$Object').$Enumerator;
+
     function ModuleValue(value){
       this.Value = value;
     }
@@ -987,6 +989,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         if (this.has(key)) {
           return E__;
         }
+      },
+      function enumerator(){
+        return new $Enumerator(this.keys);
       },
       function GetInheritance(){
         return null;
@@ -2326,12 +2331,14 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$MakeException(args[0], args[1] ? args[1].array : []);
         },
         $$Get: function(_, args){
-          var val = args[0][args[1]];
+          var obj = args[0],
+              key = args[1],
+              val = obj[key];
 
           if (typeof val === 'function') {
             return val._wraps || (val._wraps = new $NativeFunction({
               length: val.length,
-              name  : val.name,
+              name  : key,
               call  : val
             }));
           }
