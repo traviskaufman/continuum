@@ -283,6 +283,10 @@ var $Object = (function(exports){
     this.properties = new PropertyList;
     this.storage = new Hash;
     tag(this);
+    hide(this, 'Realm');
+    hide(this, 'Prototype');
+    hide(this, 'storage');
+    hide(this, 'id');
     if (proto && proto.HiddenPrototype) {
       this.properties.setProperty(['__proto__', null, 6, Proto]);
     }
