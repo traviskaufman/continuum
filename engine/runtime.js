@@ -2788,8 +2788,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function useConsole(console){
         if (console.error) {
-          this.on('throw', function(obj){
-            console.error(obj);
+          this.on('throw', function(completion){
+            console.error(completion.value);
           });
         }
 
