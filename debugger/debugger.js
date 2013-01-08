@@ -115,15 +115,17 @@ realm.on('clear', function(){
 });
 
 realm.on('backspace', stdout.backspace, stdout);
-realm.on('inspect', function(obj, expand){
-  var tree = inspect(obj);
-  if (expand) {
-    tree.expand();
-    setTimeout(function(){
-      inspector.element.scrollTop = inspector.element.scrollHeight;
-      inspector.refresh();
-    }, 1);
-  }
+realm.on('inspect', function(values, expand){
+  each(values.array, function(value){
+    var tree = inspect(value);
+    if (expand) {
+      tree.expand();
+      setTimeout(function(){
+        inspector.element.scrollTop = inspector.element.scrollHeight;
+        inspector.refresh();
+      }, 1);
+    }
+  });
 });
 
 realm.on('debug', function(sp, stack){

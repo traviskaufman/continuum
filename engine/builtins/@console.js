@@ -45,7 +45,7 @@ export class Console {
   }
 
   dir(object){
-    this.@output.signal('inspect', object, true);
+    this.@output.signal('inspect', [object], true);
     return QUIET;
   }
 
@@ -78,7 +78,7 @@ export class Console {
   }
 
   log(...values){
-    values.forEach(value => this.@output.signal('inspect', value));
+    this.@output.signal('inspect', values);
     return QUIET;
   }
 

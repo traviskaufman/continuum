@@ -2766,6 +2766,8 @@ var runtime = (function(GLOBAL, exports, undefined){
             errback(error);
           });
         }
+
+        return this;
       },
       function evaluate(subject){
         activate(this);
@@ -2783,6 +2785,30 @@ var runtime = (function(GLOBAL, exports, undefined){
         var completionType = result && result.Abrupt ? 'throw' : 'complete';
         this.emit(completionType, result);
         return result;
+      },
+      function useConsole(console){
+        if (console.error) {
+          this.on('throw', function(obj){
+            console.error(obj);
+          });
+        }
+
+        if (console.clear) {
+          this.on('clear', function(){
+            console.clear();
+          });
+        }
+
+        this.on('inspect', function(values, expand){
+          values = values.array;
+          if (expand) {
+            console.dir(values[0]);
+          } else {
+            console.log.apply(console, values);
+          }
+        });
+
+        return this;
       }
     ]);
 
