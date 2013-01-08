@@ -924,7 +924,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
   var $Module = (function(){
-    var $Enumerator = require('./$Object').$Enumerator;
+    var $Enumerator = require('./object-model/$Object').$Enumerator;
 
     function ModuleValue(value){
       this.Value = value;
