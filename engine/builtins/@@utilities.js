@@ -36,7 +36,6 @@ export function zeroPad(number, places = 2){
   return num;
 }
 
-
 export function abs(x){
   return x < 0 ? -x : x;
 }
