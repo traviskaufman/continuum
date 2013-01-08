@@ -1255,7 +1255,7 @@ var assembler = (function(exports){
         this[1] = (node.internal ? '@' : '') + node.name;
       } else if (node.type === 'Literal') {
         this[0] = '';
-        this[1] = node.value;
+        this[1] = ''+node.value;
       } else {
         this[0] = '';
         this[1] = node.name;
