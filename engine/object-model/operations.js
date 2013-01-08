@@ -524,10 +524,10 @@ var operations = (function(exports){
       return $array.array;
     }
     var array = [],
-        len = $array.get('length');
+        len   = $array.Get('length');
 
     for (var i=0; i < len; i++) {
-      array[i] = $array.get(i+'');
+      array[i] = $array.Get(i+'');
     }
     return array;
   }

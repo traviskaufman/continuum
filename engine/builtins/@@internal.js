@@ -152,12 +152,15 @@ internalFunction(ensureDescriptor);
 
 
 function ensureArgs(o, name){
-  if (o == null || typeof o !== 'object' || typeof $__get(o, 'length') !== 'number') {
+  const brand = $__GetBuiltinBrand(o);
+
+  if (brand === 'BuiltinArguments') {
+    return [...o];
+  } else if (brand !== 'BuiltinArray') {
     throw $__Exception('apply_wrong_args', []);
   }
 
-  const brand = $__GetBuiltinBrand(o);
-  return brand === 'BuiltinArray' || brand === 'BuiltinArguments' ? o : [...o];
+  return o;
 }
 
 internalFunction(ensureArgs);
