@@ -1,12 +1,13 @@
 import {
-  $$Call,
-  $$CreateObject,
+  $$Invoke,
   $$CreateInternalObject,
+  $$CreateObject,
   $$Get,
   $$GetIntrinsic,
+  $$Has,
+  $$NumberToString,
   $$Set,
-  $$SetIntrinsic,
-  $$NumberToString
+  $$SetIntrinsic
 } from '@@internals';
 
 import {
@@ -71,51 +72,51 @@ export function isInteger(value) {
       && value | 0 === value;
 }
 
-export function hasBrand(object, brand){
-  return $$Get(object, 'BuiltinBrand') === brand;
+export function hasBrand(obj, brand){
+  if (obj == null) {
+    return false;
+  }
+  return $$Get(obj, 'BuiltinBrand') === brand;
 }
 
-const argsList  = [null, null],
-      emptyList = $$Get([], 'array');
+const emptyList = $$Get([], 'array');
 
 export function call(func, receiver, args){
-  argsList[0] = receiver;
-  argsList[1] = args ? $$Get(args, 'array') : emptyList;
-  return $$Call(func, 'Call', argsList);
+  return $$Invoke(func, 'Call', receiver, args ? $$Get(args, 'array') : emptyList);
 }
 
 
 
-export function enumerate(object, inherited, onlyEnumerable){
-  return $$CreateObject('Array', $$Call(object, 'Enumerate', [inherited, onlyEnumerable]));
+export function enumerate(obj, inherited, onlyEnumerable){
+  return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));
 }
 
-function getOwnPropertyInternal(object, key){
-  return $$Call(object, 'GetOwnProperty', [key]);
+function getOwnPropertyInternal(obj, key){
+  return $$Invoke(obj, 'GetOwnProperty', key);
 }
 
-function defineOwnPropertyInternal(object, key, Desc){
-  return $$Call(object, 'DefineOwnProperty', [key, Desc]);
+function defineOwnPropertyInternal(obj, key, Desc){
+  return $$Invoke(obj, 'DefineOwnProperty', key, Desc);
 }
 
-export function deleteProperty(object, key){
-  return $$Call(object, 'remove', [key]);
+export function deleteProperty(obj, key){
+  return $$Invoke(obj, 'remove', key);
 }
 
-export function update(object, key, attr){
-  return $$Call(object, 'update', [key, attr]);
+export function update(obj, key, attr){
+  return $$Invoke(obj, 'update', key, attr);
 }
 
-export function define(object, key, value, attr){
-  return $$Call(object, 'define', [key, value, attr]);
+export function define(obj, key, value, attr){
+  return $$Invoke(obj, 'define', key, value, attr);
 }
 
-export function get(object, key){
-  return $$Call(object, 'get', [key]);
+export function get(obj, key){
+  return $$Invoke(obj, 'get', key);
 }
 
-export function set(object, key, value){
-  return $$Call(object, 'set', [key, value]);
+export function set(obj, key, value){
+  return $$Invoke(obj, 'set', key, value);
 }
 
 export function builtinFunction(func){
@@ -127,19 +128,11 @@ export function builtinFunction(func){
 }
 
 export function builtinClass(Ctor, brand){
-  var prototypeName = Ctor.name + 'Proto',
-      prototype = $$GetIntrinsic(prototypeName),
+  var prototypeName = '%' + Ctor.name + 'Prototype%',
       isSymbol = Ctor.name === 'Symbol';
 
-  if (prototype) {
-    if (!isSymbol) {
-      extend(prototype, Ctor.prototype);
-    }
-    set(Ctor, 'prototype', prototype);
-  } else {
-    $$SetIntrinsic(prototypeName, Ctor.prototype);
-  }
-
+  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
+  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
   $$Set(Ctor, 'BuiltinConstructor', true);
   $$Set(Ctor, 'BuiltinFunction', true);
   $$Set(Ctor, 'strict', false);
@@ -161,7 +154,7 @@ export function builtinClass(Ctor, brand){
 }
 
 
-export function extend(object, properties){
+export function extend(obj, properties){
   const keys = enumerate(properties, false, false);
   let index = keys.length;
 
@@ -178,8 +171,25 @@ export function extend(object, properties){
       builtinFunction(value);
     }
 
-    defineOwnPropertyInternal(object, key, desc);
+    defineOwnPropertyInternal(obj, key, desc);
   }
+}
+
+export function extendInternal(internal, properties){
+  const keys = enumerate(properties, false, false);
+
+  let index = keys.length;
+
+  while (index--) {
+    const key = keys[index];
+    $$Set(internal, key, properties[key]);
+  }
+
+  return internal;
+}
+
+export function createInternal(proto, properties){
+  return extendInternal($$CreateInternalObject(proto), properties);
 }
 
 export function hideEverything(o){
@@ -231,17 +241,45 @@ function builtinClass(Ctor, brand){
   }
 }
 
+export function isInitializing(obj, internal){
+  return obj != null && $$Has(obj, internal) && $$Get(obj, internal) === undefined;
+}
 
 
 
-const hidden = $$CreateInternalObject();
-$$Set(hidden, 'Writable', true);
-$$Set(hidden, 'Enumerable', false);
-$$Set(hidden, 'Configurable', true);
+export function listFrom(array){
+  return $$Get(array, 'array') || $$Get([...array], 'array');
+}
 
-function defineHidden(object, value){
-  $$Set(hidden, 'Value', V);
-  const result = $$Call(O, 'DefineOwnProperty', [P, hidden]);
-  $$Set(hidden, 'Value', undefined);
+export function listOf(...items){
+  return $$Get(items, 'array');
+}
+
+
+const cache = [];
+
+export function numbers(start, end){
+  if (!isFinite(end)) {
+    end = start;
+    start = 0;
+  }
+
+  let index = end - start;
+
+  if (end > cache.length) {
+    while (index--) {
+      const curr = start + index;
+      cache[curr] = ToString(curr);
+    }
+  }
+
+  const result = [];
+  index = 0;
+
+  while (start < end) {
+    result[index++] = cache[start++];
+  }
+
   return result;
 }
+
