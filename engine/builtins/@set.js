@@ -8,6 +8,14 @@ import {
 } from '@@internals';
 
 import {
+  builtinClass,
+  define,
+  extend,
+  hasBrand,
+  isInitializing
+} from '@@utilities';
+
+import {
   Type
 } from '@@types';
 
@@ -108,7 +116,7 @@ export class Set {
   }
 }
 
-$__extend(Set, {
+extend(Set, {
   @@create(){
     var obj = OrdinaryCreateFromConstructor(this, '%SetPrototype%');
     $$Set(obj, 'BuiltinBrand', 'BuiltinSet');
@@ -118,7 +126,7 @@ $__extend(Set, {
 
 builtinClass(Set);
 const SetPrototype = Set.prototype;
-$__define(SetPrototype, @@iterator, SetPrototype.values);
+define(SetPrototype, @@iterator, SetPrototype.values);
 
 
 
