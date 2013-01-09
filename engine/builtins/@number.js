@@ -1,16 +1,13 @@
 import {
-  @@NumberValue: NumberValue
-} from '@@symbols';
-
-import {
   $$ArgumentCount,
   $$Exception,
   $$Get,
-  $$IsConstruct,
-  $$NumberToString
+  $$NumberToString,
+  $$Set
 } from '@@internals';
 
 import {
+  OrdinaryCreateFromConstructor,
   ToInteger,
   ToNumber
 } from '@@operations';
@@ -24,7 +21,8 @@ import {
   define,
   extend,
   floor,
-  hasBrand
+  hasBrand,
+  isInitializing
 } from '@@utilities';
 
 
@@ -43,14 +41,19 @@ export const EPSILON           = 2.220446049250313e-16,
 export class Number {
   constructor(value){
     value = $$ArgumentCount() ? ToNumber(value) : 0;
-    return $$IsConstruct() ? $__NumberCreate(value) : value;
+
+    if (!isInitializing(this, 'NumberValue')) {
+      return value;
+    }
+
+    $$Set(this, 'NumberValue', value);
   }
 
   toString(radix = 10){
     if (typeof this === 'number') {
       return $$NumberToString(this, ToInteger(radix));
     } else if (hasBrand(this, 'NumberWrapper')) {
-      return $$NumberToString(this.@@NumberValue, ToInteger(radix));
+      return $$NumberToString($$Get(this, 'NumberValue'), ToInteger(radix));
     }
 
     throw $$Exception('not_generic', ['Number.prototype.toString']);
@@ -60,7 +63,7 @@ export class Number {
     if (typeof this === 'number') {
       return this;
     } else if (hasBrand(this, 'NumberWrapper')) {
-      return this.@@NumberValue;
+      return $$Get(this, 'NumberValue');
     }
 
     throw $$Exception('not_generic', ['Number.prototype.valueOf']);
@@ -81,7 +84,7 @@ export class Number {
 
 builtinClass(Number);
 
-define(Number.prototype, @@NumberValue, 0);
+$$Set(Number.prototype, 'NumberValue', 0);
 
 
 export function isNaN(value){
@@ -112,3 +115,11 @@ extend(Number, { isNaN, isFinite, isInteger, toInteger,
                  EPSILON, MAX_INTEGER, MAX_VALUE, MIN_VALUE,
                  NaN, NEGATIVE_INFINITY, POSITIVE_INFINITY });
 
+extend(Number, {
+  @@create(){
+    const obj = OrdinaryCreateFromConstructor(this, '%NumberPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'NumberWrapper');
+    $$Set(obj, 'NumberValue', undefined);
+    return obj;
+  }
+});
