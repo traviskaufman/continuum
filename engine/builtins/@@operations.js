@@ -24,7 +24,7 @@ import {
   $$AssertIsInternalArray,
   $$AssertIsECMAScriptValue,
   $$AssertWontThrow,
-  $$Call,
+  $$Invoke,
   $$CreateObject,
   $$CreateInternalObject,
   $$CurrentRealm,
@@ -242,7 +242,7 @@ export function ToString(argument){
     case 'Undefined':
       return 'undefined';
     case 'Number':
-      return $$Call(argument, 'toString');
+      return $$Invoke(argument, 'toString');
     case 'Null':
       return 'null';
     case 'Boolean':
@@ -361,7 +361,7 @@ export function Get(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  return $$Call(O, 'GetP', [O, P]);
+  return $$Invoke(O, 'GetP', O, P);
 }
 
 
@@ -374,7 +374,7 @@ export function Put(O, P, V, Throw){
   $$Assert(IsPropertyKey(P) === true);
   $$Assert(Type(Throw) === 'Boolean');
 
-  const success = $$Call(O, 'SetP', [O, P, V]);
+  const success = $$Invoke(O, 'SetP', O, P, V);
   if (Throw && !success) {
     throw $$Exception('strict_cannot_assign', [P]);
   }
@@ -397,13 +397,13 @@ export function CreateOwnDataProperty(O, P, V){
   $$Assert(IsPropertyKey(P) === true);
   //$$Assert(!hasOwn(O, P));
 
-  const extensible = $$Call(O, 'IsExtensible');
+  const extensible = $$Invoke(O, 'IsExtensible');
   if (!extensible) {
     return extensible;
   }
 
   $$Set(normal, 'Value', V);
-  const result = $$Call(O, 'DefineOwnProperty', [P, normal]);
+  const result = $$Invoke(O, 'DefineOwnProperty', P, normal);
   $$Set(normal, 'Value', undefined);
 
   return result;
@@ -418,7 +418,7 @@ export function DefinePropertyOrThrow(O, P, desc){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const success = $$Call(O, 'DefineOwnProperty', [P, desc]);
+  const success = $$Invoke(O, 'DefineOwnProperty', P, desc);
   if (!success) {
     throw $$Exception('redefine_disallowed', [P]);
   }
@@ -435,7 +435,7 @@ export function DeletePropertyOrThrow(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const success = $$Call(O, 'Delete', [P]); // TODO: rename to DeleteProperty
+  const success = $$Invoke(O, 'Delete', P); // TODO: rename to DeleteProperty
   if (!success) {
     throw $$Exception('strict_delete_property', [P, Type(O)]);
   }
@@ -451,7 +451,7 @@ export function HasProperty(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  return $$Call(O, 'HasProperty', [P]);
+  return $$Invoke(O, 'HasProperty', P);
 }
 
 
@@ -463,7 +463,7 @@ export function GetMethod(O, P){
   $$Assert(Type(O) === 'Object');
   $$Assert(IsPropertyKey(P) === true);
 
-  const func = $$Call(O, 'GetP', [O, P]);
+  const func = $$Invoke(O, 'GetP', O, P);
   if (func === undefined) {
     return func;
   }
@@ -494,7 +494,7 @@ export function Invoke(O, P, args){
     throw $$Exception('property_not_function', [P]);
   }
 
-  return $$Call(func, 'Call', [O, $$Get(args, 'array')]);
+  return $$Invoke(func, 'Call', O, $$Get(args, 'array'));
 }
 
 
@@ -555,7 +555,7 @@ export function OrdinaryHasInstance(C, O){
   }
 
   do {
-    O = $$Call(O, 'GetInheritance');
+    O = $$Invoke(O, 'GetInheritance');
     if (O === P) {
       return true;
     }
@@ -572,21 +572,24 @@ export function OrdinaryHasInstance(C, O){
 const protos = {
   '%ArrayBufferPrototype%' : 'ArrayBufferProto',
   '%ArrayPrototype%'       : 'ArrayProto',
+  '%BooleanPrototype%'     : '%BooleanPrototype%',
   '%DataViewPrototype%'    : 'DataViewProto',
-  '%DatePrototype%'        : 'DateProto',
+  '%DatePrototype%'        : '%DatePrototype%',
   '%Float32ArrayPrototype%': 'Float32ArrayProto',
   '%Float64ArrayPrototype%': 'Float64ArrayProto',
   '%FunctionPrototype%'    : 'FunctionProto',
   '%Int16ArrayPrototype%'  : 'Int16ArrayProto',
   '%Int32ArrayPrototype%'  : 'Int32ArrayProto',
   '%Int8ArrayPrototype%'   : 'Int8ArrayProto',
-  '%MapPrototype%'         : 'MapProto',
+  '%MapPrototype%'         : '%MapPrototype%',
+  '%NumberPrototype%'      : '%NumberPrototype%',
   '%ObjectPrototype%'      : 'ObjectProto',
-  '%SetPrototype%'         : 'SetProto',
+  '%SetPrototype%'         : '%SetPrototype%',
+  '%StringPrototype%'      : '%StringPrototype%',
   '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',
   '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',
   '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
-  '%WeakMapPrototype%'     : 'WeakMapProto'
+  '%WeakMapPrototype%'     : '%WeakMapPrototype%'
 };
 
 export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
