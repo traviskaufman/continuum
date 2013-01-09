@@ -315,12 +315,16 @@ var debug = (function(exports){
         var attrs = this.subject.query(key);
         return attrs === null ? this.getPrototype().query(key) : attrs;
       },
-      function label(){
+      function toStringTag(){
         if (this.subject.toStringTag) {
-          var tag = this.subject.toStringTag();
-          if (tag) {
-            return tag;
-          }
+          return this.subject.toStringTag();
+        }
+        return '';
+      },
+      function label(){
+        var tag = this.toStringTag();
+        if (tag) {
+          return tag;
         }
 
         var brand = this.subject.BuiltinBrand;
@@ -452,41 +456,6 @@ var debug = (function(exports){
     return MirrorArrayBufferView;
   })();
 
-
-  var MirrorPrimitiveWrapper = (function(){
-    function MirrorPrimitiveWrapper(subject){
-      MirrorObject.call(this, subject);
-    }
-
-    inherit(MirrorPrimitiveWrapper, MirrorObject, {
-      kind: 'PrimitiveWrapper'
-    }, [
-      function primitiveValue(){
-        return this.subject.getPrimitiveValue();
-      },
-      function label(){
-        return this.kind+'('+this.subject.getPrimitiveValue()+')';
-      }
-    ]);
-
-    return MirrorPrimitiveWrapper;
-  })();
-
-
-
-  var MirrorBoolean = (function(){
-    function MirrorBoolean(subject){
-      MirrorObject.call(this, subject);
-    }
-
-    inherit(MirrorBoolean, MirrorPrimitiveWrapper, {
-      kind: 'Boolean'
-    });
-
-    return MirrorBoolean;
-  })();
-
-
   var MirrorDate = (function(){
 
     function MirrorDate(subject){
@@ -496,6 +465,9 @@ var debug = (function(exports){
     inherit(MirrorDate, MirrorObject, {
       kind: 'Date'
     }, [
+      function primitiveValue(){
+        return this.subject.DateValue;
+      },
       function label(){
         var toLocaleString = this.subject.Get('toLocaleString');
         if (toLocaleString) {
@@ -702,19 +674,6 @@ var debug = (function(exports){
     return MirrorModule;
   })();
 
-  var MirrorNumber = (function(){
-    function MirrorNumber(subject){
-      MirrorObject.call(this, subject);
-    }
-
-    inherit(MirrorNumber, MirrorPrimitiveWrapper, {
-      kind: 'Number'
-    });
-
-    return MirrorNumber;
-  })();
-
-
   var MirrorRegExp = (function(){
     function MirrorRegExp(subject){
       MirrorObject.call(this, subject);
@@ -733,6 +692,61 @@ var debug = (function(exports){
 
 
 
+  var MirrorPrimitiveWrapper = (function(){
+    function MirrorPrimitiveWrapper(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorPrimitiveWrapper, MirrorObject, {
+      kind: 'PrimitiveWrapper'
+    }, [
+      function primitiveValue(){
+        return this.subject.getPrimitiveValue();
+      },
+      function primitiveLabel(){
+        return ''+this.primitiveValue();
+      },
+      function label(){
+        return MirrorObject.prototype.label.call(this)+'('+this.primitiveLabel()+')';
+      }
+    ]);
+
+    return MirrorPrimitiveWrapper;
+  })();
+
+  var MirrorBoolean = (function(){
+    function MirrorBoolean(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorBoolean, MirrorPrimitiveWrapper, {
+      kind: 'Boolean'
+    }, [
+      function primitiveValue(){
+        return this.subject.BooleanValue;
+      }
+    ]);
+
+    return MirrorBoolean;
+  })();
+
+  var MirrorNumber = (function(){
+    function MirrorNumber(subject){
+      MirrorObject.call(this, subject);
+    }
+
+    inherit(MirrorNumber, MirrorPrimitiveWrapper, {
+      kind: 'Number'
+    }, [
+      function primitiveValue(){
+        return this.subject.NumberValue;
+      }
+    ]);
+
+    return MirrorNumber;
+  })();
+
+
   var MirrorString = (function(){
     function MirrorString(subject){
       MirrorObject.call(this, subject);
@@ -742,8 +756,11 @@ var debug = (function(exports){
       kind: 'String'
     }, [
       MirrorArray.prototype.list,
-      function label(){
-        return this.kind+'("'+this.subject.getPrimitiveValue()+'")';
+      function primitiveValue(){
+        return this.subject.StringValue;
+      },
+      function primitiveLabel(){
+        return quotes(this.subject.StringValue);
       }
     ]);
 
