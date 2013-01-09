@@ -8,6 +8,14 @@ import {
 } from '@@internals';
 
 import {
+  builtinClass,
+  define,
+  extend,
+  hasBrand,
+  isInitializing
+} from '@@utilities';
+
+import {
   Type
 } from '@@types';
 
@@ -18,7 +26,6 @@ import {
 import {
   Iterator
 } from '@iter';
-
 
 function ensureMap(o, name){
   if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {
@@ -126,7 +133,7 @@ export class Map {
   }
 }
 
-$__extend(Map, {
+extend(Map, {
   @@create(){
     var obj = OrdinaryCreateFromConstructor(this, '%MapPrototype%');
     $$Set(obj, 'BuiltinBrand', 'BuiltinMap');
@@ -136,7 +143,7 @@ $__extend(Map, {
 
 builtinClass(Map);
 const MapPrototype = Map.prototype;
-$__define(MapPrototype, @@iterator, MapPrototype.entries);
+define(MapPrototype, @@iterator, MapPrototype.entries);
 
 
 
