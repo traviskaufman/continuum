@@ -4,14 +4,19 @@ import {
 } from '@@symbols';
 
 import {
+  $$Exception,
+  $$Get,
+  $$Has,
   $$Set
 } from '@@internals';
+
 
 import {
   builtinClass,
   define,
   extend,
   hasBrand,
+  hideEverything,
   isInitializing
 } from '@@utilities';
 
