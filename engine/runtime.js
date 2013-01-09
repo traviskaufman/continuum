@@ -16,7 +16,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
-      $String          = require('./object-model/$String').$String,
       $StrictArguments = require('./object-model/$Arguments').$StrictArguments,
       $MappedArguments = require('./object-model/$Arguments').$MappedArguments,
       $Array           = require('./object-model/$Array').$Array,
@@ -343,6 +342,46 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
 
+
+  function createBoolean(value){
+    return runtime.intrinsics['%Boolean%'].Construct([value]);
+  }
+
+  function createNumber(value){
+    return runtime.intrinsics['%Number%'].Construct([value]);
+  }
+
+  function createString(value){
+    return runtime.intrinsics['%String%'].Construct([value]);
+  }
+
+  function fromInternal(object){
+    if (typeof object === 'function') {
+      return new $InternalFunction(object);
+    } else if (object === null || typeof object !== 'object') {
+      return object;
+    } else if (object instanceof RegExp) {
+      return new $RegExp(object);
+    } else if (object instanceof Number) {
+      return createNumber(object);
+    } else if (object instanceof String) {
+      return createString(object);
+    } else if (object instanceof Boolean) {
+      return createBoolean(object);
+    } else if (object instanceof Array) {
+      var out = new $Array;
+      each(object, function(item, index){
+        out.set(index, fromInternal(item));
+      });
+      return out;
+    }
+
+    var out = new $Object;
+    each(object, function(val, key){
+      out.set(key, fromInternal(val));
+    });
+    return out;
+  }
 
   function CollectionInitializer(Data, name){
     var data = name + 'Data';
@@ -703,142 +742,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return $Generator;
   })();
-
-
-
-  // #############
-  // ### $Date ###
-  // #############
-
-  var $Date = (function(){
-    function $Date(value){
-      $Object.call(this, intrinsics.DateProto);
-      this.setPrimitiveValue(value);
-    }
-
-    inherit($Date, $Object, {
-      BuiltinBrand: 'BuiltinDate',
-      type: '$Date'
-    }, [
-      function getPrimitiveValue(){
-        return this.get(DateValueSymbol);
-      },
-      function setPrimitiveValue(value){
-        return this.define(DateValueSymbol, value, _CW);
-      }
-    ]);
-
-    return $Date;
-  })();
-
-
-
-
-  // ###############
-  // ### $Number ###
-  // ###############
-
-  var $Number = (function(){
-    function $Number(value){
-      $Object.call(this, intrinsics.NumberProto);
-      this.setPrimitiveValue(value);
-    }
-
-    inherit($Number, $Object, {
-      BuiltinBrand: 'NumberWrapper',
-      type: '$Number'
-    }, [
-      function getPrimitiveValue(){
-        return this.get(NumberValueSymbol);
-      },
-      function setPrimitiveValue(value){
-        return this.define(NumberValueSymbol, value, _CW);
-      }
-    ]);
-
-    return $Number;
-  })();
-
-
-  // ################
-  // ### $Boolean ###
-  // ################
-
-  var $Boolean = (function(){
-    function $Boolean(value){
-      $Object.call(this, intrinsics.BooleanProto);
-      this.setPrimitiveValue(value);
-    }
-
-    inherit($Boolean, $Object, {
-      BuiltinBrand: 'BooleanWrapper',
-      type: '$Boolean'
-    }, [
-      function getPrimitiveValue(){
-        return this.get(BooleanValueSymbol);
-      },
-      function setPrimitiveValue(value){
-        return this.define(BooleanValueSymbol, value, _CW);
-      }
-    ]);
-
-    return $Boolean;
-  })();
-
-
-
-  // ############
-  // ### $Map ###
-  // ############
-
-  var $Map = (function(){
-    function $Map(){
-      $Object.call(this, intrinsics.MapProto);
-    }
-
-    inherit($Map, $Object, {
-      BuiltinBrand: 'BuiltinMap'
-    });
-
-    return $Map;
-  })();
-
-
-  // ############
-  // ### $Set ###
-  // ############
-
-  var $Set = (function(){
-    function $Set(){
-      $Object.call(this, intrinsics.SetProto);
-    }
-
-    inherit($Set, $Object, {
-      BuiltinBrand: 'BuiltinSet'
-    });
-
-    return $Set;
-  })();
-
-
-
-  // ################
-  // ### $WeakMap ###
-  // ################
-
-  var $WeakMap = (function(){
-    function $WeakMap(){
-      $Object.call(this, intrinsics.WeakMapProto);
-    }
-
-    inherit($WeakMap, $Object, {
-      BuiltinBrand: 'BuiltinWeakMap'
-    });
-
-    return $WeakMap;
-  })();
-
-
 
 
   // ###############
@@ -1724,41 +1627,27 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     var $builtins = {
       Array   : $Array,
-      Boolean : $Boolean,
-      Date    : $Date,
       Error   : $Error,
       Function: $Function,
-      Map     : $Map,
-      Number  : $Number,
       RegExp  : $RegExp,
-      Set     : $Set,
-      String  : $String,
-      Symbol  : $Symbol,
-      WeakMap : $WeakMap
+      Symbol  : $Symbol
     };
 
     exports.builtins = {
       $Array            : $Array,
-      $Boolean          : $Boolean,
       $BoundFunction    : $BoundFunction,
-      $Date             : $Date,
       $Error            : $Error,
       $Function         : $Function,
       $Generator        : $Generator,
       $GeneratorFunction: $GeneratorFunction,
       $InternalFunction : $InternalFunction,
-      $Map              : $Map,
       $Module           : $Module,
       $NativeFunction   : $NativeFunction,
-      $Number           : $Number,
       $Object           : $Object,
       $Proxy            : $Proxy,
       $RegExp           : $RegExp,
-      $Set              : $Set,
       $Symbol           : $Symbol,
-      $String           : $String,
       $TypedArray       : $TypedArray,
-      $WeakMap          : $WeakMap,
       MapData           : MapData,
       WeakMapData       : WeakMapData,
       DeclarativeEnv    : DeclarativeEnv,
@@ -2020,34 +1909,6 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  function fromInternal(object){
-    if (typeof object === 'function') {
-      return new $InternalFunction(object);
-    } else if (object === null || typeof object !== 'object') {
-      return object;
-    } else if (object instanceof RegExp) {
-      return new $RegExp(object);
-    } else if (object instanceof Number) {
-      return new $Number(object);
-    } else if (object instanceof String) {
-      return new $String(object);
-    } else if (object instanceof Boolean) {
-      return new $Boolean(object);
-    } else if (object instanceof Array) {
-      var out = new $Array;
-      each(object, function(item, index){
-        out.set(index, fromInternal(item));
-      });
-      return out;
-    }
-
-    var out = new $Object;
-    each(object, function(val, key){
-      out.set(key, fromInternal(val));
-    });
-    return out;
-  }
-
 
   var Realm = (function(){
     function wrapFunction(f){
@@ -2117,17 +1978,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       _BoundFunctionCreate: function(obj, args){
         return new $BoundFunction(args[0], args[1], $$CreateListFromArray(args[2]));
       },
-      _BooleanCreate: function(obj, args){
-        return new $Boolean(args[0]);
-      },
-      _DateCreate: function(obj, args){
-        return new $Date(applyNew(Date, args));
-      },
       _ErrorCreate: function(obj, args){
         return new $Error(args[0], undefined, args[1]);
-      },
-      _NumberCreate: function(obj, args){
-        return new $Number(args[0]);
       },
       _ObjectCreate: function(obj, args){
         return new $Object(args[0] === null ? intrinsics.Genesis : args[0]);
@@ -2137,9 +1989,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       _SymbolCreate: function(obj, args){
         return new $Symbol(args[0], args[1]);
-      },
-      _StringCreate: function(obj, args){
-        return new $String(args[0]);
       },
       _RegExpCreate: function(obj, args){
         var pattern = args[0],
@@ -2222,17 +2071,16 @@ var runtime = (function(GLOBAL, exports, undefined){
     void function(){
       var objectTypes = {
         Array   : $Array,
-        Boolean : $Boolean,
-        Date    : $Date,
+        Boolean : createBoolean,
         Error   : $Error,
         Function: $Function,
         Module  : $Module,
-        Number  : $Number,
+        Number  : createNumber,
         Object  : $Object,
         Proxy   : $Proxy,
         RegExp  : $RegExp,
         Symbol  : $Symbol,
-        String  : $String
+        String  : createString
       };
 
 
@@ -2264,6 +2112,19 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           return $$ThrowException('assertion_failed', ['$$AssertWontThrow']);
         },
+        $$Call: function(_, args){
+          var func = args[0].Call ? args[0].call : args[0];
+
+          switch (args.length) {
+            case 1: return func();
+            case 2: return func.call(args[1]);
+            case 3: return func.call(args[1], args[2]);
+            case 4: return func.call(args[1], args[2], args[3]);
+            case 5: return func.call(args[1], args[2], args[3], args[4]);
+            case 6: return func.call(args[1], args[2], args[3], args[4], args[5]);
+            default: return func.apply(args[1], args.slice(2));
+          }
+        },
         $$CallerArgumentCount: function(){
           if (context.caller) {
             return context.argumentCount();
@@ -2284,20 +2145,6 @@ var runtime = (function(GLOBAL, exports, undefined){
             return context.caller.isConstruct;
           }
           return false;
-        },
-        $$Call: function(_, args){
-          var obj = args[0],
-              key = args[1],
-              argv = args[2],
-              func = obj[key];
-
-          if (func) {
-            if (argv) {
-              return func.apply(obj, argv.array);
-            }
-            return obj[key]();
-          }
-          return $$ThrowException('unknown_internal_function', [key]);
         },
         $$CreateObject: function(_, args){
           return new objectTypes[args[0]](args[1]);
@@ -2354,6 +2201,22 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$Has: function(_, args){
           return args[1] in args[0];
         },
+        $$Invoke: function(_, args){
+          var obj  = args[0],
+              key  = args[1];
+
+          if (obj[key]) {
+            switch (args.length) {
+              case 2: return obj[key]();
+              case 3: return obj[key](args[2]);
+              case 4: return obj[key](args[2], args[3]);
+              case 5: return obj[key](args[2], args[3], args[4]);
+              case 6: return obj[key](args[2], args[3], args[4], args[5]);
+              default: return obj[key].apply(obj, args.slice(2));
+            }
+          }
+          return $$ThrowException('unknown_internal_function', [key]);
+        },
         $$IsConstruct: function(){
           return context.isConstruct;
         },
@@ -2383,7 +2246,7 @@ var runtime = (function(GLOBAL, exports, undefined){
             val = wrapFunction(val);
           }
 
-          args[0][args[1]] = val;
+          return args[0][args[1]] = val;
         },
         $$SetIntrinsic: function(_, args){
           realm.intrinsics[args[0]] = args[1];
@@ -2836,7 +2699,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       target.active = true;
       $Object.changeRealm(target);
       $Array.changeRealm(target);
-      $String.changeRealm(target);
+      //$String.changeRealm(target);
       $StrictArguments.changeRealm(target);
       operations.changeRealm(target);
       target.emit('activate');
