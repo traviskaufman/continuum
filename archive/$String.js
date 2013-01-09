@@ -28,7 +28,7 @@ var $String = (function(exports){
 
   function $String(value){
     $Object.call(this, intrinsics.StringProto);
-    this.setPrimitiveValue(value);
+    this.StringValue = value;
     this.define('length', value.length, ___);
   }
 
@@ -39,12 +39,6 @@ var $String = (function(exports){
     BuiltinBrand: 'StringWrapper',
     type: '$String'
   }, [
-    function getPrimitiveValue(){
-      return ObjectGet.call(this, StringValueSymbol) || '';
-    },
-    function setPrimitiveValue(value){
-      return this.define(StringValueSymbol, value, _CW);
-    },
 
     function each(callback){
       var str = this.getPrimitiveValue();

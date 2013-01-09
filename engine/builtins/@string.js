@@ -1,20 +1,69 @@
-import MAX_INTEGER from '@number';
-import RegExp from '@regexp';
+import {
+  $$ArgumentCount,
+  $$Call,
+  $$CreateInternalObject,
+  $$Get,
+  $$Exception,
+  $$Has,
+  $$Invoke,
+  $$Set
+} from '@@internals';
 
+import {
+  builtinClass,
+  call,
+  createInternal,
+  define,
+  extend,
+  extendInternal,
+  hasBrand,
+  isInitializing,
+  listFrom,
+  listOf,
+  numbers
+} from '@@utilities';
+
+import {
+  OrdinaryCreateFromConstructor,
+  ToInteger,
+  ToString,
+  ToUint32
+} from '@@operations';
+
+import {
+  MAX_INTEGER
+} from '@number';
+
+import {
+  RegExp
+} from '@regexp';
+
+
+import {
+  Array
+} from '@array';
+
+import {
+  dict
+} from '@dict';
+
+
+
+const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/
 
 
 function ensureCoercible(target, method){
   if (target === null || target === undefined) {
-    throw $__Exception('object_not_coercible', ['String.prototype.'+method, target]);
+    throw $$Exception('object_not_coercible', ['String.prototype.'+method, target]);
   }
-  return $__ToString(target);
+  return ToString(target);
 }
 
 internalFunction(ensureCoercible);
 
 
 function ToHTML(tag, content, attrName, attrVal){
-  const attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace($__ToString(attrVal), '"', '&quot;')+'"';
+  const attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace(ToString(attrVal), '"', '&quot;')+'"';
 
   return '<'+tag+attr+'>'+content+'</'+tag+'>';
 }
@@ -22,16 +71,9 @@ function ToHTML(tag, content, attrName, attrVal){
 internalFunction(ToHTML);
 
 
-function isRegExp(subject){
-  return subject !== null && typeof subject === 'object' && $__GetBuiltinBrand(subject) === 'BuiltinRegExp';
-}
-
-internalFunction(isRegExp);
-
-
 function stringIndexOf(string, search, position){
-  const searchStr = $__ToString(search),
-        pos       = $__ToInteger(position),
+  const searchStr = ToString(search),
+        pos       = ToInteger(position),
         len       = string.length,
         searchLen = searchStr.length,
         maxLen    = len - searchLen;
@@ -54,7 +96,7 @@ internalFunction(stringIndexOf);
 
 
 function stringMatch(string, regexp){
-  if (!isRegExp(regexp)) {
+  if (!hasBrand(regexp, 'BuiltinRegExp')) {
     regexp = new RegExp(regexp);
   }
 
@@ -91,7 +133,7 @@ internalFunction(stringMatch);
 
 
 function useHost(value, method){
-  return $__CallBuiltin(ensureCoercible(value, method), method);
+  return $$Invoke(ensureCoercible(value, method), method);
 }
 
 internalFunction(useHost);
@@ -99,10 +141,15 @@ internalFunction(useHost);
 
 
 export class String {
-  constructor(...string){
-    const str = string.length ? $__ToString(string[0]) : '';
+  constructor(value){
+    value = $$ArgumentCount() ? ToString(value) : '';
 
-    return $__isConstruct() ? $__StringCreate(str) : str;
+    if (!isInitializing(this, 'StringValue')) {
+      return value;
+    }
+
+    $$Set(this, 'StringValue', value);
+    define(this, 'length', value.length, 0);
   }
 
   anchor(name){
@@ -160,7 +207,7 @@ export class String {
   charAt(position){
     const string = ensureCoercible(this, 'charAt');
 
-    position = $__ToInteger(position);
+    position = ToInteger(position);
 
     return position < 0 || position >= string.length ? '' : string[position];
   }
@@ -168,7 +215,7 @@ export class String {
   charCodeAt(position){
     const string = ensureCoercible(this, 'charCodeAt');
 
-    position = $__ToInteger(position);
+    position = ToInteger(position);
 
     return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);
   }
@@ -177,7 +224,7 @@ export class String {
     let string = ensureCoercible(this, 'concat');
 
     for (var i=0; i < args.length; i++) {
-      string += $__ToString(args[i]);
+      string += ToString(args[i]);
     }
 
     return string;
@@ -189,10 +236,10 @@ export class String {
 
   lastIndexOf(searchString, position = Infinity){
     const string    = ensureCoercible(this, 'lastIndexOf'),
-          search    = $__ToString(searchString),
+          search    = ToString(searchString),
           len       = string.length,
           searchLen = searchString.length,
-          pos       = $__ToInteger(position) - searchLen;
+          pos       = ToInteger(position) - searchLen;
 
     let index = pos > 0 ? pos < len ? pos : len : 0;
 
@@ -218,11 +265,11 @@ export class String {
 
   repeat(count){
     let string = ensureCoercible(this, 'repeat'),
-        factor = $__ToInteger(count),
+        factor = ToInteger(count),
         result = '';
 
     if (factor <= 1 || factor === Infinity || factor === -Infinity) {
-      throw $__Exception('invalid_repeat_count', []);
+      throw $$Exception('invalid_repeat_count', []);
     }
 
     while (factor > 0) {
@@ -239,18 +286,18 @@ export class String {
 
     if (typeof replace === 'function') {
       let match, count;
-      if (isRegExp(search)) {
+      if (hasBrand(search, 'BuiltinRegExp')) {
         match = stringMatch(string, search);
         count = matches.length;
       } else {
-        match = stringIndexOf(string, $__ToString(search));
+        match = stringIndexOf(string, ToString(search));
         count = 1;
       }
       //TODO
     } else {
-      replace = $__ToString(replace);
-      if (!isRegExp(search)) {
-        search = $__ToString(search);
+      replace = ToString(replace);
+      if (!hasBrand(search, 'BuiltinRegExp')) {
+        search = ToString(search);
       }
 
       return $__StringReplace(string, search, replace);
@@ -260,7 +307,7 @@ export class String {
   search(regexp){
     const string = ensureCoercible(this, 'search');
 
-    if (!isRegExp(regexp)) {
+    if (!hasBrand(regexp, 'BuiltinRegExp')) {
       regexp = new RegExp(regexp);
     }
 
@@ -270,17 +317,17 @@ export class String {
   slice(start = 0, end = this.length){
     const string = ensureCoercible(this, 'slice');
 
-    start = $__ToInteger(start);
-    end = $__ToInteger(end);
+    start = ToInteger(start);
+    end = ToInteger(end);
 
-    return $__StringSlice(string, start, end);
+    return $$Invoke(string, 'slice', start, end);
   }
 
   split(separator, limit = MAX_INTEGER - 1){
     const string = ensureCoercible(this, 'split');
 
-    limit = $__ToInteger(limit);
-    separator = isRegExp(separator) ? separator : $__ToString(separator);
+    limit = ToInteger(limit);
+    separator = hasBrand(separator, 'BuiltinRegExp') ? separator : ToString(separator);
 
     return $__StringSplit(string, separator, limit);
   }
@@ -289,8 +336,8 @@ export class String {
     const string = ensureCoercible(this, 'substr'),
           chars  = string.length;
 
-    start = $__ToInteger(start);
-    length = $__ToInteger(length);
+    start = ToInteger(start);
+    length = ToInteger(length);
 
     if (start < 0) {
       start += chars;
@@ -303,15 +350,15 @@ export class String {
       length = chars - start;
     }
 
-    return length <= 0 ? '' : $__StringSlice(string, start, start + length);
+    return length <= 0 ? '' : $$Invoke(string, 'slice', start, start + length);
   }
 
   substring(start = 0, end = this.length){
     const string = ensureCoercible(this, 'substring'),
           len    = string.length;
 
-    start = $__ToInteger(start);
-    end = $__ToInteger(end);
+    start = ToInteger(start);
+    end = ToInteger(end);
 
     start = start > 0 ? start < len ? start : len : 0;
     end = end > 0 ? end < len ? end : len : 0;
@@ -319,51 +366,51 @@ export class String {
     const from = start < end ? start : end,
           to = start > end ? start : end;
 
-    return $__StringSlice(string, from, to);
+    return $$Invoke(string, 'slice', from, to);
   }
 
   toLocaleLowerCase(){
-    return $__CallBuiltin(ensureCoercible(this, 'toLocaleLowerCase'), 'toLocaleLowerCase');
+    return $$Invoke(ensureCoercible(this, 'toLocaleLowerCase'), 'toLocaleLowerCase');
   }
 
   toLocaleUpperCase(){
-    return $__CallBuiltin(ensureCoercible(this, 'toLocaleUpperCase'), 'toLocaleUpperCase');
+    return $$Invoke(ensureCoercible(this, 'toLocaleUpperCase'), 'toLocaleUpperCase');
   }
 
   toLowerCase(){
-    return $__CallBuiltin(ensureCoercible(this, 'toLowerCase'), 'toLowerCase');
+    return $$Invoke(ensureCoercible(this, 'toLowerCase'), 'toLowerCase');
   }
 
   toString(){
     if (typeof this === 'string') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'StringWrapper') {
-      return this.@@StringValue;
+    } else if (hasBrand(this, 'StringWrapper')) {
+      return $$Get(this, 'StringValue');
     }
-    throw $__Exception('not_generic', ['String.prototype.toString']);
+    throw $$Exception('not_generic', ['String.prototype.toString']);
   }
 
   toUpperCase(){
-    return $__CallBuiltin(ensureCoercible(this, 'toUpperCase'), 'toUpperCase');
+    return $$Invoke(ensureCoercible(this, 'toUpperCase'), 'toUpperCase');
   }
 
   trim(){
-    return $__StringTrim(ensureCoercible(this, 'trim'));
+    return $__StringReplace(ensureCoercible(this, 'trim'), trimmer, '');
   }
 
   valueOf(){
     if (typeof this === 'string') {
       return this;
-    } else if ($__GetBuiltinBrand(this) === 'StringWrapper') {
-      return this.@@StringValue;
+    } else if (hasBrand(this, 'StringWrapper')) {
+      return $$Get(this, 'StringValue');
     }
-    throw $__Exception('not_generic', ['String.prototype.toString']);
+    throw $$Exception('not_generic', ['String.prototype.toString']);
   }
 }
 
 builtinClass(String);
-$__define(String.prototype, @@NumberValue, '');
-$__define(String.prototype, 'length', 0, FROZEN);
+$$Set(String.prototype, 'StringValue', '');
+define(String.prototype, 'length', 0, FROZEN);
 
 
 export function fromCharCode(...codeUnits){
@@ -377,6 +424,142 @@ export function fromCharCode(...codeUnits){
   return result;
 }
 
-extend(String, { fromCharCode });
+extend(String, {
+  fromCharCode,
+  @@create(){
+    const obj = OrdinaryCreateFromConstructor(this, '%StringPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'StringWrapper');
+    $$Set(obj, 'StringValue', undefined);
+    return extendInternal(obj, internalMethods);
+  }
+});
 
 
+
+
+function unique(strings){
+  const len    = strings.length,
+        count  = 0,
+        seen   = dict(),
+        result = [];
+
+  for (var i=0; i < len; i++) {
+    const string = strings[i];
+    if (!(string in seen)) {
+      seen[string] = true;
+      result[count++] = string;
+    }
+  }
+
+  return result;
+}
+
+internalFunction(unique);
+
+
+function getCharacter(obj, key){
+  const string = $$Get(obj, 'StringValue'),
+        index  = ToUint32(key);
+
+  if (ToString(index) === key && index < $$Get(string, 'length')) {
+    return $$Get(string, key);
+  }
+}
+
+internalFunction(getCharacter);
+
+
+const StringIndexDescriptor = createInternal(null, {
+  Value: undefined,
+  Writable: false,
+  Enumerable: true,
+  Configurable: false,
+  attrs: 1
+});
+
+const GetOwnProperty = $$Get(String.prototype, 'GetOwnProperty'),
+      Enumerate      = $$Get(String.prototype, 'Enumerate'),
+      describe       = $$Get(String.prototype, 'describe'),
+      get            = $$Get(String.prototype, 'get'),
+      has            = $$Get(String.prototype, 'has'),
+      query          = $$Get(String.prototype, 'query'),
+      each           = $$Get(String.prototype, 'each');
+
+const internalMethods = {
+  GetOwnProperty(P){
+    const char = getCharacter(this, P);
+
+    if (char) {
+      const Desc = $$CreateInternalObject(StringIndexDescriptor);
+      $$Set(Desc, 'Value', char);
+      return Desc;
+    }
+
+    return $$Call(GetOwnProperty, this, P);
+  },
+  Get(P){
+    const char = getCharacter(this, P);
+
+    if (char) {
+      return char;
+    }
+
+    return $$Invoke(this, 'GetP', this, P);
+  },
+  Enumerate(includePrototype, onlyEnumerable){
+    const length = this.length,
+          props  = $$Call(Enumerate, this, includePrototype, onlyEnumerable);
+
+    if (!length) {
+      return props;
+    }
+
+    const array = [];
+    $$Set(array, 'array', props);
+    return listFrom(unique(numbers($$Get(props, 'length')).concat(array)));
+  },
+  each(callback){
+    const string = $$Get(this, 'StringValue'),
+          length = $$Get(string, 'length');
+
+    for (var i=0; i < length; i++) {
+      $$Call(callback, this, listOf(ToString(i), $$Get(string, i), 1));
+    }
+
+    return $$Call(each, this, callback);
+  },
+  has(key){
+    if (getCharacter(this, key)) {
+      return true;
+    }
+
+    return $$Call(has, this, key);
+  },
+  get(key){
+    const char = getCharacter(this, key);
+
+    if (char) {
+      return char;
+    }
+
+    return $$Call(get, this, key);
+  },
+  query(key){
+    const char = getCharacter(this, key);
+
+    if (char) {
+      return 1;
+    }
+
+    return $$Call(query, this, key);
+  },
+  describe(key){
+    const char = getCharacter(this, key);
+
+    if (char) {
+      return listOf(key, char, 1);
+    }
+
+    return $$Call(describe, this, key);
+  }
+}
