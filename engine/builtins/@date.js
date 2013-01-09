@@ -1004,11 +1004,6 @@ export class Date {
 
     return OrdinaryToPrimitive(this, tryFirst);
   }
-
-  // non-standard to make DateValue viewable in the debugger
-  get @@DateValue(){
-    return $$Get(this, 'DateValue');
-  }
 }
 
 builtinClass(Date);
