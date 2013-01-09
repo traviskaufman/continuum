@@ -1250,14 +1250,17 @@ var assembler = (function(exports){
 
   var symbol = (function(){
     function Symbol(node){
-      if (node.type === 'AtSymbol') {
+      this[0] = '';
+      if (!node) {
+        this[1] = '';
+      } else if (typeof node === 'string') {
+        this[1] = node;
+      } else if (node.type === 'AtSymbol') {
         this[0] = '@';
         this[1] = (node.internal ? '@' : '') + node.name;
       } else if (node.type === 'Literal') {
-        this[0] = '';
         this[1] = ''+node.value;
       } else {
-        this[0] = '';
         this[1] = node.name;
       }
     }
@@ -2077,15 +2080,12 @@ var assembler = (function(exports){
   function Property(node){
     var value = node.value;
     if (node.kind === 'init'){
-      var key = node.key.type === 'Identifier' ? node.key : node.key.value,
+      var key  = node.key.type === 'Identifier' ? node.key : node.key.value,
           name = key && key.name || key;
 
-      if (name === '__proto__') {
-        key = '';
-      }
       if (node.method) {
         pushNode(value);
-        FunctionExpression(value, intern(key));
+        FunctionExpression(value, symbol(node.key));
         popNode();
       } else if (isAnonymous(value)) {
         renameables[node.type](value, key).flags.writableName = true;
