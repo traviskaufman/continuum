@@ -127,8 +127,8 @@ var debug = (function(exports){
     }, [
       function label(){
         var label = [];
-        if ('Get' in this.subject) label.push('Getter');
-        if ('Set' in this.subject) label.push('Setter');
+        if (this.subject.Get) label.push('Getter');
+        if (this.subject.Set) label.push('Setter');
         return label.join('/');
       },
       function getName(){

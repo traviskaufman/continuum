@@ -328,6 +328,7 @@ h1, h2
 
 
 .ƒArguments      { color: #ff0 } /* hsl( 60, 100%, 50%) */
+.ƒAccessor       { color: #fc0 }
 .ƒArray          { color: #f68 } /* hsl(347, 100%, 70%) */
 .ƒArrayBuffer    { color: #f3a }
 .ƒBoolean        { color: #af6 } /* hsl( 93, 100%, 70%) */
