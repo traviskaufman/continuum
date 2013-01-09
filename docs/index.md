@@ -10,6 +10,8 @@
     Creates a Script object which can be executed.
 * __createCode(code|filename)__
     Creates bytecode from the given source and returns it unexecuted (this will be serializable to disk soon).
+* __createAbruptCompletion(value)__
+    Creates an AbruptCompletion using the value. This is basically a throw in flight, returning it from a function is essentially the same as `throw`.
 * __createRenderer(handlers)__
     For debug rendering, like the debugger UI.
 * __createFunction(func)__
@@ -20,6 +22,8 @@
     This modifies a VM function object so that your provided callback function is executed instead of the original code in the function. This change is made without modifying the function in any other way, so you're basically taking it over like a body snatcher.
 * __createExotic(definition)__
     An interface that exposes a similar API as the Proxy API in ES6, but at a lower level. By implementing a small set of basic handlers, you can create object types with custom semantics easily that still act like "normal" objects.
+* __parse(code)__
+    Parses the code using esprima as if it were being parsed to run in Continuum. Any syntax errors will be converted into AbruptCompletion $SyntaxError objects and returned.
 
 ### Extras
 
