@@ -1,14 +1,12 @@
 import {
-  @@BooleanValue: BooleanValue
-} from '@@symbols';
-
-import {
+  $$ArgumentCount,
   $$Exception,
   $$Get,
-  $$IsConstruct
+  $$Set
 } from '@@internals';
 
 import {
+  OrdinaryCreateFromConstructor,
   ToBoolean
 } from '@@operations';
 
@@ -19,7 +17,9 @@ import {
 import {
   builtinClass,
   define,
-  hasBrand
+  extend,
+  hasBrand,
+  isInitializing
 } from '@@utilities';
 
 
@@ -27,28 +27,29 @@ import {
 export class Boolean {
   constructor(value){
     value = ToBoolean(value);
-    return $$IsConstruct() ? $__BooleanCreate(value) : value;
+
+    if (!isInitializing(this, 'BooleanValue')) {
+      return value;
+    }
+
+    $$Set(this, 'BooleanValue', value);
   }
 
   toString(){
-    const type = Type(this);
-
-    if (type === 'Boolean') {
+    if (typeof this === 'boolean') {
       return this;
-    } else if (type === 'Object' && hasBrand(this, 'BooleanWrapper')) {
-      return this.@@BooleanValue ? 'true' : 'false';
+    } else if (hasBrand(this, 'BooleanWrapper')) {
+      return $$Get(this, 'BooleanValue');
     }
 
     throw $$Exception('not_generic', ['Boolean.prototype.toString']);
   }
 
   valueOf(){
-    const type = Type(this);
-
-    if (type === 'Boolean') {
+    if (typeof this === 'boolean') {
       return this;
-    } else if (type === 'Object' && hasBrand(this, 'BooleanWrapper')) {
-      return this.@@BooleanValue;
+    } else if (hasBrand(this, 'BooleanWrapper')) {
+      return $$Get(this, 'BooleanValue');
     }
 
     throw $$Exception('not_generic', ['Boolean.prototype.valueOf']);
@@ -58,4 +59,13 @@ export class Boolean {
 
 builtinClass(Boolean);
 
-define(Boolean.prototype, @@BooleanValue, false);
+$$Set(Boolean.prototype, 'BooleanValue', false);
+
+extend(Boolean, {
+  @@create(){
+    const obj = OrdinaryCreateFromConstructor(this, '%BooleanPrototype%');
+    $$Set(obj, 'BuiltinBrand', 'BooleanWrapper');
+    $$Set(obj, 'BooleanValue', undefined);
+    return obj;
+  }
+});
