@@ -78,7 +78,7 @@ var $Symbol = (function(exports){
       },
       function GetP(receiver, key){
         if (key === 'toString') {
-          return receiver.Realm.intrinsics.ObjectToString;
+          return require('../runtime').intrinsics.ObjectToString;
         }
       },
       function SetP(receiver, key, value){
