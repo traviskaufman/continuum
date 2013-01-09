@@ -542,25 +542,30 @@ var operations = (function(exports){
   exports.$$CreateArrayFromList = $$CreateArrayFromList;
 
 
+
   var protos = {
     '%ArrayBufferPrototype%' : 'ArrayBufferProto',
     '%ArrayPrototype%'       : 'ArrayProto',
+    '%BooleanPrototype%'     : '%BooleanPrototype%',
     '%DataViewPrototype%'    : 'DataViewProto',
-    '%DatePrototype%'        : 'DateProto',
+    '%DatePrototype%'        : '%DatePrototype%',
     '%Float32ArrayPrototype%': 'Float32ArrayProto',
     '%Float64ArrayPrototype%': 'Float64ArrayProto',
     '%FunctionPrototype%'    : 'FunctionProto',
     '%Int16ArrayPrototype%'  : 'Int16ArrayProto',
     '%Int32ArrayPrototype%'  : 'Int32ArrayProto',
     '%Int8ArrayPrototype%'   : 'Int8ArrayProto',
-    '%MapPrototype%'         : 'MapProto',
+    '%MapPrototype%'         : '%MapPrototype%',
+    '%NumberPrototype%'      : '%NumberPrototype%',
     '%ObjectPrototype%'      : 'ObjectProto',
-    '%SetPrototype%'         : 'SetProto',
+    '%SetPrototype%'         : '%SetPrototype%',
+    '%StringPrototype%'      : '%StringPrototype%',
     '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',
     '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',
     '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
-    '%WeakMapPrototype%'     : 'WeakMapProto'
+    '%WeakMapPrototype%'     : '%WeakMapPrototype%'
   };
+
 
   function $$OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
     if ($$Type(constructor) !== 'Object') {
