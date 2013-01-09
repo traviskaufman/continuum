@@ -91,12 +91,8 @@ export function enumerate(obj, inherited, onlyEnumerable){
   return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));
 }
 
-function getOwnPropertyInternal(obj, key){
-  return $$Invoke(obj, 'GetOwnProperty', key);
-}
-
 function defineOwnPropertyInternal(obj, key, Desc){
-  return $$Invoke(obj, 'DefineOwnProperty', key, Desc);
+  return
 }
 
 export function deleteProperty(obj, key){
@@ -109,6 +105,10 @@ export function update(obj, key, attr){
 
 export function define(obj, key, value, attr){
   return $$Invoke(obj, 'define', key, value, attr);
+}
+
+export function query(obj, key){
+  return $$Invoke(obj, 'query', key);
 }
 
 export function get(obj, key){
@@ -160,18 +160,22 @@ export function extend(obj, properties){
 
   while (index--) {
     const key   = keys[index],
-          desc  = getOwnPropertyInternal(properties, key),
-          value = $$Get(desc, 'Value');
+          desc  = $$Invoke(properties, 'GetOwnProperty', key);
 
     $$Set(desc, 'Enumerable', false);
-    if (typeof value === 'number') {
-      $$Set(desc, 'Configurable', false);
-      $$Set(desc, 'Writable', false);
-    } else if (typeof value === 'function') {
-      builtinFunction(value);
+
+    if ($$Has(desc, 'Value')) {
+      const value = $$Get(desc, 'Value');
+
+      if (typeof value === 'number') {
+        $$Set(desc, 'Configurable', false);
+        $$Set(desc, 'Writable', false);
+      } else if (typeof value === 'function') {
+        builtinFunction(value);
+      }
     }
 
-    defineOwnPropertyInternal(obj, key, desc);
+    $$Invoke(obj, 'DefineOwnProperty', key, desc);
   }
 }
 
@@ -194,6 +198,7 @@ export function createInternal(proto, properties){
 
 export function hideEverything(o){
   const type = typeof o;
+
   if (type === 'object' ? o === null : type !== 'function') {
     return o;
   }
@@ -202,7 +207,11 @@ export function hideEverything(o){
   let index = keys.length;
 
   while (index--) {
-    update(o, keys[index], typeof o[keys[index]] === 'number' ? FROZEN : HIDDEN);
+    const key   = keys[index],
+          attrs = query(o, key),
+          val   = get(o, key);
+
+    update(o, key, typeof val === 'number' ? FROZEN : attrs & ~1);
   }
 
   if (type === 'function') {
