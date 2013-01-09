@@ -7,7 +7,9 @@ import {
   $$ArgumentCount,
   $$CallerHasArgument,
   $$CallerName,
+  $$Get,
   $$Exception,
+  $$Has,
   $$HasArgument,
   $$IsConstruct,
   $$Now,
@@ -38,6 +40,7 @@ import {
   extend,
   hideEverything,
   isFinite,
+  isInitializing,
   isNaN,
   floor,
   zeroPad
@@ -56,7 +59,6 @@ import {
 
 import {
   @@create     : create,
-  @@DateValue  : DateValue,
   @@ToPrimitive: ToPrimitive
 } from '@@symbols';
 
@@ -586,13 +588,14 @@ export class Date {
   // ### 15.9.5.1 Date.prototype.constructor ###
   // ###########################################
   constructor(year, month, date = 1, hours = 0, minutes = 0, seconds = 0, ms = 0){
-    if (!$$IsConstruct()) {
+    if (!isInitializing(this, 'DateValue')) {
       // 15.9.2 The Date Constructor Called as a Function
       return toString($$Now());
     }
 
     // 15.9.3 The Date Constructor
     const argc = $$ArgumentCount();
+    let date;
 
     if (argc > 1) {
       // 15.9.3.1 new Date (year, month [, date [, hours [, minutes [, seconds [, ms ] ] ] ] ] )
@@ -607,290 +610,328 @@ export class Date {
       const yInt = ToInteger(y),
             yr   = !isNaN(y) && 0 <= yInt && yInt <= 99 ? y + 1900 : y;
 
-      define(this, @@DateValue, TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli)))));
+      date = TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
     } else if (argc === 1) {
       // 15.9.3.2 new Date (value)
-      const date = ToPrimitive(year);
-      define(this, @@DateValue, TimeClip(typeof date === 'string' ? parse(date) : date));
+      year = ToPrimitive(year);
+      date = TimeClip(typeof year === 'string' ? parse(year) : year)
     } else {
       // 15.9.3.3 new Date ( )
-      define(this, @@DateValue, $$Now());
+      date = $$Now();
     }
+
+    $$Set(this, 'DateValue', date);
   }
 
   // ########################################
   // ### 15.9.5.2 Date.prototype.toString ###
   // ########################################
   toString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toString(t);
   }
+
   // ############################################
   // ### 15.9.5.3 Date.prototype.toDateString ###
   // ############################################
   toDateString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toDateString(t);
   }
+
   // ############################################
   // ### 15.9.5.4 Date.prototype.toTimeString ###
   // ############################################
   toTimeString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toTimeString(t);
   }
+
   // ##############################################
   // ### 15.9.5.5 Date.prototype.toLocaleString ###
   // ##############################################
   toLocaleString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toLocaleString(t);
   }
+
   // ##################################################
   // ### 15.9.5.6 Date.prototype.toLocaleDateString ###
   // ##################################################
   toLocaleDateString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toLocaleDateString(t);
   }
+
   // ##################################################
   // ### 15.9.5.7 Date.prototype.toLocaleTimeString ###
   // ##################################################
   toLocaleTimeString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
     return isNaN(t) ? 'Invalid Date' : toLocaleTimeString(t);
   }
+
   // #######################################
   // ### 15.9.5.8 Date.prototype.valueOf ###
   // #######################################
   valueOf(){
-    return this.@@DateValue;
+    return $$Get(this, 'DateValue');
   }
 
   // #######################################
   // ### 15.9.5.9 Date.prototype.getTime ###
   // #######################################
   getTime(){
-    return this.@@DateValue;
+    return $$Get(this, 'DateValue');
   }
+
   // ############################################
   // ### 15.9.5.10 Date.prototype.getFullYear ###
   // ############################################
   getFullYear(){
-    return getTime(this.@@DateValue, false, YearFromTime);
+    return getTime($$Get(this, 'DateValue'), false, YearFromTime);
   }
+
   // ###############################################
   // ### 15.9.5.11 Date.prototype.getUTCFullYear ###
   // ###############################################
   getUTCFullYear(){
-    return getTime(this.@@DateValue, true, YearFromTime);
+    return getTime($$Get(this, 'DateValue'), true, YearFromTime);
   }
+
   // #########################################
   // ### 15.9.5.12 Date.prototype.getMonth ###
   // #########################################
   getMonth(){
-    return getTime(this.@@DateValue, false, MonthFromTime);
+    return getTime($$Get(this, 'DateValue'), false, MonthFromTime);
   }
+
   // ############################################
   // ### 15.9.5.13 Date.prototype.getUTCMonth ###
   // ############################################
   getUTCMonth(){
-    return getTime(this.@@DateValue, true, MonthFromTime);
+    return getTime($$Get(this, 'DateValue'), true, MonthFromTime);
   }
+
   // ########################################
   // ### 15.9.5.14 Date.prototype.getDate ###
   // ########################################
   getDate(){
-    return getTime(this.@@DateValue, false, DateFromTime);
+    return getTime($$Get(this, 'DateValue'), false, DateFromTime);
   }
+
   // ###########################################
   // ### 15.9.5.15 Date.prototype.getUTCDate ###
   // ###########################################
   getUTCDate(){
-    return getTime(this.@@DateValue, true, DateFromTime);
+    return getTime($$Get(this, 'DateValue'), true, DateFromTime);
   }
+
   // #######################################
   // ### 15.9.5.16 Date.prototype.getDay ###
   // #######################################
   getDay(){
-    return getTime(this.@@DateValue, false, WeekDay);
+    return getTime($$Get(this, 'DateValue'), false, WeekDay);
   }
+
   // ##########################################
   // ### 15.9.5.17 Date.prototype.getUTCDay ###
   // ##########################################
   getUTCDay(){
-    return getTime(this.@@DateValue, true, WeekDay);
+    return getTime($$Get(this, 'DateValue'), true, WeekDay);
   }
+
   // #########################################
   // ### 15.9.5.18 Date.prototype.getHours ###
   // #########################################
   getHours(){
-    return getTime(this.@@DateValue, false, HourFromTime);
+    return getTime($$Get(this, 'DateValue'), false, HourFromTime);
   }
+
   // ############################################
   // ### 15.9.5.19 Date.prototype.getUTCHours ###
   // ############################################
   getUTCHours(){
-    return getTime(this.@@DateValue, true, HourFromTime);
+    return getTime($$Get(this, 'DateValue'), true, HourFromTime);
   }
+
   // ###########################################
   // ### 15.9.5.20 Date.prototype.getMinutes ###
   // ###########################################
   getMinutes(){
-    return getTime(this.@@DateValue, false, MinFromTime);
+    return getTime($$Get(this, 'DateValue'), false, MinFromTime);
   }
+
   // ##############################################
   // ### 15.9.5.21 Date.prototype.getUTCMinutes ###
   // ##############################################
   getUTCMinutes(){
-    return getTime(this.@@DateValue, true, MinFromTime);
+    return getTime($$Get(this, 'DateValue'), true, MinFromTime);
   }
+
   // ###########################################
   // ### 15.9.5.22 Date.prototype.getSeconds ###
   // ###########################################
   getSeconds(){
-    return getTime(this.@@DateValue, false, SecFromTime);
+    return getTime($$Get(this, 'DateValue'), false, SecFromTime);
   }
+
   // ##############################################
   // ### 15.9.5.23 Date.prototype.getUTCSeconds ###
   // ##############################################
   getUTCSeconds(){
-    return getTime(this.@@DateValue, true, SecFromTime);
+    return getTime($$Get(this, 'DateValue'), true, SecFromTime);
   }
+
   // ################################################
   // ### 15.9.5.24 Date.prototype.getMilliseconds ###
   // ################################################
   getMilliseconds(){
-    return getTime(this.@@DateValue, false, msFromTime);
+    return getTime($$Get(this, 'DateValue'), false, msFromTime);
   }
+
   // ###################################################
   // ### 15.9.5.25 Date.prototype.getUTCMilliseconds ###
   // ###################################################
   getUTCMilliseconds(){
-    return getTime(this.@@DateValue, true, msFromTime);
+    return getTime($$Get(this, 'DateValue'), true, msFromTime);
   }
 
   // ##################################################
   // ### 15.9.5.26 Date.prototype.getTimezoneOffset ###
   // ##################################################
   getTimezoneOffset(){
-    return getTimezone(this.@@DateValue, msPerMinute);
+    return getTimezone($$Get(this, 'DateValue'), msPerMinute);
   }
 
   // ########################################
   // ### 15.9.5.27 Date.prototype.setTime ###
   // ########################################
   setTime(time){
-    return this.@@DateValue = TimeClip(ToNumber(time));
+    return $$Set(this, 'DateValue', TimeClip(ToNumber(time)));
   }
+
   // ################################################
   // ### 15.9.5.28 Date.prototype.setMilliseconds ###
   // ################################################
   setMilliseconds(ms){
-    return this.@@DateValue = TimeClip(ToUTC(makeMilliseconds(this.@@DateValue, ms)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeMilliseconds($$Get(this, 'DateValue'), ms))));
   }
+
   // ###################################################
   // ### 15.9.5.29 Date.prototype.setUTCMilliseconds ###
   // ###################################################
   setUTCMilliseconds(ms){
-    return this.@@DateValue = TimeClip(makeMilliseconds(this.@@DateValue, ms));
+    return $$Set(this, 'DateValue', TimeClip(makeMilliseconds($$Get(this, 'DateValue'), ms)));
   }
+
   // ###########################################
   // ### 15.9.5.30 Date.prototype.setSeconds ###
   // ###########################################
   setSeconds(sec, ms){
-    return this.@@DateValue = TimeClip(ToUTC(makeSeconds(this.@@DateValue, sec, ms)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeSeconds($$Get(this, 'DateValue'), sec, ms))));
   }
+
   // ##############################################
   // ### 15.9.5.31 Date.prototype.setUTCSeconds ###
   // ##############################################
   setUTCSeconds(sec, ms){
-    return this.@@DateValue = TimeClip(makeSeconds(this.@@DateValue, sec, ms));
+    return $$Set(this, 'DateValue', TimeClip(makeSeconds($$Get(this, 'DateValue'), sec, ms)));
   }
+
   // ###########################################
   // ### 15.9.5.32 Date.prototype.setMinutes ###
   // ###########################################
   setMinutes(min, sec, ms){
-    return this.@@DateValue = TimeClip(ToUTC(makeMinutes(this.@@DateValue, min, sec, ms)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeMinutes($$Get(this, 'DateValue'), min, sec, ms))));
   }
+
   // ##############################################
   // ### 15.9.5.33 Date.prototype.setUTCMinutes ###
   // ##############################################
   setUTCMinutes(min, sec, ms){
-    return this.@@DateValue = TimeClip(makeMinutes(this.@@DateValue, min, sec, ms));
+    return $$Set(this, 'DateValue', TimeClip(makeMinutes($$Get(this, 'DateValue'), min, sec, ms)));
   }
+
   // #########################################
   // ### 15.9.5.34 Date.prototype.setHours ###
   // #########################################
   setHours(hour, min, sec, ms){
-    return this.@@DateValue = TimeClip(ToUTC(makeHours(this.@@DateValue, hour, min, sec, ms)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeHours($$Get(this, 'DateValue'), hour, min, sec, ms))));
   }
+
   // ############################################
   // ### 15.9.5.35 Date.prototype.setUTCHours ###
   // ############################################
   setUTCHours(hour, min, sec, ms){
-    return this.@@DateValue = TimeClip(makeHours(this.@@DateValue, hour, min, sec, ms));
+    return $$Set(this, 'DateValue', TimeClip(makeHours($$Get(this, 'DateValue'), hour, min, sec, ms)));
   }
+
   // ########################################
   // ### 15.9.5.36 Date.prototype.setDate ###
   // ########################################
   setDate(date){
-    return this.@@DateValue = TimeClip(ToUTC(makeDate(this.@@DateValue, date)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeDate($$Get(this, 'DateValue'), date))));
   }
+
   // ###########################################
   // ### 15.9.5.37 Date.prototype.setUTCDate ###
   // ###########################################
   setUTCDate(date){
-    return this.@@DateValue = TimeClip(makeDate(this.@@DateValue, date));
+    return $$Set(this, 'DateValue', TimeClip(makeDate($$Get(this, 'DateValue'), date)));
   }
+
   // #########################################
   // ### 15.9.5.38 Date.prototype.setMonth ###
   // #########################################
   setMonth(month, date){
-    return this.@@DateValue = TimeClip(ToUTC(makeMonth(this.@@DateValue, month, date)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeMonth($$Get(this, 'DateValue'), month, date))));
   }
+
   // ############################################
   // ### 15.9.5.39 Date.prototype.setUTCMonth ###
   // ############################################
   setUTCMonth(month, date){
-    return this.@@DateValue = TimeClip(makeMonth(this.@@DateValue, month, date));
+    return $$Set(this, 'DateValue', TimeClip(makeMonth($$Get(this, 'DateValue'), month, date)));
   }
+
   // ############################################
   // ### 15.9.5.40 Date.prototype.setFullYear ###
   // ############################################
   setFullYear(year, month, date){
-    return this.@@DateValue = TimeClip(ToUTC(makeFullYear(this.@@DateValue, year, month, date)));
+    return $$Set(this, 'DateValue', TimeClip(ToUTC(makeFullYear($$Get(this, 'DateValue'), year, month, date))));
   }
+
   // ###############################################
   // ### 15.9.5.41 Date.prototype.setUTCFullYear ###
   // ###############################################
   setUTCFullYear(year, month, date){
-    return this.@@DateValue = TimeClip(makeFullYear(this.@@DateValue, year, month, date));
+    return $$Set(this, 'DateValue', TimeClip(makeFullYear($$Get(this, 'DateValue'), year, month, date)));
   }
 
   // ############################################
   // ### 15.9.5.42 Date.prototype.toUTCString ###
   // ############################################
   toUTCString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
@@ -908,11 +949,12 @@ export class Date {
 
     return `${weekday}, ${date} ${month} ${year} ${hour}:${min}:${sec} GMT`;
   }
+
   // ############################################
   // ### 15.9.5.43 Date.prototype.toISOString ###
   // ############################################
   toISOString(){
-    const t = this.@@DateValue;
+    const t = $$Get(this, 'DateValue');
 
     ensureDate(t);
 
@@ -930,6 +972,7 @@ export class Date {
 
     return `${year}-${month}-${date}T${hour}:${min}:${sec}.${ms}Z`;
   }
+
   // #######################################
   // ### 15.9.5.44 Date.prototype.toJSON ###
   // #######################################
@@ -961,10 +1004,15 @@ export class Date {
 
     return OrdinaryToPrimitive(this, tryFirst);
   }
+
+  // non-standard to make DateValue viewable in the debugger
+  get @@DateValue(){
+    return $$Get(this, 'DateValue');
+  }
 }
 
 builtinClass(Date);
-define(Date.prototype, @@DateValue, NaN);
+$$Set(Date.prototype, 'DateValue', NaN);
 extend(Date, { parse, UTC, now });
 
 extend(Date, {
@@ -972,6 +1020,7 @@ extend(Date, {
   @@create(){
     const obj = OrdinaryCreateFromConstructor(this, '%DatePrototype%');
     $$Set(obj, 'BuiltinBrand', 'BuiltinDate');
+    $$Set(obj, 'DateValue', undefined);
     return obj;
   }
 });
