@@ -111,38 +111,33 @@ var operators = (function(exports){
   }
   exports.$$GetThisValue = $$GetThisValue;
 
+  var runtime;
 
-  function $Boolean(o){
-    $Boolean = require('../runtime').builtins.$Boolean;
-    return new $Boolean(o);
-  }
-
-  function $Number(o){
-    $Number = require('../runtime').builtins.$Number;
-    return new $Number(o);
-  }
-
-  function $String(o){
-    $String = require('../runtime').builtins.$String;
-    return new $String(o);
-  }
 
   function $$ToObject(argument){
-    switch (typeof argument) {
-      case 'boolean':
-        return new $Boolean(argument);
-      case 'number':
-        return new $Number(argument);
-      case 'string':
-        return new $String(argument);
-      case 'undefined':
-        return $$ThrowException('undefined_to_object', []);
-      case 'object':
-        if (argument === null) {
-          return $$ThrowException('null_to_object', []);
-        }
-        return argument;
-    }
+    var $Object = require('./$Object').$Object,
+        runtime = require('../runtime');
+
+    $$ToObject = function _$$ToObject(argument){
+      switch (typeof argument) {
+        case 'undefined':
+          return $$ThrowException('undefined_to_object', []);
+        case 'object':
+          return argument === null ? $$ThrowException('null_to_object', []) : argument;
+        case 'boolean':
+          var name = '%Boolean%';
+          break;
+        case 'number':
+          var name = '%Number%';
+          break;
+        case 'string':
+          var name = '%String%';
+      }
+
+      return runtime.intrinsics[name].Construct([argument]);
+    };
+
+    return $$ToObject(argument);
   }
 
   exports.$$ToObject = $$ToObject;
