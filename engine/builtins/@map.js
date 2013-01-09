@@ -4,11 +4,16 @@ import {
 } from '@@symbols';
 
 import {
+  $$Exception,
+  $$Get,
+  $$Has,
   $$Set
 } from '@@internals';
 
+
 import {
   builtinClass,
+  builtinFunction,
   define,
   extend,
   hasBrand,
@@ -28,8 +33,8 @@ import {
 } from '@iter';
 
 function ensureMap(o, name){
-  if (!o || typeof o !== 'object' || !$__hasInternal(o, 'MapData')) {
-    throw $__Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
+  if (!o || typeof o !== 'object' || !$$Has(o, 'MapData')) {
+    throw $$Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
   }
 }
 
@@ -49,11 +54,11 @@ class MapIterator extends Iterator {
 
   next(){
     if (Type(this) !== 'Object') {
-      throw $__Exception('called_on_non_object', ['MapIterator.prototype.next']);
+      throw $$Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
 
     if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {
-      throw $__Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
+      throw $$Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
 
     var kind = this.@kind,
@@ -84,7 +89,7 @@ export class Map {
   }
 
   get size(){
-    if (this && $__hasInternal(this, 'MapData')) {
+    if (this && $$Has(this, 'MapData')) {
       return $__MapSize(this);
     }
     return 0;
@@ -158,8 +163,8 @@ builtinFunction(mapClear);
 function mapCreate(target, iterable){
   target = $__ToObject(target);
 
-  if ($__hasInternal(target, 'MapData')) {
-    throw $__Exception('double_initialization', ['Map']);
+  if ($$Has(target, 'MapData')) {
+    throw $$Exception('double_initialization', ['Map']);
   }
 
   $__MapInitialization(target, iterable);
