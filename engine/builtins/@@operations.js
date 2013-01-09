@@ -266,11 +266,11 @@ export function ToObject(argument){
     case 'Null':
       throw $$Exception('null_to_object', []);
     case 'Boolean':
-      return $$CreateObject('Boolean', argument);
+      return new ($$GetIntrinsic('%Boolean%'))(argument);
     case 'Number':
-      return $$CreateObject('Number', argument);
+      return new ($$GetIntrinsic('%Number%'))(argument);
     case 'String':
-      return $$CreateObject('String', argument);
+      return new ($$GetIntrinsic('%String%'))(argument);
   }
 }
 
