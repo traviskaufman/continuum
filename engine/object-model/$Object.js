@@ -349,7 +349,7 @@ var $Object = (function(exports){
         }
       },
       function toStringTag(){
-        return this.get(symbols.toStringTag);
+        return this.Get(symbols.toStringTag);
       }
     ]);
   }();
@@ -540,7 +540,7 @@ var $Object = (function(exports){
         if (proto) {
           var inherited = proto.Enumerate(includePrototype, onlyEnumerable);
           for (var i=0; i < inherited.length; i++) {
-            var key = inherited[i][0];
+            var key = inherited[i];
             if (!(key in seen)) {
               props.push(key);
               seen[key] = true;
