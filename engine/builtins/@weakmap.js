@@ -8,6 +8,14 @@ import {
 } from '@@internals';
 
 import {
+  builtinClass,
+  define,
+  extend,
+  hasBrand,
+  isInitializing
+} from '@@utilities';
+
+import {
   OrdinaryCreateFromConstructor
 } from '@@operations';
 
@@ -51,7 +59,7 @@ export class WeakMap {
 }
 
 
-$__extend(WeakMap, {
+extend(WeakMap, {
   @@create(){
     var obj = OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
     $$Set(obj, 'BuiltinBrand', 'BuiltinWeakMap');
