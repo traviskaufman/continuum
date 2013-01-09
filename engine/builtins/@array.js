@@ -8,6 +8,23 @@ import {
 } from '@@internals';
 
 import {
+  define,
+  call,
+  hasBrand
+} from '@@utilities';
+
+import {
+  ToInteger,
+  ToObject,
+  ToString,
+  ToUint32
+} from '@@operations';
+
+import {
+  Type
+} from '@@types';
+
+import {
   Iterator
 } from '@iter';
 
@@ -22,6 +39,9 @@ import {
   max,
   floor
 } from '@math';
+
+
+
 
 const arrays = new Set;
 
@@ -38,13 +58,15 @@ const kinds = {
   'sparse:key+value': 7
 };
 
+
+
 class ArrayIterator extends Iterator {
   private @array, // IteratedObject
           @index, // ArrayIteratorNextIndex
           @kind;  // ArrayIterationKind
 
   constructor(array, kind){
-    this.@array = $__ToObject(array);
+    this.@array = ToObject(array);
     this.@index = 0;
     this.@kind = kinds[kind];
   }
@@ -59,7 +81,7 @@ class ArrayIterator extends Iterator {
     const array = this.@array,
           index = this.@index,
           kind  = this.@kind,
-          len   = $__ToUint32(array.length);
+          len   = ToUint32(array.length);
 
     if (kind & S) {
       let found = false;
@@ -77,7 +99,7 @@ class ArrayIterator extends Iterator {
     }
 
     this.@index = index + 1;
-    const key = $__ToString(index);
+    const key = ToString(index);
     return kind & V ? kind & K ? [key, array[key]] : array[key] : key;
   }
 }
@@ -88,7 +110,7 @@ builtinClass(ArrayIterator);
 
 
 function defaultComparefn(x, y){
-  return 1 - ($__ToString(x) < $__ToString(y));
+  return 1 - (ToString(x) < ToString(y));
 }
 
 internalFunction(defaultComparefn);
@@ -116,7 +138,7 @@ export class Array {
     const array = [],
           count = items.length;
 
-    let obj   = $__ToObject(this),
+    let obj   = ToObject(this),
         n     = 0,
         index = 0;
 
@@ -144,15 +166,15 @@ export class Array {
   }
 
   every(callbackfn, context = undefined){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length);
+    const array  = ToObject(this),
+          len    = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
     if (len) {
       let index = 0;
       do {
-        if (index in array && !$__Call(callbackfn, context, [array[index], index, array])) {
+        if (index in array && !call(callbackfn, context, [array[index], index, array])) {
           return false;
         }
       } while (++index < len)
@@ -162,8 +184,8 @@ export class Array {
   }
 
   filter(callbackfn, context = undefined){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           result = [];
 
     ensureCallback(callbackfn);
@@ -173,7 +195,7 @@ export class Array {
       do {
         if (index in array) {
           let element = array[index];
-          if ($__Call(callbackfn, context, [element, index, array])) {
+          if (call(callbackfn, context, [element, index, array])) {
             result[result.length] = element;
           }
         }
@@ -184,27 +206,27 @@ export class Array {
   }
 
   forEach(callbackfn, context = undefined){
-    const array = $__ToObject(this),
+    const array = ToObject(this),
           len   = $__ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
     for (let i=0; i < len; i++) {
       if (i in array) {
-        $__Call(callbackfn, context, [array[i], i, this]);
+        call(callbackfn, context, [array[i], i, this]);
       }
     }
   }
 
   indexOf(search, fromIndex = 0){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     if (len === 0) {
       return -1;
     }
 
-    let index = $__ToInteger(fromIndex);
+    let index = ToInteger(fromIndex);
     if (index >= len) {
       return -1;
     } else if (index < 0) {
@@ -224,25 +246,25 @@ export class Array {
   }
 
   join(separator){
-    const array = $__ToObject(this);
+    const array = ToObject(this);
 
     if (has(arrays, array)) {
       return '';
     }
     add(arrays, array);
 
-    const sep = $$ArgumentCount() ? $__ToString(separator) : ',',
-          len = $__ToUint32(array.length);
+    const sep = $$ArgumentCount() ? ToString(separator) : ',',
+          len = ToUint32(array.length);
 
     if (len === 0) {
       return '';
     }
 
-    let result = '0' in array ? $__ToString(array[0]) : '',
+    let result = '0' in array ? ToString(array[0]) : '',
         index  = 0;
 
     while (++index < len) {
-      result += index in array ? sep + $__ToString(array[index]) : sep;
+      result += index in array ? sep + ToString(array[index]) : sep;
     }
 
     arrays.delete(array);
@@ -254,14 +276,14 @@ export class Array {
   }
 
   lastIndexOf(search, fromIndex = this.length){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     if (len === 0) {
       return -1;
     }
 
-    let index = $__ToInteger(fromIndex);
+    let index = ToInteger(fromIndex);
     if (index >= len) {
       index = len - 1;
     } else if (index < 0) {
@@ -281,15 +303,15 @@ export class Array {
   }
 
   map(callbackfn, context = undefined){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           result = [];
 
     ensureCallback(callbackfn);
 
     for (var i=0; i < len; i++) {
       if (i in array) {
-        result[i] = $__Call(callbackfn, context, [array[i], i, this]);
+        result[i] = call(callbackfn, context, [array[i], i, this]);
       }
     }
 
@@ -297,8 +319,8 @@ export class Array {
   }
 
   pop(){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length) - 1;
+    const array  = ToObject(this),
+          len    = ToUint32(array.length) - 1;
 
     if (len >= 0) {
       const result = array[len];
@@ -308,8 +330,8 @@ export class Array {
   }
 
   push(...values){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length),
+    const array = ToObject(this),
+          len   = ToUint32(array.length),
           count = values.length;
 
     let index = len;
@@ -324,8 +346,8 @@ export class Array {
   }
 
   reduce(callbackfn, initialValue){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
@@ -340,7 +362,7 @@ export class Array {
 
     do {
       if (index in array) {
-        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);
+        accumulator = call(callbackfn, this, [accumulator, array[index], array]);
       }
     } while (++index < len)
 
@@ -348,8 +370,8 @@ export class Array {
   }
 
   reduceRight(callbackfn, initialValue){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
@@ -364,7 +386,7 @@ export class Array {
 
     do {
       if (index in array) {
-        accumulator = $__Call(callbackfn, this, [accumulator, array[index], array]);
+        accumulator = call(callbackfn, this, [accumulator, array[index], array]);
       }
     } while (--index >= 0)
 
@@ -372,15 +394,15 @@ export class Array {
   }
 
   reverse(){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           middle = floor(len / 2);
 
     let lower = -1;
     while (++lower !== middle) {
       const upper       = len - lower - 1,
-            lowerP      = $__ToString(lower),
-            upperP      = $__ToString(upper),
+            lowerP      = ToString(lower),
+            upperP      = ToString(upper),
             lowerValue  = array[lowerP],
             upperValue  = array[upperP];
 
@@ -402,16 +424,16 @@ export class Array {
   }
 
   slice(start = 0, end = this.length){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           result = [];
 
-    start = $__ToInteger(start);
+    start = ToInteger(start);
     if (start < 0) {
       start = max(len + start, 0);
     }
 
-    end = $__ToInteger(end);
+    end = ToInteger(end);
     if (end < 0) {
       end = max(len + end, 0);
     } else {
@@ -431,8 +453,8 @@ export class Array {
   }
 
   shift(){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           result = array[0];
 
     if (!len) {
@@ -456,15 +478,15 @@ export class Array {
   }
 
   some(callbackfn, context = undefined){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
     if (len) {
       let index = 0;
       do {
-        if (index in array && $__Call(callbackfn, context, [array[index], index, array])) {
+        if (index in array && call(callbackfn, context, [array[index], index, array])) {
           return true;
         }
       } while (++index < len)
@@ -474,7 +496,7 @@ export class Array {
   }
 
   sort(comparefn = defaultComparefn){
-    const array = $__ToObject(this),
+    const array = ToObject(this),
           len   = array.length;
 
     ensureCallback(comparefn);
@@ -549,19 +571,19 @@ export class Array {
   }
 
   splice(start, deleteCount, ...items){
-    const array     = $__ToObject(this),
-          len       = $__ToUint32(array.length),
+    const array     = ToObject(this),
+          len       = ToUint32(array.length),
           itemCount = items.length,
           result    = [];
 
-    start = $__ToInteger(start);
+    start = ToInteger(start);
     if (start < 0) {
       start = max(len + start, 0);
     } else {
       start = min(start, len);
     }
 
-    deleteCount = min(max($__ToInteger(deleteCount), 0), len - start);
+    deleteCount = min(max(ToInteger(deleteCount), 0), len - start);
 
     if (deleteCount > 0) {
       let index = 0;
@@ -626,8 +648,8 @@ export class Array {
   }
 
   toLocaleString(){
-    const array = $__ToObject(this),
-          len   = $__ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     if (len === 0 || has(arrays, array)) {
       return '';
@@ -651,19 +673,19 @@ export class Array {
   }
 
   toString(){
-    const array = $__ToObject(this);
+    const array = ToObject(this);
     let func = array.join;
 
     if (typeof func !== 'function') {
       func = $__ObjectToString;
     }
 
-    return $__Call(func, array, []);
+    return call(func, array, []);
   }
 
   unshift(...values){
-    const array  = $__ToObject(this),
-          len    = $__ToUint32(array.length),
+    const array  = ToObject(this),
+          len    = ToUint32(array.length),
           newLen = len + values.length;
 
     if (len === newLen) {
@@ -698,43 +720,44 @@ export class Array {
 
 builtinClass(Array);
 const ArrayPrototype = Array.prototype;
-$__define(ArrayPrototype, @@iterator, ArrayPrototype.values);
+define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 
-['push', 'reduce', 'reduceRight'].forEach(name => $__set(ArrayPrototype[name], 'length', 1));
+['push', 'reduce', 'reduceRight'].forEach(name => define(ArrayPrototype[name], 'length', 1, FROZEN));
 
 export function isArray(array){
-  return $__Type(array) === 'Object' ? $__GetBuiltinBrand(array) === 'BuiltinArray' : false;
+  return Type(array) === 'Object' ? hasBrand(array, 'BuiltinArray') : false;
 }
 
 export function from(arrayLike){
-  arrayLike = $__ToObject(arrayLike);
-
-  const len  = $__ToUint32(arrayLike.length),
-        Ctor = $__IsConstructor(this) ? this : Array,
-        out  = new Ctor(len);
+  const obj    = ToObject(arrayLike),
+        len    = ToUint32(obj.length),
+        Ctor   = $__IsConstructor(this) ? this : Array,
+        result = new Ctor(len);
 
   for (var i = 0; i < len; i++) {
-    if (i in arrayLike) {
-      out[i] = arrayLike[i];
+    if (i in obj) {
+      result[i] = obj[i];
     }
   }
 
-  out.length = len;
-  return out;
+  result.length = len;
+  return result;
 }
 
 export function of(...items){
-  const len  = items.length,
-        Ctor = $__IsConstructor(this) ? this : Array,
-        out  = new Ctor(len);
-
-
-  for (var i=0; i < len; i++) {
-    out[i] = items[i];
+  if (!$__IsConstructor(this)) {
+    return items;
   }
 
-  out.length = len;
-  return out;
+  const len    = items.length,
+        result = new this(len);
+
+  for (var i=0; i < len; i++) {
+    result[i] = items[i];
+  }
+
+  result.length = len;
+  return result;
 }
 
 extend(Array, { isArray, from, of });
