@@ -954,16 +954,16 @@ var Panel = function(){
           } else {
             if (this[first].size === 'auto') {
               var primary = this[second];
-                  second = this[first];
+                  secondary = this[first];
             } else {
               var primary = this[first];
-                  second = this[second];
+                  secondary = this[second];
             }
             primary[main] = length(primary.size, this[main]);
-            second[main] = this[main] - primary[main];
+            secondary[main] = this[main] - primary[main];
           }
           this[first].recalc && this[first].recalc();
-          this[second] && this[second].recalc && this[second].recalc();
+          this[second].recalc && this[second].recalc();
         }
       }
     }
