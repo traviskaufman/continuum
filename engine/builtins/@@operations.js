@@ -7,6 +7,7 @@ import {
   abs,
   call,
   floor,
+  getIntrinsic,
   hasBrand,
   isNaN,
   isZeroOrInfinite,
@@ -266,11 +267,11 @@ export function ToObject(argument){
     case 'Null':
       throw $$Exception('null_to_object', []);
     case 'Boolean':
-      return new ($$GetIntrinsic('%Boolean%'))(argument);
+      return new (getIntrinsic('%Boolean%'))(argument);
     case 'Number':
-      return new ($$GetIntrinsic('%Number%'))(argument);
+      return new (getIntrinsic('%Number%'))(argument);
     case 'String':
-      return new ($$GetIntrinsic('%String%'))(argument);
+      return new (getIntrinsic('%String%'))(argument);
   }
 }
 
@@ -591,6 +592,7 @@ const protos = {
   '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
   '%WeakMapPrototype%'     : '%WeakMapPrototype%'
 };
+
 
 export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
   if (Type(constructor) !== 'Object') {
