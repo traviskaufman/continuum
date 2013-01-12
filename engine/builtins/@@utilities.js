@@ -127,32 +127,6 @@ export function builtinFunction(func){
   define(func, 'arguments', null, 0);
 }
 
-export function builtinClass(Ctor, brand){
-  var prototypeName = '%' + Ctor.name + 'Prototype%',
-      isSymbol = Ctor.name === 'Symbol';
-
-  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
-  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
-  $$Set(Ctor, 'BuiltinConstructor', true);
-  $$Set(Ctor, 'BuiltinFunction', true);
-  $$Set(Ctor, 'strict', false);
-  update(Ctor, 'prototype', FROZEN);
-  set(Ctor, 'length', 1);
-  define(Ctor, 'caller', null, FROZEN);
-  define(Ctor, 'arguments', null, FROZEN);
-
-  if (!isSymbol) {
-    brand || (brand = 'Builtin'+Ctor.name);
-    if (brand in brands) {
-      brand = brands[brand];
-    }
-
-    $$Set(Ctor.prototype, 'BuiltinBrand', brand);
-    define(Ctor.prototype, @@toStringTag, Ctor.name);
-    hideEverything(Ctor);
-  }
-}
-
 
 export function extend(obj, properties){
   const keys = enumerate(properties, false, false);
@@ -221,34 +195,23 @@ export function hideEverything(o){
   return o;
 }
 
-function builtinClass(Ctor, brand){
-  const prototypeName = Ctor.name + 'Proto',
-        prototype     = $$GetIntrinsic(prototypeName),
-        isSymbol      = Ctor.name === 'Symbol';
-
-  if (prototype) {
-    if (!isSymbol) {
-      extend(prototype, Ctor.prototype);
-    }
-    set(Ctor, 'prototype', prototype);
-  } else {
-    $$SetIntrinsic(prototypeName, Ctor.prototype);
-  }
-
+export function builtinClass(Ctor, brand){
+  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
+  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
   $$Set(Ctor, 'BuiltinConstructor', true);
   $$Set(Ctor, 'BuiltinFunction', true);
-  $$Set(Ctor, 'strict', false);
   update(Ctor, 'prototype', FROZEN);
-  set(Ctor, 'length', 1);
+  define(Ctor, 'length', 1, FROZEN);
   define(Ctor, 'caller', null, FROZEN);
   define(Ctor, 'arguments', null, FROZEN);
 
-  if (!isSymbol) {
-    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name)
+  if (Ctor.name !== 'Symbol') {
+    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name);
     define(Ctor.prototype, @@toStringTag, Ctor.name);
     hideEverything(Ctor);
   }
 }
+
 
 export function isInitializing(obj, internal){
   return obj != null && $$Has(obj, internal) && $$Get(obj, internal) === undefined;
@@ -292,3 +255,6 @@ export function numbers(start, end){
   return result;
 }
 
+export function getIntrinsic(name){
+  return $$GetIntrinsic($$CurrentRealm(), name);
+}
