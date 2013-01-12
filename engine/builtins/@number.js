@@ -82,8 +82,7 @@ export class Number {
   }
 }
 
-builtinClass(Number);
-
+builtinClass(Number, 'NumberWrapper');
 $$Set(Number.prototype, 'NumberValue', 0);
 
 

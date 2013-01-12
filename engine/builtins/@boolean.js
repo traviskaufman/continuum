@@ -57,8 +57,7 @@ export class Boolean {
 }
 
 
-builtinClass(Boolean);
-
+builtinClass(Boolean, 'BooleanWrapper');
 $$Set(Boolean.prototype, 'BooleanValue', false);
 
 extend(Boolean, {
