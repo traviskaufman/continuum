@@ -49,7 +49,7 @@ import {
 
 
 
-const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/
+const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/;
 
 
 function ensureCoercible(target, method){
@@ -408,7 +408,7 @@ export class String {
   }
 }
 
-builtinClass(String);
+builtinClass(String, 'StringWrapper');
 $$Set(String.prototype, 'StringValue', '');
 define(String.prototype, 'length', 0, FROZEN);
 
