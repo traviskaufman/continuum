@@ -2088,7 +2088,7 @@ var assembler = (function(exports){
         FunctionExpression(value, symbol(node.key));
         popNode();
       } else if (isAnonymous(value)) {
-        renameables[node.type](value, key).flags.writableName = true;
+        renameables[value.type](value, key).flags.writableName = true;
       } else {
         recurse(value);
       }
