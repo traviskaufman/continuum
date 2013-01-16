@@ -380,6 +380,7 @@ var assembler = (function(exports){
       define(this, {
         body: body,
         source: source == null ? context.code.source : source,
+        script: context.script,
         children: [],
         createDirective: function(opcode, args){
           var op = new Instruction(opcode, args);
@@ -2437,8 +2438,8 @@ var assembler = (function(exports){
     };
 
 
-    function Assembler(options){
-      this.options = new AssemblerOptions(options);
+    function Assembler(script){
+      this.script = new AssemblerOptions(script);
       define(this, {
         strings: [],
         hash: new Hash
@@ -2462,11 +2463,11 @@ var assembler = (function(exports){
         this.labels = null;
         this.source = source;
 
-        if (this.options.scope === 'function') {
+        if (this.script.scope === 'function') {
           node = node.body[0].expression;
         }
 
-        var code = new Code(node, source, 'normal', this.options.scope);
+        var code = new Code(node, source, 'normal', this.script.scope);
         define(code, {
           strings: this.strings,
           hash: this.hash
@@ -2474,7 +2475,7 @@ var assembler = (function(exports){
 
         code.topLevel = true;
 
-        if (this.options.natives) {
+        if (this.script.natives) {
           code.natives = true;
           code.flags.strict = false;
         }
@@ -2550,9 +2551,9 @@ var assembler = (function(exports){
     return Assembler;
   })();
 
-  exports.assemble = function assemble(options){
-    var assembler = new Assembler(options);
-    return assembler.assemble(options.ast, options.source);
+  exports.assemble = function assemble(script){
+    var assembler = new Assembler(script);
+    return assembler.assemble(script.ast, script.source);
   };
 
   return exports;
