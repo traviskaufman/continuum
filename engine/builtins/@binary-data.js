@@ -1,5 +1,5 @@
 import {
-  $$Call,
+  $$Invoke,
   $$Exception,
   $$Get,
   $$Set
@@ -28,8 +28,8 @@ class Data {
       throw $$Exception('not_generic', ['Data.prototype.update']);
     }
 
-    const R = $$Call($$Get(this, 'DataType'), 'Convert', [val]);
-    $$Call(this, 'SetValue', [Dereference(R)]);
+    const R = $$Invoke($$Get(this, 'DataType'), 'Convert', [val]);
+    $$Invoke(this, 'SetValue', [Dereference(R)]);
   }
 }
 
