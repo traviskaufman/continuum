@@ -1,0 +1,553 @@
+{
+  "Primitive": {
+    "type": "signature",
+    "types": [ "Null", "Undefined", "Boolean", "String", "Number" ]
+  },
+  "DebuggeeValue": {
+    "type": "signature",
+    "types": [ "Primitive", "Debugger.Object" ]
+  },
+  "RegularValue": { "type": "signature", "types": [ "Primitive", "Object" ] },
+  "Symbol": {
+    "type": "signature",
+    "qualities": { "[[BuiltinBrand]]": "BuiltinSymbol" }
+  },
+  "GlobalObject": {
+    "type": "signature",
+    "qualities": { "[[BuiltinBrand]]": "BuiltinGlobal" }
+  },
+  "ParameterDescription": {
+    "type": "signature",
+    "types": [ "String", "ParameterDescription", "...ParameterDescription" ]
+  },
+  "PropertyKey": { "type": "signature", "types": [ "String", "Symbol" ] },
+  "ReturnCompletion": {
+    "type": "signature",
+    "fields": { "return": { "type": [ "DebuggeeValue" ] } }
+  },
+  "ThrowCompletion": {
+    "type": "signature",
+    "fields": { "throw": { "type": [ "DebuggeeValue" ] } }
+  },
+  "YieldCompletion": {
+    "type": "signature",
+    "fields": { "yield": { "type": [ "DebuggeeValue" ] } }
+  },
+  "StopIterationCompletion": {
+    "type": "signature",
+    "fields": { "throw": { "values": [ "%StopIteration%" ] } }
+  },
+  "CompletionValue": {
+    "type": "signature",
+    "types": [ "Null", "ReturnCompletion", "ThrowCompletion", "YieldCompletion", "ThrowStopIteration" ]
+  },
+  "ResumptionValue": {
+    "type": "signature",
+    "types": [ "Null", "Undefined", "ReturnCompletion", "ThrowCompletion", "YieldCompletion", "ThrowStopIteration" ]
+  },
+  "Report": {
+    "type": "dict",
+    "fields": {
+      "message": { "type": [ "String" ] },
+      "offset": { "type": [ "Number" ] },
+      "arguments": { "type": [ "...String" ] },
+      "file": { "type": [ "String" ], "optional": true },
+      "line": { "type": [ "Number" ], "optional": true },
+      "lineText": { "type": [ "String" ], "optional": true },
+      "warning": { "type": [ "Boolean" ], "optional": true },
+      "strict": { "type": [ "Boolean" ], "optional": true },
+      "exception": { "type": [ "Boolean" ], "optional": true }
+    }
+  },
+  "Query": {
+    "type": "dict",
+    "fields": {
+      "url": { "type": [ "String" ], "optional": true },
+      "line": { "type": [ "Number" ], "optional": true },
+      "column": { "type": [ "Number" ], "optional": true },
+      "innermost": { "type": [ "Boolean" ], "optional": true },
+      "global": { "type": [ "GlobalObject", "Debugger.Object" ], "optional": true }
+    }
+  },
+  "BreakpointHandler": {
+    "type": "signature",
+    "methods": {
+      "hit": {
+        "params": { "frame": [ "Debugger.Frame" ] },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      }
+    }
+  },
+  "AsConstructor": {
+    "type": "signature",
+    "fields": {
+      "asConstructor": {
+        "type": ["Boolean"]
+      }
+    }
+  },
+  "WatchpointHandler": {
+    "type": "signature",
+    "methods": {
+      "add": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "name": { "type": [ "String" ] },
+          "descriptor": { "type": [ "Descriptor" ] }
+        },
+        "optional": true,
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "delete": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "name": { "type": [ "String" ] }
+        },
+        "optional": true,
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "change": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "oldDescriptor": { "type": [ "Descriptor" ] },
+          "newDescriptor": { "type": [ "Descriptor" ] }
+        },
+        "optional": true,
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "set": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "name": { "type": [ "String" ] },
+          "oldValue": { "type": [ "DebuggeeValue" ] },
+          "newValue": { "type": [ "DebuggeeValue" ] }
+        },
+        "optional": true,
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "extensionsPrevented": {
+        "params": { "frame": { "type": [ "Debugger.Frame" ] } },
+        "optional": true,
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Boolean" ]
+      }
+    }
+  },
+  "Descriptor": {
+    "type": "dict",
+    "fields": {
+      "enumerable": { "type": [ "Boolean" ], "optional": true },
+      "configurable": { "type": [ "Boolean" ], "optional": true },
+      "writable": { "type": [ "Boolean" ], "optional": true },
+      "value": { "type": [ "DebuggeeValue" ], "optional": true },
+      "get": { "type": [ "Debugger.Object", "Undefined" ], "optional": true },
+      "set": { "type": [ "Debugger.Object", "Undefined" ], "optional": true }
+    }
+  },
+  "ASTNode": { "type": "dict", "fields": {} },
+  "Parameters": {
+    "type": "dict",
+    "fields": {
+      "params": { "type": [ "...ParameterDescription" ] },
+      "rest": { "optional": true, "type": [ "ParameterDescription" ] },
+      "defaults": { "optional": true, "type": [ "...ASTNode" ] }
+    }
+  },
+  "Debugger": {
+    "type": "class",
+    "name": "Debugger",
+    "exported": true,
+    "methods": {
+      "constructor": {
+        "params": {
+          "globals": { "type": [ "GlobalObject", "Debugger.Object" ], "rest": true }
+        },
+        "returnType": [ "Debugger" ]
+      },
+      "addDebuggee": {
+        "params": { "global": { "type": [ "GlobalObject", "Debugger.Object" ] } },
+        "returnType": [ "Debugger.Object" ]
+      },
+      "removeDebuggee": {
+        "params": { "global": { "type": [ "GlobalObject", "Debugger.Object" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "hasDebuggee": {
+        "params": { "global": { "type": [ "GlobalObject", "Debugger.Object" ] } },
+        "returnType": [ "Boolean" ]
+      },
+      "getDebuggees": { "params": {}, "returnType": [ "...Debugger.Object" ] },
+      "getNewestFrame": { "params": {}, "returnType": [ "Null", "Debugger.Frame" ] },
+      "findScriptURLs": {
+        "params": { "query": { "type": [ "String" ], "optional": true } },
+        "returnType": [ "...String" ]
+      },
+      "findScripts": {
+        "params": { "query": { "type": [ "Query" ], "optional": true } },
+        "returnType": [ "...Debugger.Script" ]
+      },
+      "clearBreakpoint": {
+        "params": { "handler": { "type": [ "Function" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "clearAllBreakpoints": { "params": {}, "returnType": [ "Undefined" ] },
+      "clearAllWatchpoints": { "params": {}, "returnType": [ "Undefined" ] },
+      "findAllGlobals": {
+        "params": {},
+        "privileged": true,
+        "returnType": [ "...Debugger.Object" ]
+      }
+    },
+    "accessors": {
+      "enabled": { "defaultValue": true, "type": [ "Boolean" ], "writable": true },
+      "uncaughtExceptionHook": {
+        "defaultValue": null,
+        "type": [ "Null", "Function" ],
+        "writable": true
+      }
+    },
+    "handlers": {
+      "onNewScript": {
+        "params": {
+          "script": { "type": [ "Debugger.Script" ] },
+          "global": { "type": [ "Debugger.Object" ] }
+        },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "onDebuggerStatement": {
+        "params": { "frame": { "type": [ "Debugger.Frame" ] } },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onEnterFrame": {
+        "params": { "frame": { "type": [ "Debugger.Frame" ] } },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onThrow": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "value": { "type": [ "DebuggeeValue" ] }
+        },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onException": {
+        "params": {
+          "status": {
+            "values": [ "throw", "unwind", "catch", "finally", "rethrow" ]
+          },
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "value": { "type": [ "DebuggeeValue" ] }
+        },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onExceptionUnwind": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "value": { "type": [ "DebuggeeValue" ] }
+        },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onError": {
+        "params": {
+          "frame": { "type": [ "Debugger.Frame" ] },
+          "report": { "type": [ "Report" ] }
+        },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "Undefined" ]
+      },
+      "onNewGlobalObject": {
+        "params": { "global": { "type": [ "DebuggeeValue" ] } },
+        "privileged": true,
+        "returnType": [ "ResumptionValue" ]
+      }
+    }
+  },
+  "Debugger.DebuggeeWouldRun": {
+    "type": "class",
+    "name": "DebuggeeWouldRun",
+    "fields": {
+      "cause": { "values": [ "proxy", "getter", "setter" ], "optional": true }
+    }
+  },
+  "Debugger.Frame": {
+    "type": "class",
+    "name": "Frame",
+    "methods": {
+      "eval": {
+        "params": { "code": { "type": [ "String" ] } },
+        "returnType": [ "CompletionValue" ]
+      },
+      "evalWithBindings": {
+        "params": {
+          "code": { "type": [ "String" ] },
+          "bindings": { "type": [ "Object" ] }
+        },
+        "returnType": [ "CompletionValue" ]
+      },
+      "pop": {
+        "params": { "completion": { "type": [ "CompletionValue" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "replaceCall": {
+        "params": {
+          "func": { "type": [ "Debugger.Object" ] },
+          "thisArg": { "type": [ "DebuggeeValue" ] },
+          "arguments": { "type": [ "...DebuggeeValue" ], "rest": true }
+        },
+        "returnType": [ "Undefined" ]
+      }
+    },
+    "accessors": {
+      "type": { "values": [ "call", "eval", "global", "debugger" ] },
+      "this": { "type": [ "DebuggeeValue" ] },
+      "older": { "type": [ "Null", "Debugger.Frame" ] },
+      "depth": { "type": [ "Number" ], "defaultValue": 0 },
+      "live": { "type": [ "Boolean" ] },
+      "script": { "type": [ "Debugger.Script" ] },
+      "offset": { "type": [ "Number" ], "optional": true },
+      "environment": { "type": [ "Null", "Debugger.Environment" ] },
+      "callee": { "type": [ "Null", "Debugger.Object" ] },
+      "generator": { "type": [ "Boolean" ] },
+      "constructing": { "type": [ "Boolean" ] }
+    },
+    "handlers": {
+      "onStep": {
+        "params": {},
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      },
+      "onPop": {
+        "params": { "completion": { "type": [ "CompletionValue" ] } },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "CompletionValue" ]
+      },
+      "onResume": {
+        "params": { "value": { "type": [ "DebuggeeValue" ] } },
+        "type": [ "Undefined", "Function" ],
+        "returnType": [ "ResumptionValue" ]
+      }
+    }
+  },
+  "Debugger.Script": {
+    "type": "class",
+    "name": "Script",
+    "methods": {
+      "decompile": {
+        "params": { "pretty": { "type": [ "Boolean" ], "optional": true } },
+        "returnType": [ "String" ]
+      },
+      "getAllOffsets": { "params": {}, "returnType": [ "Array" ] },
+      "getLineOffsets": {
+        "params": { "line": { "type": [ "Number" ] } },
+        "returnType": [ "Array" ]
+      },
+      "getOffsetLine": { "params": { "offset": { "type": [ "Number" ] } } },
+      "getChildScripts": { "params": {}, "returnType": [ "...Debugger.Script" ] },
+      "setBreakpoint": {
+        "params": {
+          "offset": { "type": [ "Number" ] },
+          "handler": { "type": [ "BreakpointHandler" ] }
+        },
+        "returnType": [ "Undefined" ]
+      },
+      "getBreakpoints": {
+        "params": { "offset": { "type": [ "Number" ], "optional": true } },
+        "returnType": [ "...BreakpointHandler" ]
+      },
+      "clearBreakpoints": {
+        "params": {
+          "handler": { "type": [ "BreakpointHandler" ] },
+          "offset": { "type": [ "Number" ], "optional": true }
+        },
+        "returnType": [ "Undefined" ]
+      }
+    },
+    "accessors": {
+      "url": { "type": [ "String" ] },
+      "startLine": { "type": [ "Number" ] },
+      "lineCount": { "type": [ "Number" ] },
+      "staticLevel": { "type": [ "Number" ] }
+    }
+  },
+  "Debugger.Object": {
+    "type": "class",
+    "name": "Object",
+    "methods": {
+      "getProperty": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "DebuggeeValue" ]
+      },
+      "setProperty": {
+        "params": {
+          "name": { "type": [ "String" ] },
+          "value": { "type": [ "DebuggeeValue" ] }
+        },
+        "returnType": [ "Undefined" ]
+      },
+      "getOwnPropertyDescriptor": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Descriptor", "Null" ]
+      },
+      "getOwnPropertyNames": { "params": {}, "returnType": [ "...String" ] },
+      "defineProperty": {
+        "params": {
+          "name": { "type": [ "String" ] },
+          "attributes": { "type": [ "Descriptor" ] }
+        },
+        "returnType": [ "Debugger.Object" ]
+      },
+      "defineProperties": {
+        "params": { "properties": { "type": [ "Object" ] } },
+        "returnType": [ "Debugger.Object" ]
+      },
+      "deleteProperty": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Boolean" ]
+      },
+      "seal": { "params": {}, "returnType": [ "Debugger.Object" ] },
+      "freeze": { "params": {}, "returnType": [ "Debugger.Object" ] },
+      "preventExtensions": { "params": {}, "returnType": [ "Debugger.Object" ] },
+      "isSealed": { "params": {}, "returnType": [ "Boolean" ] },
+      "isFrozen": { "params": {}, "returnType": [ "Boolean" ] },
+      "isExtensible": { "params": {}, "returnType": [ "Boolean" ] },
+      "copy": {
+        "params": { "value": { "type": [ "Debugger.Object" ] } },
+        "returnType": [ "Debugger.Object" ]
+      },
+      "create": {
+        "params": {
+          "prototype": { "type": [ "Debugger.Object", "Null" ] },
+          "properties": { "type": [ "Object" ], "optional": true }
+        },
+        "returnType": [ "Debugger.Object" ]
+      },
+      "makeDebuggeeValue": {
+        "params": { "value": { "type": [ "Any" ] } },
+        "returnType": [ "DebuggeeValue" ]
+      },
+      "decompile": {
+        "params": { "pretty": { "type": [ "Boolean" ], "optional": true } },
+        "returnType": [ "String", "Undefined" ]
+      },
+      "call": {
+        "params": {
+          "thisArg": { "type": [ "DebuggeeValue", "AsConstructor" ] },
+          "arguments": { "type": [ "...DebuggeeValue" ], "rest": true }
+        },
+        "returnType": [ "CompletionValue" ]
+      },
+      "apply": {
+        "params": {
+          "thisArg": { "type": [ "DebuggeeValue", "AsConstructor" ] },
+          "arguments": { "type": [ "...DebuggeeValue" ] }
+        },
+        "returnType": [ "CompletionValue" ]
+      },
+      "evalInGlobal": {
+        "params": { "code": { "type": [ "String" ] } },
+        "returnType": [ "CompletionValue" ]
+      },
+      "evalInGlobalWithBindings": {
+        "params": {
+          "code": { "type": [ "String" ] },
+          "bindings": { "type": [ "Object" ] }
+        },
+        "returnType": [ "CompletionValue" ]
+      },
+      "asEnvironment": { "params": {}, "returnType": [ "Debugger.Environment" ] },
+      "setObjectWatchpoint": {
+        "params": { "handler": { "type": [ "WatchpointHandler", "Null" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "clearObjectWatchpoint": { "params": {}, "returnType": [ "Undefined" ] },
+      "setPropertyWatchpoint": {
+        "params": {
+          "name": { "type": [ "String" ] },
+          "handler": { "type": [ "WatchpointHandler", "Null" ] }
+        },
+        "returnType": [ "Undefined" ]
+      },
+      "clearPropertyWatchpoint": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "unwrap": { "params": {}, "returnType": [ "RegularValue" ] }
+    },
+    "accessors": {
+      "proto": { "type": [ "Debugger.Object", "Null" ] },
+      "class": { "type": [ "String" ] },
+      "callable": { "type": [ "Boolean" ] },
+      "name": { "type": [ "String", "Undefined" ] },
+      "displayName": { "type": [ "String", "Undefined" ] },
+      "parameters": { "type": [ "Parameters", "Undefined" ] },
+      "script": { "type": [ "Debugger.Script", "Undefined" ] },
+      "environment": { "type": [ "Debugger.Environment", "Undefined" ] },
+      "proxyHandler": { "type": [ "Debugger.Object", "Null" ] },
+      "global": { "type": [ "Debugger.Object" ] }
+    }
+  },
+  "Debugger.Environment": {
+    "type": "class",
+    "name": "Environment",
+    "methods": {
+      "names": { "params": {}, "returnType": [ "...String" ] },
+      "getVariable": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "DebuggeeValue" ]
+      },
+      "setVariable": {
+        "params": {
+          "name": { "type": [ "String" ] },
+          "value": { "type": [ "DebuggeeValue" ] }
+        },
+        "returnType": [ "Undefined" ]
+      },
+      "getVariableDescriptor": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Descriptor", "Undefined" ]
+      },
+      "defineVariable": {
+        "params": {
+          "name": { "type": [ "String" ] },
+          "descriptor": { "type": [ "Descriptor" ] }
+        },
+        "returnType": [ "Undefined" ]
+      },
+      "deleteVariable": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Undefined" ]
+      },
+      "find": {
+        "params": { "name": { "type": [ "String" ] } },
+        "returnType": [ "Debugger.Environment", "Null" ]
+      },
+      "eval": {
+        "params": { "code": { "type": [ "String" ] } },
+        "returnType": [ "CompletionValue" ]
+      },
+      "evalWithBindings": {
+        "params": {
+          "code": { "type": [ "String" ] },
+          "bindings": { "type": [ "Object" ] }
+        },
+        "returnType": [ "CompletionValue" ]
+      }
+    },
+    "accessors": {
+      "type": { "values": [ "declarative", "object", "with" ] },
+      "parent": { "type": [ "Debugger.Environment", "Null" ] },
+      "object": { "type": [ "Debugger.Object", "Undefined" ] },
+      "thisValue": { "type": [ "DebuggeeValue" ] }
+    }
+  }
+}
