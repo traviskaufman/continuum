@@ -466,9 +466,8 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.define('caller', null, ___);
       }
 
-      this.name = getKey(code.name);
       this.define('length', params ? params.ExpectedArgumentCount : 0, ___);
-      this.define('name', this.name, code.name && !code.flags.writableName ? ___ : __W);
+      this.define('name', getKey(code.name), code.name && !code.flags.writableName ? ___ : __W);
     }
 
     inherit($Function, $Object, {
@@ -482,7 +481,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       type: '$Function'
     }, [
       function getName(){
-        return this.name;
+        return this.get('name');
       },
       function prepare(receiver, args, ctx, isConstruct){
         if (realm !== this.Realm) {
@@ -1047,8 +1046,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.define('caller', null, ___);
       this.define('length', options.length, ___);
       this.define('name', options.name, ___);
-      this.name = options.name;
-
 
       if (options.unwrapped) {
         this.Call = options.call;
