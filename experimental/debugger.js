@@ -146,73 +146,129 @@ define(Debugger.Script.prototype, [
   }
 ]);
 
+function debuggerWouldRun(reason){
+  return new AbruptCompletion(new DebuggerDebuggeeWouldRun(reason));
+}
 
 var DebuggerObject = Debugger.Object = function Object(debugger, obj){
+  this.debugger = debugger;
+  this.subject = obj;
 };
 
 define(Debugger.Object.prototype, [
   function getProperty(name){
-    assertSignature(name, 'String');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // this needs to manually walk inheritance checking for accessors and proxies
   },
   function setProperty(name, value){
-    assertSignature(name, 'String');
-    assertSignature(value, 'DebuggeeValue');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // this needs to manually walk inheritance checking for accessors and proxies
   },
   function getOwnPropertyDescriptor(name){
-    assertSignature(name, 'String');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
   },
   function getOwnPropertyNames(){
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
   },
   function defineProperty(name, attributes){
-    assertSignature(name, 'String');
-    assertSignature(attributes, 'Descriptor');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // TODO: need a "system realm"
   },
   function defineProperties(properties){
-    assertSignature(properties, 'Object');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // TODO: need a "system realm"
   },
   function deleteProperty(name){
-    assertSignature(name, 'String');
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
   },
   function seal(){
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // TODO: need a "system realm"
   },
   function freeze(){
+    if (this.subject.Proxy) {
+      return debuggerWouldRun('proxy');
+    }
+    // TODO: need a "system realm"
   },
   function preventExtensions(){
+    return this.subject.PreventExtensions();
   },
   function isSealed(){
   },
   function isFrozen(){
   },
   function isExtensible(){
+    return this.subject.IsExtensible();
   },
   function copy(value){
-    assertSignature(value, 'DebuggerObject');
+    // TODO: need a "system realm"
   },
   function create(prototype, properties){
-    assertSignature(prototype, 'DebuggerObject', 'Null');
-    assertSignature(properties, 'Undefined', 'Object');
+    // TODO: need a "system realm"
   },
   function makeDebuggeeValue(value){
-    assertSignature(value, 'Any');
+    return wrap(this, value);
   },
   function decompile(pretty){
     assertSignature(pretty, 'Undefined', 'Boolean');
   },
   function call(thisArg/*, ...arguments*/){
-    assertSignature(thisArg, 'DebuggeeValue', 'AsConstructor');
-    var args = slice.call(arguments, 1);
-    assertSignatures(args, 'DebuggeeValue');
+    if (!this.subject.Call) {
+      // TODO: throw TypeError
+    }
+
+    var args = [];
+    for (var i=1; i < arguments.length; i++) {
+      var arg = arguments[i];
+      ensureDebuggeeValue(arg);
+      args.push(arg);
+    }
+
+    if (thisArg && thisArg.asConstructor) {
+      return wrap(this, this.subject.Construct(args));
+    }
+
+    ensureDebuggeeValue(thisArg);
+    return wrap(this, this.subject.Call(thisArg, args));
   },
   function apply(thisArg, arguments){
-    assertSignature(thisArg, 'DebuggeeValue', 'AsConstructor');
-    assertSignatures(arguments, 'DebuggeeValue');
+    if (!this.subject.Construct) {
+      // TODO: throw TypeError
+    }
+
+    ensureDebuggeeValue(thisArg);
+
+    for (var i=0; i < arguments.length; i++) {
+      ensureDebuggeeValue(arguments[i]);
+    }
+
+    if (thisArg && thisArg.asConstructor) {
+      return wrap(this, this.subject.Construct(arguments));
+    }
+
+    ensureDebuggeeValue(thisArg);
+    return wrap(this, this.subject.Call(thisArg, arguments));
   },
   function evalInGlobal(code){
-    assertSignature(code, 'String');
   },
   function evalInGlobalWithBindings(code, bindings){
-    assertSignature(code, 'String');
-    assertSignature(bindings, 'Object');
   },
   function asEnvironment(){
   },
@@ -231,24 +287,45 @@ define(Debugger.Object.prototype, [
   function unwrap(){
   },
   function getProto(){ // get proto(){}
+    return wrap(this, this.subject.GetInheritance());
   },
-  function getClass(){ // get class(){}
+  // TODO feedback: Class -> Brand
+  function getBrand(){ // get brand(){}
+    return this.subject.BuiltinBrand;
   },
   function getCallable(){ // get callable(){}
+    return !!this.subject.Call;
   },
   function getName(){ // get name(){}
+  if (this.subject.getName) {
+    return this.subject.getName();
+  }
   },
   function getDisplayName(){ // get displayName(){}
+    // TODO implement displayName
   },
   function getParameters(){ // get parameters(){}
+    if (this.subject.code) {
+      return this.subject.code.params.reduced;
+    }
   },
   function getScript(){ // get script(){}
+    if (this.subject.code) {
+      return wrap(this, this.subject.code.script);
+    }
   },
   function getEnvironment(){ // get environment(){}
+    if (this.subject.Scope) {
+      return wrap(this, this.subject.Scope);
+    }
   },
   function getProxyHandler(){ // get proxyHandler(){}
+    if (this.subject.ProxyHandler) {
+      return wrap(this, this.subject.ProxyHandler);
+    }
   },
   function getGlobal(){ // get global(){}
+    return wrap(this, this.subject.Realm.global);
   }
 ]);
 
@@ -259,6 +336,7 @@ var envTypes = assign(create(null), {
   GlobalEnv: 'object',
   ObjectEnv: 'object'
 });
+
 
 var DebuggerEnvironment = Debugger.Environment = function Environment(debugger, env){
   this.debugger = debugger;
@@ -283,13 +361,11 @@ define(Debugger.Environment.prototype, [
   function getVariableDescriptor(name){
     if (!this.hasVariable(name)) {
       return this.getVariable(name); // AbruptCompletion not_defined
-
     } else if (this.type === 'declarative') {
       return { configurable: !(name in this.subject.deletables),
                enumerable: true,
                writable: !(name in this.subject.consts),
                value: this.getVariable(name) };
-
     }
 
     var obj = this.getObject();
