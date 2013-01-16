@@ -137,10 +137,11 @@ var environments = (function(exports, undefined){
       },
       function SetMutableBinding(name, value, strict){
         if (name in this.consts) {
-          if (this.bindings[name] === Uninitialized)
+          if (this.bindings[name] === Uninitialized) {
             return $$ThrowException('uninitialized_const', name);
-          else if (strict)
+          } else if (strict) {
             return $$ThrowException('const_assign', name);
+          }
         } else {
           this.bindings[name] = value;
         }
