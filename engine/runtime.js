@@ -290,7 +290,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     var proto = new $Object(superproto),
-        brand = name || '';
+        brand = getKey(name || '');
 
     for (var i=0; i < symbols[0].length; i++) {
       var symbol   = symbols[0][i],
@@ -475,7 +475,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       FormalParameters: null,
       code: null,
       Scope: null,
-      strict: false,
+      Strict: false,
       ThisMode: 'global',
       Realm: null,
       type: '$Function'
@@ -1852,8 +1852,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     })();
 
     function Script(options){
-      if (options instanceof Script)
+      if (options instanceof Script) {
         return options;
+      }
 
       this.type = 'script';
 
@@ -1874,6 +1875,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       } else if (typeof options === 'string') {
         options = load(options);
+      } else if (options == null) {
+
+      } else if (typeof options === 'object') {
+
       }
 
       if (options.natives) {
@@ -2148,6 +2153,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$CreateObject: function(_, args){
           return new objectTypes[args[0]](args[1]);
+        },
+        $$CreateArray: function(_, args){
+          var array = new $Array(args[1]);
+          if (args[0] !== realm) {
+            array.Realm = args[0];
+            array.Prototype = args[0].intrinsics['%ArrayPrototype%'];
+          }
+          return array;
         },
         $$CreateInternalObject: function(_, args){
           return create(args[0] || null);
