@@ -145,14 +145,10 @@ var $Proxy = (function(module){
     this.BuiltinBrand = target.BuiltinBrand;
 
     if (target.Call) {
-      this.Call = ProxyCall;
       this.HasInstance = getHasInstance();
+      this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
-    }
-
-    if (target.getPrimitiveValue) {
-      this.getPrimitiveValue = ProxyGetPrimitiveValue;
-      this.setPrimitiveValue = ProxySetPrimitiveValue;
+      this.getName = ProxyGetName;
     }
   }
 
@@ -441,12 +437,8 @@ var $Proxy = (function(module){
     return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $Array(args)]);
   }
 
-  function ProxyGetPrimitiveValue(){
-    return this.ProxyTarget.getPrimitiveValue();
-  }
-
-  function ProxySetPrimitiveValue(value){
-    return this.ProxyTarget.setPrimitiveValue(value);
+  function ProxyGetName(){
+    return this.ProxyTarget.getName();
   }
 
   return module.exports = $Proxy;
