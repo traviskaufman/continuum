@@ -115,8 +115,9 @@ var environments = (function(exports, undefined){
       },
       function CreateMutableBinding(name, deletable){
         this.bindings[name] = undefined;
-        if (deletable)
+        if (deletable) {
           this.deletables[name] = true;
+        }
       },
       function InitializeBinding(name, value){
         this.bindings[name] = value;
