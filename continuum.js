@@ -9320,6 +9320,7 @@ exports.assembler = (function(exports){
       define(this, {
         body: body,
         source: source == null ? context.code.source : source,
+        script: context.script,
         children: [],
         createDirective: function(opcode, args){
           var op = new Instruction(opcode, args);
@@ -11377,8 +11378,8 @@ exports.assembler = (function(exports){
     };
 
 
-    function Assembler(options){
-      this.options = new AssemblerOptions(options);
+    function Assembler(script){
+      this.script = new AssemblerOptions(script);
       define(this, {
         strings: [],
         hash: new Hash
@@ -11402,11 +11403,11 @@ exports.assembler = (function(exports){
         this.labels = null;
         this.source = source;
 
-        if (this.options.scope === 'function') {
+        if (this.script.scope === 'function') {
           node = node.body[0].expression;
         }
 
-        var code = new Code(node, source, 'normal', this.options.scope);
+        var code = new Code(node, source, 'normal', this.script.scope);
         define(code, {
           strings: this.strings,
           hash: this.hash
@@ -11414,7 +11415,7 @@ exports.assembler = (function(exports){
 
         code.topLevel = true;
 
-        if (this.options.natives) {
+        if (this.script.natives) {
           code.natives = true;
           code.flags.strict = false;
         }
@@ -11490,9 +11491,9 @@ exports.assembler = (function(exports){
     return Assembler;
   })();
 
-  exports.assemble = function assemble(options){
-    var assembler = new Assembler(options);
-    return assembler.assemble(options.ast, options.source);
+  exports.assemble = function assemble(script){
+    var assembler = new Assembler(script);
+    return assembler.assemble(script.ast, script.source);
   };
 
   return exports;
@@ -13283,10 +13284,11 @@ exports.environments = (function(exports, undefined){
       },
       function SetMutableBinding(name, value, strict){
         if (name in this.consts) {
-          if (this.bindings[name] === Uninitialized)
+          if (this.bindings[name] === Uninitialized) {
             return $$ThrowException('uninitialized_const', name);
-          else if (strict)
+          } else if (strict) {
             return $$ThrowException('const_assign', name);
+          }
         } else {
           this.bindings[name] = value;
         }
@@ -15316,14 +15318,10 @@ exports.$Proxy = (function(module){
     this.BuiltinBrand = target.BuiltinBrand;
 
     if (target.Call) {
-      this.Call = ProxyCall;
       this.HasInstance = getHasInstance();
+      this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
-    }
-
-    if (target.getPrimitiveValue) {
-      this.getPrimitiveValue = ProxyGetPrimitiveValue;
-      this.setPrimitiveValue = ProxySetPrimitiveValue;
+      this.getName = ProxyGetName;
     }
   }
 
@@ -15612,12 +15610,8 @@ exports.$Proxy = (function(module){
     return trap.Call(this.ProxyHandler, [this.ProxyTarget, new $Array(args)]);
   }
 
-  function ProxyGetPrimitiveValue(){
-    return this.ProxyTarget.getPrimitiveValue();
-  }
-
-  function ProxySetPrimitiveValue(value){
-    return this.ProxyTarget.setPrimitiveValue(value);
+  function ProxyGetName(){
+    return this.ProxyTarget.getName();
   }
 
   return module.exports = $Proxy;
@@ -18360,8 +18354,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.define('caller', null, ___);
       }
 
+      this.name = getKey(code.name);
       this.define('length', params ? params.ExpectedArgumentCount : 0, ___);
-      this.define('name', getKey(code.name), code.name && !code.flags.writableName ? ___ : __W);
+      this.define('name', this.name, code.name && !code.flags.writableName ? ___ : __W);
     }
 
     inherit($Function, $Object, {
@@ -18374,6 +18369,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Realm: null,
       type: '$Function'
     }, [
+      function getName(){
+        return this.name;
+      },
       function prepare(receiver, args, ctx, isConstruct){
         if (realm !== this.Realm) {
           activate(this.Realm);
@@ -18482,6 +18480,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       BoundArgs: null,
       type: '$BoundFunction'
     }, [
+      function getName(){
+        return this.BoundTargetFunction.getName();
+      },
       function Call(_, newArgs){
         return this.BoundTargetFunction.Call(this.BoundThis, this.BoundArgs.concat(newArgs));
       },
@@ -18934,6 +18935,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       this.define('caller', null, ___);
       this.define('length', options.length, ___);
       this.define('name', options.name, ___);
+      this.name = options.name;
 
 
       if (options.unwrapped) {
