@@ -4,7 +4,8 @@ import {
 } from '@@symbols';
 
 import {
-  $$ArgumentCount
+  $$ArgumentCount,
+  $$Exception
 } from '@@internals';
 
 import {
@@ -17,6 +18,7 @@ import {
   ToInteger,
   ToObject,
   ToString,
+  ToInt32,
   ToUint32
 } from '@@operations';
 
@@ -40,6 +42,9 @@ import {
   floor
 } from '@math';
 
+import {
+  hasOwn
+} from '@reflect';
 
 
 
@@ -74,8 +79,8 @@ class ArrayIterator extends Iterator {
   next(){
     ensureObject(this);
 
-    if (!$__has(this, @array) || !$__has(this, @index) || !$__has(this, @kind)) {
-      throw $__Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
+    if (!hasOwn(this, @array) || !hasOwn(this, @index) || !hasOwn(this, @kind)) {
+      throw $$Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);
     }
 
     const array = this.@array,
@@ -144,7 +149,7 @@ export class Array {
 
     do {
       if (isArray(obj)) {
-        let len = $__ToInt32(obj.length),
+        let len = ToUint32(obj.length),
             i   = 0;
 
         do {
@@ -166,8 +171,8 @@ export class Array {
   }
 
   every(callbackfn, context = undefined){
-    const array  = ToObject(this),
-          len    = ToUint32(array.length);
+    const array = ToObject(this),
+          len   = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
@@ -557,7 +562,7 @@ export class Array {
 
           [arrayA, arrayB] = [arrayB, arrayA];
           size *= 2;
-        } while (len > size);
+        } while (len > size)
 
         if (!(trunc & 1)) {
           for (var i = len - 1; i >= 0; i--) {
