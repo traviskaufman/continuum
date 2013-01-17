@@ -4,6 +4,7 @@
 
 import {
   $$ArgumentCount,
+  $$CreateArray,
   $$CreateObject,
   $$CreateInternalObject,
   $$CurrentRealm,
@@ -143,7 +144,7 @@ $$Set(OrdinaryObject, 'DefineOwnProperty', function(P, Desc){;
 
 export function OrdinaryDefineOwnProperty(O, P, Desc){
   const current    = OrdinaryGetOwnProperty(O, P),
-        extensible = $$Invoke(O, 'IsExtensible'); // spec bug, https://bugs.ecmascript.org/show_bug.cgi?id=1191
+        extensible = $$Get(O, 'Extensible');
 
   return ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current);
 }
@@ -151,7 +152,7 @@ export function OrdinaryDefineOwnProperty(O, P, Desc){
 
 // 11.1.7.2 IsCompatiblePropertyDescriptor
 
-export function IsCompatiblePropertyDesriptor(Extensible, Desc, Current) {
+export function IsCompatiblePropertyDescriptor(Extensible, Desc, Current) {
   return ValidateAndApplyPropertyDescriptor(undefined, undefined, Extensible, Desc, Current);
 }
 
@@ -159,12 +160,36 @@ export function IsCompatiblePropertyDesriptor(Extensible, Desc, Current) {
 // 11.1.7.3 ValidateAndApplyPropertyDescriptor
 
 function attributesFromDescriptor(Desc){
+  if ($$Has(Desc, 'attrs')) {
+    return $$Get(Desc, 'attrs');
+  }
+
+  if ($$Has(Desc, 'Get') || $$Has(Desc, 'Set')) {
+    $$Assert(!$$Has(Desc, 'Value') && !$$Has(Desc, 'Writable'));
+    return $$Get(Desc, 'Enumerable') | ($$Get(Desc, 'Configurable') << 1) | 8;
+  }
+  return $$Get(Desc, 'Enumerable') | ($$Get(Desc, 'Configurable') << 1) | ($$Get(Desc, 'Writable') << 2);
+}
+
+const Accessor = $$CreateInternalObject();
+$$Set(Accessor, '_type', 'Accessor');
+$$Set(Accessor, 'Get', undefined);
+$$Set(Accessor, 'Set', undefined);
+
+function accessorFromDescriptor(Desc){
+  const accessor = $$CreateInternalObject(Accessor);
+  $$Set(accessor, 'Get', $$Get(Desc, 'Get'));
+  $$Set(accessor, 'Set', $$Get(Desc, 'Set'));
+  return accessor;
+}
+
+function same(a, b, field){
+  return SameValue($$Get(a, field), $$Get(b, field));
 }
 
 export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current){
   $$Assert(O === undefined || IsPropertyKey(P));
 
-  let changeType = 'reconfigured';
 
   // New property
   if (current === undefined) {
@@ -176,62 +201,73 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
 
     if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {
       if (O !== undefined) {
-        $$CreateProperty(O, )
-        create an own data property named P of object O whose [[Value]], [[Writable]], [[Enumerable]] and [[Configurable]] attribute values are described by Desc.
-        If the value of an attribute field of Desc is absent, the attribute of the newly created property is set to its default value.
+        $$CreateProperty(O, P, $$Get(Desc, 'Value'), attributesFromDescriptor(Desc));
+      }
+    } else {
+      if (O !== undefined) {
+        $$CreateProperty(O, P, accessorFromDescriptor(Desc), attributesFromDescriptor(Desc));
       }
     }
 
-    if (O !== undefined) {
-      if ($$IsGenericDescriptor(Desc) || $$IsDataDescriptor(Desc)) {
-        O.define(P, Desc.Value, Desc.Enumerable | (Desc.Configurable << 1) | (Desc.Writable << 2));
-      } else {
-        O.define(P, new Accessor(Desc.Get, Desc.Set), Desc.Enumerable | (Desc.Configurable << 1) | 8);
-      }
-
-      if (O.Notifier) {
-        var changeObservers = O.Notifier.ChangeObservers;
-        if (changeObservers.size) {
-          var record = $$CreateChangeRecord('new', O, P);
-          $$EnqueueChangeRecord(record, changeObservers);
-        }
+    if ($$Has(O, 'Notifier')) {
+      const changeObservers = $$Get($$Get(O, 'Notifier'), 'ChangeObservers');
+      if ($$Get(changeObservers, 'size')) {
+        EnqueueChangeRecord(CreateChangeRecord('new', O, P), changeObservers);
       }
     }
-    return extensible === true;
+
+    return true;
   }
 
+
   // Empty Descriptor
-  if (!('Get' in Desc || 'Set' in Desc || 'Value' in Desc)) {
-    if (!('Writable' in Desc || 'Enumerable' in Desc || 'Configurable' in Desc)) {
+  if (!($$Has(Desc, 'Get') || $$Has(Desc, 'Set') || $$Has(Desc, 'Value'))) {
+    if (!($$Has(Desc, 'Writable') || $$Has(Desc, 'Configurable') || $$Has(Desc, 'Enumerable'))) {
       return true;
     }
   }
 
   //Equal Descriptor
-  if (Desc.Writable === current.Writable && Desc.Enumerable === current.Enumerable && Desc.Configurable === current.Configurable) {
-    if (Desc.Get === current.Get && Desc.Set === current.Set && is(Desc.Value, current.Value)) {
+  if (same(Desc, current, 'Value') && same(Desc, current, 'Get') && same(Desc, current, 'Set')) {
+    if (same(Desc, current, 'Writable') && same(Desc, current, 'Enumerable') && same(Desc, current, 'Configurable')) {
       return true;
     }
   }
 
-  if (!current.Configurable) {
-    if (Desc.Configurable || 'Enumerable' in Desc && Desc.Enumerable !== current.Enumerable) {
-      return false;
-    } else {
-      var currentIsData = $$IsDataDescriptor(current),
-          DescIsData = $$IsDataDescriptor(Desc);
+  let changeType = 'reconfigured';
 
-      if (currentIsData !== DescIsData) {
-        return false;
-      } else if (currentIsData && DescIsData) {
-        if (!current.Writable && 'Value' in Desc && !is(Desc.Value, current.Value)) {
-          return false;
-        }
-      } else if ('Set' in Desc && Desc.Set !== current.Set) {
-        return false;
-      } else if ('Get' in Desc && Desc.Get !== current.Get) {
+  if ($$Get(current, 'Configurable') === false) {
+    if ($$Get(Desc, 'Configurable')) {
+      return false;
+    }
+    if ($$Has(Desc, 'Enumerable') && !same(Desc, current, 'Enumerable')) {
+      return false;
+    }
+  }
+/*
+  if (!IsGenericDescriptor(Desc)) {
+    if (IsDataDescriptor(current) !== IsDataDescriptor(Desc)) {
+      if ($$Get(current, 'Configurable') === false) {
         return false;
       }
+
+      if (IsDataDescriptor(current)) {
+        if (O !== undefined) {
+
+        }
+      }
+    }
+
+    if (currentIsData && descIsData) {
+
+    if (currentIsData) {
+      if (!$$Get(current, 'Writable') && $$Has(Desc, 'Value') && !same(Desc, current, 'Value')) {
+        return false;
+      }
+    } else if ($$Has(Desc, 'Set') && !same(Desc, current, 'Set')) {
+      return false;
+    } else if ($$Has(Desc, 'Get') && !same(Desc, current, 'Get')) {
+      return false;
     }
   }
 
@@ -242,9 +278,9 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
   'Configurable' in Desc || (Desc.Configurable = current.Configurable);
   'Enumerable' in Desc || (Desc.Enumerable = current.Enumerable);
 
-  if ($$IsAccessorDescriptor(Desc)) {
+  if (IsAccessorDescriptor(Desc)) {
     O.update(P, Desc.Enumerable | (Desc.Configurable << 1) | 8);
-    if ($$IsDataDescriptor(current)) {
+    if (IsDataDescriptor(current)) {
       O.set(P, new Accessor(Desc.Get, Desc.Set));
     } else {
       var accessor = current.getAccessor();
@@ -253,7 +289,7 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
       ('Set' in Desc || 'Get' in Desc) && O.set(P, accessor);
     }
   } else {
-    if ($$IsAccessorDescriptor(current)) {
+    if (IsAccessorDescriptor(current)) {
       current.Writable = true;
     }
     'Writable' in Desc || (Desc.Writable = current.Writable);
@@ -272,7 +308,7 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
     }
   }
 
-  return true;
+  return true;*/
 }
 
 
@@ -293,7 +329,6 @@ export function ObjectCreate(proto){
 // # 11.2.2.3 ArrayCreate Abstract Operation #
 // ###########################################
 
-export function ArrayCreate(len){
-  return $$CreateObject('Array', len);
+export function ArrayCreate(length){
+  return $$CreateArray($$CurrentRealm(), length);
 }
-
