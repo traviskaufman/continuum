@@ -22,6 +22,7 @@ var operations = (function(exports){
       each                   = iteration.each,
       AbruptCompletion       = errors.AbruptCompletion,
       $$ThrowException       = errors.$$ThrowException,
+      HAS_INSTANCE           = operators.HAS_INSTANCE,
       $$ToPropertyKey        = operators.$$ToPropertyKey,
       $$GetThisValue         = operators.$$GetThisValue,
       $$ToUint32             = operators.$$ToUint32,
@@ -288,37 +289,6 @@ var operations = (function(exports){
   exports.$$Invoke = $$Invoke;
 
 
-  function $$OrdinaryHasInstance(callable, object){
-    if (!$$IsCallable(callable)) {
-      return false;
-    }
-
-    if (callable.BoundTargetFunction) {
-      return callable.BoundTargetFunction.HasInstance(object);
-    }
-
-    if (typeof object !== 'object' || object === null) {
-      return false;
-    }
-
-    var prototype = callable.Get('prototype');
-    if (prototype.Abrupt) return prototype;
-
-    if (typeof prototype !== 'object') {
-      return $$ThrowException('instanceof_nonobject_proto');
-    }
-
-    while (object) {
-      object = object.GetInheritance();
-      if (prototype === object) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  exports.$$OrdinaryHasInstance = $$OrdinaryHasInstance;
-
 
   function $$SpreadArguments(precedingArgs, spread){
     var obj = $$ToObject(spread);
@@ -581,6 +551,40 @@ var operations = (function(exports){
   }
 
   exports.$$OrdinaryCreateFromConstructor = $$OrdinaryCreateFromConstructor;
+
+
+
+  function $$OrdinaryHasInstance(C, O){
+    if (!$$IsCallable(C)) {
+      return false;
+    }
+
+    if (C.BoundTargetFunction) {
+      return INSTANCE_OF(O, C.BoundTargetFunction);
+    }
+
+    if ($$Type(O) !== 'Object') {
+      return false;
+    }
+
+    var P = C.Get('prototype');
+    if ($$Type(P) !== 'Object') {
+      return $$ThrowException('instanceof_nonobject_proto');
+    }
+
+    do {
+      O = O.GetInheritance();
+      if (O === P) {
+        return true;
+      }
+    } while (O)
+
+    return false;
+  }
+
+  exports.$$OrdinaryHasInstance = $$OrdinaryHasInstance;
+
+
 
 
   var realm, intrinsics;

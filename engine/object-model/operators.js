@@ -505,15 +505,31 @@ var operators = (function(exports){
   });
 
 
-  function INSTANCE_OF(lval, rval) {
-    if (!rval || !rval.HasInstance) {
-      return $$ThrowException('instanceof_function_expected', [TYPEOF(rval)]);
+  function $$OrdinaryHasInstance(C, O){
+    $$OrdinaryHasInstance = require('./operations').$$OrdinaryHasInstance;
+    return $$OrdinaryHasInstance(C, O);
+  }
+
+
+  function $$GetMethod(O, P){
+    $$GetMethod = require('./operations').$$GetMethod;
+    return $$GetMethod(O, P);
+  }
+
+  function INSTANCE_OF(O, C){
+    var instOfHandler = $$GetMethod(C, hasInstanceSymbol);
+
+    if (instOfHandler !== undefined) {
+      return instOfHandler.Call(C, [O]);
     }
 
-    return rval.HasInstance(lval);
+    if (!C || !C.Call) {
+      return $$ThrowException('instanceof_function_expected', [TYPEOF(C)]);
+    }
+
+    return $$OrdinaryHasInstance(C, O);
   }
   exports.INSTANCE_OF = INSTANCE_OF;
-
 
 
 

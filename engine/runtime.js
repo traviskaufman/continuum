@@ -534,28 +534,9 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function Construct(args){
         return $$OrdinaryConstruct(this, args);
-      },
-      function HasInstance(arg){
-        if (typeof arg !== 'object' || arg === null) {
-          return false;
-        }
-
-        var prototype = this.Get('prototype');
-        if (prototype.Abrupt) return prototype;
-
-        if (typeof prototype !== 'object') {
-          return $$ThrowException('instanceof_nonobject_proto');
-        }
-
-        while (arg) {
-          arg = arg.GetInheritance();
-          if (prototype === arg) {
-            return true;
-          }
-        }
-        return false;
       }
     ]);
+
 
     function $$OrdinaryConstruct(F, argumentsList, fallBackProto){
       var creator = F.Get(createSymbol);
@@ -572,6 +553,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     return $Function;
   })();
+
 
 
   var $BoundFunction = (function(){
@@ -604,13 +586,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
         target.constructCount = (target.constructCount || 0) + 1;
         return target.Construct(this.BoundArgs.concat(newArgs));
-      },
-      function HasInstance(arg){
-        var target = this.BoundTargetFunction;
-        if (!target.HasInstance) {
-          return $$ThrowException('instanceof_function_expected', target.name);
-        }
-        return target.HasInstance(arg);
       }
     ]);
 
@@ -1663,9 +1638,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
 
     function FunctionPrototypeCall(){}
-    function FunctionPrototypeHasInstance(){
-      return false;
-    }
 
     function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
@@ -1721,7 +1693,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       intrinsics.FunctionProto.FormalParameters = [];
       intrinsics.FunctionProto.Call = FunctionPrototypeCall;
-      intrinsics.FunctionProto.HasInstance = FunctionPrototypeHasInstance;
       intrinsics.FunctionProto.BuiltinBrand = 'BuiltinFunction';
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;

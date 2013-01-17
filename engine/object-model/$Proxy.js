@@ -131,21 +131,12 @@ var $Proxy = (function(module){
     return seen;
   }
 
-  function getHasInstance(){
-    var HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
-    getHasInstance = function(){
-      return HasInstance;
-    };
-    return HasInstance;
-  }
-
   function $Proxy(target, handler){
     this.ProxyHandler = handler;
     this.ProxyTarget = target;
     this.BuiltinBrand = target.BuiltinBrand;
 
     if (target.Call) {
-      this.HasInstance = getHasInstance();
       this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
       this.getName = ProxyGetName;
