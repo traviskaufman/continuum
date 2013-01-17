@@ -12918,15 +12918,31 @@ exports.operators = (function(exports){
   });
 
 
-  function INSTANCE_OF(lval, rval) {
-    if (!rval || !rval.HasInstance) {
-      return $$ThrowException('instanceof_function_expected', [TYPEOF(rval)]);
+  function $$OrdinaryHasInstance(C, O){
+    $$OrdinaryHasInstance = require('./operations').$$OrdinaryHasInstance;
+    return $$OrdinaryHasInstance(C, O);
+  }
+
+
+  function $$GetMethod(O, P){
+    $$GetMethod = require('./operations').$$GetMethod;
+    return $$GetMethod(O, P);
+  }
+
+  function INSTANCE_OF(O, C){
+    var instOfHandler = $$GetMethod(C, hasInstanceSymbol);
+
+    if (instOfHandler !== undefined) {
+      return instOfHandler.Call(C, [O]);
     }
 
-    return rval.HasInstance(lval);
+    if (!C || !C.Call) {
+      return $$ThrowException('instanceof_function_expected', [TYPEOF(C)]);
+    }
+
+    return $$OrdinaryHasInstance(C, O);
   }
   exports.INSTANCE_OF = INSTANCE_OF;
-
 
 
 
@@ -13473,6 +13489,7 @@ exports.operations = (function(exports){
       each                   = iteration.each,
       AbruptCompletion       = errors.AbruptCompletion,
       $$ThrowException       = errors.$$ThrowException,
+      HAS_INSTANCE           = operators.HAS_INSTANCE,
       $$ToPropertyKey        = operators.$$ToPropertyKey,
       $$GetThisValue         = operators.$$GetThisValue,
       $$ToUint32             = operators.$$ToUint32,
@@ -13739,37 +13756,6 @@ exports.operations = (function(exports){
   exports.$$Invoke = $$Invoke;
 
 
-  function $$OrdinaryHasInstance(callable, object){
-    if (!$$IsCallable(callable)) {
-      return false;
-    }
-
-    if (callable.BoundTargetFunction) {
-      return callable.BoundTargetFunction.HasInstance(object);
-    }
-
-    if (typeof object !== 'object' || object === null) {
-      return false;
-    }
-
-    var prototype = callable.Get('prototype');
-    if (prototype.Abrupt) return prototype;
-
-    if (typeof prototype !== 'object') {
-      return $$ThrowException('instanceof_nonobject_proto');
-    }
-
-    while (object) {
-      object = object.GetInheritance();
-      if (prototype === object) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  exports.$$OrdinaryHasInstance = $$OrdinaryHasInstance;
-
 
   function $$SpreadArguments(precedingArgs, spread){
     var obj = $$ToObject(spread);
@@ -14032,6 +14018,40 @@ exports.operations = (function(exports){
   }
 
   exports.$$OrdinaryCreateFromConstructor = $$OrdinaryCreateFromConstructor;
+
+
+
+  function $$OrdinaryHasInstance(C, O){
+    if (!$$IsCallable(C)) {
+      return false;
+    }
+
+    if (C.BoundTargetFunction) {
+      return INSTANCE_OF(O, C.BoundTargetFunction);
+    }
+
+    if ($$Type(O) !== 'Object') {
+      return false;
+    }
+
+    var P = C.Get('prototype');
+    if ($$Type(P) !== 'Object') {
+      return $$ThrowException('instanceof_nonobject_proto');
+    }
+
+    do {
+      O = O.GetInheritance();
+      if (O === P) {
+        return true;
+      }
+    } while (O)
+
+    return false;
+  }
+
+  exports.$$OrdinaryHasInstance = $$OrdinaryHasInstance;
+
+
 
 
   var realm, intrinsics;
@@ -15304,21 +15324,12 @@ exports.$Proxy = (function(module){
     return seen;
   }
 
-  function getHasInstance(){
-    var HasInstance = require('../runtime').builtins.$Function.prototype.HasInstance;
-    getHasInstance = function(){
-      return HasInstance;
-    };
-    return HasInstance;
-  }
-
   function $Proxy(target, handler){
     this.ProxyHandler = handler;
     this.ProxyTarget = target;
     this.BuiltinBrand = target.BuiltinBrand;
 
     if (target.Call) {
-      this.HasInstance = getHasInstance();
       this.Call = ProxyCall;
       this.Construct = ProxyConstruct;
       this.getName = ProxyGetName;
@@ -18422,28 +18433,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function Construct(args){
         return $$OrdinaryConstruct(this, args);
-      },
-      function HasInstance(arg){
-        if (typeof arg !== 'object' || arg === null) {
-          return false;
-        }
-
-        var prototype = this.Get('prototype');
-        if (prototype.Abrupt) return prototype;
-
-        if (typeof prototype !== 'object') {
-          return $$ThrowException('instanceof_nonobject_proto');
-        }
-
-        while (arg) {
-          arg = arg.GetInheritance();
-          if (prototype === arg) {
-            return true;
-          }
-        }
-        return false;
       }
     ]);
+
 
     function $$OrdinaryConstruct(F, argumentsList, fallBackProto){
       var creator = F.Get(createSymbol);
@@ -18460,6 +18452,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     return $Function;
   })();
+
 
 
   var $BoundFunction = (function(){
@@ -18492,13 +18485,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
         target.constructCount = (target.constructCount || 0) + 1;
         return target.Construct(this.BoundArgs.concat(newArgs));
-      },
-      function HasInstance(arg){
-        var target = this.BoundTargetFunction;
-        if (!target.HasInstance) {
-          return $$ThrowException('instanceof_function_expected', target.name);
-        }
-        return target.HasInstance(arg);
       }
     ]);
 
@@ -19551,9 +19537,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     };
 
     function FunctionPrototypeCall(){}
-    function FunctionPrototypeHasInstance(){
-      return false;
-    }
 
     function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
@@ -19609,7 +19592,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       intrinsics.FunctionProto.FormalParameters = [];
       intrinsics.FunctionProto.Call = FunctionPrototypeCall;
-      intrinsics.FunctionProto.HasInstance = FunctionPrototypeHasInstance;
       intrinsics.FunctionProto.BuiltinBrand = 'BuiltinFunction';
       intrinsics.FunctionProto.Scope = realm.globalEnv;
       intrinsics.FunctionProto.Realm = realm;
@@ -22524,6 +22506,8 @@ exports.builtins["@@internal"] = "private @@toStringTag  = $__getWellKnownSymbol
 exports.builtins["@@objects"] = "// ##############################################\n// ##### 11 Internal Methods and Properties #####\n// ##############################################\n\nimport {\n  $$ArgumentCount,\n  $$CreateObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Get,\n  $$GetPropertyAttribute,\n  $$GetPropertyValue,\n  $$GetIntrinsic,\n  $$HasArgument,\n  $$Set,\n  $$SetPropertyAttribute,\n  $$SetPropertyValue\n} from '@@internals';\n\nimport {\n  createAccessorDescriptor,\n  createDataDescriptor,\n  Type\n} from '@@types';\n\nconst E = 0x1,\n      C = 0x2,\n      W = 0x4,\n      A = 0x8,\n      ___ = 0,\n      E__ = E,\n      _C_ = C,\n      EC_ = E | C,\n      __W = W,\n      E_W = E | W,\n      _CW = C | W,\n      ECW = E | C | W,\n      __A = A,\n      E_A = E | A,\n      _CA = C | A,\n      ECA = E | C | A;\n\n\n// ##########################################################################\n// ### 11.1 Ordinary Object Internal Methods and Internal Data Properties ###\n// ##########################################################################\n\nconst OrdinaryObject = $$CreateInternalObject();\n\n\n// #############################\n// # 11.1.1 [[GetInheritance]] #\n// #############################\n\n$$Set(OrdinaryObject, 'GetInheritance', function(){\n  return $$Get(this, 'Prototype');\n});\n\n\n// #############################\n// # 11.1.2 [[SetInheritance]] #\n// #############################\n\n$$Set(OrdinaryObject, 'SetInheritance', function(V){\n  $$Assert(Type(V) === 'Object' || Type(V) === 'Null');\n\n  if (!$$Invoke(this, 'IsExtensible')) { // spec bug, https://bugs.ecmascript.org/show_bug.cgi?id=1191\n    return false;\n  }\n\n  $$Set(this, 'Prototype', V);\n  return true;\n});\n\n\n// ###########################\n// # 11.1.3 [[IsExtensible]] #\n// ###########################\n\n$$Set(OrdinaryObject, 'IsExtensible', function(){;\n  return $$Get(this, 'Extensible');\n});\n\n\n// ################################\n// # 11.1.4 [[PreventExtensions]] #\n// ################################\n\n$$Set(OrdinaryObject, 'PreventExtensions', function(){;\n  $$Set(this, 'Extensible', false);\n});\n\n\n// #############################\n// # 11.1.5 [[HasOwnProperty]] #\n// #############################\n\n$$Set(OrdinaryObject, 'HasOwnProperty', function(P){;\n  $$Assert(IsPropertyKey(P));\n  return $$HasProperty(this, P);\n});\n\n\n// #############################\n// # 11.1.6 [[GetOwnProperty]] #\n// #############################\n\n$$Set(OrdinaryObject, 'GetOwnProperty', function(P){;\n  return OrdinaryGetOwnProperty(this, P);\n});\n\n\n// 11.1.6.1 OrdinaryGetOwnProperty\n\nexport function OrdinaryGetOwnProperty(O, P){\n  $$Assert(IsPropertyKey(P));\n\n  if (!$$HasProperty(O, P)) {\n    return undefined;\n  }\n\n  const attr = $$GetPropertyAttribute(O, P),\n        val  = $$GetPropertyValue(O, P);\n\n  if (attr & A) {\n    return createAccessorDescriptor($$Get(val, 'Get'), $$Get(val, 'Set'), attr & E, attr & C);\n  }\n\n  return createDataDescriptor(val, attr & W, attr & E, attr & C);\n}\n\n\n// ################################\n// # 11.1.7 [[DefineOwnProperty]] #\n// ################################\n\n$$Set(OrdinaryObject, 'DefineOwnProperty', function(P, Desc){;\n  return OrdinaryDefineOwnProperty(this, P, Desc);\n});\n\n\n// 11.1.7.1 OrdinaryDefineOwnProperty\n\nexport function OrdinaryDefineOwnProperty(O, P, Desc){\n  const current    = OrdinaryGetOwnProperty(O, P),\n        extensible = $$Invoke(O, 'IsExtensible'); // spec bug, https://bugs.ecmascript.org/show_bug.cgi?id=1191\n\n  return ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current);\n}\n\n\n// 11.1.7.2 IsCompatiblePropertyDescriptor\n\nexport function IsCompatiblePropertyDesriptor(Extensible, Desc, Current) {\n  return ValidateAndApplyPropertyDescriptor(undefined, undefined, Extensible, Desc, Current);\n}\n\n\n// 11.1.7.3 ValidateAndApplyPropertyDescriptor\n\nfunction attributesFromDescriptor(Desc){\n}\n\nexport function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current){\n  $$Assert(O === undefined || IsPropertyKey(P));\n\n  let changeType = 'reconfigured';\n\n  // New property\n  if (current === undefined) {\n    if (!extensible) {\n      return false;\n    }\n\n    $$Assert(extensible === true);\n\n    if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {\n      if (O !== undefined) {\n        $$CreateProperty(O, )\n        create an own data property named P of object O whose [[Value]], [[Writable]], [[Enumerable]] and [[Configurable]] attribute values are described by Desc.\n        If the value of an attribute field of Desc is absent, the attribute of the newly created property is set to its default value.\n      }\n    }\n\n    if (O !== undefined) {\n      if ($$IsGenericDescriptor(Desc) || $$IsDataDescriptor(Desc)) {\n        O.define(P, Desc.Value, Desc.Enumerable | (Desc.Configurable << 1) | (Desc.Writable << 2));\n      } else {\n        O.define(P, new Accessor(Desc.Get, Desc.Set), Desc.Enumerable | (Desc.Configurable << 1) | 8);\n      }\n\n      if (O.Notifier) {\n        var changeObservers = O.Notifier.ChangeObservers;\n        if (changeObservers.size) {\n          var record = $$CreateChangeRecord('new', O, P);\n          $$EnqueueChangeRecord(record, changeObservers);\n        }\n      }\n    }\n    return extensible === true;\n  }\n\n  // Empty Descriptor\n  if (!('Get' in Desc || 'Set' in Desc || 'Value' in Desc)) {\n    if (!('Writable' in Desc || 'Enumerable' in Desc || 'Configurable' in Desc)) {\n      return true;\n    }\n  }\n\n  //Equal Descriptor\n  if (Desc.Writable === current.Writable && Desc.Enumerable === current.Enumerable && Desc.Configurable === current.Configurable) {\n    if (Desc.Get === current.Get && Desc.Set === current.Set && is(Desc.Value, current.Value)) {\n      return true;\n    }\n  }\n\n  if (!current.Configurable) {\n    if (Desc.Configurable || 'Enumerable' in Desc && Desc.Enumerable !== current.Enumerable) {\n      return false;\n    } else {\n      var currentIsData = $$IsDataDescriptor(current),\n          DescIsData = $$IsDataDescriptor(Desc);\n\n      if (currentIsData !== DescIsData) {\n        return false;\n      } else if (currentIsData && DescIsData) {\n        if (!current.Writable && 'Value' in Desc && !is(Desc.Value, current.Value)) {\n          return false;\n        }\n      } else if ('Set' in Desc && Desc.Set !== current.Set) {\n        return false;\n      } else if ('Get' in Desc && Desc.Get !== current.Get) {\n        return false;\n      }\n    }\n  }\n\n  if (O === undefined) {\n    return true;\n  }\n\n  'Configurable' in Desc || (Desc.Configurable = current.Configurable);\n  'Enumerable' in Desc || (Desc.Enumerable = current.Enumerable);\n\n  if ($$IsAccessorDescriptor(Desc)) {\n    O.update(P, Desc.Enumerable | (Desc.Configurable << 1) | 8);\n    if ($$IsDataDescriptor(current)) {\n      O.set(P, new Accessor(Desc.Get, Desc.Set));\n    } else {\n      var accessor = current.getAccessor();\n      'Set' in Desc && (accessor.Set = Desc.Set);\n      'Get' in Desc && (accessor.Get = Desc.Get);\n      ('Set' in Desc || 'Get' in Desc) && O.set(P, accessor);\n    }\n  } else {\n    if ($$IsAccessorDescriptor(current)) {\n      current.Writable = true;\n    }\n    'Writable' in Desc || (Desc.Writable = current.Writable);\n    O.update(P, Desc.Enumerable | (Desc.Configurable << 1) | (Desc.Writable << 2));\n    if ('Value' in Desc) {\n      O.set(P, Desc.Value);\n      changeType = 'updated';\n    }\n  }\n\n  if (O.Notifier) {\n    var changeObservers = O.Notifier.ChangeObservers;\n    if (changeObservers.size) {\n      var record = $$CreateChangeRecord(changeType, O, P, current);\n      $$EnqueueChangeRecord(record, changeObservers);\n    }\n  }\n\n  return true;\n}\n\n\n\n// ###########################################\n// # 11.1.18 ObjectCreate Abstract Operation #\n// ###########################################\n\nexport function ObjectCreate(proto){\n  if (!$$ArgumentCount()) {\n    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');\n  }\n  return $$CreateObject('Object', proto);\n}\n\n\n// ###########################################\n// # 11.2.2.3 ArrayCreate Abstract Operation #\n// ###########################################\n\nexport function ArrayCreate(len){\n  return $$CreateObject('Array', len);\n}\n\n";
 
 exports.builtins["@@operations"] = "// #####################################\n// ####### 9 Abstract Operations #######\n// #####################################\n\n\nimport {\n  abs,\n  call,\n  floor,\n  getIntrinsic,\n  hasBrand,\n  isNaN,\n  isZeroOrInfinite,\n  sign\n} from '@@utilities';\n\nimport {\n  ArrayCreate,\n  ObjectCreate,\n  Type\n} from '@@types';\n\nimport {\n  $$Assert,\n  $$AssertIsInternalArray,\n  $$AssertIsECMAScriptValue,\n  $$AssertWontThrow,\n  $$Invoke,\n  $$CreateObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Exception,\n  $$Get,\n  $$GetIntrinsic,\n  $$Has,\n  $$HasArgument,\n  $$StringToNumber,\n  $$Set\n} from '@@internals';\n\nimport {\n  NaN\n} from '@@constants';\n\nimport {\n  @@ToPrimitive: ToPrimitive\n} from '@@symbols';\n\n\n\n// ###########################################\n// ##### 9.1 Type Conversion and Testing #####\n// ###########################################\n\n\n// #########################\n// ### 9.1.1 ToPrimitive ###\n// #########################\n\nexport function ToPrimitive(argument, PreferredType){\n  if (Type(argument) !== 'Object') {\n    return argument;\n  }\n\n  let hint = 'number';\n  if (!$$HasArgument('PreferredType')) {\n    hint = 'default';\n  } else if (PreferredType === 'String') {\n    hint = 'string';\n  }\n\n  const exoticToPrim = Get(argument, @@ToPrimitive);\n  if (exoticToPrim !== undefined) {\n    if (!IsCallable(exoticToPrim)) {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n\n    const result = call(exoticToPrim, argument);\n    if (Type(result) !== 'Object') {\n      return result;\n    } else {\n      throw $$Exception('cannot_convert_to_primitive', []);\n    }\n  }\n\n  if (hint === 'default') {\n    hint = 'number';\n  }\n\n  return OrdinaryToPrimitive(argument, hint);\n}\n\nexport function OrdinaryToPrimitive(O, hint){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(Type(hint) === 'String' && hint === 'string' || hint === 'number');\n\n  let tryFirst, trySecond;\n  if (hint === 'string') {\n    tryFirst = 'toString';\n    trySecond = 'valueOf';\n  } else {\n    tryFirst = 'valueOf';\n    trySecond = 'toString';\n  }\n\n  const first = Get(O, tryFirst);\n  if (IsCallable(first)) {\n    const result = call(first, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    }\n  }\n\n  const second = Get(O, trySecond);\n  if (IsCallable(second)) {\n    const result = call(second, O);\n    if (Type(result) !== 'Object') {\n      return result;\n    }\n  }\n\n  throw $$Exception('cannot_convert_to_primitive', []);\n}\n\n\n// #######################\n// ### 9.1.2 ToBoolean ###\n// #######################\n\nexport function ToBoolean(argument){\n  switch (Type(argument)) {\n    case 'Boolean':\n      return argument;\n    case 'Undefined':\n    case 'Null':\n      return false;\n    case 'Number':\n      return argument !== 0 && argument === argument;\n    case 'String':\n      return argument !== '';\n    case 'Object':\n      return true;\n  }\n}\n\n\n// ######################\n// ### 9.1.3 ToNumber ###\n// ######################\n\nexport function ToNumber(argument){\n  switch (Type(argument)) {\n    case 'Number':\n      return argument;\n    case 'Undefined':\n      return NaN;\n    case 'Null':\n      return 0;\n    case 'Boolean':\n      return argument === true ? 1 : 0;\n    case 'String':\n      return $$StringToNumber(argument);\n    case 'Object':\n      return ToNumber(ToPrimitive(argument), 'Number');\n  }\n}\n\n\n// #######################\n// ### 9.1.4 ToInteger ###\n// #######################\n\nexport function ToInteger(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number)) {\n    return 0;\n  }\n\n  if (isZeroOrInfinite(number)) {\n    return number;\n  }\n\n  return sign(number) * floor(abs(number));\n}\n\n\n// #####################\n// ### 9.1.5 ToInt32 ###\n// #####################\n\nexport function ToInt32(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number) || isZeroOrInfinite(number)) {\n    return 0;\n  }\n\n  const int = sign(number) * floor(abs(number)) & 0xffffffff;\n\n  return int >= 0x80000000 ? int - 0x80000000 : int;\n}\n\n\n// ######################\n// ### 9.1.6 ToUint32 ###\n// ######################\n\nexport function ToUint32(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number) || isZeroOrInfinite(number)) {\n    return 0;\n  }\n\n  return sign(number) * floor(abs(number)) & 0xffffffff;\n}\n\n\n// ######################\n// ### 9.1.7 ToUint16 ###\n// ######################\n\nexport function ToUint16(argument){\n  const number = ToNumber(argument);\n\n  if (isNaN(number) || isZeroOrInfinite(number)) {\n    return 0;\n  }\n\n  return sign(number) * floor(abs(number)) & 0xffff;\n}\n\n\n// ######################\n// ### 9.1.8 ToString ###\n// ######################\n\nexport function ToString(argument){\n  switch (Type(argument)) {\n    case 'String':\n      return argument;\n    case 'Undefined':\n      return 'undefined';\n    case 'Number':\n      return $$Invoke(argument, 'toString');\n    case 'Null':\n      return 'null';\n    case 'Boolean':\n      return argument === true ? 'true' : 'false';\n    case 'Object':\n      return ToString(ToPrimitive(argument, 'String'));\n  }\n}\n\n\n// ######################\n// ### 9.1.9 ToObject ###\n// ######################\n\nexport function ToObject(argument){\n  switch (Type(argument)) {\n    case 'Object':\n      return argument;\n    case 'Undefined':\n      throw $$Exception('undefined_to_object', []);\n    case 'Null':\n      throw $$Exception('null_to_object', []);\n    case 'Boolean':\n      return new (getIntrinsic('%Boolean%'))(argument);\n    case 'Number':\n      return new (getIntrinsic('%Number%'))(argument);\n    case 'String':\n      return new (getIntrinsic('%String%'))(argument);\n  }\n}\n\n\n// ############################\n// ### 9.1.10 ToPropertyKey ###\n// ############################\n\nexport function ToPropertyKey(argument){\n  const type = Type(argument);\n\n  if (type === 'String' || type === 'Object' && hasBrand(argument, 'BuiltinSymbol')) {\n    return argument;\n  }\n\n  return ToString(argument);\n}\n\n\n\n// #################################################\n// ##### 9.2 Testing and Comparison Operations #####\n// #################################################\n\n\n// ##################################\n// ### 9.2.1 CheckObjectCoercible ###\n// ##################################\n\nexport function CheckObjectCoercible(argument){\n  if (argument === null) {\n    throw $$Exception('null_to_object', []);\n  } else if (argument === undefined) {\n    throw $$Exception('undefined_to_object', []);\n  }\n\n  return argument;\n}\n\n// ########################\n// ### 9.2.2 IsCallable ###\n// ########################\n\nexport function IsCallable(argument){\n  return Type(argument) === 'Object' && $$Has(argument, 'Call');\n}\n\n\n// #######################\n// ### 9.2.3 SameValue ###\n// #######################\n\nexport function SameValue(x, y){\n  return x === y ? x !== 0 || 1 / x === 1 / y : isNaN(x) && isNaN(y);\n}\n\n\n// ###########################\n// ### 9.2.4 IsConstructor ###\n// ###########################\n\nexport function IsConstructor(argument){\n  return Type(argument) === 'Object' && $$Has(argument, 'Construct');\n}\n\n// ###########################\n// ### 9.2.5 IsPropertyKey ###\n// ###########################\n\nexport function IsPropertyKey(argument){\n  const type = Type(argument);\n  return type === 'String' || type === 'Object' && hasBrand(argument, 'BuiltinSymbol');\n}\n\n\n\n\n// #####################################\n// ##### 9.3 Operations on Objects #####\n// #####################################\n\n\n// #################\n// ### 9.3.1 Get ###\n// #################\n\nexport function Get(O, P){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n\n  return $$Invoke(O, 'GetP', O, P);\n}\n\n\n// #################\n// ### 9.3.2 Put ###\n// #################\n\nexport function Put(O, P, V, Throw){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n  $$Assert(Type(Throw) === 'Boolean');\n\n  const success = $$Invoke(O, 'SetP', O, P, V);\n  if (Throw && !success) {\n    throw $$Exception('strict_cannot_assign', [P]);\n  }\n\n  return success;\n}\n\n\n// ###################################\n// ### 9.3.3 CreateOwnDataProperty ###\n// ###################################\n\nconst normal = $$CreateInternalObject();\n$$Set(normal, 'Writable', true);\n$$Set(normal, 'Enumerable', true);\n$$Set(normal, 'Configurable', true);\n\nexport function CreateOwnDataProperty(O, P, V){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n  //$$Assert(!hasOwn(O, P));\n\n  const extensible = $$Invoke(O, 'IsExtensible');\n  if (!extensible) {\n    return extensible;\n  }\n\n  $$Set(normal, 'Value', V);\n  const result = $$Invoke(O, 'DefineOwnProperty', P, normal);\n  $$Set(normal, 'Value', undefined);\n\n  return result;\n}\n\n\n// ###################################\n// ### 9.3.4 DefinePropertyOrThrow ###\n// ###################################\n\nexport function DefinePropertyOrThrow(O, P, desc){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n\n  const success = $$Invoke(O, 'DefineOwnProperty', P, desc);\n  if (!success) {\n    throw $$Exception('redefine_disallowed', [P]);\n  }\n\n  return success;\n}\n\n\n// ###################################\n// ### 9.3.5 DeletePropertyOrThrow ###\n// ###################################\n\nexport function DeletePropertyOrThrow(O, P){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n\n  const success = $$Invoke(O, 'Delete', P); // TODO: rename to DeleteProperty\n  if (!success) {\n    throw $$Exception('strict_delete_property', [P, Type(O)]);\n  }\n  return success;\n}\n\n\n// #########################\n// ### 9.3.6 HasProperty ###\n// #########################\n\nexport function HasProperty(O, P){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n\n  return $$Invoke(O, 'HasProperty', P);\n}\n\n\n// #######################\n// ### 9.3.7 GetMethod ###\n// #######################\n\nexport function GetMethod(O, P){\n  $$Assert(Type(O) === 'Object');\n  $$Assert(IsPropertyKey(P) === true);\n\n  const func = $$Invoke(O, 'GetP', O, P);\n  if (func === undefined) {\n    return func;\n  }\n\n  if (!IsCallable(func)) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return func;\n}\n\n\n// ####################\n// ### 9.3.8 Invoke ###\n// ####################\n\nconst emptyArgs = [];\n\nexport function Invoke(O, P, args){\n  $$Assert(IsPropertyKey(P) === true);\n\n  args || (args = emptyArgs);\n\n  const obj  = ToObject(O),\n        func = GetMethod(obj, P);\n\n  if (func === undefined) {\n    throw $$Exception('property_not_function', [P]);\n  }\n\n  return $$Invoke(func, 'Call', O, $$Get(args, 'array'));\n}\n\n\n// ################################\n// ### 9.3.9 TestIfSecureObject ###\n// ################################\n\nfunction TestIfSecureObject(O, immutable){}\n\n\n// ###############################\n// ### 9.3.10 MakeObjectSecure ###\n// ###############################\n\nfunction MakeObjectSecure(O, immutable){}\n\n\n// ##################################\n// ### 9.3.11 CreateArrayFromList ###\n// ##################################\n\nfunction CreateArrayFromList(elements){\n  $$AssertIsInternalArray(elements);\n\n  const array = ArrayCreate(0),\n        len   = $$Get(elements, 'length');\n\n  for (let n=0; n < len; n++) {\n    const element = $$Get(elements, n);\n    $$AssertIsECMAScriptValue(elements);\n    $$AssertWontThrow(CreateOwnDataProperty(array, ToString(n), element));\n  }\n\n  return array;\n}\n\n\n// ##################################\n// ### 9.3.12 OrdinaryHasInstance ###\n// ##################################\n\nexport function OrdinaryHasInstance(C, O){\n  if (!IsCallable(C)) {\n    return false;\n  }\n\n  if ($$Has(C, 'BoundTargetFunction')) {\n    return O instanceof $$Get(C, 'BoundTargetFunction');\n  }\n\n  if (Type(O) !== 'Object') {\n    return false;\n  }\n\n  const P = Get(C, 'prototype');\n  if (Type(P) !== 'Object') {\n    throw $$Exception('instanceof_nonobject_proto');\n  }\n\n  do {\n    O = $$Invoke(O, 'GetInheritance');\n    if (O === P) {\n      return true;\n    }\n  } while (O)\n\n  return false;\n}\n\n\n// ############################################\n// ### 9.3.13 OrdinaryCreateFromConstructor ###\n// ############################################\n\nconst protos = {\n  '%ArrayBufferPrototype%' : 'ArrayBufferProto',\n  '%ArrayPrototype%'       : 'ArrayProto',\n  '%BooleanPrototype%'     : '%BooleanPrototype%',\n  '%DataViewPrototype%'    : 'DataViewProto',\n  '%DatePrototype%'        : '%DatePrototype%',\n  '%Float32ArrayPrototype%': 'Float32ArrayProto',\n  '%Float64ArrayPrototype%': 'Float64ArrayProto',\n  '%FunctionPrototype%'    : 'FunctionProto',\n  '%Int16ArrayPrototype%'  : 'Int16ArrayProto',\n  '%Int32ArrayPrototype%'  : 'Int32ArrayProto',\n  '%Int8ArrayPrototype%'   : 'Int8ArrayProto',\n  '%MapPrototype%'         : '%MapPrototype%',\n  '%NumberPrototype%'      : '%NumberPrototype%',\n  '%ObjectPrototype%'      : 'ObjectProto',\n  '%SetPrototype%'         : '%SetPrototype%',\n  '%StringPrototype%'      : '%StringPrototype%',\n  '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',\n  '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',\n  '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',\n  '%WeakMapPrototype%'     : '%WeakMapPrototype%'\n};\n\n\nexport function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){\n  if (Type(constructor) !== 'Object') {\n    throw $$Exception('construct_non_constructor', [Type(constructor)]);\n  }\n\n  let proto = Get(constructor, 'prototype');\n\n  if (!proto) {\n    const realm = $$Has(constructor, 'Realm') ? $$Get(constructor, 'Realm') : $$CurrentRealm();\n    proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto));\n  }\n\n  return ObjectCreate(proto);\n}\n\n";
+
+exports.builtins["@@operators"] = "// ###############################\n// ## 12.8 Relational Operators ##\n// ###############################\n\n// #######################################################\n// # 12.8.1 The Abstract Relational Comparison Algorithm #\n// #######################################################\n\nfunction AbstractRelationalComparison(x, y, LeftFirst = true){\n  let px, py;\n\n  if (LeftFirst) {\n    px = ToPrimitive(x, 'Number');\n    py = ToPrimitive(y, 'Number');\n  } else {\n    py = ToPrimitive(y, 'Number');\n    px = ToPrimitive(x, 'Number');\n  }\n\n  if (Type(px) === 'String' && Type(py) === 'String') {\n    // TODO: full string relational comparison\n    return $$Compare(px, py);\n  }\n\n  const nx = ToNumber(px),\n        ny = ToNumber(py);\n\n  if (isNaN(nx) || isNaN(ny)) {\n    return undefined;\n  } else if (nx === ny) {\n    return false;\n  } else if (nx === Infinity) {\n    return false;\n  } else if (ny === Infinity) {\n    return true;\n  } else if (ny === -Infinity) {\n    return false;\n  } else if (nx === -Infinity) {\n    return true;\n  }\n  return $$Compare(nx, ny);\n}\n\nfunction instanceofOperator(O, C){\n  const instOfHandler = GetMethod(C, hasInstanceSymbol);\n\n  if (instOfHandler !== undefined) {\n    return call(instOfHandler, C, [O]);\n  }\n\n  if (!IsCallable(C)) {\n    throw $$Exception('instanceof_function_expected', [Type(C)]);\n  }\n\n  return OrdinaryHasInstance(C, O);\n}\n";
 
 exports.builtins["@@types"] = "// #######################\n// ####### 8 Types #######\n// #######################\n\n\nimport {\n  $$ArgumentCount,\n  $$CreateObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Get,\n  $$GetIntrinsic,\n  $$HasArgument,\n  $$Set\n} from '@@internals';\n\nimport {\n  toBoolean\n} from '@@utilities';\n\n\n// #########################################\n// ##### 8.1 ECMAScript Language Types #####\n// #########################################\n\n\n// ################################\n// ### 8.1.1 The Undefined Type ###\n// ################################\n\nlet und;\nexport const undefined = und;\n\n\n// ###########################\n// ### 8.1.2 The Null Type ###\n// ###########################\n\n// null\n\n\n// ##############################\n// ### 8.1.3 The Boolean Type ###\n// ##############################\n\n// true\n// false\n\n\n// #############################\n// ### 8.1.4 The String Type ###\n// #############################\n\n// #############################\n// ### 8.1.5 The Number Type ###\n// #############################\n\nexport const NaN = +'NaN';\nexport const Infinity = 1 / 0;\n\n\n\n// #############################\n// ### 8.1.6 The Object Type ###\n// #############################\n\n// ###############################\n// # 8.1.6.1 Property Attributes #\n// ###############################\n\nconst descriptorTypes = $$CreateInternalObject();\n\nconst Descriptor = $$CreateInternalObject();\n$$Set(Descriptor, '_type', 'Descriptor');\n$$Set(descriptorTypes, 'Descriptor', Descriptor);\n\n\n// Data Descriptors\nconst DataDescriptor = $$CreateInternalObject(Descriptor);\n$$Set(DataDescriptor, '_type', 'DataDescriptor');\n$$Set(descriptorTypes, 'DataDescriptor', DataDescriptor);\n\nexport function createDataDescriptor(value, writable, enumerable, configurable){\n  const desc = $$CreateInternalObject(DataDescriptor);\n  $$Set(desc, 'Configurable', configurable || false);\n  $$Set(desc, 'Enumerable', enumerable || false);\n  $$Set(desc, 'Writable', writable || false);\n  $$Set(desc, 'Value', value);\n  return desc;\n}\n\n// Accessor Descriptors\nconst AccessorDescriptor = $$CreateInternalObject(Descriptor);\n$$Set(AccessorDescriptor, '_type', 'AccessorDescriptor');\n$$Set(descriptorTypes, 'AccessorDescriptor', AccessorDescriptor);\n\nexport function createAccessorDescriptor(get, set, enumerable, configurable){\n  const desc = $$CreateInternalObject(AccessorDescriptor);\n  $$Set(desc, 'Configurable', configurable || false);\n  $$Set(desc, 'Enumerable', enumerable || false);\n  $$Set(desc, 'Set', set);\n  $$Set(desc, 'Get', get);\n  return desc;\n}\n\nexport function copyDescriptor(desc){\n  const DescType = $$Get(descriptorTypes, $$Get(desc, '_type'));\n  const copy = $$CreateInternalObject(DescType);\n\n  $$Set(copy, 'Configurable', $$Get(desc, 'Configurable'));\n  $$Set(copy, 'Writable', $$Get(desc, 'Writable'));\n\n  if (DescType === DataDescriptor) {\n    $$Set(copy, 'Enumerable', $$Get(desc, 'Enumerable'));\n    $$Set(copy, 'Value', $$Get(desc, 'Value'));\n  } else if (DescType === AccessorDescriptor) {\n    $$Set(copy, 'Get', $$Get(desc, 'Get'));\n    $$Set(copy, 'Set', $$Get(desc, 'Set'));\n  }\n\n  return copy;\n}\n\n\nexport function isPrimitive(value){\n  switch (typeof value) {\n    case 'undefined':\n    case 'string':\n    case 'number':\n    case 'boolean':\n      return true;\n    default:\n      return value === null;\n  }\n}\n\nexport function Type(value){\n  switch (typeof value) {\n    case 'object':\n      return value === null ? 'Null' : 'Object';\n    case 'undefined':\n      return 'Undefined';\n    case 'function':\n      return 'Object';\n    case 'string':\n      return 'String';\n    case 'number':\n      return 'Number';\n    case 'boolean':\n      return 'Boolean';\n  }\n}\n\nfunction GetInheritance(){}\nfunction SetInheritance(){}\nfunction IsExtensible(){}\nfunction PreventExtensions(){}\nfunction HasOwnProperty(){}\nfunction GetOwnProperty(){}\nfunction GetP(){}\nfunction SetP(){}\nfunction Delete(){}\nfunction DefineOwnProperty(){}\nfunction Enumerate(){}\nfunction Keys(){}\nfunction OwnPropertyKeys(){}\nfunction Freeze(){}\nfunction Seal(){}\nfunction IsFrozen(){}\nfunction IsSealed(){}\n\nfunction Call(){}\nfunction Construct(){}\n\n\n\n// #############################################\n// # 8.1.6.3 Well-Known Symbols and Intrinsics #\n// #############################################\n/*\n@@create\n@@hasInstance\n@@iterator\n@@ToPrimitive\n@@toStringTag\n\n\n'%Object%'\n'%ObjectPrototype%'\n'%ObjProto_toString%'\n'%Function%'\n'%FunctionPrototype%'\n'%Array%'\n'%ArrayPrototype%'\n'%ArrayIteratorPrototype%'\n'%Map%'\n'%MapPrototype%'\n'%MapIteratorPrototype%'\n'%WeakMap%'\n'%WeakMapPrototype%'\n'%Set%'\n'%SetPrototype%'\n'%SetIteratorPrototype%'\n'%StopIteration%'\n*/\n// ####################################################\n// ### 8.2.2 The List and Record Specification Type ###\n// ####################################################\n\n\n// ######################################################\n// ### 8.2.3 The Completion Record Specification Type ###\n// ######################################################\n\nconst empty = $$CreateInternalObject();\n\nconst CompletionRecord = $$CreateInternalObject();\n$$Set(CompletionRecord, '_type', 'CompletionRecord');\n$$Set(CompletionRecord, 'type', 'normal');\n$$Set(CompletionRecord, 'value', undefined);\n$$Set(CompletionRecord, 'target', empty);\n\nexport function createCompletionRecord(type, value, target = empty){\n  const completion = $$CreateInternalObject(CompletionRecord);\n  $$Set(completion, 'type', type);\n  $$Set(completion, 'value', value);\n  $$Set(completion, 'target', target);\n  return completion;\n}\n\n\n// ############################\n// # 8.2.3.1 NormalCompletion #\n// ############################\n\nconst emptyCompletion = createCompletionRecord('normal');\n\nexport function NormalCompletion(argument){\n  const completion = $$CreateInternalObject(emptyCompletion);\n  $$Set(completion, 'value', argument);\n  return completion;\n}\n\n\n// ##############################\n// # 8.2.3.3 Throw an Exception #\n// ##############################\n\nconst thrownCompletion = createCompletionRecord('throw');\n\nexport function ThrowAnException(argument){\n  const completion = $$CreateInternalObject(thrownCompletion);\n  $$Set(completion, 'value', argument);\n  throw completion;\n}\n\n\n// ##########################\n// # 8.2.3.4 ReturnIfAbrupt #\n// ##########################\n\nexport function ReturnIfAbrupt(argument){\n  if (argument && $$Get(argument, '_type') === 'CompletionRecord') {\n    if ($$Get(argument, 'type') !== 'normal') {\n      throw argument;\n    }\n    return $$Get(argument, 'value');\n  }\n  return argument;\n}\n\n\n// ##############################################\n// ### 8.2.4 The Reference Specification Type ###\n// ##############################################\n\nconst Reference = $$CreateInternalObject();\n$$Set(Reference, '_type', 'Reference');\n$$Set(Reference, 'base', undefined);\n$$Set(Reference, 'name', '');\n$$Set(Reference, 'strict', false);\n$$Set(Reference, 'thisValue', undefined);\n\n\n\n// ##############################################\n// ### 8.3.18 ObjectCreate Abstract Operation ###\n// ##############################################\n\nexport function ObjectCreate(proto){\n  if (!$$ArgumentCount()) {\n    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');\n  }\n  return $$CreateObject('Object', proto);\n}\n\n\n// ##############################################\n// ### 8.4.2.3 ArrayCreate Abstract Operation ###\n// ##############################################\n\nexport function ArrayCreate(len){\n  return $$CreateObject('Array', len);\n}\n\n";
 
