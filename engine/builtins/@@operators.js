@@ -1,3 +1,37 @@
+import {
+  POSITIVE_INFINITY,
+  NEGATIVE_INFINITY
+} from '@@constants';
+
+import {
+  GetMethod,
+  IsCallable,
+  OrdinaryHasInstance,
+  ToNumber,
+  ToPrimitive
+} from '@@operations';
+
+import {
+  Type
+} from '@@types';
+
+import {
+  call,
+  isNaN
+} from '@@utilities';
+
+import {
+  $$Compare,
+  $$Exception
+} from '@@internals';
+
+import {
+  @@hasInstance: hasInstance
+} from '@@symbols';
+
+
+
+
 // ###############################
 // ## 12.8 Relational Operators ##
 // ###############################
@@ -29,20 +63,26 @@ function AbstractRelationalComparison(x, y, LeftFirst = true){
     return undefined;
   } else if (nx === ny) {
     return false;
-  } else if (nx === Infinity) {
+  } else if (nx === POSITIVE_INFINITY) {
     return false;
-  } else if (ny === Infinity) {
+  } else if (ny === POSITIVE_INFINITY) {
     return true;
-  } else if (ny === -Infinity) {
+  } else if (ny === NEGATIVE_INFINITY) {
     return false;
-  } else if (nx === -Infinity) {
+  } else if (nx === NEGATIVE_INFINITY) {
     return true;
   }
+
   return $$Compare(nx, ny);
 }
 
+
+function INSTANCE_OF(lref, rref){
+  return instanceofOperator(GetValue(lref), GetValue(rref));
+}
+
 function instanceofOperator(O, C){
-  const instOfHandler = GetMethod(C, hasInstanceSymbol);
+  const instOfHandler = GetMethod(C, @@hasInstance);
 
   if (instOfHandler !== undefined) {
     return call(instOfHandler, C, [O]);
