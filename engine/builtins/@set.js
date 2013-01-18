@@ -36,17 +36,23 @@ import {
   Iterator
 } from '@iter';
 
+import {
+  hasOwn
+} from '@reflect';
+
 
 
 function ensureSet(o, name){
-  var type = typeof o;
+  const type = typeof o;
   if (type === 'object' ? o === null : type !== 'function') {
     throw $$Exception('called_on_non_object', [name]);
   }
-  var data = $$Get(o, 'SetData');
+
+  const data = $$Get(o, 'SetData');
   if (!data) {
     throw $$Exception('called_on_incompatible_object', [name]);
   }
+
   return data;
 }
 
@@ -59,7 +65,7 @@ class SetIterator extends Iterator {
           @key;  // SetNextKey
 
   constructor(set){
-    this.@data = ensureSet($__ToObject(set), 'SetIterator');
+    this.@data = ensureSet(ToObject(set), 'SetIterator');
     this.@key  = $__MapSigil();
   }
 
@@ -68,14 +74,15 @@ class SetIterator extends Iterator {
       throw $$Exception('called_on_non_object', ['SetIterator.prototype.next']);
     }
 
-    if (!$__has(this, @data) || !$__has(this, @key)) {
+    if (!hasOwn(this, @data) || !hasOwn(this, @key)) {
       throw $$Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
     const next = $__MapNext(this.@data, this.@key);
     if (!next) {
-      throw $__StopIteration;
+      throw StopIteration;
     }
+
     return this.@key = next[0];
   }
 }
@@ -87,23 +94,19 @@ builtinClass(SetIterator);
 
 export class Set {
   constructor(iterable){
-    const target = this == null || this === SetPrototype ? $__ObjectCreate(SetPrototype) : ToObject(this);
-
-    if ($$Has(target, 'SetData')) {
-      throw $$Exception('double_initialization', ['Set']);
+    if (!isInitializing(this, 'SetData')) {
+      return new Set(iterable);
     }
 
     const data = new Map;
-    $$Set(target, 'SetData', data);
+    $$Set(this, 'SetData', data);
 
     if (iterable !== undefined) {
-      iterable = $__ToObject(iterable);
-      for (var [key, value] of iterable) {
+      iterable = ToObject(iterable);
+      for (let [key, value] of iterable) {
         $__MapSet(data, value, true);
       }
     }
-
-    return target;
   }
 
   get size(){
@@ -138,7 +141,8 @@ export class Set {
 
 extend(Set, {
   @@create(){
-    var obj = OrdinaryCreateFromConstructor(this, '%SetPrototype%');
+    const obj = OrdinaryCreateFromConstructor(this, '%SetPrototype%');
+    $$Set(obj, 'SetData', undefined);
     $$Set(obj, 'BuiltinBrand', 'BuiltinSet');
     return obj;
   }
@@ -164,29 +168,6 @@ function setClear(set){
 }
 
 builtinFunction(setClear);
-
-
-function setCreate(target, iterable){
-  target = ToObject(target);
-
-  if ($$Has(target, 'SetData')) {
-    throw $$Exception('double_initialization', ['Set']);
-  }
-
-  const data = new Map;
-  $$Set(target, 'SetData', data);
-
-  if (iterable !== undefined) {
-    iterable = $__ToObject(iterable);
-    for (var [key, value] of iterable) {
-      $__MapSet(data, value, true);
-    }
-  }
-
-  return target;
-}
-
-builtinFunction(setCreate);
 
 
 function setDelete(set, value){
@@ -219,7 +200,6 @@ builtinFunction(setIterate);
 
 export const add     = setAdd,
              clear   = setClear,
-             create  = setCreate,
            //delete  = setDelete, TODO: fix exporting reserved names
              has     = setHas,
              iterate = setIterate,

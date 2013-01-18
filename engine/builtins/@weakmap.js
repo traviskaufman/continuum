@@ -13,10 +13,7 @@ import {
 
 import {
   builtinClass,
-  define,
   extend,
-  hasBrand,
-  hideEverything,
   isInitializing
 } from '@@utilities';
 
@@ -24,21 +21,31 @@ import {
   OrdinaryCreateFromConstructor
 } from '@@operations';
 
+import {
+  Type
+} from '@@types';
+
 
 function ensureWeakMap(o, p, name){
-  if ($__Type(o) !== 'Object' || !$__hasInternal(o, 'WeakMapData')) {
-    throw $__Exception('called_on_incompatible_object', ['WeakMap.prototype.'+name]);
+  if (Type(o) !== 'Object' || !$$Has(o, 'WeakMapData')) {
+    throw $$Exception('called_on_incompatible_object', [`WeakMap.prototype.${name}`]);
   }
-  if ($__Type(p) !== 'Object') {
-    throw $__Exception('invalid_weakmap_key', []);
+
+  if (Type(p) !== 'Object') {
+    throw $$Exception('invalid_weakmap_key', []);
   }
 }
+
+internalFunction(ensureWeakMap);
 
 
 export class WeakMap {
   constructor(iterable){
-    var map = this == null || this === WeakMapPrototype ? $__ObjectCreate(WeakMapPrototype) : this;
-    return weakmapCreate(map, iterable);
+    if (!isInitializing(this, 'WeakMapData')) {
+      return new WeakMap(iterable);
+    }
+
+    $__WeakMapInitialization(this, iterable);
   }
 
   delete(key){
@@ -63,34 +70,19 @@ export class WeakMap {
   }
 }
 
-
 extend(WeakMap, {
   @@create(){
-    var obj = OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
+    const obj = OrdinaryCreateFromConstructor(this, '%WeakMapPrototype%');
     $$Set(obj, 'BuiltinBrand', 'BuiltinWeakMap');
+    $$Set(obj, 'WeakMapData', undefined);
     return obj;
   }
 });
 
 builtinClass(WeakMap);
 
-var WeakMapPrototype = WeakMap.prototype;
+const WeakMapPrototype = WeakMap.prototype;
 
-
-
-
-function weakmapCreate(target, iterable){
-  target = $__ToObject(target);
-
-  if ($__hasInternal(target, 'WeakMapData')) {
-    throw $__Exception('double_initialization', ['WeakMap']);
-  }
-
-  $__WeakMapInitialization(target, iterable);
-  return target;
-}
-
-builtinFunction(weakmapCreate);
 
 
 function weakmapDelete(weakmap, key){
@@ -126,8 +118,7 @@ function weakmapSet(weakmap, key, value){
 builtinFunction(weakmapSet);
 
 
-export const create  = weakmapCreate,
+export const get     = weakmapGet,
            //delete  = weakmapDelete, TODO: fix exporting reserved names
-             get     = weakmapGet,
              has     = weakmapHas,
              set     = weakmapSet;

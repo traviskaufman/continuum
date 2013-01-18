@@ -21,19 +21,27 @@ import {
 } from '@@utilities';
 
 import {
+  ObjectCreate,
   Type
 } from '@@types';
 
 import {
-  OrdinaryCreateFromConstructor
+  OrdinaryCreateFromConstructor,
+  ToObject,
+  ToString
 } from '@@operations';
 
 import {
   Iterator
 } from '@iter';
 
+import {
+  hasOwn
+} from '@reflect';
+
+
 function ensureMap(o, name){
-  if (!o || typeof o !== 'object' || !$$Has(o, 'MapData')) {
+  if (Type(o) !== 'Object' || !$$Has(o, 'MapData')) {
     throw $$Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
   }
 }
@@ -47,7 +55,7 @@ class MapIterator extends Iterator {
           @kind; // MapIterationKind
 
   constructor(map, kind){
-    this.@map = $__ToObject(map);
+    this.@map = ToObject(map);
     this.@key = $__MapSigil();
     this.@kind = kind;
   }
@@ -57,7 +65,7 @@ class MapIterator extends Iterator {
       throw $$Exception('called_on_non_object', ['MapIterator.prototype.next']);
     }
 
-    if (!($__has(this, @map) && $__has(this, @key) && $__has(this, @kind))) {
+    if (!(hasOwn(this, @map) && hasOwn(this, @key) && hasOwn(this, @kind))) {
       throw $$Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);
     }
 
@@ -84,8 +92,11 @@ builtinClass(MapIterator);
 
 export class Map {
   constructor(iterable){
-    var map = this == null || this === MapPrototype ? $__ObjectCreate(MapPrototype) : this;
-    return mapCreate(map, iterable);
+    if (!isInitializing(this, 'MapData')) {
+      return new Map(iterable);
+    }
+
+    $__MapInitialization(this, iterable);
   }
 
   get size(){
@@ -140,7 +151,8 @@ export class Map {
 
 extend(Map, {
   @@create(){
-    var obj = OrdinaryCreateFromConstructor(this, '%MapPrototype%');
+    const obj = OrdinaryCreateFromConstructor(this, '%MapPrototype%');
+    $$Set(obj, 'MapData', undefined);
     $$Set(obj, 'BuiltinBrand', 'BuiltinMap');
     return obj;
   }
@@ -159,19 +171,6 @@ function mapClear(map){
 }
 
 builtinFunction(mapClear);
-
-function mapCreate(target, iterable){
-  target = $__ToObject(target);
-
-  if ($$Has(target, 'MapData')) {
-    throw $$Exception('double_initialization', ['Map']);
-  }
-
-  $__MapInitialization(target, iterable);
-  return target;
-}
-
-builtinFunction(mapCreate);
 
 
 function mapDelete(map, key){
@@ -200,7 +199,7 @@ builtinFunction(mapHas);
 
 function mapIterate(map, kind){
   ensureMap(map, '@map.iterate');
-  return new MapIterator(map, kind === undefined ? 'key+value' : $__ToString(kind));
+  return new MapIterator(map, kind === undefined ? 'key+value' : ToString(kind));
 }
 
 builtinFunction(mapIterate);
@@ -224,7 +223,6 @@ builtinFunction(mapSize);
 
 
 export const clear   = mapClear,
-             create  = mapCreate,
            //delete  = mapDelete, TODO: fix exporting reserved names
              get     = mapGet,
              has     = mapHas,
