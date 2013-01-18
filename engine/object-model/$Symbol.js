@@ -78,7 +78,7 @@ var $Symbol = (function(exports){
       },
       function GetP(receiver, key){
         if (key === 'toString') {
-          return require('../runtime').intrinsics.ObjectToString;
+          return require('../runtime').intrinsics['%ObjProto_toString%'];
         }
       },
       function SetP(receiver, key, value){
