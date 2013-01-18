@@ -124,13 +124,13 @@ var operations = (function(exports){
 
 
   function $$GetIdentifierReference(lex, name, strict){
-    if (isNullish(lex)) {
-      return new Reference(undefined, name, strict);
-    } else if (lex.HasBinding(name)) {
-      return new Reference(lex, name, strict);
-    } else {
-      return $$GetIdentifierReference(lex.outer, name, strict);
+    while (lex) {
+      if (lex.HasBinding(name)) {
+        return new Reference(lex, name, strict);
+      }
+      lex = lex.outer;
     }
+    return new Reference(undefined, name, strict);
   }
 
   exports.$$GetIdentifierReference = $$GetIdentifierReference;
