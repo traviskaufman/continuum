@@ -53,7 +53,7 @@ const OrdinaryObject = $$CreateInternalObject();
 // # 11.1.1 [[GetInheritance]] #
 // #############################
 
-$$Set(OrdinaryObject, 'GetInheritance', function(){
+$$Set(OrdinaryObject, function GetInheritance(){
   return $$Get(this, 'Prototype');
 });
 
@@ -62,10 +62,10 @@ $$Set(OrdinaryObject, 'GetInheritance', function(){
 // # 11.1.2 [[SetInheritance]] #
 // #############################
 
-$$Set(OrdinaryObject, 'SetInheritance', function(V){
+$$Set(OrdinaryObject, function SetInheritance(V){
   $$Assert(Type(V) === 'Object' || Type(V) === 'Null');
 
-  if (!$$Invoke(this, 'IsExtensible')) { // spec bug, https://bugs.ecmascript.org/show_bug.cgi?id=1191
+  if (!$$Get(this, 'Extensible')) {
     return false;
   }
 
@@ -78,7 +78,7 @@ $$Set(OrdinaryObject, 'SetInheritance', function(V){
 // # 11.1.3 [[IsExtensible]] #
 // ###########################
 
-$$Set(OrdinaryObject, 'IsExtensible', function(){;
+$$Set(OrdinaryObject, function IsExtensible(){
   return $$Get(this, 'Extensible');
 });
 
@@ -87,7 +87,7 @@ $$Set(OrdinaryObject, 'IsExtensible', function(){;
 // # 11.1.4 [[PreventExtensions]] #
 // ################################
 
-$$Set(OrdinaryObject, 'PreventExtensions', function(){;
+$$Set(OrdinaryObject, function PreventExtensions(){
   $$Set(this, 'Extensible', false);
 });
 
@@ -96,7 +96,7 @@ $$Set(OrdinaryObject, 'PreventExtensions', function(){;
 // # 11.1.5 [[HasOwnProperty]] #
 // #############################
 
-$$Set(OrdinaryObject, 'HasOwnProperty', function(P){;
+$$Set(OrdinaryObject, function HasOwnProperty(P){
   $$Assert(IsPropertyKey(P));
   return $$HasProperty(this, P);
 });
@@ -106,7 +106,8 @@ $$Set(OrdinaryObject, 'HasOwnProperty', function(P){;
 // # 11.1.6 [[GetOwnProperty]] #
 // #############################
 
-$$Set(OrdinaryObject, 'GetOwnProperty', function(P){;
+$$Set(OrdinaryObject, function GetOwnProperty(P){
+  $$Assert(IsPropertyKey(P));
   return OrdinaryGetOwnProperty(this, P);
 });
 
@@ -135,7 +136,7 @@ export function OrdinaryGetOwnProperty(O, P){
 // # 11.1.7 [[DefineOwnProperty]] #
 // ################################
 
-$$Set(OrdinaryObject, 'DefineOwnProperty', function(P, Desc){;
+$$Set(OrdinaryObject, function DefineOwnProperty(P, Desc){;
   return OrdinaryDefineOwnProperty(this, P, Desc);
 });
 
@@ -176,7 +177,7 @@ $$Set(Accessor, '_type', 'Accessor');
 $$Set(Accessor, 'Get', undefined);
 $$Set(Accessor, 'Set', undefined);
 
-function accessorFromDescriptor(Desc){
+function createAccessor(Desc){
   const accessor = $$CreateInternalObject(Accessor);
   $$Set(accessor, 'Get', $$Get(Desc, 'Get'));
   $$Set(accessor, 'Set', $$Get(Desc, 'Set'));
@@ -199,20 +200,18 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
 
     $$Assert(extensible === true);
 
-    if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {
-      if (O !== undefined) {
+    if (O !== undefined) {
+      if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {
         $$CreateProperty(O, P, $$Get(Desc, 'Value'), attributesFromDescriptor(Desc));
+      } else {
+        $$CreateProperty(O, P, createAccessor(Desc), attributesFromDescriptor(Desc));
       }
-    } else {
-      if (O !== undefined) {
-        $$CreateProperty(O, P, accessorFromDescriptor(Desc), attributesFromDescriptor(Desc));
-      }
-    }
 
-    if ($$Has(O, 'Notifier')) {
-      const changeObservers = $$Get($$Get(O, 'Notifier'), 'ChangeObservers');
-      if ($$Get(changeObservers, 'size')) {
-        EnqueueChangeRecord(CreateChangeRecord('new', O, P), changeObservers);
+      if ($$Has(O, 'Notifier')) {
+        const changeObservers = $$Get($$Get(O, 'Notifier'), 'ChangeObservers');
+        if ($$Get(changeObservers, 'size')) {
+          EnqueueChangeRecord(CreateChangeRecord('new', O, P), changeObservers);
+        }
       }
     }
 
