@@ -148,17 +148,13 @@ export class Loader {
   }
 
   defineBuiltins(object = this.global){
-    const desc = { configurable: true,
-                   enumerable: false,
-                   writable: true,
-                   value: undefined };
+    const obj = object == null ? {} : ToObject(object);
 
-    for (let key in std) {
-      desc.value = std[key];
-      $__DefineOwnProperty(object, key, desc);
+    for (let [key, val] of std) {
+      obj[key] = val;
     }
 
-    return object;
+    return obj;
   }
 }
 
@@ -206,6 +202,7 @@ export const System = new Loader(null, {
 
 const builtins = new Loader(System, { global: this });
 builtins.@strict = false;
+
 $$SetIntrinsic($$CurrentRealm(), 'internalLoader', builtins);
 $$Set($$CurrentRealm(), 'loader', System);
 
