@@ -17,8 +17,8 @@ import {
   @@toStringTag: toStringTag
 } from '@@symbols';
 
-define($__global, @@toStringTag, 'global');
-define($__StopIteration, @@toStringTag, 'StopIteration');
+define($$GetIntrinsic('global'), @@toStringTag, 'global');
+define($$GetIntrinsic('StopIteration'), @@toStringTag, 'StopIteration');
 
 
 export function decodeURI(value){
