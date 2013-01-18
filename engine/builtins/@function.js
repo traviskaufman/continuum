@@ -8,6 +8,16 @@ import {
   OrdinaryHasInstance
 } from '@@operations';
 
+import {
+  //builtinClass,
+  define,
+  ensureArgs,
+  ensureFunction
+} from '@@utilities';
+
+import {
+  $$Invoke
+} from '@@internals';
 
 export class Function {
   constructor(...args){
@@ -16,7 +26,7 @@ export class Function {
 
   apply(thisArg, args){
     ensureFunction(this, 'Function.prototype.apply');
-    return $__Call(this, thisArg, ensureArgs(args));
+    return $$Invoke(this, 'Call', thisArg, $$Get(ensureArgs(args), 'array'));
   }
 
   bind(thisArg, ...args){
@@ -26,7 +36,7 @@ export class Function {
 
   call(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.call');
-    return $__Call(this, thisArg, args);
+    return $$Invoke(this, 'Call', thisArg, $$Get(args, 'array'));
   }
 
   toString(){
@@ -45,13 +55,13 @@ export class Function {
 
 builtinClass(Function);
 
-$__define(Function.prototype, 'name', '', FROZEN);
+define(Function.prototype, 'name', '', FROZEN);
 
 
 
 export function apply(func, thisArg, args){
   ensureFunction(func, '@function.apply');
-  return $__Call(func, thisArg, ensureArgs(args));
+  return $$Invoke(func, 'Call', thisArg, $$Get(ensureArgs(args), 'array'));
 }
 
 builtinFunction(apply);
@@ -67,7 +77,7 @@ builtinFunction(bind);
 
 export function call(func, thisArg, ...args){
   ensureFunction(func, '@function.call');
-  return $__Call(func, thisArg, args);
+  return $$Invoke(func, 'Call', thisArg, $$Get(args, 'array'));
 }
 
 builtinFunction(call);
