@@ -2268,22 +2268,45 @@ var runtime = (function(GLOBAL, exports, undefined){
     var mutationScopeInit = new Script('void 0');
 
     function initialize(realm, Ω, ƒ){
-      if (realm.initialized) Ω();
-      var builtins = require('./builtins'),
-          init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
-
-      var fakeLoader = {
-        Get: function(key){
-          if (key === 'global') return realm.global;
-          if (key === 'baseURL') return '';
-        }
-      };
-
-
+      if (realm.initialized) return Ω();
       realm.state = 'initializing';
       realm.initialized = true;
       realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
-      resolveModule(fakeLoader, init, '@system', Ω, ƒ);
+
+      var builtins = require('./builtins'),
+          init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
+
+      var bootstrapLoader = {
+        modules: {},
+        global: realm.global,
+        baseURL: '',
+        load: {
+          Call: function(_, args){
+            var mrl      = args[0],
+                callback = args[1],
+                errback  = args[2];
+
+            if (mrl in bootstrapLoader.modules) {
+              callback.Call(undefined, [bootstrapLoader.modules[mrl]]);
+            } else if (mrl in builtins) {
+              resolveModule(bootstrapLoader, builtins[mrl], mrl, function(module){
+                bootstrapLoader.modules[mrl] = module;
+                module.loader = bootstrapLoader;
+                module.resolved = mrl;
+                module.mrl = mrl;
+                callback.Call(undefined, [module]);
+              }, wrapFunction(errback));
+            } else {
+              callback.Call(undefined, [new $Error('Error', undefined, 'Unable to locate module "'+mrl+'"')]);
+            }
+          }
+        },
+        Get: function(key){
+          return bootstrapLoader[key];
+        }
+      };
+
+      resolveModule(bootstrapLoader, init, '@system', Ω, ƒ);
     }
 
     function prepareToRun(bytecode, scope){
@@ -2633,9 +2656,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.scripts.push(script);
 
         var result = prepareToRun(script.bytecode, this.globalEnv) || run(this, script.bytecode);
-
-        var completionType = result && result.Abrupt ? 'throw' : 'complete';
-        this.emit(completionType, result);
+        this.emit(result && result.Abrupt ? 'throw' : 'complete', result);
         return result;
       },
       function useConsole(console){
