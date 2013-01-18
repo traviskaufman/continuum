@@ -16217,9 +16217,6 @@ exports.natives = (function(module){
       return $$MakeException(type, $$CreateListFromArray(args));
     },
     _now: Date.now || function(){ return +new Date },
-    _SetDefaultLoader: function(obj, args){
-      require('./runtime').realm.loader = args[0];
-    },
     _getWellKnownSymbol: function(_, args){
       return wellKnownSymbols[args[0]];
     },
@@ -17939,6 +17936,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       environments     = require('./object-model/environments'),
       operations       = require('./object-model/operations'),
       descriptors      = require('./object-model/descriptors'),
+      symbols          = require('./object-model/$Symbol').wellKnownSymbols,
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
@@ -17993,7 +17991,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
       $$CreateListFromArray     = operations.$$CreateListFromArray,
       $$IsStopIteration         = operations.$$IsStopIteration,
-      $$IsStopIteration         = operations.$$IsStopIteration,
       $$IsPropertyReference     = operations.$$IsPropertyReference,
       $$OrdinaryCreateFromConstructor = operations.$$OrdinaryCreateFromConstructor;
 
@@ -18016,15 +18013,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       Return  = SYMBOLS.Return,
       Normal  = SYMBOLS.Normal;
 
-  var symbols            = require('./object-model/$Symbol').wellKnownSymbols,
-      toStringTagSymbol  = symbols.toStringTag,
-      iteratorSymbol     = symbols.iterator,
-      hasInstanceSymbol  = symbols.hasInstance,
-      createSymbol       = symbols.create,
-      BooleanValueSymbol = symbols.BooleanValue,
-      NumberValueSymbol  = symbols.NumberValue,
-      DateValueSymbol    = symbols.DateValue,
-      ToPrimitiveSymbol  = symbols.ToPrimitive;
 
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
@@ -18189,7 +18177,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
   }
   // ## $$ClassDefinitionEvaluation
 
-  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
+  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbolsDeclarations){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
@@ -18218,9 +18206,9 @@ exports.runtime = (function(GLOBAL, exports, undefined){
     var proto = new $Object(superproto),
         brand = getKey(name || '');
 
-    for (var i=0; i < symbols[0].length; i++) {
-      var symbol   = symbols[0][i],
-          isPublic = symbols[1][i],
+    for (var i=0; i < symbolsDeclarations[0].length; i++) {
+      var symbol   = symbolsDeclarations[0][i],
+          isPublic = symbolsDeclarations[1][i],
           result   = context.initializeSymbolBinding(symbol, context.createSymbol(symbol, isPublic));
 
       if (result && result.Abrupt) return result;
@@ -18236,7 +18224,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(toStringTagSymbol, brand);
+      proto.define(symbols.toStringTag, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -18324,7 +18312,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iter = $$Invoke(iterable, iteratorSymbol);
+      var iter = $$Invoke(iterable, symbols.iterator);
       if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
@@ -18465,7 +18453,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
 
     function $$OrdinaryConstruct(F, argumentsList, fallBackProto){
-      var creator = F.Get(createSymbol);
+      var creator = F.Get(symbols.create);
       if (creator && creator.Abrupt) return creator;
 
       var obj = creator ? creator.Call(F, argumentsList) : $$OrdinaryCreateFromConstructor(F, '%ObjectPrototype%');
@@ -18581,7 +18569,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
       var self = this;
       ExecutionContext.push(ctx);
-      setFunction(this, iteratorSymbol, function(_, args){ return self });
+      setFunction(this, symbols.iterator, function(_, args){ return self });
       setFunction(this, 'next',         function(_, args){ return self.Send() });
       setFunction(this, 'close',        function(_, args){ return self.Close() });
       setFunction(this, 'send',         function(_, args){ return self.Send(args[0]) });
@@ -18748,6 +18736,24 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       isDataDescriptor: true
     });
 
+    function $ModuleIterator(module){
+      var index = 0;
+      $Object.call(this);
+
+      this.set(symbols.iterator, this);
+      this.set('next', new $InternalFunction(function next(){
+        if (index < module.keys.length) {
+          var key = module.keys[index++];
+          return new $Array([key, module.get(key)]);
+        }
+        return new AbruptCompletion('throw', realm.intrinsics.StopIteration);
+      }));
+    }
+
+    inherit($ModuleIterator, $Object);
+
+
+
     function $Module(object, key){
       if (object instanceof $Module) {
         return object;
@@ -18774,6 +18780,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         this.props[key] = new Reference(this.object, key);
       },
       function get(key){
+        if (key === symbols.iterator) {
+          return this.iterator();
+        }
+
         var ref = this.props[key];
         if (ref) {
           return $$GetValue(ref);
@@ -18802,6 +18812,16 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       function enumerator(){
         return new $Enumerator(this.keys);
+      },
+      function iterator(){
+        // TODO make this less wasteful
+        var self = this;
+        return new $InternalFunction(function(){
+          return new $ModuleIterator(self);
+        });
+      },
+      function Iterate(){
+        return this.iterator().Call(undefined, []);
       },
       function GetInheritance(){
         return null;
@@ -18853,7 +18873,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         return this.keys;
       },
       function OwnPropertyKeys(){
-        return this.keys;
+        return this.keys.concat(symbols.iterator);
       },
       function Enumerate(){
         return this.keys;
@@ -18889,6 +18909,10 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function get(key){
+        if (key === symbols.iterator) {
+          return this.iterator();
+        }
+
         return this.props[key];
       }
     ]);
@@ -19913,33 +19937,6 @@ exports.runtime = (function(GLOBAL, exports, undefined){
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-      EvaluateModule: function(loader, source, name, callback, errback){
-        if (!callback && !errback) {
-          var result, thrown;
-
-          realm.evaluateModule(loader, source, name,
-            function(module){ result = module },
-            function(error){ result = error; thrown = true; }
-          );
-
-          return thrown ? new AbruptCompletion('throw', result) : result;
-        } else {
-          realm.evaluateModule(loader, source, name, wrapFunction(callback), wrapFunction(errback));
-        }
-      },
-      _ToModule: function(obj, args){
-        if (args[0].BuiltinBrand === 'BuiltinModule') {
-          return args[0];
-        }
-        return new $Module(args[0], args[0].Enumerate(false, false));
-      },
-      _Fetch: function(obj, args){
-        var result = require('./builtins')[args[0]];
-        if (!result) {
-          result = new $Error('Error', undefined, 'Unable to locate module "'+args[0]+'"');
-        }
-        args[1].Call(undefined, [result]);
-      }
     });
 
     function deliverChangeRecordsAndReportErrors(){
@@ -20089,8 +20086,46 @@ exports.runtime = (function(GLOBAL, exports, undefined){
 
           return new $Array(props);
         },
+        $$EvaluateModule: function(_, args){
+          var loader = args[0],
+              source = args[1],
+              mrl    = args[2];
+
+          var result, thrown;
+
+          realm.evaluateModule(loader, source, mrl,
+            function(module){ result = module },
+            function(error){ result = error; thrown = true; }
+          );
+
+          return thrown ? new AbruptCompletion('throw', result) : result;
+        },
+        $$EvaluateModuleAsync: function(_, args){
+          var loader   = args[0],
+              source   = args[1],
+              mrl      = args[2],
+              callback = args[3],
+              errback  = args[4];
+
+          realm.evaluateModule(loader, source, mrl, wrapFunction(callback), wrapFunction(errback));
+        },
         $$Exception: function(_, args){
-          return $$MakeException(args[0], args[1] ? args[1].array : []);
+          var type    = args[0],
+              details = args[1];
+
+          return $$MakeException(type, details ? details.array : []);
+        },
+        $$Fetch: function(_, args){
+          var mrl      = args[0],
+              callback = args[1];
+
+          var result = require('./builtins')[mrl];
+
+          if (!result) {
+            result = new $Error('Error', undefined, 'Unable to locate module "'+mrl+'"');
+          }
+
+          callback.Call(undefined, [result]);
         },
         $$Get: function(_, args){
           var obj = args[0],
@@ -20154,6 +20189,38 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           }
           return null;
         },
+        $$Resolve: (function(){
+          if (require('path')) {
+            var resolve = require('path').resolve;
+
+            return function(_, args){
+              var baseURL = args[0],
+                  relURL  = args[1];
+
+              return resolve(baseURL, relURL);
+            };
+          }
+
+          return function(_, args){
+            var baseURL = args[0],
+                relURL  = args[1];
+
+            var base = baseURL.split('/'),
+                to   = relURL.split('/');
+
+            base.length--;
+
+            for (var i=0; i < to.length; i++) {
+              if (to[i] === '..') {
+                base.length--;
+              } else if (to[i] !== '.') {
+                base[base.length] = to[i];
+              }
+            }
+
+            return base.join('/');
+          };
+        })(),
         $$Set: function(_, args){
           var val = args[2];
 
@@ -20168,6 +20235,11 @@ exports.runtime = (function(GLOBAL, exports, undefined){
         },
         $$StringToNumber: function(_, args){
           return +args[0];
+        },
+        $$ToModule: function(_, args){
+          var obj = args[0];
+
+          return new $Module(obj, obj.Enumerate(false, false));
         }
       });
     }();
@@ -22559,7 +22631,7 @@ exports.builtins["@@operators"] = "// ###############################\n// ## 12.
 
 exports.builtins["@@types"] = "// #######################\n// ####### 8 Types #######\n// #######################\n\n\nimport {\n  $$ArgumentCount,\n  $$CreateObject,\n  $$CreateInternalObject,\n  $$CurrentRealm,\n  $$Get,\n  $$GetIntrinsic,\n  $$HasArgument,\n  $$Set\n} from '@@internals';\n\n\nconst MISSING = $$CreateInternalObject();\n\nconst ENUMERABLE   = 0x1,\n      CONFIGURABLE = 0x2,\n      WRITABLE     = 0x4,\n      ACCESSOR     = 0x8;\n\n// #########################################\n// ##### 8.1 ECMAScript Language Types #####\n// #########################################\n\n\n// ################################\n// ### 8.1.1 The Undefined Type ###\n// ################################\n\nexport const undefined = void 0;\n\n\n// ###########################\n// ### 8.1.2 The Null Type ###\n// ###########################\n\n// null\n\n\n// ##############################\n// ### 8.1.3 The Boolean Type ###\n// ##############################\n\n// true\n// false\n\n\n// #############################\n// ### 8.1.4 The String Type ###\n// #############################\n\n// #############################\n// ### 8.1.5 The Number Type ###\n// #############################\n\nexport const NaN = +'NaN';\nexport const Infinity = 1 / 0;\n\n\n\n// #############################\n// ### 8.1.6 The Object Type ###\n// #############################\n\n// ###############################\n// # 8.1.6.1 Property Attributes #\n// ###############################\n\n\n\nexport function isPrimitive(value){\n  switch (typeof value) {\n    case 'undefined':\n    case 'string':\n    case 'number':\n    case 'boolean':\n      return true;\n    default:\n      return value === null;\n  }\n}\n\nexport function Type(value){\n  switch (typeof value) {\n    case 'object':\n      return value === null ? 'Null' : 'Object';\n    case 'undefined':\n      return 'Undefined';\n    case 'function':\n      return 'Object';\n    case 'string':\n      return 'String';\n    case 'number':\n      return 'Number';\n    case 'boolean':\n      return 'Boolean';\n  }\n}\n\n\n\n// #############################################\n// # 8.1.6.3 Well-Known Symbols and Intrinsics #\n// #############################################\n/*\n@@create\n@@hasInstance\n@@iterator\n@@ToPrimitive\n@@toStringTag\n\n\n'%Object%'\n'%ObjectPrototype%'\n'%ObjProto_toString%'\n'%Function%'\n'%FunctionPrototype%'\n'%Array%'\n'%ArrayPrototype%'\n'%ArrayIteratorPrototype%'\n'%Map%'\n'%MapPrototype%'\n'%MapIteratorPrototype%'\n'%WeakMap%'\n'%WeakMapPrototype%'\n'%Set%'\n'%SetPrototype%'\n'%SetIteratorPrototype%'\n'%StopIteration%'\n*/\n// ####################################################\n// ### 8.2.2 The List and Record Specification Type ###\n// ####################################################\n\n\n// ######################################################\n// ### 8.2.3 The Completion Record Specification Type ###\n// ######################################################\n\nconst empty = $$CreateInternalObject();\n\nconst CompletionRecord = $$CreateInternalObject();\n$$Set(CompletionRecord, '_type', 'CompletionRecord');\n$$Set(CompletionRecord, 'type', 'normal');\n$$Set(CompletionRecord, 'value', undefined);\n$$Set(CompletionRecord, 'target', empty);\n\nexport function createCompletionRecord(type, value, target = empty){\n  const completion = $$CreateInternalObject(CompletionRecord);\n  $$Set(completion, 'type', type);\n  $$Set(completion, 'value', value);\n  $$Set(completion, 'target', target);\n  return completion;\n}\n\n\n// ############################\n// # 8.2.3.1 NormalCompletion #\n// ############################\n\nconst emptyCompletion = createCompletionRecord('normal');\n\nexport function NormalCompletion(argument){\n  const completion = $$CreateInternalObject(emptyCompletion);\n  $$Set(completion, 'value', argument);\n  return completion;\n}\n\n\n// ##############################\n// # 8.2.3.3 Throw an Exception #\n// ##############################\n\nconst thrownCompletion = createCompletionRecord('throw');\n\nexport function ThrowAnException(argument){\n  const completion = $$CreateInternalObject(thrownCompletion);\n  $$Set(completion, 'value', argument);\n  throw completion;\n}\n\n\n// ##########################\n// # 8.2.3.4 ReturnIfAbrupt #\n// ##########################\n\nexport function ReturnIfAbrupt(argument){\n  if (argument && $$Get(argument, '_type') === 'CompletionRecord') {\n    if ($$Get(argument, 'type') !== 'normal') {\n      throw argument;\n    }\n    return $$Get(argument, 'value');\n  }\n  return argument;\n}\n\n\n// ##############################################\n// ### 8.2.4 The Reference Specification Type ###\n// ##############################################\n\nconst Reference = $$CreateInternalObject();\n$$Set(Reference, '_type', 'Reference');\n$$Set(Reference, 'base', undefined);\n$$Set(Reference, 'name', '');\n$$Set(Reference, 'strict', false);\n$$Set(Reference, 'thisValue', undefined);\n\n\n// ########################################################\n// ### 8.2.5 The Property Descriptor Specification Type ###\n// ########################################################\n\n\nconst Descriptor = $$CreateInternalObject();\n$$Set(Descriptor, '_type', 'Descriptor');\n$$Set(Descriptor, 'Configurable', MISSING);\n$$Set(Descriptor, 'Enumerable', MISSING);\n$$Set(Descriptor, 'Writable', MISSING);\n$$Set(Descriptor, 'Value', MISSING);\n$$Set(Descriptor, 'Set', MISSING);\n$$Set(Descriptor, 'Get', MISSING);\n\nconst defaults = $$CreateInternalObject(Descriptor);\n$$Set(defaults, 'Configurable', false);\n$$Set(defaults, 'Enumerable', false);\n$$Set(defaults, 'Writable', false);\n$$Set(defaults, 'Value', undefined);\n$$Set(defaults, 'Set', undefined);\n$$Set(defaults, 'Get', undefined);\n\n// Data Descriptors\nconst DataDescriptor = $$CreateInternalObject(Descriptor);\n$$Set(DataDescriptor, '_attrs', 0);\n\nexport function createDataDescriptor(value, writable, enumerable, configurable){\n  const desc = $$CreateInternalObject(DataDescriptor);\n  let attrs = 0;\n\n  if (configurable !== MISSING) {\n    if (configurable = !!(configurable)) {\n      attrs |= CONFIGURABLE;\n    }\n    $$Set(desc, 'Configurable', configurable);\n  }\n\n  if (enumerable !== MISSING) {\n    if (enumerable = !!(enumerable)) {\n      attrs |= ENUMERABLE;\n    }\n    $$Set(desc, 'Enumerable', !!(enumerable));\n  }\n\n  if (writable !== MISSING) {\n    if (writable = !!(writable)) {\n      writable |= WRITABLE;\n    }\n    $$Set(desc, 'Writable', !!(writable));\n  }\n\n  if (value !== MISSING) {\n    $$Set(desc, 'Value', value);\n  }\n\n  $$Set(desc, 'attrs', attrs);\n  return desc;\n}\n\n// Accessor Descriptors\nconst AccessorDescriptor = $$CreateInternalObject(Descriptor);\n$$Set(DataDescriptor, '_attrs', ACCESSOR);\n\nexport function createAccessorDescriptor(get, set, enumerable, configurable){\n  const desc = $$CreateInternalObject(AccessorDescriptor);\n  let attrs = ACCESSOR;\n\n  if (configurable !== MISSING) {\n    if (configurable = ToBoolean(configurable)) {\n      attrs |= CONFIGURABLE;\n    }\n    $$Set(desc, 'Configurable', configurable);\n  }\n\n  if (enumerable !== MISSING) {\n    if (enumerable = ToBoolean(enumerable)) {\n      attrs |= ENUMERABLE;\n    }\n    $$Set(desc, 'Enumerable', enumerable);\n  }\n\n  if (get !== MISSING) {\n    $$Set(desc, 'Set', get);\n  }\n\n  if (set !== MISSING) {\n    $$Set(desc, 'Get', set);\n  }\n\n  $$Set(desc, 'attrs', attrs);\n  return desc;\n}\n\nconst normal = createDataDescriptor(undefined, true, true, true);\n\nfunction defineNormal(obj, key, value){\n  $$Set(normal, 'Value', value);\n  const result = OrdinaryDefineOwnProperty(obj, key, normal);\n  $$Set(normal, 'Value', undefined);\n  return result;\n}\n\n\n// ################################\n// # 8.2.5.1 IsAccessorDescriptor #\n// ################################\n\nfunction isMissing(Desc, field){\n  return $$Get(Desc, 'Get') === MISSING;\n}\n\nexport function IsAccessorDescriptor(Desc){\n  return Desc !== undefined && !isMissing(Desc, 'Get') || !isMissing(Desc, 'Set');\n}\n\n// ################################\n// # 8.2.5.2 IsAccessorDescriptor #\n// ################################\n\nexport function IsDataDescriptor(Desc){\n  return Desc !== undefined && !isMissing(Desc, 'Value') || !isMissing(Desc, 'Writable');\n}\n\n// ###############################\n// # 8.2.5.3 IsGenericDescriptor #\n// ###############################\n\nexport function IsGenericDescriptor(Desc){\n  return Desc !== undefined && !(IsAccessorDescriptor(Desc) || IsDataDescriptor(Desc));\n}\n\n// ##################################\n// # 8.2.5.4 FromPropertyDescriptor #\n// ##################################\n\nfunction isEmptyOrdinaryObject(obj){\n  return true;\n}\n\nexport function FromPropertyDescriptor(Desc){\n  if (Desc === undefined) {\n    return undefined;\n  } else if ($$Has(Desc, 'Origin')) {\n    return $$Get(Desc, 'Origin');\n  }\n\n  const obj = ObjectCreate();\n  $$Assert(isOrdinaryEmptyObject(obj));\n\n  if ($$Has(Desc, 'Value')) {\n    defineNormal(obj, 'value', $$Get(Desc, 'Value'));\n  }\n  if ($$Has(Desc, 'Writable')) {\n    defineNormal(obj, 'writable', $$Get(Desc, 'Writable'));\n  }\n  if ($$Has(Desc, 'Get')) {\n    defineNormal(obj, 'get', $$Get(Desc, 'Get'));\n  }\n  if ($$Has(Desc, 'Set')) {\n    defineNormal(obj, 'set', $$Get(Desc, 'Set'));\n  }\n  if ($$Has(Desc, 'Enumerable')) {\n    defineNormal(obj, 'enumerable', $$Get(Desc, 'Enumerable'));\n  }\n  if ($$Has(Desc, 'Configurable')) {\n    defineNormal(obj, 'configurable', $$Get(Desc, 'Configurable'));\n  }\n\n  return obj;\n}\n\n\n\n// ################################\n// # 8.2.5.5 ToPropertyDescriptor #\n// ################################\n\nfunction getOrMissing(Obj, key){\n  return HasProperty(Obj, key) ? Get(Obj, key) : MISSING;\n}\n\nexport function ToPropertyDescriptor(Obj){\n  if (Type(Obj) !== 'Object') {\n    throw $$Exception(); // TODO\n  }\n\n  let enumerable   = getOrMissing(Obj, 'enumerable'),\n      configurable = getOrMissing(Obj, 'configurable'),\n      value        = getOrMissing(Obj, 'value'),\n      writable     = getOrMissing(Obj, 'writable'),\n      getter       = getOrMissing(Obj, 'get'),\n      setter       = getOrMissing(Obj, 'set');\n\n  if (getter !== MISSING || setter !== MISSING) {\n    if (value !== MISSING || writable !== MISSING) {\n      throw $$Exception(); // TODO\n    }\n    if (getter !== MISSING && getter !== undefined && !IsCallable(getter)) {\n      throw $$Exception(); // TODO\n    }\n    if (setter !== MISSING && setter !== undefined && !IsCallable(setter)) {\n      throw $$Exception(); // TODO\n    }\n    var desc = createAccessorDescriptor(get, set, enumerable, configurable);\n  } else {\n    var desc = createDataDescriptor(value, writable, enumerable, configurable);\n  }\n\n  $$Set(desc, 'Origin', obj);\n  return desc;\n}\n\n\n// ######################################\n// # 8.2.5.6 CompletePropertyDescriptor #\n// ######################################\n\nfunction copy(Desc, LikeDesc, field){\n  if (!$$Has(Desc, field)) {\n    $$Set(Desc, field, $$Get(LikeDesc, field));\n  }\n}\n\nexport function CompletePropertyDescriptor(Desc, LikeDesc){\n  $$Assert(LikeDesc === undefined || $$Get(LikeDesc, '_type') === 'Descriptor');\n  $$Assert($$Get(Desc, '_type') === 'Descriptor');\n\n  if (LikeDesc === undefined) {\n    LikeDesc = defaults;\n  }\n\n  if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {\n    copy(Desc, LikeDesc, 'Value');\n    copy(Desc, LikeDesc, 'Writable');\n  } else {\n    copy(Desc, LikeDesc, 'Get');\n    copy(Desc, LikeDesc, 'Set');\n  }\n\n  copy(Desc, LikeDesc, 'Enumerable');\n  copy(Desc, LikeDesc, 'Configurable');\n  return Desc;\n}\n\n\nexport function ObjectCreate(proto){\n  if (!$$ArgumentCount()) {\n    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');\n  }\n  return $$CreateObject('Object', proto);\n}\n\n\n// ###########################################\n// # 11.2.2.3 ArrayCreate Abstract Operation #\n// ###########################################\n\nexport function ArrayCreate(length){\n  return $$CreateArray($$CurrentRealm(), length);\n}\n";
 
-exports.builtins["@@utilities"] = "import {\n  $$Invoke,\n  $$CreateInternalObject,\n  $$CreateObject,\n  $$Get,\n  $$GetIntrinsic,\n  $$Has,\n  $$NumberToString,\n  $$Set,\n  $$SetIntrinsic\n} from '@@internals';\n\nimport {\n  MAX_INTEGER,\n  MAX_VALUE,\n  MIN_VALUE,\n  NaN,\n  POSITIVE_INFINITY,\n  NEGATIVE_INFINITY\n} from '@@constants';\n\n\nconst FROZEN = 0,\n      HIDDEN = 6;\n\n\nconst padding = ['', '0', '00', '000', '0000', '00000', '000000'];\n\nexport function zeroPad(number, places = 2){\n  const num  = $$NumberToString(number),\n        len  = num.length,\n        diff = places - len;\n\n  if (diff > 0) {\n    return padding[diff] + num;\n  }\n  return num;\n}\n\nexport function abs(x){\n  return x < 0 ? -x : x;\n}\n\nexport function floor(x){\n  return x >> 0;\n}\n\nexport function sign(x){\n  return x < 0 ? -1 : 1;\n}\n\nexport function isZeroOrInfinite(x){\n  return x === 0 || x === POSITIVE_INFINITY || x === NEGATIVE_INFINITY;\n}\n\nexport function isNaN(x){\n  return x !== x;\n}\n\nexport function isFinite(value){\n  return typeof value === 'number'\n      && !isNaN(value)\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && !isNaN(value)\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function hasBrand(obj, brand){\n  if (obj == null) {\n    return false;\n  }\n  return $$Get(obj, 'BuiltinBrand') === brand;\n}\n\nconst emptyList = $$Get([], 'array');\n\nexport function call(func, receiver, args){\n  return $$Invoke(func, 'Call', receiver, args ? $$Get(args, 'array') : emptyList);\n}\n\n\n\nexport function enumerate(obj, inherited, onlyEnumerable){\n  return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));\n}\n\nfunction defineOwnPropertyInternal(obj, key, Desc){\n  return\n}\n\nexport function deleteProperty(obj, key){\n  return $$Invoke(obj, 'remove', key);\n}\n\nexport function update(obj, key, attr){\n  return $$Invoke(obj, 'update', key, attr);\n}\n\nexport function define(obj, key, value, attr){\n  return $$Invoke(obj, 'define', key, value, attr);\n}\n\nexport function query(obj, key){\n  return $$Invoke(obj, 'query', key);\n}\n\nexport function get(obj, key){\n  return $$Invoke(obj, 'get', key);\n}\n\nexport function set(obj, key, value){\n  return $$Invoke(obj, 'set', key, value);\n}\n\nexport function builtinFunction(func){\n  $$Set(func, 'BuiltinFunction', true);\n  deleteProperty(func, 'prototype');\n  update(func, 'name', 0);\n  define(func, 'caller', null, 0);\n  define(func, 'arguments', null, 0);\n}\n\n\nexport function extend(obj, properties){\n  const keys = enumerate(properties, false, false);\n  let index = keys.length;\n\n  while (index--) {\n    const key   = keys[index],\n          desc  = $$Invoke(properties, 'GetOwnProperty', key);\n\n    $$Set(desc, 'Enumerable', false);\n\n    if ($$Has(desc, 'Value')) {\n      const value = $$Get(desc, 'Value');\n\n      if (typeof value === 'number') {\n        $$Set(desc, 'Configurable', false);\n        $$Set(desc, 'Writable', false);\n      } else if (typeof value === 'function') {\n        builtinFunction(value);\n      }\n    }\n\n    $$Invoke(obj, 'DefineOwnProperty', key, desc);\n  }\n}\n\nexport function extendInternal(internal, properties){\n  const keys = enumerate(properties, false, false);\n\n  let index = keys.length;\n\n  while (index--) {\n    const key = keys[index];\n    $$Set(internal, key, properties[key]);\n  }\n\n  return internal;\n}\n\nexport function createInternal(proto, properties){\n  return extendInternal($$CreateInternalObject(proto), properties);\n}\n\nexport function hideEverything(o){\n  const type = typeof o;\n\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  const keys = enumerate(o, false, true);\n  let index = keys.length;\n\n  while (index--) {\n    const key   = keys[index],\n          attrs = query(o, key),\n          val   = get(o, key);\n\n    update(o, key, typeof val === 'number' ? FROZEN : attrs & ~1);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\nexport function builtinClass(Ctor, brand){\n  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);\n  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);\n  $$Set(Ctor, 'BuiltinConstructor', true);\n  $$Set(Ctor, 'BuiltinFunction', true);\n  update(Ctor, 'prototype', FROZEN);\n  define(Ctor, 'length', 1, FROZEN);\n  define(Ctor, 'caller', null, FROZEN);\n  define(Ctor, 'arguments', null, FROZEN);\n\n  if (Ctor.name !== 'Symbol') {\n    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name);\n    define(Ctor.prototype, @@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\n\nexport function isInitializing(obj, internal){\n  return obj != null && $$Has(obj, internal) && $$Get(obj, internal) === undefined;\n}\n\n\n\nexport function listFrom(array){\n  return $$Get(array, 'array') || $$Get([...array], 'array');\n}\n\nexport function listOf(...items){\n  return $$Get(items, 'array');\n}\n\n\nconst cache = [];\n\nexport function numbers(start, end){\n  if (!isFinite(end)) {\n    end = start;\n    start = 0;\n  }\n\n  let index = end - start;\n\n  if (end > cache.length) {\n    while (index--) {\n      const curr = start + index;\n      cache[curr] = ToString(curr);\n    }\n  }\n\n  const result = [];\n  index = 0;\n\n  while (start < end) {\n    result[index++] = cache[start++];\n  }\n\n  return result;\n}\n\nexport function getIntrinsic(name){\n  return $$GetIntrinsic($$CurrentRealm(), name);\n}\n";
+exports.builtins["@@utilities"] = "import {\n  $$Invoke,\n  $$CreateInternalObject,\n  $$CreateObject,\n  $$Get,\n  $$GetIntrinsic,\n  $$Has,\n  $$NumberToString,\n  $$Set,\n  $$SetIntrinsic\n} from '@@internals';\n\nimport {\n  MAX_INTEGER,\n  MAX_VALUE,\n  MIN_VALUE,\n  NaN,\n  POSITIVE_INFINITY,\n  NEGATIVE_INFINITY\n} from '@@constants';\n\n\nconst FROZEN = 0,\n      HIDDEN = 6;\n\n\nconst padding = ['', '0', '00', '000', '0000', '00000', '000000'];\n\nexport function zeroPad(number, places = 2){\n  const num  = $$NumberToString(number),\n        len  = num.length,\n        diff = places - len;\n\n  if (diff > 0) {\n    return padding[diff] + num;\n  }\n  return num;\n}\n\nexport function abs(x){\n  return x < 0 ? -x : x;\n}\n\nexport function floor(x){\n  return x >> 0;\n}\n\nexport function sign(x){\n  return x < 0 ? -1 : 1;\n}\n\nexport function isZeroOrInfinite(x){\n  return x === 0 || x === POSITIVE_INFINITY || x === NEGATIVE_INFINITY;\n}\n\nexport function isNaN(x){\n  return x !== x;\n}\n\nexport function isFinite(value){\n  return typeof value === 'number'\n      && !isNaN(value)\n      && value < POSITIVE_INFINITY\n      && value > NEGATIVE_INFINITY;\n}\n\nexport function isInteger(value) {\n  return typeof value === 'number'\n      && !isNaN(value)\n      && value > -MAX_INTEGER\n      && value < MAX_INTEGER\n      && value | 0 === value;\n}\n\nexport function hasBrand(obj, brand){\n  if (obj == null) {\n    return false;\n  }\n  return $$Get(obj, 'BuiltinBrand') === brand;\n}\n\nconst emptyList = $$Get([], 'array');\n\nexport function call(func, receiver, args){\n  return $$Invoke(func, 'Call', receiver, args ? $$Get(args, 'array') : emptyList);\n}\n\n\n\nexport function enumerate(obj, inherited, onlyEnumerable){\n  return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));\n}\n\nexport function deleteProperty(obj, key){\n  return $$Invoke(obj, 'remove', key);\n}\n\nexport function update(obj, key, attr){\n  return $$Invoke(obj, 'update', key, attr);\n}\n\nexport function define(obj, key, value, attr){\n  return $$Invoke(obj, 'define', key, value, attr);\n}\n\nexport function query(obj, key){\n  return $$Invoke(obj, 'query', key);\n}\n\nexport function get(obj, key){\n  return $$Invoke(obj, 'get', key);\n}\n\nexport function set(obj, key, value){\n  return $$Invoke(obj, 'set', key, value);\n}\n\nexport function builtinFunction(func){\n  $$Set(func, 'BuiltinFunction', true);\n  deleteProperty(func, 'prototype');\n  update(func, 'name', 0);\n  define(func, 'caller', null, 0);\n  define(func, 'arguments', null, 0);\n}\n\n\nexport function extend(obj, properties){\n  const keys = enumerate(properties, false, false);\n  let index = keys.length;\n\n  while (index--) {\n    const key   = keys[index],\n          desc  = $$Invoke(properties, 'GetOwnProperty', key);\n\n    $$Set(desc, 'Enumerable', false);\n\n    if ($$Has(desc, 'Value')) {\n      const value = $$Get(desc, 'Value');\n\n      if (typeof value === 'number') {\n        $$Set(desc, 'Configurable', false);\n        $$Set(desc, 'Writable', false);\n      } else if (typeof value === 'function') {\n        builtinFunction(value);\n      }\n    }\n\n    $$Invoke(obj, 'DefineOwnProperty', key, desc);\n  }\n}\n\nexport function extendInternal(internal, properties){\n  const keys = enumerate(properties, false, false);\n\n  let index = keys.length;\n\n  while (index--) {\n    const key = keys[index];\n    $$Set(internal, key, properties[key]);\n  }\n\n  return internal;\n}\n\nexport function createInternal(proto, properties){\n  return extendInternal($$CreateInternalObject(proto), properties);\n}\n\nexport function hideEverything(o){\n  const type = typeof o;\n\n  if (type === 'object' ? o === null : type !== 'function') {\n    return o;\n  }\n\n  const keys = enumerate(o, false, true);\n  let index = keys.length;\n\n  while (index--) {\n    const key   = keys[index],\n          attrs = query(o, key),\n          val   = get(o, key);\n\n    update(o, key, typeof val === 'number' ? FROZEN : attrs & ~1);\n  }\n\n  if (type === 'function') {\n    hideEverything(o.prototype);\n  }\n\n  return o;\n}\n\nexport function builtinClass(Ctor, brand){\n  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);\n  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);\n  $$Set(Ctor, 'BuiltinConstructor', true);\n  $$Set(Ctor, 'BuiltinFunction', true);\n  update(Ctor, 'prototype', FROZEN);\n  define(Ctor, 'length', 1, FROZEN);\n  define(Ctor, 'caller', null, FROZEN);\n  define(Ctor, 'arguments', null, FROZEN);\n\n  if (Ctor.name !== 'Symbol') {\n    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name);\n    define(Ctor.prototype, @@toStringTag, Ctor.name);\n    hideEverything(Ctor);\n  }\n}\n\n\nexport function isInitializing(obj, internal){\n  return obj != null && $$Has(obj, internal) && $$Get(obj, internal) === undefined;\n}\n\n\n\nexport function listFrom(array){\n  return $$Get(array, 'array') || $$Get([...array], 'array');\n}\n\nexport function listOf(...items){\n  return $$Get(items, 'array');\n}\n\n\nconst cache = [];\n\nexport function numbers(start, end){\n  if (!isFinite(end)) {\n    end = start;\n    start = 0;\n  }\n\n  let index = end - start;\n\n  if (end > cache.length) {\n    while (index--) {\n      const curr = start + index;\n      cache[curr] = ToString(curr);\n    }\n  }\n\n  const result = [];\n  index = 0;\n\n  while (start < end) {\n    result[index++] = cache[start++];\n  }\n\n  return result;\n}\n\nexport function getIntrinsic(name){\n  return $$GetIntrinsic($$CurrentRealm(), name);\n}\n";
 
 exports.builtins["@array"] = "import {\n  @@toStringTag: toStringTag,\n  @@iterator   : iterator\n} from '@@symbols';\n\nimport {\n  $$ArgumentCount,\n  $$Exception\n} from '@@internals';\n\nimport {\n  define,\n  call,\n  hasBrand\n} from '@@utilities';\n\nimport {\n  ToInteger,\n  ToObject,\n  ToString,\n  ToInt32,\n  ToUint32\n} from '@@operations';\n\nimport {\n  Type\n} from '@@types';\n\nimport {\n  Iterator\n} from '@iter';\n\nimport {\n  Set,\n  add,\n  has\n} from '@set';\n\nimport {\n  min,\n  max,\n  floor\n} from '@math';\n\nimport {\n  hasOwn\n} from '@reflect';\n\n\n\nconst arrays = new Set;\n\nconst K = 0x01,\n      V = 0x02,\n      S = 0x04;\n\nconst kinds = {\n  'key': 1,\n  'value': 2,\n  'key+value': 3,\n  'sparse:key': 5,\n  'sparse:value': 6,\n  'sparse:key+value': 7\n};\n\n\n\nclass ArrayIterator extends Iterator {\n  private @array, // IteratedObject\n          @index, // ArrayIteratorNextIndex\n          @kind;  // ArrayIterationKind\n\n  constructor(array, kind){\n    this.@array = ToObject(array);\n    this.@index = 0;\n    this.@kind = kinds[kind];\n  }\n\n  next(){\n    ensureObject(this);\n\n    if (!hasOwn(this, @array) || !hasOwn(this, @index) || !hasOwn(this, @kind)) {\n      throw $$Exception('incompatible_array_iterator', ['ArrayIterator.prototype.next']);\n    }\n\n    const array = this.@array,\n          index = this.@index,\n          kind  = this.@kind,\n          len   = ToUint32(array.length);\n\n    if (kind & S) {\n      let found = false;\n      while (!found && index < len) {\n        found = index in array;\n        if (!found) {\n          index++;\n        }\n      }\n    }\n\n    if (index >= len) {\n      this.@index = Infinity;\n      throw $__StopIteration;\n    }\n\n    this.@index = index + 1;\n    const key = ToString(index);\n    return kind & V ? kind & K ? [key, array[key]] : array[key] : key;\n  }\n}\n\n\nbuiltinClass(ArrayIterator);\n\n\n\nfunction defaultComparefn(x, y){\n  return 1 - (ToString(x) < ToString(y));\n}\n\ninternalFunction(defaultComparefn);\n\n\nfunction truncate(value, shift){\n  return value >> shift << shift;\n}\n\ninternalFunction(truncate);\n\n\n\nexport class Array {\n  constructor(...values){\n    if (values.length === 1 && typeof values[0] === 'number') {\n      let out = [];\n      out.length = values[0];\n      return out;\n    }\n    return values;\n  }\n\n  concat(...items){\n    const array = [],\n          count = items.length;\n\n    let obj   = ToObject(this),\n        n     = 0,\n        index = 0;\n\n    do {\n      if (isArray(obj)) {\n        let len = ToUint32(obj.length),\n            i   = 0;\n\n        do {\n          if (i in obj) {\n            array[n++] = obj[i];\n          }\n        } while (++i < len)\n      } else {\n        array[n++] = obj;\n      }\n      obj = items[index];\n    } while (index++ < count)\n\n    return array;\n  }\n\n  entries(){\n    return new ArrayIterator(this, 'key+value');\n  }\n\n  every(callbackfn, context = undefined){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && !call(callbackfn, context, [array[index], index, array])) {\n          return false;\n        }\n      } while (++index < len)\n    }\n\n    return true;\n  }\n\n  filter(callbackfn, context = undefined){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array) {\n          let element = array[index];\n          if (call(callbackfn, context, [element, index, array])) {\n            result[result.length] = element;\n          }\n        }\n      } while (++index < len)\n    }\n\n    return result;\n  }\n\n  forEach(callbackfn, context = undefined){\n    const array = ToObject(this),\n          len   = $__ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    for (let i=0; i < len; i++) {\n      if (i in array) {\n        call(callbackfn, context, [array[i], i, this]);\n      }\n    }\n  }\n\n  indexOf(search, fromIndex = 0){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = ToInteger(fromIndex);\n    if (index >= len) {\n      return -1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (++index < len)\n\n    return -1;\n  }\n\n  join(separator){\n    const array = ToObject(this);\n\n    if (has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    const sep = $$ArgumentCount() ? ToString(separator) : ',',\n          len = ToUint32(array.length);\n\n    if (len === 0) {\n      return '';\n    }\n\n    let result = '0' in array ? ToString(array[0]) : '',\n        index  = 0;\n\n    while (++index < len) {\n      result += index in array ? sep + ToString(array[index]) : sep;\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  keys(){\n    return new ArrayIterator(this, 'key');\n  }\n\n  lastIndexOf(search, fromIndex = this.length){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    if (len === 0) {\n      return -1;\n    }\n\n    let index = ToInteger(fromIndex);\n    if (index >= len) {\n      index = len - 1;\n    } else if (index < 0) {\n      index += len;\n      if (index < 0) {\n        return -1;\n      }\n    }\n\n    do {\n      if (index in array && array[index] === search) {\n        return index;\n      }\n    } while (index--)\n\n    return -1;\n  }\n\n  map(callbackfn, context = undefined){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          result = [];\n\n    ensureCallback(callbackfn);\n\n    for (var i=0; i < len; i++) {\n      if (i in array) {\n        result[i] = call(callbackfn, context, [array[i], i, this]);\n      }\n    }\n\n    return result;\n  }\n\n  pop(){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length) - 1;\n\n    if (len >= 0) {\n      const result = array[len];\n      array.length = len;\n      return result;\n    }\n  }\n\n  push(...values){\n    const array = ToObject(this),\n          len   = ToUint32(array.length),\n          count = values.length;\n\n    let index = len;\n\n    array.length += count;\n\n    for (var i=0; i < count; i++) {\n      array[index++] = values[i];\n    }\n\n    return index;\n  }\n\n  reduce(callbackfn, initialValue){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    let accumulator, index;\n    if ($$ArgumentCount() > 1) {\n      accumulator = initialValue;\n      index = 0;\n    } else {\n      accumulator = array[0];\n      index = 1;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = call(callbackfn, this, [accumulator, array[index], array]);\n      }\n    } while (++index < len)\n\n    return accumulator;\n  }\n\n  reduceRight(callbackfn, initialValue){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    let accumulator, index;\n    if ($$ArgumentCount() > 1) {\n      accumulator = initialValue;\n      index = len - 1;\n    } else {\n      accumulator = array[len - 1];\n      index = len - 2;\n    }\n\n    do {\n      if (index in array) {\n        accumulator = call(callbackfn, this, [accumulator, array[index], array]);\n      }\n    } while (--index >= 0)\n\n    return accumulator;\n  }\n\n  reverse(){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          middle = floor(len / 2);\n\n    let lower = -1;\n    while (++lower !== middle) {\n      const upper       = len - lower - 1,\n            lowerP      = ToString(lower),\n            upperP      = ToString(upper),\n            lowerValue  = array[lowerP],\n            upperValue  = array[upperP];\n\n      if (upperP in array) {\n        PutPropertyOrThrow(array, lowerP, upperValue, 'Array.prototype.reverse');\n        if (lowerP in array) {\n          PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');\n        } else {\n          DeletePropertyOrThrow(array, upperP, 'Array.prototype.reverse');\n        }\n      } else if (lowerP in array) {\n        PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');\n      } else {\n        DeletePropertyOrThrow(array, lowerP, 'Array.prototype.reverse');\n      }\n    }\n\n    return array;\n  }\n\n  slice(start = 0, end = this.length){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          result = [];\n\n    start = ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    }\n\n    end = ToInteger(end);\n    if (end < 0) {\n      end = max(len + end, 0);\n    } else {\n      end = min(end, len);\n    }\n\n    if (start < end) {\n      let newIndex = 0,\n          oldIndex = start;\n\n      do {\n        result[newIndex++] = array[oldIndex++];\n      } while (oldIndex < end)\n    }\n\n    return result;\n  }\n\n  shift(){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          result = array[0];\n\n    if (!len) {\n      return result;\n    }\n\n    let oldIndex = 1,\n        newIndex = 0;\n\n    do {\n      if (oldIndex in array) {\n        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.shift');\n      } else {\n        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.shift');\n      }\n      newIndex++;\n    } while (++oldIndex < len)\n\n    PutPropertyOrThrow(array, 'length', len - 1, 'Array.prototype.shift');\n    return result;\n  }\n\n  some(callbackfn, context = undefined){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    ensureCallback(callbackfn);\n\n    if (len) {\n      let index = 0;\n      do {\n        if (index in array && call(callbackfn, context, [array[index], index, array])) {\n          return true;\n        }\n      } while (++index < len)\n    }\n\n    return false;\n  }\n\n  sort(comparefn = defaultComparefn){\n    const array = ToObject(this),\n          len   = array.length;\n\n    ensureCallback(comparefn);\n\n    if (len >= 2) {\n      let trunc = 1;\n\n      for (var start = truncate(len - 2, trunc); start >= 0; start -= 2) {\n        if (comparefn(array[start], array[start + 1]) > 0) {\n          [array[start], array[start + 1]] = [array[start + 1], array[start]];\n        }\n      }\n\n      if (len > 2) {\n        let arrayA = array,\n            arrayB = new Array(len),\n            size   = 2;\n\n        do {\n          let start  = truncate(len - 1, ++trunc),\n              countA = start + size,\n              countB = len;\n\n          countA = min(countA, len);\n\n          while (start >= 0) {\n            let toIndex   = start,\n                fromA     = toIndex,\n                fromB     = countA,\n                continues = true;\n\n            do {\n              if (fromA < countA) {\n                if (fromB < countB) {\n                  if (comparefn(arrayA[fromA], arrayA[fromB]) > 0) {\n                    arrayB[toIndex++] = arrayA[fromB++];\n                  } else {\n                    arrayB[toIndex++] = arrayA[fromA++];\n                  }\n                } else {\n                  while (fromA < countA) {\n                    arrayB[toIndex++] = arrayA[fromA++];\n                  }\n                  continues = false;\n                }\n              } else {\n                while (fromB < countB) {\n                  arrayB[toIndex++] = arrayA[fromB++];\n                }\n                continues = false;\n              }\n            } while (continues)\n\n            countB = start;\n            start -= 2 * size;\n            countA = start + size;\n          }\n\n          [arrayA, arrayB] = [arrayB, arrayA];\n          size *= 2;\n        } while (len > size)\n\n        if (!(trunc & 1)) {\n          for (var i = len - 1; i >= 0; i--) {\n            array[i] = arrayA[i];\n          }\n        }\n      }\n    }\n\n    return array;\n  }\n\n  splice(start, deleteCount, ...items){\n    const array     = ToObject(this),\n          len       = ToUint32(array.length),\n          itemCount = items.length,\n          result    = [];\n\n    start = ToInteger(start);\n    if (start < 0) {\n      start = max(len + start, 0);\n    } else {\n      start = min(start, len);\n    }\n\n    deleteCount = min(max(ToInteger(deleteCount), 0), len - start);\n\n    if (deleteCount > 0) {\n      let index = 0;\n\n      do {\n        let from = index + start;\n\n        if (from in array) {\n          PutPropertyOrThrow(result, index, array[from], 'Array.prototype.splice');\n        }\n        index++;\n      } while (index < deleteCount)\n\n      PutPropertyOrThrow(result, 'length', deleteCount, 'Array.prototype.splice');\n    }\n\n    const count = len - deleteCount;\n\n    if (itemCount < deleteCount) {\n      let index = start;\n\n      while (index < count) {\n        let from = index + deleteCount,\n            to   = index + itemCount;\n\n        if (from in array) {\n          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');\n        } else {\n          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');\n        }\n        index++;\n      }\n    } else if (itemCount > deleteCount) {\n      let index = count;\n\n      while (index > start) {\n        let from = index + deleteCount - 1,\n            to   = index + itemCount - 1;\n\n        if (from in array) {\n          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');\n        } else {\n          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');\n        }\n\n        index--;\n      }\n    }\n\n    if (itemCount) {\n      let itemIndex = 0,\n          index     = start;\n\n      do {\n        PutPropertyOrThrow(array, index++, items[itemIndex++], 'Array.prototype.splice');\n      } while (itemIndex < itemCount)\n    }\n\n    PutPropertyOrThrow(array, 'length', len - deleteCount + itemCount, 'Array.prototype.splice');\n\n    return result;\n  }\n\n  toLocaleString(){\n    const array = ToObject(this),\n          len   = ToUint32(array.length);\n\n    if (len === 0 || has(arrays, array)) {\n      return '';\n    }\n    add(arrays, array);\n\n    let nextElement = array[0],\n        result = nextElement == null ? '' : nextElement.toLocaleString(),\n        index  = 0;\n\n    while (++index < len) {\n      result += ',';\n      nextElement = array[index];\n      if (nextElement != null) {\n        result += nextElement.toLocaleString();\n      }\n    }\n\n    arrays.delete(array);\n    return result;\n  }\n\n  toString(){\n    const array = ToObject(this);\n    let func = array.join;\n\n    if (typeof func !== 'function') {\n      func = $__ObjectToString;\n    }\n\n    return call(func, array, []);\n  }\n\n  unshift(...values){\n    const array  = ToObject(this),\n          len    = ToUint32(array.length),\n          newLen = len + values.length;\n\n    if (len === newLen) {\n      return newLen;\n    }\n\n    PutPropertyOrThrow(array, 'length', newLen, 'Array.prototype.unshift');\n\n    let oldIndex = len,\n        newIndex = newLen;\n\n    while (oldIndex-- > 0) {\n      newIndex--;\n      if (oldIndex in array) {\n        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.unshift');\n      } else {\n        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.unshift');\n      }\n    }\n\n    while (newIndex-- > 0) {\n      PutPropertyOrThrow(array, newIndex, values[newIndex], 'Array.prototype.unshift');\n    }\n\n    return newLen;\n  }\n\n  values(){\n    return new ArrayIterator(this, 'value');\n  }\n}\n\nbuiltinClass(Array);\nconst ArrayPrototype = Array.prototype;\ndefine(ArrayPrototype, @@iterator, ArrayPrototype.values);\n\n['push', 'reduce', 'reduceRight'].forEach(name => define(ArrayPrototype[name], 'length', 1, FROZEN));\n\nexport function isArray(array){\n  return Type(array) === 'Object' ? hasBrand(array, 'BuiltinArray') : false;\n}\n\nexport function from(arrayLike){\n  const obj    = ToObject(arrayLike),\n        len    = ToUint32(obj.length),\n        Ctor   = $__IsConstructor(this) ? this : Array,\n        result = new Ctor(len);\n\n  for (var i = 0; i < len; i++) {\n    if (i in obj) {\n      result[i] = obj[i];\n    }\n  }\n\n  result.length = len;\n  return result;\n}\n\nexport function of(...items){\n  if (!$__IsConstructor(this)) {\n    return items;\n  }\n\n  const len    = items.length,\n        result = new this(len);\n\n  for (var i=0; i < len; i++) {\n    result[i] = items[i];\n  }\n\n  result.length = len;\n  return result;\n}\n\nextend(Array, { isArray, from, of });\n";
 
@@ -22609,7 +22681,7 @@ exports.builtins["@string"] = "import {\n  $$ArgumentCount,\n  $$Call,\n  $$Crea
 
 exports.builtins["@symbol"] = "export class Symbol {\n  constructor(name, isPublic){\n    if (name == null) {\n      throw $__Exception('unnamed_symbol', []);\n    }\n    return $__SymbolCreate(name, !!isPublic);\n  }\n}\n\nbuiltinClass(Symbol);\n";
 
-exports.builtins["@system"] = "import {\n  ToObject\n} from '@@operations';\n\nimport {\n  ObjectCreate,\n  Type\n} from '@@types';\n\nimport {\n  hasBrand\n} from '@@utilities';\n\nimport {\n  $$Set\n} from '@@internals';\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader   = loader;\n    this.@mrl      = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback  = errback;\n  }\n\n  fulfill(src){\n    const loader = this.@loader;\n    let translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n' + translated;\n    }\n\n    $__EvaluateModule(loader, translated, this.@resolved, module => {\n      $$Set(module, 'loader', loader);\n      $$Set(module, 'resolved', this.@resolved);\n      $$Set(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    const loader   = this.@loader,\n          resolved = (loader.@resolve)(mrl, baseURL),\n          module   = loader.get(resolved);\n\n    this.@resolved = resolved;\n    this.@mrl = mrl;\n\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\n\nprivate @strict, @resolve, @modules, @translate, @fetch;\n\n\nexport class Loader {\n  private @options, @parent;\n\n  constructor(parent, options = {}){\n    this.@strict  = true;\n    this.@modules = ObjectCreate(null);\n    this.@options = ToObject(options);\n    this.@parent  = parent && parent.@options ? parent : System || {};\n    this.linkedTo = this.@options.linkedTo || null;\n  }\n\n  get global(){\n    return this.@options.global || this.@parent.global || $__global;\n  }\n\n  get baseURL(){\n    return this.@options.baseURL || this.@parent.baseURL || '';\n  }\n\n  get @translate(){\n    return this.@options.translate || this.@parent.@translate;\n  }\n\n  get @resolve(){\n    return this.@options.resolve || this.@parent.@resolve;\n  }\n\n  get @fetch(){\n    return this.@options.fetch || this.@parent.@fetch;\n  }\n\n  load(mrl, callback, errback){\n    const canonical = (this.@resolve)(mrl, this.baseURL),\n          module    = this.@modules[canonical];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, canonical, callback, errback), canonical);\n    }\n  }\n\n  eval(src){\n    return $__EvaluateModule(this, src);\n  }\n\n  evalAsync(src, callback, errback){\n    $__EvaluateModule(this, src, callback, errback);\n  }\n\n  get(mrl){\n    const canonical = (this.@resolve)(mrl, this.baseURL);\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    const canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else if (Type(canonical) === 'Object') {\n      for (var key in canonical) {\n        this.@modules[key] = canonical[key];\n      }\n    }\n  }\n\n  defineBuiltins(object = this.global){\n    const desc = { configurable: true,\n                   enumerable: false,\n                   writable: true,\n                   value: undefined };\n\n    for (var key in std) {\n      desc.value = std[key];\n      $__DefineOwnProperty(object, key, desc);\n    }\n\n    return object;\n  }\n}\n\nexport function Module(object, mrl){\n  object = ToObject(object);\n\n  if (hasBrand(object, 'BuiltinModule')) {\n    return object;\n  }\n\n  const module = $__ToModule(object);\n  $$Set(module, 'loader', System);\n  $$Set(module, 'resolved', mrl || '');\n  $$Set(module, 'mrl', mrl || '');\n  return module;\n}\n\nbuiltinFunction(Module);\n\n\nexport var System = new Loader(null, {\n  global: $__global,\n  baseURL: '',\n  fetch(relURL, baseURL, request, resolved) {\n    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n$__SetDefaultLoader(System);\n\n\nconst internalLoader = $__internalLoader = new Loader(System, { global: this });\ninternalLoader.@strict = false;\n\nSystem.@modules['@system'] = internalLoader.@modules['@system'] = new Module({\n  Module: Module,\n  System: System,\n  Loader: Loader\n}, '@system');\n\nconst std = internalLoader.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\nfor (let name in internalLoader.@modules) {\n  System.@modules[name] = internalLoader.@modules[name];\n}\n\n$__each(std, key => $__define($__global, key, std[key], Type(std[key]) === 'Object' ? HIDDEN : FROZEN));\n";
+exports.builtins["@system"] = "import {\n  ToObject\n} from '@@operations';\n\nimport {\n  ObjectCreate,\n  Type\n} from '@@types';\n\nimport {\n  builtinFunction,\n  define,\n  hasBrand\n} from '@@utilities';\n\nimport {\n  $$CurrentRealm,\n  $$EvaluateModule,\n  $$EvaluateModuleAsync,\n  $$Fetch,\n  $$GetIntrinsic,\n  $$Set,\n  $$SetIntrinsic,\n  $$ToModule\n} from '@@internals';\n\n\nclass Request {\n  private @loader, @callback, @errback, @mrl, @resolved;\n\n  constructor(loader, mrl, resolved, callback, errback){\n    this.@loader   = loader;\n    this.@mrl      = mrl;\n    this.@resolved = resolved;\n    this.@callback = callback;\n    this.@errback  = errback;\n  }\n\n  fulfill(src){\n    const loader = this.@loader;\n    let translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);\n\n    if (loader.@strict) {\n      translated = '\"use strict\";\\n' + translated;\n    }\n\n    $$EvaluateModuleAsync(loader, translated, this.@resolved, module => {\n      $$Set(module, 'loader', loader);\n      $$Set(module, 'resolved', this.@resolved);\n      $$Set(module, 'mrl', this.@mrl);\n      loader.@modules[this.@resolved] = module;\n      (this.@callback)(module);\n    }, msg => this.reject(msg));\n  }\n\n  redirect(mrl, baseURL){\n    const loader   = this.@loader,\n          resolved = (loader.@resolve)(mrl, baseURL),\n          module   = loader.get(resolved);\n\n    this.@resolved = resolved;\n    this.@mrl = mrl;\n\n    if (module) {\n      (this.@callback)(module);\n    } else {\n      (loader.@fetch)(mrl, baseURL, this, resolved);\n    }\n  }\n\n  reject(msg){\n    (this.@errback)(msg);\n  }\n}\n\n\nprivate @strict, @resolve, @modules, @translate, @fetch;\n\n\nexport class Loader {\n  private @options, @parent;\n\n  constructor(parent, options = {}){\n    this.@strict  = true;\n    this.@modules = ObjectCreate(null);\n    this.@options = ToObject(options);\n    this.@parent  = parent && parent.@options ? parent : typeof System === 'undefined' ? {} : System;\n    this.linkedTo = this.@options.linkedTo || null;\n  }\n\n  get global(){\n    return this.@options.global || this.@parent.global || $$GetIntrinsic('global');\n  }\n\n  get baseURL(){\n    return this.@options.baseURL || this.@parent.baseURL || '';\n  }\n\n  get @translate(){\n    return this.@options.translate || this.@parent.@translate;\n  }\n\n  get @resolve(){\n    return this.@options.resolve || this.@parent.@resolve;\n  }\n\n  get @fetch(){\n    return this.@options.fetch || this.@parent.@fetch;\n  }\n\n  load(mrl, callback, errback){\n    const canonical = (this.@resolve)(mrl, this.baseURL),\n          module    = this.@modules[canonical];\n\n    if (module) {\n      callback(module);\n    } else {\n      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, canonical, callback, errback), canonical);\n    }\n  }\n\n  // TODO feedback: Loader#eval needs an optional? name/mrl parameter\n  eval(src, mrl = ''){\n    return $$EvaluateModule(this, src, mrl);\n  }\n\n  // TODO feedback: Loader#evalAsync needs an optional? name/mrl parameter\n  evalAsync(src, callback, errback, mrl = ''){\n    $$EvaluateModuleAsync(this, src, mrl, callback, errback);\n  }\n\n  get(mrl){\n    const canonical = (this.@resolve)(mrl, this.baseURL);\n\n    return this.@modules[canonical];\n  }\n\n  set(mrl, mod){\n    const canonical = (this.@resolve)(mrl, this.baseURL);\n\n    if (typeof canonical === 'string') {\n      this.@modules[canonical] = mod;\n    } else if (Type(canonical) === 'Object') {\n      for (let mrl in canonical) {\n        this.@modules[mrl] = canonical[mrl];\n      }\n    }\n  }\n\n  defineBuiltins(object = this.global){\n    const desc = { configurable: true,\n                   enumerable: false,\n                   writable: true,\n                   value: undefined };\n\n    for (let key in std) {\n      desc.value = std[key];\n      $__DefineOwnProperty(object, key, desc);\n    }\n\n    return object;\n  }\n}\n\n\n// TODO feedback: Module needs an optional? name/mrl parameter\nexport function Module(object, mrl = ''){\n  object = ToObject(object);\n\n  if (hasBrand(object, 'BuiltinModule')) {\n    return object;\n  }\n\n  const module = $$ToModule(object);\n  $$Set(module, 'loader', System);\n  $$Set(module, 'resolved', mrl);\n  $$Set(module, 'mrl', mrl);\n  return module;\n}\n\nbuiltinFunction(Module);\n\n\nexport const System = new Loader(null, {\n  global: $$GetIntrinsic('global'),\n  baseURL: '',\n  fetch(relURL, baseURL, request, resolved) {\n    const fetcher = resolved[0] === '@' ? $$Fetch : $__readFile;\n\n    fetcher(resolved, src => {\n      if (typeof src === 'string') {\n        request.fulfill(src);\n      } else {\n        request.reject(src);\n      }\n    });\n  },\n  resolve(relURL, baseURL){\n    return relURL[0] === '@' ? relURL : $$Resolve(baseURL, relURL);\n  },\n  translate(src, relURL, baseURL, resolved) {\n    return src;\n  }\n});\n\n\nconst builtins = new Loader(System, { global: this });\nbuiltins.@strict = false;\n$$SetIntrinsic($$CurrentRealm(), 'internalLoader', builtins);\n$$Set($$CurrentRealm(), 'loader', System);\n\nSystem.@modules['@system'] = builtins.@modules['@system'] = new Module({\n  Module: Module,\n  System: System,\n  Loader: Loader\n}, '@system');\n\n\nconst std = builtins.eval(`\n  module std = '@std';\n  export std;\n`).std;\n\n\nfor (let name in builtins.@modules) {\n  System.@modules[name] = builtins.@modules[name];\n}\n\n{\n  const global = $$GetIntrinsic('global');\n\n  for (let [key, val] of std) {\n    define(global, key, val, Type(val) === 'Object' ? HIDDEN : FROZEN);\n  }\n}\n";
 
 exports.builtins["@timers"] = "export function clearInterval(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearInterval);\n\n\nexport function clearTimeout(id){\n  id = $__ToInteger(id);\n  $__ClearTimer(id);\n}\n\nbuiltinFunction(clearTimeout);\n\n\nexport function setInterval(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, true);\n}\n\nbuiltinFunction(setInterval);\n\n\nexport function setTimeout(callback, milliseconds){\n  milliseconds = $__ToInteger(milliseconds);\n  if (typeof callback !== 'function') {\n    callback = $__ToString(callback);\n  }\n  return $__SetTimer(callback, milliseconds, false);\n}\n\nbuiltinFunction(setTimeout);\n";
 
