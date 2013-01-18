@@ -595,23 +595,6 @@ var natives = (function(module){
         callback.Call(undefined, [file]);
       });
     },
-    resolve: require('path')
-      ?  require('path').resolve
-      : function(base, to){
-          to = to.split('/');
-          base = base.split('/');
-          base.length--;
-
-          for (var i=0; i < to.length; i++) {
-            if (to[i] === '..') {
-              base.length--;
-            } else if (to[i] !== '.') {
-              base[base.length] = to[i];
-            }
-          }
-
-          return base.join('/');
-        },
     baseURL: module ? function(){ return module.parent.parent.dirname }
                     : function(){ return location.origin + location.pathname }
   });
