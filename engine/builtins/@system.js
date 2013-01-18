@@ -1,3 +1,21 @@
+import {
+  ToObject
+} from '@@operations';
+
+import {
+  ObjectCreate,
+  Type
+} from '@@types';
+
+import {
+  hasBrand
+} from '@@utilities';
+
+import {
+  $$Set
+} from '@@internals';
+
+
 class Request {
   private @loader, @callback, @errback, @mrl, @resolved;
 
@@ -14,13 +32,13 @@ class Request {
     let translated = (loader.@translate)(src, this.@mrl, loader.baseURL, this.@resolved);
 
     if (loader.@strict) {
-      translated = '"use strict";\n'+translated;
+      translated = '"use strict";\n' + translated;
     }
 
     $__EvaluateModule(loader, translated, this.@resolved, module => {
-      $__setInternal(module, 'loader', loader);
-      $__setInternal(module, 'resolved', this.@resolved);
-      $__setInternal(module, 'mrl', this.@mrl);
+      $$Set(module, 'loader', loader);
+      $$Set(module, 'resolved', this.@resolved);
+      $$Set(module, 'mrl', this.@mrl);
       loader.@modules[this.@resolved] = module;
       (this.@callback)(module);
     }, msg => this.reject(msg));
@@ -28,9 +46,10 @@ class Request {
 
   redirect(mrl, baseURL){
     const loader   = this.@loader,
-          resolved = this.@resolved = (loader.@resolve)(mrl, baseURL),
+          resolved = (loader.@resolve)(mrl, baseURL),
           module   = loader.get(resolved);
 
+    this.@resolved = resolved;
     this.@mrl = mrl;
 
     if (module) {
@@ -54,10 +73,10 @@ export class Loader {
 
   constructor(parent, options = {}){
     this.@strict  = true;
-    this.@modules = $__ObjectCreate(null);
-    this.@options = options = options || $__ToObject(options);
+    this.@modules = ObjectCreate(null);
+    this.@options = ToObject(options);
     this.@parent  = parent && parent.@options ? parent : System || {};
-    this.linkedTo = options.linkedTo || null;
+    this.linkedTo = this.@options.linkedTo || null;
   }
 
   get global(){
@@ -81,13 +100,13 @@ export class Loader {
   }
 
   load(mrl, callback, errback){
-    var key = (this.@resolve)(mrl, this.baseURL),
-        module = this.@modules[key];
+    const canonical = (this.@resolve)(mrl, this.baseURL),
+          module    = this.@modules[canonical];
 
     if (module) {
       callback(module);
     } else {
-      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, key, callback, errback), key);
+      (this.@fetch)(mrl, this.baseURL, new Request(this, mrl, canonical, callback, errback), canonical);
     }
   }
 
@@ -109,7 +128,7 @@ export class Loader {
 
     if (typeof canonical === 'string') {
       this.@modules[canonical] = mod;
-    } else if ($__Type(canonical) === 'Object') {
+    } else if (Type(canonical) === 'Object') {
       for (var key in canonical) {
         this.@modules[key] = canonical[key];
       }
@@ -132,14 +151,16 @@ export class Loader {
 }
 
 export function Module(object, mrl){
-  object = $__ToObject(object);
-  if ($__GetBuiltinBrand(object) === 'BuiltinModule') {
+  object = ToObject(object);
+
+  if (hasBrand(object, 'BuiltinModule')) {
     return object;
   }
-  var module = $__ToModule(object);
-  $__setInternal(module, 'loader', System);
-  $__setInternal(module, 'resolved', mrl || '');
-  $__setInternal(module, 'mrl', mrl || '');
+
+  const module = $__ToModule(object);
+  $$Set(module, 'loader', System);
+  $$Set(module, 'resolved', mrl || '');
+  $$Set(module, 'mrl', mrl || '');
   return module;
 }
 
@@ -189,4 +210,4 @@ for (let name in internalLoader.@modules) {
   System.@modules[name] = internalLoader.@modules[name];
 }
 
-$__each(std, key => $__define($__global, key, std[key], $__Type(std[key]) === 'Object' ? HIDDEN : FROZEN));
+$__each(std, key => $__define($__global, key, std[key], Type(std[key]) === 'Object' ? HIDDEN : FROZEN));
