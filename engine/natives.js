@@ -284,9 +284,6 @@ var natives = (function(module){
       return $$MakeException(type, $$CreateListFromArray(args));
     },
     _now: Date.now || function(){ return +new Date },
-    _SetDefaultLoader: function(obj, args){
-      require('./runtime').realm.loader = args[0];
-    },
     _getWellKnownSymbol: function(_, args){
       return wellKnownSymbols[args[0]];
     },

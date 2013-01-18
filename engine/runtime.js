@@ -13,6 +13,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       environments     = require('./object-model/environments'),
       operations       = require('./object-model/operations'),
       descriptors      = require('./object-model/descriptors'),
+      symbols          = require('./object-model/$Symbol').wellKnownSymbols,
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
@@ -67,7 +68,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords,
       $$CreateListFromArray     = operations.$$CreateListFromArray,
       $$IsStopIteration         = operations.$$IsStopIteration,
-      $$IsStopIteration         = operations.$$IsStopIteration,
       $$IsPropertyReference     = operations.$$IsPropertyReference,
       $$OrdinaryCreateFromConstructor = operations.$$OrdinaryCreateFromConstructor;
 
@@ -90,15 +90,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       Return  = SYMBOLS.Return,
       Normal  = SYMBOLS.Normal;
 
-  var symbols            = require('./object-model/$Symbol').wellKnownSymbols,
-      toStringTagSymbol  = symbols.toStringTag,
-      iteratorSymbol     = symbols.iterator,
-      hasInstanceSymbol  = symbols.hasInstance,
-      createSymbol       = symbols.create,
-      BooleanValueSymbol = symbols.BooleanValue,
-      NumberValueSymbol  = symbols.NumberValue,
-      DateValueSymbol    = symbols.DateValue,
-      ToPrimitiveSymbol  = symbols.ToPrimitive;
 
   AbruptCompletion.prototype.Abrupt = SYMBOLS.Abrupt;
   Completion.prototype.Completion   = SYMBOLS.Completion;
@@ -263,7 +254,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
   // ## $$ClassDefinitionEvaluation
 
-  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbols){
+  function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbolsDeclarations){
     if (superclass === undefined) {
       var superproto = intrinsics.ObjectProto,
           superctor = intrinsics.FunctionProto;
@@ -292,9 +283,9 @@ var runtime = (function(GLOBAL, exports, undefined){
     var proto = new $Object(superproto),
         brand = getKey(name || '');
 
-    for (var i=0; i < symbols[0].length; i++) {
-      var symbol   = symbols[0][i],
-          isPublic = symbols[1][i],
+    for (var i=0; i < symbolsDeclarations[0].length; i++) {
+      var symbol   = symbolsDeclarations[0][i],
+          isPublic = symbolsDeclarations[1][i],
           result   = context.initializeSymbolBinding(symbol, context.createSymbol(symbol, isPublic));
 
       if (result && result.Abrupt) return result;
@@ -310,7 +301,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     if (name) {
       context.initializeBinding(name, ctor);
-      proto.define(toStringTagSymbol, brand);
+      proto.define(symbols.toStringTag, brand);
     }
 
     $$MakeConstructor(ctor, false, proto);
@@ -398,7 +389,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       iterable = $$ToObject(iterable);
       if (iterable && iterable.Abrupt) return iterable;
 
-      var iter = $$Invoke(iterable, iteratorSymbol);
+      var iter = $$Invoke(iterable, symbols.iterator);
       if (iter && iter.Abrupt) return iter;
 
       var adder = object.Get('set');
@@ -539,7 +530,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     function $$OrdinaryConstruct(F, argumentsList, fallBackProto){
-      var creator = F.Get(createSymbol);
+      var creator = F.Get(symbols.create);
       if (creator && creator.Abrupt) return creator;
 
       var obj = creator ? creator.Call(F, argumentsList) : $$OrdinaryCreateFromConstructor(F, '%ObjectPrototype%');
@@ -655,7 +646,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       var self = this;
       ExecutionContext.push(ctx);
-      setFunction(this, iteratorSymbol, function(_, args){ return self });
+      setFunction(this, symbols.iterator, function(_, args){ return self });
       setFunction(this, 'next',         function(_, args){ return self.Send() });
       setFunction(this, 'close',        function(_, args){ return self.Close() });
       setFunction(this, 'send',         function(_, args){ return self.Send(args[0]) });
@@ -822,6 +813,24 @@ var runtime = (function(GLOBAL, exports, undefined){
       isDataDescriptor: true
     });
 
+    function $ModuleIterator(module){
+      var index = 0;
+      $Object.call(this);
+
+      this.set(symbols.iterator, this);
+      this.set('next', new $InternalFunction(function next(){
+        if (index < module.keys.length) {
+          var key = module.keys[index++];
+          return new $Array([key, module.get(key)]);
+        }
+        return new AbruptCompletion('throw', realm.intrinsics.StopIteration);
+      }));
+    }
+
+    inherit($ModuleIterator, $Object);
+
+
+
     function $Module(object, key){
       if (object instanceof $Module) {
         return object;
@@ -848,6 +857,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         this.props[key] = new Reference(this.object, key);
       },
       function get(key){
+        if (key === symbols.iterator) {
+          return this.iterator();
+        }
+
         var ref = this.props[key];
         if (ref) {
           return $$GetValue(ref);
@@ -876,6 +889,16 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function enumerator(){
         return new $Enumerator(this.keys);
+      },
+      function iterator(){
+        // TODO make this less wasteful
+        var self = this;
+        return new $InternalFunction(function(){
+          return new $ModuleIterator(self);
+        });
+      },
+      function Iterate(){
+        return this.iterator().Call(undefined, []);
       },
       function GetInheritance(){
         return null;
@@ -927,7 +950,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this.keys;
       },
       function OwnPropertyKeys(){
-        return this.keys;
+        return this.keys.concat(symbols.iterator);
       },
       function Enumerate(){
         return this.keys;
@@ -963,6 +986,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       },
       function get(key){
+        if (key === symbols.iterator) {
+          return this.iterator();
+        }
+
         return this.props[key];
       }
     ]);
@@ -1987,33 +2014,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       _MapInitialization: CollectionInitializer(MapData, 'Map'),
       _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
-      EvaluateModule: function(loader, source, name, callback, errback){
-        if (!callback && !errback) {
-          var result, thrown;
-
-          realm.evaluateModule(loader, source, name,
-            function(module){ result = module },
-            function(error){ result = error; thrown = true; }
-          );
-
-          return thrown ? new AbruptCompletion('throw', result) : result;
-        } else {
-          realm.evaluateModule(loader, source, name, wrapFunction(callback), wrapFunction(errback));
-        }
-      },
-      _ToModule: function(obj, args){
-        if (args[0].BuiltinBrand === 'BuiltinModule') {
-          return args[0];
-        }
-        return new $Module(args[0], args[0].Enumerate(false, false));
-      },
-      _Fetch: function(obj, args){
-        var result = require('./builtins')[args[0]];
-        if (!result) {
-          result = new $Error('Error', undefined, 'Unable to locate module "'+args[0]+'"');
-        }
-        args[1].Call(undefined, [result]);
-      }
     });
 
     function deliverChangeRecordsAndReportErrors(){
@@ -2163,8 +2163,46 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           return new $Array(props);
         },
+        $$EvaluateModule: function(_, args){
+          var loader = args[0],
+              source = args[1],
+              mrl    = args[2];
+
+          var result, thrown;
+
+          realm.evaluateModule(loader, source, mrl,
+            function(module){ result = module },
+            function(error){ result = error; thrown = true; }
+          );
+
+          return thrown ? new AbruptCompletion('throw', result) : result;
+        },
+        $$EvaluateModuleAsync: function(_, args){
+          var loader   = args[0],
+              source   = args[1],
+              mrl      = args[2],
+              callback = args[3],
+              errback  = args[4];
+
+          realm.evaluateModule(loader, source, mrl, wrapFunction(callback), wrapFunction(errback));
+        },
         $$Exception: function(_, args){
-          return $$MakeException(args[0], args[1] ? args[1].array : []);
+          var type    = args[0],
+              details = args[1];
+
+          return $$MakeException(type, details ? details.array : []);
+        },
+        $$Fetch: function(_, args){
+          var mrl      = args[0],
+              callback = args[1];
+
+          var result = require('./builtins')[mrl];
+
+          if (!result) {
+            result = new $Error('Error', undefined, 'Unable to locate module "'+mrl+'"');
+          }
+
+          callback.Call(undefined, [result]);
         },
         $$Get: function(_, args){
           var obj = args[0],
@@ -2228,6 +2266,38 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
           return null;
         },
+        $$Resolve: (function(){
+          if (require('path')) {
+            var resolve = require('path').resolve;
+
+            return function(_, args){
+              var baseURL = args[0],
+                  relURL  = args[1];
+
+              return resolve(baseURL, relURL);
+            };
+          }
+
+          return function(_, args){
+            var baseURL = args[0],
+                relURL  = args[1];
+
+            var base = baseURL.split('/'),
+                to   = relURL.split('/');
+
+            base.length--;
+
+            for (var i=0; i < to.length; i++) {
+              if (to[i] === '..') {
+                base.length--;
+              } else if (to[i] !== '.') {
+                base[base.length] = to[i];
+              }
+            }
+
+            return base.join('/');
+          };
+        })(),
         $$Set: function(_, args){
           var val = args[2];
 
@@ -2242,6 +2312,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$StringToNumber: function(_, args){
           return +args[0];
+        },
+        $$ToModule: function(_, args){
+          var obj = args[0];
+
+          return new $Module(obj, obj.Enumerate(false, false));
         }
       });
     }();
