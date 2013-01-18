@@ -141,15 +141,14 @@ export function Type(value){
 // ### 8.2.3 The Completion Record Specification Type ###
 // ######################################################
 
-const empty = $$CreateInternalObject();
 
 const CompletionRecord = $$CreateInternalObject();
 $$Set(CompletionRecord, '_type', 'CompletionRecord');
 $$Set(CompletionRecord, 'type', 'normal');
 $$Set(CompletionRecord, 'value', undefined);
-$$Set(CompletionRecord, 'target', empty);
+$$Set(CompletionRecord, 'target', MISSING);
 
-export function createCompletionRecord(type, value, target = empty){
+export function createCompletionRecord(type, value, target = MISSING){
   const completion = $$CreateInternalObject(CompletionRecord);
   $$Set(completion, 'type', type);
   $$Set(completion, 'value', value);
@@ -225,13 +224,13 @@ $$Set(Descriptor, 'Value', MISSING);
 $$Set(Descriptor, 'Set', MISSING);
 $$Set(Descriptor, 'Get', MISSING);
 
-const defaults = $$CreateInternalObject(Descriptor);
-$$Set(defaults, 'Configurable', false);
-$$Set(defaults, 'Enumerable', false);
-$$Set(defaults, 'Writable', false);
-$$Set(defaults, 'Value', undefined);
-$$Set(defaults, 'Set', undefined);
-$$Set(defaults, 'Get', undefined);
+const descriptorDefaults = $$CreateInternalObject(Descriptor);
+$$Set(descriptorDefaults, 'Configurable', false);
+$$Set(descriptorDefaults, 'Enumerable', false);
+$$Set(descriptorDefaults, 'Writable', false);
+$$Set(descriptorDefaults, 'Value', undefined);
+$$Set(descriptorDefaults, 'Set', undefined);
+$$Set(descriptorDefaults, 'Get', undefined);
 
 // Data Descriptors
 const DataDescriptor = $$CreateInternalObject(Descriptor);
@@ -313,17 +312,17 @@ function defineNormal(obj, key, value){
   return result;
 }
 
+function isMissing(Desc, field){
+  return $$Get(Desc, field) === MISSING;
+}
+
 
 // ################################
 // # 8.2.5.1 IsAccessorDescriptor #
 // ################################
 
-function isMissing(Desc, field){
-  return $$Get(Desc, 'Get') === MISSING;
-}
-
 export function IsAccessorDescriptor(Desc){
-  return Desc !== undefined && !isMissing(Desc, 'Get') || !isMissing(Desc, 'Set');
+  return Desc !== undefined && $$Get(Desc, 'Get') !== MISSING || $$Get(Desc, 'Set') !== MISSING;
 }
 
 // ################################
@@ -331,7 +330,7 @@ export function IsAccessorDescriptor(Desc){
 // ################################
 
 export function IsDataDescriptor(Desc){
-  return Desc !== undefined && !isMissing(Desc, 'Value') || !isMissing(Desc, 'Writable');
+  return Desc !== undefined && $$Get(Desc, 'Value') !== MISSING || $$Get(Desc, 'Writable') !== MISSING;
 }
 
 // ###############################
@@ -339,7 +338,7 @@ export function IsDataDescriptor(Desc){
 // ###############################
 
 export function IsGenericDescriptor(Desc){
-  return Desc !== undefined && !(IsAccessorDescriptor(Desc) || IsDataDescriptor(Desc));
+  return Desc !== undefined && !IsAccessorDescriptor(Desc) && !IsDataDescriptor(Desc);
 }
 
 // ##################################
@@ -388,35 +387,33 @@ export function FromPropertyDescriptor(Desc){
 // # 8.2.5.5 ToPropertyDescriptor #
 // ################################
 
-function getOrMissing(Obj, key){
-  return HasProperty(Obj, key) ? Get(Obj, key) : MISSING;
-}
-
 export function ToPropertyDescriptor(Obj){
   if (Type(Obj) !== 'Object') {
-    throw $$Exception(); // TODO
+    throw $$Exception(); // TODO desc must be object
   }
 
-  let enumerable   = getOrMissing(Obj, 'enumerable'),
-      configurable = getOrMissing(Obj, 'configurable'),
-      value        = getOrMissing(Obj, 'value'),
-      writable     = getOrMissing(Obj, 'writable'),
-      getter       = getOrMissing(Obj, 'get'),
-      setter       = getOrMissing(Obj, 'set');
+  const enumerable   = HasProperty(Obj, 'enumerable')   ? Get(Obj, 'enumerable')   : MISSING,
+        configurable = HasProperty(Obj, 'configurable') ? Get(Obj, 'configurable') : MISSING,
+        value        = HasProperty(Obj, 'value')        ? Get(Obj, 'value')        : MISSING,
+        writable     = HasProperty(Obj, 'writable')     ? Get(Obj, 'writable')     : MISSING,
+        getter       = HasProperty(Obj, 'get')          ? Get(Obj, 'get')          : MISSING,
+        setter       = HasProperty(Obj, 'set')          ? Get(Obj, 'set')          : MISSING;
+
+  let desc;
 
   if (getter !== MISSING || setter !== MISSING) {
     if (value !== MISSING || writable !== MISSING) {
-      throw $$Exception(); // TODO
+      throw $$Exception(); // TODO accessor + data
     }
     if (getter !== MISSING && getter !== undefined && !IsCallable(getter)) {
-      throw $$Exception(); // TODO
+      throw $$Exception(); // TODO non-callable getter
     }
     if (setter !== MISSING && setter !== undefined && !IsCallable(setter)) {
-      throw $$Exception(); // TODO
+      throw $$Exception(); // TODO non-callable setter
     }
-    var desc = createAccessorDescriptor(get, set, enumerable, configurable);
+    desc = createAccessorDescriptor(get, set, enumerable, configurable);
   } else {
-    var desc = createDataDescriptor(value, writable, enumerable, configurable);
+    desc = createDataDescriptor(value, writable, enumerable, configurable);
   }
 
   $$Set(desc, 'Origin', obj);
@@ -434,15 +431,11 @@ function copy(Desc, LikeDesc, field){
   }
 }
 
-export function CompletePropertyDescriptor(Desc, LikeDesc){
-  $$Assert(LikeDesc === undefined || $$Get(LikeDesc, '_type') === 'Descriptor');
+export function CompletePropertyDescriptor(Desc, LikeDesc = descriptorDefaults){
+  $$Assert($$Get(LikeDesc, '_type') === 'Descriptor');
   $$Assert($$Get(Desc, '_type') === 'Descriptor');
 
-  if (LikeDesc === undefined) {
-    LikeDesc = defaults;
-  }
-
-  if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {
+  if (IsDataDescriptor(Desc) || IsGenericDescriptor(Desc)) {
     copy(Desc, LikeDesc, 'Value');
     copy(Desc, LikeDesc, 'Writable');
   } else {
