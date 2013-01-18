@@ -152,7 +152,7 @@ internalFunction(ensureDescriptor);
 
 
 function ensureArgs(o, name){
-  const brand = $__GetBuiltinBrand(o);
+  const brand = $__Type(o) === 'Object' ? $__GetBuiltinBrand(o) : null;
 
   if (brand === 'BuiltinArguments') {
     return [...o];
