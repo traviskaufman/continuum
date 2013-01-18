@@ -112,7 +112,7 @@ function stringMatch(string, regexp){
   regexp.lastIndex = 0;
 
   while (lastMatch) {
-    let result = $__RegExpExec(regexp, string);
+    const result = $__RegExpExec(regexp, string);
     if (result === null) {
       lastMatch = false;
     } else {
@@ -130,13 +130,6 @@ function stringMatch(string, regexp){
 }
 
 internalFunction(stringMatch);
-
-
-function useHost(value, method){
-  return $$Invoke(ensureCoercible(value, method), method);
-}
-
-internalFunction(useHost);
 
 
 
@@ -562,4 +555,4 @@ const internalMethods = {
 
     return $$Call(describe, this, key);
   }
-}
+};
