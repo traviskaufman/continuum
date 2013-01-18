@@ -1,19 +1,47 @@
+import {
+  call,
+  extend,
+  hasBrand,
+  setTag
+} from '@@utilities';
+
+import {
+  $$Get,
+  $$Exception,
+  $$Set
+} from '@@internals';
+
+import {
+  ToNumber,
+  ToString
+} from '@@operations';
+
+import {
+  Type
+} from '@@types';
+
+import {
+  add,
+  has,
+  Set
+} from '@set';
+
 let ReplacerFunction, PropertyList, stack, indent, gap;
 
 function J(value){
-  if (stack.has(value)) {
-    throw $__Exception('circular_structure', []);
+  if (has(stack, value)) {
+    throw $$Exception('circular_structure', []);
   }
 
   const stepback = indent,
-        partial = [];
+        partial  = [];
 
-  var brackets;
+  let brackets;
 
   indent += gap;
-  stack.add(value);
+  add(stack, value);
 
-  if ($__GetBuiltinBrand(value) === 'Array') {
+  if (hasBrand(value, 'BuiltinArray')) {
     brackets = ['[', ']'];
 
     for (var i=0, len = value.length; i < len; i++) {
@@ -21,55 +49,57 @@ function J(value){
       partial[i] = prop === undefined ? 'null' : prop;
     }
   } else {
-    var keys = PropertyList || $__Enumerate(value, false, true),
-        colon = gap ? ': ' : ':';
+    const keys  = PropertyList || $__Enumerate(value, false, true),
+          colon = gap ? ': ' : ':';
 
     brackets = ['{', '}'];
 
     for (var i=0, len=keys.length; i < len; i++) {
-      var prop = Str(keys[i], value);
+      const prop = Str(keys[i], value);
       if (prop !== undefined) {
         partial.push($__Quote(keys[i]) + colon + prop);
       }
     }
   }
 
-  var final;
+  let final;
   if (!partial.length) {
-    final = brackets[0] + brackets[1];
+    final = '';
   } else if (!gap) {
-    final = brackets[0] + partial.join(',') + brackets[1];
+    final = partial.join(',');
   } else {
-    final = brackets[0] + '\n' + indent + partial.join(',\n' + indent) + '\n' + stepback + brackets[1];
+    final = '\n' + indent + partial.join(',\n' + indent) + '\n' + stepback;
   }
+
   stack.delete(value);
   indent = stepback;
-  return final;
+  return brackets[0] + final + brackets[1];
 }
 
 internalFunction(J);
 
 function Str(key, holder){
-  var value = holder[key];
-  if ($__Type(value) === 'Object') {
-    var toJSON = value.toJSON;
+  let value = holder[key];
+
+  if (Type(value) === 'Object') {
+    const toJSON = value.toJSON;
     if (typeof toJSON === 'function') {
-      value = $__Call(toJSON, value, [key]);
+      value = call(toJSON, value, [key]);
     }
   }
 
   if (ReplacerFunction) {
-    value = $__Call(ReplacerFunction, holder, [key, value]);
+    value = call(ReplacerFunction, holder, [key, value]);
   }
 
-  if ($__Type(value) === 'Object') {
-    var brand = $__GetBuiltinBrand(value);
-    if (brand === 'Number') {
-      value = $__ToNumber(value);
-    } else if (brand === 'String') {
-      value = $__ToString(value);
-    } else if (brand === 'Boolean') {
-      value = value.@@BooleanValue;
+  if (Type(value) === 'Object') {
+    const brand = $$Get(value, 'BuiltinBrand');
+    if (brand === 'NumberWrapper') {
+      value = $$Get(value, 'NumberValue');
+    } else if (brand === 'StringWrapper') {
+      value = $$Get(value, 'StringValue');
+    } else if (brand === 'BooleanWrapper') {
+      value = $$Get(value, 'BooleanValue');
     }
   }
 
@@ -82,15 +112,14 @@ function Str(key, holder){
     return 'false';
   }
 
-  var type = typeof value;
-  if (type === 'string') {
+  const type = Type(value);
+  if (type === 'String') {
     return $__Quote(value);
-  } else if (type === 'number') {
-    return value !== value || value === Infinity || value === -Infinity ? 'null' : '' + value;
-  } else if (type === 'object') {
+  } else if (type === 'Number') {
+    return isNaN(value) || value === Infinity || value === -Infinity ? 'null' : ToString(value);
+  } else if (type === 'Object') {
     return J(value);
   }
-
 }
 
 internalFunction(Str);
@@ -101,29 +130,29 @@ export function stringify(value, replacer, space){
   stack = new Set;
   indent = '';
 
-  if ($__Type(replacer) === 'Object') {
+  if (Type(replacer) === 'Object') {
     if (typeof replacer === 'function') {
       ReplacerFunction = replacer;
-    } else if ($__GetBuiltinBrand(replacer) === 'Array') {
+    } else if (hasBrand(replacer, 'BuiltinArray')) {
       let props = new Set;
 
       for (let value of replacer) {
-        var item,
-            type = $__Type(value);
+        const type = Type(value);
+        let item;
 
         if (type === 'String') {
           item = value;
         } else if (type === 'Number') {
-          item = $__ToString(value);
+          item = ToString(value);
         } else if (type === 'Object') {
-          let brand = $__GetBuiltinBrand(value);
+          const brand = $$Get(value, 'BuiltinBrand');
           if (brand === 'String' || brand === 'Number') {
-            item = $__ToString(value);
+            item = ToString(value);
           }
         }
 
         if (item !== undefined) {
-          props.add(item);
+          add(props, item);
         }
       }
 
@@ -131,13 +160,13 @@ export function stringify(value, replacer, space){
     }
   }
 
-  if ($__Type(space) === 'Object') {
-    space = $__ToString(space);
+  if (Type(space) === 'Object') {
+    space = ToString(space);
   }
 
-  if ($__Type(space) === 'String') {
+  if (Type(space) === 'String') {
     gap = $__StringSlice(space, 0, 10);
-  } else if ($__Type(space) === 'Number') {
+  } else if (Type(space) === 'Number') {
     space |= 0;
     space = space > 10 ? 10 : space < 1 ? 0 : space
     gap = ' '.repeat(space);
@@ -154,7 +183,7 @@ export function parse(source, reviver){
 
 
 
-export let JSON = {};
+export const JSON = {};
 extend(JSON, { stringify, parse });
-$__SetBuiltinBrand(JSON, 'BuiltinJSON');
-$__define(JSON, @@toStringTag, 'JSON');
+$$Set(JSON, 'BuiltinBrand', 'BuiltinJSON');
+setTag(JSON, 'JSON');
