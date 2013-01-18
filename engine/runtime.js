@@ -1810,6 +1810,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
+  var timers = create(null);
 
   var Realm = (function(){
     function wrapFunction(f){
@@ -1957,6 +1958,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         String  : createString
       };
 
+      var timerId = Math.random() * 1000000 << 10;
+
+      var now = Date.now || function(){ return +new Date };
 
       internalModules.set('@@internals', {
         $$ArgumentCount: function(){
@@ -2019,6 +2023,24 @@ var runtime = (function(GLOBAL, exports, undefined){
             return context.caller.isConstruct;
           }
           return false;
+        },
+        $$ClearImmediate: function(_, args){
+          var id = args[0];
+          var func = timers[id];
+
+          if (func) {
+            func.Realm.queue[func.queueIndex] = null;
+            timers[id] = null;
+            func.queueIndex = undefined;
+            func.timerId = undefined;
+          }
+        },
+        $$ClearTimer: function(_, args){
+          var id = args[0];
+
+          if (timers[id]) {
+            timers[id] = null;
+          }
         },
         $$CreateObject: function(_, args){
           return new objectTypes[args[0]](args[1]);
@@ -2140,9 +2162,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$IsConstruct: function(){
           return context.isConstruct;
         },
-        $$Now: Date.now
-          ? Date.now
-          : function(){ return +new Date },
+        $$Now: now,
         $$NumberToString: function(_, args){
           return args[0].toString(args[1] || 10);
         },
@@ -2199,6 +2219,47 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           return args[0][args[1]] = val;
+        },
+        $$SetTimer: function(_, args){
+          var func   = args[0],
+              time   = args[1],
+              repeat = args[2];
+
+          var id    = timerId++,
+              start = now();
+
+          timers[id] = setTimeout(function trigger(){
+            if (timers[id]) {
+              func.Call(realm.global, []);
+
+              var curr   = now(),
+                  excess = curr - start - time;
+
+              start = curr;
+              timers[id] = repeat ? setTimeout(trigger, time - excess) : null;
+
+              deliverChangeRecordsAndReportErrors();
+            }
+
+            if (!repeat || !timers[id]) {
+              func = null;
+            }
+          }, time);
+
+          return id;
+        },
+        $$SetImmediate: function(_, args){
+          var func = args[0];
+
+          if (func.timerId == null) {
+            var queue = func.Realm.queue;
+            func.queueIndex = queue.length;
+            func.timerId = timerId++;
+            queue[queue.length] = func;
+            timers[func.timerId] = func;
+          }
+
+          return func.timerId;
         },
         $$SetIntrinsic: function(_, args){
           realm.intrinsics[args[0]] = args[1];
@@ -2415,7 +2476,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function runScript(realm, script, Ω, ƒ){
       var scope = realm.globalEnv,
-          ctx = new ExecutionContext(context, scope, realm, script.bytecode);
+          ctx   = new ExecutionContext(context, scope, realm, script.bytecode);
 
       ExecutionContext.push(ctx);
       var status = $$TopLevelDeclarationInstantiation(script.bytecode);
@@ -2468,8 +2529,10 @@ var runtime = (function(GLOBAL, exports, undefined){
         } else {
           Ω(result);
         }
+        runQueue(realm);
       }, function(errors){
         each(errors, ƒ);
+        runQueue(realm);
       });
     }
 
@@ -2495,6 +2558,21 @@ var runtime = (function(GLOBAL, exports, undefined){
       }, ƒ);
     }
 
+    function runQueue(realm){
+      if (realm.queue.length) {
+        for (var i=0; i < realm.queue.length; i++) {
+          var func = realm.queue[i];
+          if (func) {
+            timers[func.timerId] = null;
+            func.timerId = undefined;
+            func.queueIndex = undefined;
+            func.Call(realm.global, []);
+          }
+        }
+        realm.queue.length = 0;
+      }
+    }
+
 
     function Realm(oncomplete){
       var self = this;
@@ -2506,6 +2584,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.initialized   = false;
       this.mutationScope = null;
       this.scripts       = [];
+      this.queue         = [];
       this.templates     = {};
       this.state         = 'bootstrapping';
 
@@ -2625,6 +2704,9 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         var result = prepareToRun(script.bytecode, this.globalEnv) || run(this, script.bytecode);
         this.emit(result && result.Abrupt ? 'throw' : 'complete', result);
+
+        runQueue(this);
+
         return result;
       },
       function useConsole(console){

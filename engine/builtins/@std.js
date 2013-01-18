@@ -17,8 +17,10 @@ import { escape,
          unescape } from '@globals';
 
 
-import { clearInterval,
+import { clearImmediate,
+         clearInterval,
          clearTimeout,
+         setImmediate,
          setInterval,
          setTimeout } from '@timers';
 
@@ -75,7 +77,8 @@ export Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, 
        Error, EvalError, RangeError, ReferenceError, SyntaxError, TypeError, URIError,
        ArrayBuffer, DataView, Float32Array, Float64Array, Int16Array,
        Int32Array, Int8Array, Uint16Array, Uint32Array, Uint8Array,
-       clearInterval, clearTimeout, decodeURI, decodeURIComponent, escape, encodeURI, encodeURIComponent,
-       eval, isFinite, isNaN, parseFloat, parseInt, setInterval, setTimeout, unescape,
+       clearImmediate, clearInterval, clearTimeout, setImmediate, setInterval, setTimeout,
+       decodeURI, decodeURIComponent, escape, encodeURI, encodeURIComponent,
+       eval, isFinite, isNaN, parseFloat, parseInt, unescape,
        console, StopIteration, JSON, Math,
        NaN, Infinity, undefined;

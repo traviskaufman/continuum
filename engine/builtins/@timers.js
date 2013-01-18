@@ -1,36 +1,73 @@
+import {
+  ToInteger,
+  ToString
+} from '@@operations';
+
+import {
+  builtinFunction
+} from '@@utilities';
+
+import {
+  $$ClearImmediate,
+  $$ClearTimer,
+  $$SetImmediate,
+  $$SetTimer
+} from '@@internals';
+
+import {
+  Function
+} from '@function';
+
+
+export function clearImmediate(id){
+  $$ClearImmediate(ToInteger(id));
+}
+
+builtinFunction(clearImmediate);
+
+
 export function clearInterval(id){
-  id = $__ToInteger(id);
-  $__ClearTimer(id);
+  $$ClearTimer(ToInteger(id));
 }
 
 builtinFunction(clearInterval);
 
 
 export function clearTimeout(id){
-  id = $__ToInteger(id);
-  $__ClearTimer(id);
+  $$ClearTimer(ToInteger(id));
 }
 
 builtinFunction(clearTimeout);
 
 
-export function setInterval(callback, milliseconds){
-  milliseconds = $__ToInteger(milliseconds);
+export function setImmediate(callback){
   if (typeof callback !== 'function') {
-    callback = $__ToString(callback);
+    callback = new Function(ToString(callback));
   }
-  return $__SetTimer(callback, milliseconds, true);
+
+  return $$SetImmediate(callback);
+}
+
+builtinFunction(setImmediate);
+
+
+export function setInterval(callback, milliseconds){
+  if (typeof callback !== 'function') {
+    callback = new Function(ToString(callback));
+  }
+
+  return $$SetTimer(callback, ToInteger(milliseconds), true);
 }
 
 builtinFunction(setInterval);
 
 
 export function setTimeout(callback, milliseconds){
-  milliseconds = $__ToInteger(milliseconds);
   if (typeof callback !== 'function') {
-    callback = $__ToString(callback);
+    callback = new Function(ToString(callback));
   }
-  return $__SetTimer(callback, milliseconds, false);
+
+  return $$SetTimer(callback, ToInteger(milliseconds), false);
 }
 
 builtinFunction(setTimeout);
