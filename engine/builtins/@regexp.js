@@ -1,48 +1,62 @@
-function isRegExp(o){
-  return $__Type(o) === 'Object' && $__GetBuiltinBrand(o) === 'BuiltinRegExp';
-}
+import {
+  Type
+} from '@@types';
+
+import {
+  ToString
+} from '@@operations';
+
+import {
+  //builtinClass,
+  builtinFunction,
+  hasBrand
+} from '@@utilities';
+
+import {
+  $$Exception
+} from '@@internals';
+
 
 export class RegExp {
   constructor(pattern, flags){
     if ($__isConstruct()) {
       if (pattern === undefined) {
         pattern = '';
-      } else if (typeof pattern === 'string') {
-      } else if (isRegExp(pattern)) {
+      } else if (hasBrand(pattern, 'BuiltinRegExp')) {
         if (flags !== undefined) {
-          throw $__Exception('regexp_flags', []);
+          throw $$Exception('regexp_flags', []);
         }
       } else {
-        pattern = $__ToString(pattern);
+        pattern = ToString(pattern);
       }
-      return $__RegExpCreate(pattern, flags);
-    } else {
-      if (flags === undefined && isRegExp(pattern)) {
-        return pattern;
-      }
-      return $__RegExpCreate(pattern, flags);
+    } else if (flags === undefined && hasBrand(pattern, 'BuiltinRegExp')) {
+      return pattern;
     }
+    return $__RegExpCreate(pattern, flags);
   }
 
   exec(string){
-    if (isRegExp(this)) {
-      return $__RegExpExec(this, $__ToString(string));
+    if (hasBrand(this, 'BuiltinRegExp')) {
+      return $__RegExpExec(this, ToString(string));
     }
-    throw $__Exception('not_generic', ['RegExp.prototype.exec']);
+
+    throw $$Exception('not_generic', ['RegExp.prototype.exec']);
   }
 
   test(string){
-    if (isRegExp(this)) {
-      return $__RegExpTest(this, $__ToString(string));
+    if (hasBrand(this, 'BuiltinRegExp')) {
+      return $__RegExpTest(this, ToString(string));
     }
-    throw $__Exception('not_generic', ['RegExp.prototype.test']);
+
+    throw $$Exception('not_generic', ['RegExp.prototype.test']);
   }
 
   toString(){
-    if (isRegExp(this)) {
+    if (hasBrand(this, 'BuiltinRegExp')) {
       return $__RegExpToString(this);
     }
-    throw $__Exception('not_generic', ['RegExp.prototype.toString']);
+
+    throw $$Exception('not_generic', ['RegExp.prototype.toString']);
   }
 }
 
@@ -50,20 +64,20 @@ builtinClass(RegExp);
 
 
 export function exec(regexp, string){
-  if (isRegExp(regexp)) {
-    return $__RegExpExec(regexp, $__ToString(string));
+  if (hasBrand(regexp, 'BuiltinRegExp')) {
+    return $__RegExpExec(regexp, ToString(string));
   }
-  throw $__Exception('not_generic', ['@regexp.exec']);
+  throw $$Exception('not_generic', ['@regexp.exec']);
 }
 
 builtinFunction(exec);
 
 
 export function test(regexp, string){
-  if (isRegExp(regexp)) {
-    return $__RegExpTest(regexp, [$__ToString(string)]);
+  if (hasBrand(regexp, 'BuiltinRegExp')) {
+    return $__RegExpTest(regexp, [ToString(string)]);
   }
-  throw $__Exception('not_generic', ['@regexp.test']);
+  throw $$Exception('not_generic', ['@regexp.test']);
 }
 
 builtinFunction(test);
