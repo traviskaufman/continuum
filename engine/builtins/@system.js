@@ -8,11 +8,20 @@ import {
 } from '@@types';
 
 import {
+  builtinFunction,
+  define,
   hasBrand
 } from '@@utilities';
 
 import {
-  $$Set
+  $$CurrentRealm,
+  $$EvaluateModule,
+  $$EvaluateModuleAsync,
+  $$Fetch,
+  $$GetIntrinsic,
+  $$Set,
+  $$SetIntrinsic,
+  $$ToModule
 } from '@@internals';
 
 
@@ -35,7 +44,7 @@ class Request {
       translated = '"use strict";\n' + translated;
     }
 
-    $__EvaluateModule(loader, translated, this.@resolved, module => {
+    $$EvaluateModuleAsync(loader, translated, this.@resolved, module => {
       $$Set(module, 'loader', loader);
       $$Set(module, 'resolved', this.@resolved);
       $$Set(module, 'mrl', this.@mrl);
@@ -75,12 +84,12 @@ export class Loader {
     this.@strict  = true;
     this.@modules = ObjectCreate(null);
     this.@options = ToObject(options);
-    this.@parent  = parent && parent.@options ? parent : System || {};
+    this.@parent  = parent && parent.@options ? parent : typeof System === 'undefined' ? {} : System;
     this.linkedTo = this.@options.linkedTo || null;
   }
 
   get global(){
-    return this.@options.global || this.@parent.global || $__global;
+    return this.@options.global || this.@parent.global || $$GetIntrinsic('global');
   }
 
   get baseURL(){
@@ -110,16 +119,19 @@ export class Loader {
     }
   }
 
-  eval(src){
-    return $__EvaluateModule(this, src);
+  // TODO feedback: Loader#eval needs an optional? name/mrl parameter
+  eval(src, mrl = ''){
+    return $$EvaluateModule(this, src, mrl);
   }
 
-  evalAsync(src, callback, errback){
-    $__EvaluateModule(this, src, callback, errback);
+  // TODO feedback: Loader#evalAsync needs an optional? name/mrl parameter
+  evalAsync(src, callback, errback, mrl = ''){
+    $$EvaluateModuleAsync(this, src, mrl, callback, errback);
   }
 
   get(mrl){
     const canonical = (this.@resolve)(mrl, this.baseURL);
+
     return this.@modules[canonical];
   }
 
@@ -129,8 +141,8 @@ export class Loader {
     if (typeof canonical === 'string') {
       this.@modules[canonical] = mod;
     } else if (Type(canonical) === 'Object') {
-      for (var key in canonical) {
-        this.@modules[key] = canonical[key];
+      for (let mrl in canonical) {
+        this.@modules[mrl] = canonical[mrl];
       }
     }
   }
@@ -141,7 +153,7 @@ export class Loader {
                    writable: true,
                    value: undefined };
 
-    for (var key in std) {
+    for (let key in std) {
       desc.value = std[key];
       $__DefineOwnProperty(object, key, desc);
     }
@@ -150,28 +162,30 @@ export class Loader {
   }
 }
 
-export function Module(object, mrl){
+
+// TODO feedback: Module needs an optional? name/mrl parameter
+export function Module(object, mrl = ''){
   object = ToObject(object);
 
   if (hasBrand(object, 'BuiltinModule')) {
     return object;
   }
 
-  const module = $__ToModule(object);
+  const module = $$ToModule(object);
   $$Set(module, 'loader', System);
-  $$Set(module, 'resolved', mrl || '');
-  $$Set(module, 'mrl', mrl || '');
+  $$Set(module, 'resolved', mrl);
+  $$Set(module, 'mrl', mrl);
   return module;
 }
 
 builtinFunction(Module);
 
 
-export var System = new Loader(null, {
-  global: $__global,
+export const System = new Loader(null, {
+  global: $$GetIntrinsic('global'),
   baseURL: '',
   fetch(relURL, baseURL, request, resolved) {
-    var fetcher = resolved[0] === '@' ? $__Fetch : $__readFile;
+    const fetcher = resolved[0] === '@' ? $$Fetch : $__readFile;
 
     fetcher(resolved, src => {
       if (typeof src === 'string') {
@@ -182,32 +196,40 @@ export var System = new Loader(null, {
     });
   },
   resolve(relURL, baseURL){
-    return relURL[0] === '@' ? relURL : $__resolve(baseURL, relURL);
+    return relURL[0] === '@' ? relURL : $$Resolve(baseURL, relURL);
   },
   translate(src, relURL, baseURL, resolved) {
     return src;
   }
 });
 
-$__SetDefaultLoader(System);
 
+const builtins = new Loader(System, { global: this });
+builtins.@strict = false;
+$$SetIntrinsic($$CurrentRealm(), 'internalLoader', builtins);
+$$Set($$CurrentRealm(), 'loader', System);
 
-const internalLoader = $__internalLoader = new Loader(System, { global: this });
-internalLoader.@strict = false;
-
-System.@modules['@system'] = internalLoader.@modules['@system'] = new Module({
+System.@modules['@system'] = builtins.@modules['@system'] = new Module({
   Module: Module,
   System: System,
   Loader: Loader
 }, '@system');
 
-const std = internalLoader.eval(`
+
+const std = builtins.eval(`
   module std = '@std';
   export std;
 `).std;
 
-for (let name in internalLoader.@modules) {
-  System.@modules[name] = internalLoader.@modules[name];
+
+for (let name in builtins.@modules) {
+  System.@modules[name] = builtins.@modules[name];
 }
 
-$__each(std, key => $__define($__global, key, std[key], Type(std[key]) === 'Object' ? HIDDEN : FROZEN));
+{
+  const global = $$GetIntrinsic('global');
+
+  for (let [key, val] of std) {
+    define(global, key, val, Type(val) === 'Object' ? HIDDEN : FROZEN);
+  }
+}
