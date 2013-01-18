@@ -13,6 +13,8 @@ import {
   builtinFunction,
   call,
   define,
+  ensureCallback,
+  ensureObject,
   hasBrand,
   internalFunction
 } from '@@utilities';
