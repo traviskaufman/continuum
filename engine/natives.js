@@ -283,125 +283,12 @@ var natives = (function(module){
     Exception: function(type, args){
       return $$MakeException(type, $$CreateListFromArray(args));
     },
-    _now: Date.now || function(){ return +new Date },
     _getWellKnownSymbol: function(_, args){
       return wellKnownSymbols[args[0]];
-    },
-    _promoteClass: function(obj, args){
-      var ctor = args[0],
-          prototype = ctor.Get('prototype');
-
-      function $Reflected(){
-        $Object.call(this, prototype);
-      }
-
-      $Reflected.prototype = define(create(prototype), {
-        Prototype: prototype,
-        properties: undefined,
-        storage: undefined,
-        id: undefined,
-        __introspected: undefined
-      });
-
-      ctor.Construct = function Construct(args){
-        var instance = new $Reflected;
-        var result = this.Call(instance, args, true);
-        return result !== null && typeof result === 'object' ? result : instance;
-      };
-
-      return ctor;
     },
     _createNil: function(){
       return new $Nil;
     },
-    _getHook: function(obj, args){
-      var hook = args[0][args[1]];
-      if (hook && hook.hooked === Hooked) {
-        return hook.callback;
-      }
-    },
-    _hasHook: function(obj, args){
-      var hook = args[0][args[1]];
-      return !!hook && hook.hooked === Hooked;
-    },
-    _setHook: function(obj, args){
-      var target = args[0],
-          type = args[1],
-          callback = args[2],
-          original = target[type];
-
-      if (type === 'describe') {
-        var forward = new $InternalFunction(function(_, args){
-          return new $Array(original.call(args[0], args[1]));
-        });
-
-        target.describe = function(key){
-          var result = callback.Call(this, [key]);
-          if (result instanceof $Array) {
-            return [result.get(0), result.get(1), result.get(2)];
-          }
-        };
-      } else if (type === 'each') {
-        var stack = new Stack;
-
-        var forward = new $InternalFunction(function(_, args){
-          return original.call(args[0], stack.top);
-        });
-
-        var proxy = [new $InternalFunction(function(obj, args){
-          var result = args[0];
-          if (result instanceof $Array) {
-            stack.top([result.get(0), result.get(1), result.get(2)]);
-          }
-        })];
-
-        target.each = function(callback){
-          stack.push(callback);
-          args[2].Call(this, proxy);
-          stack.pop();
-        };
-      } else if (type === 'define') {
-        var forward = new $InternalFunction(function(_, args){
-          return original.call(args[0], args[1], args[2], args[3]);
-        });
-
-        target.define = function(key, value, attr){
-          return callback.Call(this, [key, value, attr]);
-        };
-      } else if (type === 'get' || type === 'has' || type === 'remove' || type === 'query') {
-        var forward = new $InternalFunction(function(_, args){
-          return original.call(args[0], args[1]);
-        });
-
-        target[type] = function(key){
-          return callback.Call(this, [key]);
-        };
-      } else if (type === 'set' || type === 'update') {
-        var forward = new $InternalFunction(function(_, args){
-          return original.call(args[0], args[1], args[2]);
-        });
-
-        target[type] = function(key, value){
-          return callback.Call(this, [key, value]);
-        };
-      }
-
-      target[type].hooked = Hooked;
-      target[type].callback = callback;
-      return forward;
-    },
-    _removeHook: function(obj, args){
-      var target = args[0],
-          type = args[1],
-          hook = target[type];
-
-      if (hook && hook.hooked === Hooked) {
-        delete target[type];
-        return true;
-      }
-      return false;
-    },
-
     _FunctionToString: function(obj, args){
       obj = args[0];
       if (obj.Proxy) {
@@ -469,39 +356,6 @@ var natives = (function(module){
       return end === undefined ? str.slice(start) : str.slice(start, end);
     },
     FromCharCode: String.fromCharCode,
-    StringTrim: String.prototype.trim
-      ? function(str){ return str.trim() }
-      : (function(trimmer){
-        return function(str){
-          return str.replace(trimmer, '');
-        };
-      })(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/),
-
-    SetTimer: function(f, time, repeating){
-      if (typeof f === 'string') {
-        f = natives.get('FunctionCreate')(f);
-      }
-      var id = Math.random() * 1000000 << 10;
-      timers[id] = setTimeout(function trigger(){
-        if (timers[id]) {
-          f.Call(require('./runtime').global, []);
-          deliverChangeRecordsAndReportErrors();
-          if (repeating) {
-            timers[id] = setTimeout(trigger, time);
-          } else {
-            timers[id] = f = null;
-          }
-        } else {
-          f = null;
-        }
-      }, time);
-      return id;
-    },
-    ClearTimer: function(id){
-      if (timers[id]) {
-        timers[id] = null;
-      }
-    },
     JSONParse: function parse(source, reviver){
       function walk(holder, key){
         var value = holder.get(key);
