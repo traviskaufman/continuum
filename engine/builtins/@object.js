@@ -1,15 +1,53 @@
+import {
+  ToBoolean,
+  ToObject,
+  ToPropertyKey
+} from '@@operations';
+
+import {
+  //builtinClass,
+  builtinFunction,
+  ensureFunction,
+  ensureObject,
+  ensureProto,
+  extend,
+  query
+} from '@@utilities';
+
+import {
+  ObjectCreate,
+  Type
+} from '@@types';
+
+import {
+  $$Exception,
+  $$Has,
+  $$Invoke,
+  $$GetIntrinsic,
+  $$SetIntrinsic
+} from '@@internals';
+
+import {
+  toStringTag: @@toStringTag
+} from '@@symbols'
+
+import {
+  hasOwn
+} from '@reflect';
+
+
 export class Object {
   constructor(value){
-    return value == null ? {} : $__ToObject(value);
+    return value == null ? {} : ToObject(value);
   }
 
   hasOwnProperty(key){
-    return $__HasOwnProperty($__ToObject(this), $__ToPropertyKey(key));
+    return hasOwn(ToObject(this), key);
   }
 
   isPrototypeOf(object){
-    while ($__Type(object) === 'Object') {
-      object = $__GetInheritance(object);
+    while (Type(object) === 'Object') {
+      object = $$Invoke(object, 'GetInheritance');
       if (object === this) {
         return true;
       }
@@ -18,7 +56,7 @@ export class Object {
   }
 
   propertyIsEnumerable(key){
-    return $__ToBoolean($__query($__ToObject(this), key) & 1);
+    return ToBoolean(query(ToObject(this), key) & 1);
   }
 
   toLocaleString(){
@@ -31,35 +69,37 @@ export class Object {
     } else if (this === null) {
       return '[object Null]';
     }
-    return '[object ' + $__ToObject(this).@@toStringTag + ']';
+    return '[object ' + ToObject(this).@@toStringTag + ']';
   }
 
   valueOf(){
-    return $__ToObject(this);
+    return ToObject(this);
   }
 }
 
 builtinClass(Object);
 
-$__ObjectToString = Object.prototype.toString;
+$$SetIntrinsic('%ObjProto_toString%', Object.prototype.toString);
 
 
 export function assign(target, source){
   ensureObject(target, 'Object.assign');
-  source = $__ToObject(source);
+  source = ToObject(source);
+
   for (let [i, key] of $__Enumerate(source, false, true)) {
     const prop = source[key];
-    if (typeof prop === 'function' && $__get(prop, 'HomeObject')) {
+    if (typeof prop === 'function' && $$Has(prop, 'HomeObject')) {
       // TODO
     }
     target[key] = prop;
   }
+
   return target;
 }
 
 export function create(proto, properties){
   ensureProto(proto, 'Object.create');
-  const object = $__ObjectCreate(proto);
+  const object = ObjectCreate(proto);
 
   if (properties !== undefined) {
     ensureDescriptor(properties);
@@ -77,7 +117,7 @@ export function create(proto, properties){
 export function defineProperty(object, key, property){
   ensureObject(object, 'Object.defineProperty');
   ensureDescriptor(property);
-  $__DefineOwnProperty(object, $__ToPropertyKey(key), property);
+  $__DefineOwnProperty(object, ToPropertyKey(key), property);
   return object;
 }
 
@@ -109,7 +149,7 @@ export function freeze(object){
     }
   }
 
-  $__PreventExtensions(object);
+  $$Invoke(object, 'PreventExtensions');
   return object;
 }
 
@@ -117,7 +157,7 @@ $__freeze = freeze;
 
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
-  return $__GetOwnProperty(object, $__ToPropertyKey(key));
+  return $__GetOwnProperty(object, ToPropertyKey(key));
 }
 
 export function getOwnPropertyNames(object){
@@ -127,7 +167,7 @@ export function getOwnPropertyNames(object){
 
 export function getPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getPropertyDescriptor');
-  return $__GetProperty(object, $__ToPropertyKey(key));
+  return $__GetProperty(object, ToPropertyKey(key));
 }
 
 export function getPropertyNames(object){
@@ -137,7 +177,7 @@ export function getPropertyNames(object){
 
 export function getPrototypeOf(object){
   ensureObject(object, 'Object.getPrototypeOf');
-  return $__GetInheritance(object);
+  return $$Invoke(object, 'GetInheritance');
 }
 
 export function is(x, y){
@@ -150,12 +190,12 @@ export function isnt(x, y){
 
 export function isExtensible(object){
   ensureObject(object, 'Object.isExtensible');
-  return $__IsExtensible(object);
+  return $$Invoke(object, 'IsExtensible');
 }
 
 export function isFrozen(object){
   ensureObject(object, 'Object.isFrozen');
-  if ($__IsExtensible(object)) {
+  if ($$Invoke(object, 'IsExtensible')) {
     return false;
   }
 
@@ -173,7 +213,7 @@ export function isFrozen(object){
 
 export function isSealed(object){
   ensureObject(object, 'Object.isSealed');
-  if ($__IsExtensible(object)) {
+  if ($$Invoke(object, 'IsExtensible')) {
     return false;
   }
 
@@ -196,7 +236,7 @@ export function keys(object){
 
 export function preventExtensions(object){
   ensureObject(object, 'Object.preventExtensions');
-  $__PreventExtensions(object);
+  $$Invoke(object, 'PreventExtensions');
   return object;
 }
 
@@ -210,13 +250,13 @@ export function seal(object){
     $__DefineOwnProperty(object, props[i], desc);
   }
 
-  $__PreventExtensions(object);
+  $$Invoke(object, 'PreventExtensions');
   return object;
 }
 
 
 function getObservers(object){
-  return $__getInternal($__GetNotifier(object), 'ChangeObservers');
+  return $$GetInternal($__GetNotifier(object), 'ChangeObservers');
 }
 
 internalFunction(getObservers);
@@ -229,7 +269,7 @@ export function observe(object, callback){
   }
 
   $__AddObserver(getObservers(object), callback);
-  $__AddObserver($__ObserverCallbacks, callback);
+  $__AddObserver($$GetIntrinsic('ObserverCallbacks'), callback);
   return object;
 }
 
@@ -261,7 +301,7 @@ extend(Object, { assign, create, defineProperty, defineProperties, deliverChange
 
 export function isPrototypeOf(object, prototype){
   while (prototype) {
-    prototype = $__GetInheritance(prototype);
+    prototype = $$Invoke(prototype, 'GetInheritance');
     if (prototype === object) {
       return true;
     }
@@ -273,14 +313,14 @@ builtinFunction(isPrototypeOf);
 
 
 export function hasOwnProperty(object, key){
-  return $__HasOwnProperty($__ToObject(object), $__ToPropertyKeys(key));
+  return hasOwn(ToObject(object), key);
 }
 
 builtinFunction(hasOwnProperty);
 
 
 export function propertyIsEnumerable(object, key){
-  return $__ToBoolean($__query($__ToObject(object), key) & 1);
+  return ToBoolean(query(ToObject(object), key) & 1);
 }
 
 builtinFunction(propertyIsEnumerable);
