@@ -91,10 +91,6 @@ export function enumerate(obj, inherited, onlyEnumerable){
   return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));
 }
 
-function defineOwnPropertyInternal(obj, key, Desc){
-  return
-}
-
 export function deleteProperty(obj, key){
   return $$Invoke(obj, 'remove', key);
 }
