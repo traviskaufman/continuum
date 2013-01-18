@@ -90,7 +90,7 @@ export function call(func, receiver, args){
 }
 
 export function construct(func, args){
-  return $$Invoke(func, 'Call', args ? $$Get(args, 'array') : emptyList);
+  return $$Invoke(func, 'Construct', args ? $$Get(args, 'array') : emptyList);
 }
 
 
@@ -272,3 +272,67 @@ export function getIntrinsic(name){
 export function setTag(obj, tag){
   define(obj, toStringTag, tag);
 }
+
+
+
+
+
+export function ensureObject(o, name){
+  if (Type(o) !== 'Object') {
+    throw $$Exception('called_on_non_object', [name]);
+  }
+}
+
+internalFunction(ensureObject);
+
+
+export function ensureDescriptor(o){
+  if (o === null || typeof o !== 'object') {
+    throw $$Exception('property_desc_object', [Type(o)])
+  }
+}
+
+internalFunction(ensureDescriptor);
+
+
+export function ensureArgs(o, name){
+  const brand = Type(o) === 'Object' ? $$Get(o, 'BuiltinBrand') : null;
+
+  if (brand === 'BuiltinArguments') {
+    return [...o];
+  } else if (brand === 'BuiltinArray') {
+    return o;
+  }
+
+  throw $$Exception('apply_wrong_args', []);
+}
+
+internalFunction(ensureArgs);
+
+
+export function ensureFunction(o, name){
+  if (typeof o !== 'function') {
+    throw $$Exception('called_on_non_function', [name]);
+  }
+}
+
+internalFunction(ensureFunction);
+
+
+export function ensureCallback(o, name){
+  if (typeof o !== 'function') {
+    throw $$Exception('callback_must_be_callable', [name]);
+  }
+}
+
+internalFunction(ensureCallback);
+
+
+export function ensureProto(proto){
+  if (proto !== null && Type(proto) !== 'Object') {
+    throw $$Exception('proto_object_or_null', [])
+  }
+}
+
+internalFunction(ensureProto);
+
