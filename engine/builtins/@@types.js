@@ -14,10 +14,13 @@ import {
   $$Set
 } from '@@internals';
 
-import {
-  toBoolean
-} from '@@utilities';
 
+const MISSING = $$CreateInternalObject();
+
+const ENUMERABLE   = 0x1,
+      CONFIGURABLE = 0x2,
+      WRITABLE     = 0x4,
+      ACCESSOR     = 0x8;
 
 // #########################################
 // ##### 8.1 ECMAScript Language Types #####
@@ -28,8 +31,7 @@ import {
 // ### 8.1.1 The Undefined Type ###
 // ################################
 
-let und;
-export const undefined = und;
+export const undefined = void 0;
 
 
 // ###########################
@@ -68,58 +70,6 @@ export const Infinity = 1 / 0;
 // # 8.1.6.1 Property Attributes #
 // ###############################
 
-const descriptorTypes = $$CreateInternalObject();
-
-const Descriptor = $$CreateInternalObject();
-$$Set(Descriptor, '_type', 'Descriptor');
-$$Set(descriptorTypes, 'Descriptor', Descriptor);
-
-
-// Data Descriptors
-const DataDescriptor = $$CreateInternalObject(Descriptor);
-$$Set(DataDescriptor, '_type', 'DataDescriptor');
-$$Set(descriptorTypes, 'DataDescriptor', DataDescriptor);
-
-export function createDataDescriptor(value, writable, enumerable, configurable){
-  const desc = $$CreateInternalObject(DataDescriptor);
-  $$Set(desc, 'Configurable', configurable || false);
-  $$Set(desc, 'Enumerable', enumerable || false);
-  $$Set(desc, 'Writable', writable || false);
-  $$Set(desc, 'Value', value);
-  return desc;
-}
-
-// Accessor Descriptors
-const AccessorDescriptor = $$CreateInternalObject(Descriptor);
-$$Set(AccessorDescriptor, '_type', 'AccessorDescriptor');
-$$Set(descriptorTypes, 'AccessorDescriptor', AccessorDescriptor);
-
-export function createAccessorDescriptor(get, set, enumerable, configurable){
-  const desc = $$CreateInternalObject(AccessorDescriptor);
-  $$Set(desc, 'Configurable', configurable || false);
-  $$Set(desc, 'Enumerable', enumerable || false);
-  $$Set(desc, 'Set', set);
-  $$Set(desc, 'Get', get);
-  return desc;
-}
-
-export function copyDescriptor(desc){
-  const DescType = $$Get(descriptorTypes, $$Get(desc, '_type'));
-  const copy = $$CreateInternalObject(DescType);
-
-  $$Set(copy, 'Configurable', $$Get(desc, 'Configurable'));
-  $$Set(copy, 'Writable', $$Get(desc, 'Writable'));
-
-  if (DescType === DataDescriptor) {
-    $$Set(copy, 'Enumerable', $$Get(desc, 'Enumerable'));
-    $$Set(copy, 'Value', $$Get(desc, 'Value'));
-  } else if (DescType === AccessorDescriptor) {
-    $$Set(copy, 'Get', $$Get(desc, 'Get'));
-    $$Set(copy, 'Set', $$Get(desc, 'Set'));
-  }
-
-  return copy;
-}
 
 
 export function isPrimitive(value){
@@ -150,27 +100,6 @@ export function Type(value){
       return 'Boolean';
   }
 }
-
-function GetInheritance(){}
-function SetInheritance(){}
-function IsExtensible(){}
-function PreventExtensions(){}
-function HasOwnProperty(){}
-function GetOwnProperty(){}
-function GetP(){}
-function SetP(){}
-function Delete(){}
-function DefineOwnProperty(){}
-function Enumerate(){}
-function Keys(){}
-function OwnPropertyKeys(){}
-function Freeze(){}
-function Seal(){}
-function IsFrozen(){}
-function IsSealed(){}
-
-function Call(){}
-function Construct(){}
 
 
 
@@ -282,10 +211,250 @@ $$Set(Reference, 'strict', false);
 $$Set(Reference, 'thisValue', undefined);
 
 
+// ########################################################
+// ### 8.2.5 The Property Descriptor Specification Type ###
+// ########################################################
 
-// ##############################################
-// ### 8.3.18 ObjectCreate Abstract Operation ###
-// ##############################################
+
+const Descriptor = $$CreateInternalObject();
+$$Set(Descriptor, '_type', 'Descriptor');
+$$Set(Descriptor, 'Configurable', MISSING);
+$$Set(Descriptor, 'Enumerable', MISSING);
+$$Set(Descriptor, 'Writable', MISSING);
+$$Set(Descriptor, 'Value', MISSING);
+$$Set(Descriptor, 'Set', MISSING);
+$$Set(Descriptor, 'Get', MISSING);
+
+const defaults = $$CreateInternalObject(Descriptor);
+$$Set(defaults, 'Configurable', false);
+$$Set(defaults, 'Enumerable', false);
+$$Set(defaults, 'Writable', false);
+$$Set(defaults, 'Value', undefined);
+$$Set(defaults, 'Set', undefined);
+$$Set(defaults, 'Get', undefined);
+
+// Data Descriptors
+const DataDescriptor = $$CreateInternalObject(Descriptor);
+$$Set(DataDescriptor, '_attrs', 0);
+
+export function createDataDescriptor(value, writable, enumerable, configurable){
+  const desc = $$CreateInternalObject(DataDescriptor);
+  let attrs = 0;
+
+  if (configurable !== MISSING) {
+    if (configurable = !!(configurable)) {
+      attrs |= CONFIGURABLE;
+    }
+    $$Set(desc, 'Configurable', configurable);
+  }
+
+  if (enumerable !== MISSING) {
+    if (enumerable = !!(enumerable)) {
+      attrs |= ENUMERABLE;
+    }
+    $$Set(desc, 'Enumerable', !!(enumerable));
+  }
+
+  if (writable !== MISSING) {
+    if (writable = !!(writable)) {
+      writable |= WRITABLE;
+    }
+    $$Set(desc, 'Writable', !!(writable));
+  }
+
+  if (value !== MISSING) {
+    $$Set(desc, 'Value', value);
+  }
+
+  $$Set(desc, 'attrs', attrs);
+  return desc;
+}
+
+// Accessor Descriptors
+const AccessorDescriptor = $$CreateInternalObject(Descriptor);
+$$Set(DataDescriptor, '_attrs', ACCESSOR);
+
+export function createAccessorDescriptor(get, set, enumerable, configurable){
+  const desc = $$CreateInternalObject(AccessorDescriptor);
+  let attrs = ACCESSOR;
+
+  if (configurable !== MISSING) {
+    if (configurable = ToBoolean(configurable)) {
+      attrs |= CONFIGURABLE;
+    }
+    $$Set(desc, 'Configurable', configurable);
+  }
+
+  if (enumerable !== MISSING) {
+    if (enumerable = ToBoolean(enumerable)) {
+      attrs |= ENUMERABLE;
+    }
+    $$Set(desc, 'Enumerable', enumerable);
+  }
+
+  if (get !== MISSING) {
+    $$Set(desc, 'Set', get);
+  }
+
+  if (set !== MISSING) {
+    $$Set(desc, 'Get', set);
+  }
+
+  $$Set(desc, 'attrs', attrs);
+  return desc;
+}
+
+const normal = createDataDescriptor(undefined, true, true, true);
+
+function defineNormal(obj, key, value){
+  $$Set(normal, 'Value', value);
+  const result = OrdinaryDefineOwnProperty(obj, key, normal);
+  $$Set(normal, 'Value', undefined);
+  return result;
+}
+
+
+// ################################
+// # 8.2.5.1 IsAccessorDescriptor #
+// ################################
+
+function isMissing(Desc, field){
+  return $$Get(Desc, 'Get') === MISSING;
+}
+
+export function IsAccessorDescriptor(Desc){
+  return Desc !== undefined && !isMissing(Desc, 'Get') || !isMissing(Desc, 'Set');
+}
+
+// ################################
+// # 8.2.5.2 IsAccessorDescriptor #
+// ################################
+
+export function IsDataDescriptor(Desc){
+  return Desc !== undefined && !isMissing(Desc, 'Value') || !isMissing(Desc, 'Writable');
+}
+
+// ###############################
+// # 8.2.5.3 IsGenericDescriptor #
+// ###############################
+
+export function IsGenericDescriptor(Desc){
+  return Desc !== undefined && !(IsAccessorDescriptor(Desc) || IsDataDescriptor(Desc));
+}
+
+// ##################################
+// # 8.2.5.4 FromPropertyDescriptor #
+// ##################################
+
+function isEmptyOrdinaryObject(obj){
+  return true;
+}
+
+export function FromPropertyDescriptor(Desc){
+  if (Desc === undefined) {
+    return undefined;
+  } else if ($$Has(Desc, 'Origin')) {
+    return $$Get(Desc, 'Origin');
+  }
+
+  const obj = ObjectCreate();
+  $$Assert(isOrdinaryEmptyObject(obj));
+
+  if ($$Has(Desc, 'Value')) {
+    defineNormal(obj, 'value', $$Get(Desc, 'Value'));
+  }
+  if ($$Has(Desc, 'Writable')) {
+    defineNormal(obj, 'writable', $$Get(Desc, 'Writable'));
+  }
+  if ($$Has(Desc, 'Get')) {
+    defineNormal(obj, 'get', $$Get(Desc, 'Get'));
+  }
+  if ($$Has(Desc, 'Set')) {
+    defineNormal(obj, 'set', $$Get(Desc, 'Set'));
+  }
+  if ($$Has(Desc, 'Enumerable')) {
+    defineNormal(obj, 'enumerable', $$Get(Desc, 'Enumerable'));
+  }
+  if ($$Has(Desc, 'Configurable')) {
+    defineNormal(obj, 'configurable', $$Get(Desc, 'Configurable'));
+  }
+
+  return obj;
+}
+
+
+
+// ################################
+// # 8.2.5.5 ToPropertyDescriptor #
+// ################################
+
+function getOrMissing(Obj, key){
+  return HasProperty(Obj, key) ? Get(Obj, key) : MISSING;
+}
+
+export function ToPropertyDescriptor(Obj){
+  if (Type(Obj) !== 'Object') {
+    throw $$Exception(); // TODO
+  }
+
+  let enumerable   = getOrMissing(Obj, 'enumerable'),
+      configurable = getOrMissing(Obj, 'configurable'),
+      value        = getOrMissing(Obj, 'value'),
+      writable     = getOrMissing(Obj, 'writable'),
+      getter       = getOrMissing(Obj, 'get'),
+      setter       = getOrMissing(Obj, 'set');
+
+  if (getter !== MISSING || setter !== MISSING) {
+    if (value !== MISSING || writable !== MISSING) {
+      throw $$Exception(); // TODO
+    }
+    if (getter !== MISSING && getter !== undefined && !IsCallable(getter)) {
+      throw $$Exception(); // TODO
+    }
+    if (setter !== MISSING && setter !== undefined && !IsCallable(setter)) {
+      throw $$Exception(); // TODO
+    }
+    var desc = createAccessorDescriptor(get, set, enumerable, configurable);
+  } else {
+    var desc = createDataDescriptor(value, writable, enumerable, configurable);
+  }
+
+  $$Set(desc, 'Origin', obj);
+  return desc;
+}
+
+
+// ######################################
+// # 8.2.5.6 CompletePropertyDescriptor #
+// ######################################
+
+function copy(Desc, LikeDesc, field){
+  if (!$$Has(Desc, field)) {
+    $$Set(Desc, field, $$Get(LikeDesc, field));
+  }
+}
+
+export function CompletePropertyDescriptor(Desc, LikeDesc){
+  $$Assert(LikeDesc === undefined || $$Get(LikeDesc, '_type') === 'Descriptor');
+  $$Assert($$Get(Desc, '_type') === 'Descriptor');
+
+  if (LikeDesc === undefined) {
+    LikeDesc = defaults;
+  }
+
+  if (IsGenericDescriptor(Desc) || IsDataDescriptor(Desc)) {
+    copy(Desc, LikeDesc, 'Value');
+    copy(Desc, LikeDesc, 'Writable');
+  } else {
+    copy(Desc, LikeDesc, 'Get');
+    copy(Desc, LikeDesc, 'Set');
+  }
+
+  copy(Desc, LikeDesc, 'Enumerable');
+  copy(Desc, LikeDesc, 'Configurable');
+  return Desc;
+}
+
 
 export function ObjectCreate(proto){
   if (!$$ArgumentCount()) {
@@ -295,11 +464,10 @@ export function ObjectCreate(proto){
 }
 
 
-// ##############################################
-// ### 8.4.2.3 ArrayCreate Abstract Operation ###
-// ##############################################
+// ###########################################
+// # 11.2.2.3 ArrayCreate Abstract Operation #
+// ###########################################
 
-export function ArrayCreate(len){
-  return $$CreateObject('Array', len);
+export function ArrayCreate(length){
+  return $$CreateArray($$CurrentRealm(), length);
 }
-
