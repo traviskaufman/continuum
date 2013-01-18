@@ -1,8 +1,20 @@
-const global = this;
+import {
+  $$GetIntrinsic
+} from '@@internals';
+
+import {
+  builtinClass
+} from '@@utilities';
+
+import {
+  ToString
+} from '@@operations';
+
+const global = $$GetIntrinsic('global');
 
 export class Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === ErrorPrototype) {
       return $__ErrorCreate('Error', message);
     }
@@ -20,7 +32,7 @@ builtinClass(Error, 'BuiltinError');
 
 export class EvalError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === EvalErrorPrototype) {
       return $__ErrorCreate('EvalError', message);
     }
@@ -34,7 +46,7 @@ builtinClass(EvalError, 'BuiltinError');
 
 export class RangeError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === RangeErrorPrototype) {
       return $__ErrorCreate('RangeError', message);
     }
@@ -48,7 +60,7 @@ builtinClass(RangeError, 'BuiltinError');
 
 export class ReferenceError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === ReferenceErrorPrototype) {
       return $__ErrorCreate('ReferenceError', message);
     }
@@ -62,7 +74,7 @@ builtinClass(ReferenceError, 'BuiltinError');
 
 export class SyntaxError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === SyntaxErrorPrototype) {
       return $__ErrorCreate('SyntaxError', message);
     }
@@ -76,7 +88,7 @@ builtinClass(SyntaxError, 'BuiltinError');
 
 export class TypeError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === TypeErrorPrototype) {
       return $__ErrorCreate('TypeError', message);
     }
@@ -90,7 +102,7 @@ builtinClass(TypeError, 'BuiltinError');
 
 export class URIError extends Error {
   constructor(message){
-    message = $__ToString(message);
+    message = ToString(message);
     if (this == null || this === global || this === URIErrorPrototype) {
       return $__ErrorCreate('URIError', message);
     }

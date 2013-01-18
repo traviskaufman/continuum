@@ -17,6 +17,7 @@ import {
   define,
   extend,
   hasBrand,
+  internalFunction,
   isInitializing
 } from '@@utilities';
 

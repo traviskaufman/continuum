@@ -1,10 +1,13 @@
 import {
   $$Get,
+  $$GetIntrinsic,
   $$Set
 } from '@@internals';
 
 import {
-  define
+  builtinFunction,
+  define,
+  setTag
 } from '@@utilities';
 
 import {
@@ -13,12 +16,8 @@ import {
   ToString
 } from '@@operations';
 
-import {
-  @@toStringTag: toStringTag
-} from '@@symbols';
-
-define($$GetIntrinsic('global'), @@toStringTag, 'global');
-define($$GetIntrinsic('StopIteration'), @@toStringTag, 'StopIteration');
+setTag($$GetIntrinsic('global'), 'global');
+setTag($$GetIntrinsic('StopIteration'), 'StopIteration');
 
 
 export function decodeURI(value){

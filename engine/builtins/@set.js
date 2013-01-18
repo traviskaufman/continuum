@@ -12,10 +12,12 @@ import {
 
 import {
   builtinClass,
+  builtinFunction,
   define,
   extend,
   hasBrand,
   hideEverything,
+  internalFunction,
   isInitializing
 } from '@@utilities';
 

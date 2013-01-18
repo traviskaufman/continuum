@@ -9,9 +9,12 @@ import {
 } from '@@internals';
 
 import {
-  define,
+  //builtinClass,
+  builtinFunction,
   call,
-  hasBrand
+  define,
+  hasBrand,
+  internalFunction
 } from '@@utilities';
 
 import {

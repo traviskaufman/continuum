@@ -19,6 +19,10 @@ import {
   NEGATIVE_INFINITY
 } from '@@constants';
 
+import {
+  toStringTag
+} from '@@symbols';
+
 
 const FROZEN = 0,
       HIDDEN = 6;
@@ -123,6 +127,13 @@ export function builtinFunction(func){
   define(func, 'arguments', null, 0);
 }
 
+export function internalFunction(func){
+  $$Set(func, 'InternalFunction', true);
+  $$Set(func, 'Strict', false);
+  deleteProperty(func, 'prototype');
+  deleteProperty(func, 'caller');
+  deleteProperty(func, 'arguments');
+}
 
 export function extend(obj, properties){
   const keys = enumerate(properties, false, false);
@@ -253,4 +264,8 @@ export function numbers(start, end){
 
 export function getIntrinsic(name){
   return $$GetIntrinsic($$CurrentRealm(), name);
+}
+
+export function setTag(obj, tag){
+  define(obj, toStringTag, tag);
 }

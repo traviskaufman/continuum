@@ -13,7 +13,9 @@ import {
 
 import {
   builtinClass,
+  builtinFunction,
   extend,
+  internalFunction,
   isInitializing
 } from '@@utilities';
 
