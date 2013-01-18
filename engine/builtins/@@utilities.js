@@ -89,6 +89,9 @@ export function call(func, receiver, args){
   return $$Invoke(func, 'Call', receiver, args ? $$Get(args, 'array') : emptyList);
 }
 
+export function construct(func, args){
+  return $$Invoke(func, 'Call', args ? $$Get(args, 'array') : emptyList);
+}
 
 
 export function enumerate(obj, inherited, onlyEnumerable){
