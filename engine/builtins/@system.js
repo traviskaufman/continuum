@@ -208,7 +208,6 @@ export const System = new Loader(null, {
 const builtins = new Loader(System);
 builtins.@strict = false;
 
-$$SetIntrinsic($$CurrentRealm(), 'internalLoader', builtins);
 $$Set($$CurrentRealm(), 'loader', System);
 
 System.@modules['@system'] = builtins.@modules['@system'] = new Module({
