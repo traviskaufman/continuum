@@ -20,6 +20,9 @@ import {
 } from '@@utilities';
 
 import {
+  DeletePropertyOrThrow,
+  PutPropertyOrThrow,
+  IsConstructor,
   ToInteger,
   ToObject,
   ToString,
@@ -32,7 +35,8 @@ import {
 } from '@@types';
 
 import {
-  Iterator
+  Iterator,
+  StopIteration
 } from '@iter';
 
 import {
@@ -105,7 +109,7 @@ class ArrayIterator extends Iterator {
 
     if (index >= len) {
       this.@index = Infinity;
-      throw $__StopIteration;
+      throw StopIteration;
     }
 
     this.@index = index + 1;
@@ -137,9 +141,9 @@ internalFunction(truncate);
 export class Array {
   constructor(...values){
     if (values.length === 1 && typeof values[0] === 'number') {
-      let out = [];
-      out.length = values[0];
-      return out;
+      const result = [];
+      result.length = values[0];
+      return result;
     }
     return values;
   }
@@ -217,11 +221,11 @@ export class Array {
 
   forEach(callbackfn, context = undefined){
     const array = ToObject(this),
-          len   = $__ToUint32(array.length);
+          len   = ToUint32(array.length);
 
     ensureCallback(callbackfn);
 
-    for (let i=0; i < len; i++) {
+    for (let i = 0; i < len; i++) {
       if (i in array) {
         call(callbackfn, context, [array[i], i, this]);
       }
@@ -319,7 +323,7 @@ export class Array {
 
     ensureCallback(callbackfn);
 
-    for (var i=0; i < len; i++) {
+    for (var i = 0; i < len; i++) {
       if (i in array) {
         result[i] = call(callbackfn, context, [array[i], i, this]);
       }
@@ -329,8 +333,8 @@ export class Array {
   }
 
   pop(){
-    const array  = ToObject(this),
-          len    = ToUint32(array.length) - 1;
+    const array = ToObject(this),
+          len   = ToUint32(array.length) - 1;
 
     if (len >= 0) {
       const result = array[len];
@@ -348,7 +352,7 @@ export class Array {
 
     array.length += count;
 
-    for (var i=0; i < count; i++) {
+    for (var i = 0; i < count; i++) {
       array[index++] = values[i];
     }
 
@@ -417,16 +421,16 @@ export class Array {
             upperValue  = array[upperP];
 
       if (upperP in array) {
-        PutPropertyOrThrow(array, lowerP, upperValue, 'Array.prototype.reverse');
+        PutPropertyOrThrow(array, lowerP, upperValue);
         if (lowerP in array) {
-          PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');
+          PutPropertyOrThrow(array, upperP, lowerValue);
         } else {
-          DeletePropertyOrThrow(array, upperP, 'Array.prototype.reverse');
+          DeletePropertyOrThrow(array, upperP);
         }
       } else if (lowerP in array) {
-        PutPropertyOrThrow(array, upperP, lowerValue, 'Array.prototype.reverse');
+        PutPropertyOrThrow(array, upperP, lowerValue);
       } else {
-        DeletePropertyOrThrow(array, lowerP, 'Array.prototype.reverse');
+        DeletePropertyOrThrow(array, lowerP);
       }
     }
 
@@ -476,14 +480,14 @@ export class Array {
 
     do {
       if (oldIndex in array) {
-        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.shift');
+        PutPropertyOrThrow(array, newIndex, array[oldIndex]);
       } else {
-        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.shift');
+        DeletePropertyOrThrow(array, newIndex);
       }
       newIndex++;
     } while (++oldIndex < len)
 
-    PutPropertyOrThrow(array, 'length', len - 1, 'Array.prototype.shift');
+    PutPropertyOrThrow(array, 'length', len - 1);
     return result;
   }
 
@@ -521,9 +525,9 @@ export class Array {
       }
 
       if (len > 2) {
-        let arrayA = array,
-            arrayB = new Array(len),
-            size   = 2;
+        let a    = array,
+            b    = new Array(len),
+            size = 2;
 
         do {
           let start  = truncate(len - 1, ++trunc),
@@ -541,20 +545,20 @@ export class Array {
             do {
               if (fromA < countA) {
                 if (fromB < countB) {
-                  if (comparefn(arrayA[fromA], arrayA[fromB]) > 0) {
-                    arrayB[toIndex++] = arrayA[fromB++];
+                  if (comparefn(a[fromA], a[fromB]) > 0) {
+                    b[toIndex++] = a[fromB++];
                   } else {
-                    arrayB[toIndex++] = arrayA[fromA++];
+                    b[toIndex++] = a[fromA++];
                   }
                 } else {
                   while (fromA < countA) {
-                    arrayB[toIndex++] = arrayA[fromA++];
+                    b[toIndex++] = a[fromA++];
                   }
                   continues = false;
                 }
               } else {
                 while (fromB < countB) {
-                  arrayB[toIndex++] = arrayA[fromB++];
+                  b[toIndex++] = a[fromB++];
                 }
                 continues = false;
               }
@@ -565,13 +569,13 @@ export class Array {
             countA = start + size;
           }
 
-          [arrayA, arrayB] = [arrayB, arrayA];
+          [a, b] = [b, a];
           size *= 2;
         } while (len > size)
 
         if (!(trunc & 1)) {
           for (var i = len - 1; i >= 0; i--) {
-            array[i] = arrayA[i];
+            array[i] = a[i];
           }
         }
       }
@@ -602,12 +606,12 @@ export class Array {
         let from = index + start;
 
         if (from in array) {
-          PutPropertyOrThrow(result, index, array[from], 'Array.prototype.splice');
+          PutPropertyOrThrow(result, index, array[from]);
         }
         index++;
       } while (index < deleteCount)
 
-      PutPropertyOrThrow(result, 'length', deleteCount, 'Array.prototype.splice');
+      PutPropertyOrThrow(result, 'length', deleteCount);
     }
 
     const count = len - deleteCount;
@@ -620,9 +624,9 @@ export class Array {
             to   = index + itemCount;
 
         if (from in array) {
-          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');
+          PutPropertyOrThrow(array, to, array[from]);
         } else {
-          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');
+          DeletePropertyOrThrow(array, to);
         }
         index++;
       }
@@ -634,9 +638,9 @@ export class Array {
             to   = index + itemCount - 1;
 
         if (from in array) {
-          PutPropertyOrThrow(array, to, array[from], 'Array.prototype.splice');
+          PutPropertyOrThrow(array, to, array[from]);
         } else {
-          DeletePropertyOrThrow(array, to, 'Array.prototype.splice');
+          DeletePropertyOrThrow(array, to);
         }
 
         index--;
@@ -648,11 +652,11 @@ export class Array {
           index     = start;
 
       do {
-        PutPropertyOrThrow(array, index++, items[itemIndex++], 'Array.prototype.splice');
+        PutPropertyOrThrow(array, index++, items[itemIndex++]);
       } while (itemIndex < itemCount)
     }
 
-    PutPropertyOrThrow(array, 'length', len - deleteCount + itemCount, 'Array.prototype.splice');
+    PutPropertyOrThrow(array, 'length', len - deleteCount + itemCount);
 
     return result;
   }
@@ -666,15 +670,15 @@ export class Array {
     }
     add(arrays, array);
 
-    let nextElement = array[0],
-        result = nextElement == null ? '' : nextElement.toLocaleString(),
+    let next   = array[0],
+        result = next == null ? '' : next.toLocaleString(),
         index  = 0;
 
     while (++index < len) {
       result += ',';
-      nextElement = array[index];
-      if (nextElement != null) {
-        result += nextElement.toLocaleString();
+      next = array[index];
+      if (next != null) {
+        result += next.toLocaleString();
       }
     }
 
@@ -687,10 +691,10 @@ export class Array {
     let func = array.join;
 
     if (typeof func !== 'function') {
-      func = $__ObjectToString;
+      func = $$GetIntrinsic('%ObjProto_toString%');
     }
 
-    return call(func, array, []);
+    return call(func, array);
   }
 
   unshift(...values){
@@ -702,7 +706,7 @@ export class Array {
       return newLen;
     }
 
-    PutPropertyOrThrow(array, 'length', newLen, 'Array.prototype.unshift');
+    PutPropertyOrThrow(array, 'length', newLen);
 
     let oldIndex = len,
         newIndex = newLen;
@@ -710,14 +714,14 @@ export class Array {
     while (oldIndex-- > 0) {
       newIndex--;
       if (oldIndex in array) {
-        PutPropertyOrThrow(array, newIndex, array[oldIndex], 'Array.prototype.unshift');
+        PutPropertyOrThrow(array, newIndex, array[oldIndex]);
       } else {
-        DeletePropertyOrThrow(array, newIndex, 'Array.prototype.unshift');
+        DeletePropertyOrThrow(array, newIndex);
       }
     }
 
     while (newIndex-- > 0) {
-      PutPropertyOrThrow(array, newIndex, values[newIndex], 'Array.prototype.unshift');
+      PutPropertyOrThrow(array, newIndex, values[newIndex]);
     }
 
     return newLen;
@@ -741,7 +745,7 @@ export function isArray(array){
 export function from(arrayLike){
   const obj    = ToObject(arrayLike),
         len    = ToUint32(obj.length),
-        Ctor   = $__IsConstructor(this) ? this : Array,
+        Ctor   = IsConstructor(this) ? this : Array,
         result = new Ctor(len);
 
   for (var i = 0; i < len; i++) {
@@ -755,14 +759,14 @@ export function from(arrayLike){
 }
 
 export function of(...items){
-  if (!$__IsConstructor(this)) {
+  if (!IsConstructor(this)) {
     return items;
   }
 
   const len    = items.length,
         result = new this(len);
 
-  for (var i=0; i < len; i++) {
+  for (var i = 0; i < len; i++) {
     result[i] = items[i];
   }
 
