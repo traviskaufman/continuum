@@ -513,13 +513,15 @@ var FunctionBranch = (function(){
           defaults = details.defaults,
           offset   = params.length - defaults.length;
 
-
       var nameElement = label.append(functionName(name));
       if (this.mirror.isConstructor()) {
         nameElement.addClass('Constructor');
       }
       if (this.mirror.isClass()) {
         nameElement.addClass('Class');
+      }
+      if (this.mirror.isGenerator()) {
+        nameElement.addClass('GeneratorFunction');
       }
 
       var container = inline('', 'Params');
@@ -709,6 +711,9 @@ var FunctionPreview = (function(){
       }
       if (this.mirror.isClass()) {
         nameElement.addClass('Class');
+      }
+      if (this.mirror.isGenerator()) {
+        nameElement.addClass('GeneratorFunction');
       }
     }
   ]);

@@ -366,18 +366,18 @@ h1, h2
 .ƒThis           { color: #c05 }
 .ƒSuper          { color: #f08 }
 
-.ƒParams               { color: #08f;  }
+.ƒParams               { color: #08f  }
 .ƒParams:before,
 .ƒParams:after,
-.ƒParam:before         { color: #8cf; }
+.ƒParam:before         { color: #8cf }
 .ƒArrayPattern:before,
 .ƒArrayPattern:after,
-.ƒElement:before       { color: #f68; }
+.ƒElement:before       { color: #f68 }
 .ƒObjectPattern:before,
 .ƒObjectPattern:after,
-.ƒProperty:before     { color: #ff8; }
+.ƒProperty:before     { color: #ff8 }
 .ƒKey,
-.ƒMemberExpression > :first-child:after { color: #ffc; }
+.ƒMemberExpression > :first-child:after { color: #ffc }
 
 .ƒParam .ƒOperator, .ƒDefaultAssign { padding: 0 4px; color: #0ff }
 
@@ -396,18 +396,19 @@ h1, h2
 .ƒElement:first-child:before,
 .ƒProperty:first-child:before { content: ''; padding-right: 0; }
 
-.ƒParams:before        { content: '('; }
-.ƒParams:after         { content: ')'; }
-.ƒArrayPattern:before  { content: '['; }
-.ƒArrayPattern:after   { content: ']'; }
-.ƒObjectPattern:before { content: '{'; }
-.ƒObjectPattern:after  { content: '}'; }
-.ƒKey:after            { content: ':'; }
-.ƒrest:before          { content: '...'; }
+.ƒParams:before        { content: '(' }
+.ƒParams:after         { content: ')' }
+.ƒArrayPattern:before  { content: '[' }
+.ƒArrayPattern:after   { content: ']' }
+.ƒObjectPattern:before { content: '{' }
+.ƒObjectPattern:after  { content: '}' }
+.ƒKey:after            { content: ':' }
+.ƒrest:before          { content: '...' }
 .ƒParam:before,
 .ƒProperty:before,
-.ƒElement:before       { content: ','; }
-.ƒMemberExpression > :first-child:after   { content: '.'; }
+.ƒElement:before       { content: ',' }
+.ƒMemberExpression > :first-child:after   { content: '.' }
+.ƒGeneratorFunction:before { content: '*' }
 
 .ƒParam         { font-size: .8em; }
 .ƒIdentifier    {}

@@ -130,7 +130,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     if (install) {
       prototype = new $Object;
     }
-    prototype.IsProto = true;
+    prototype.isProto = true;
     if (writable === undefined) {
       writable = true;
     }
@@ -305,13 +305,13 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     $$MakeConstructor(ctor, false, proto);
-    ctor.IsClass = true;
-    ctor.IsConstructor = true;
+    ctor.isClass = true;
+    ctor.isConstructor = true;
     ctor.SetInheritance(superctor);
     ctor.set('name', brand);
     ctor.define('prototype', proto, ___);
     proto.define('constructor', ctor, _CW);
-    proto.IsClassProto = true;
+    proto.isClassProto = true;
 
     each(methods, function(method){
       $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
@@ -589,7 +589,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     inherit($GeneratorFunction, $Function, {
-      generator: true
+      isGenerator: true
     }, [
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
@@ -1569,8 +1569,8 @@ var runtime = (function(GLOBAL, exports, undefined){
       thrower.define('name', 'ThrowTypeError', ___);
       thrower.Realm = realm;
       thrower.Extensible = false;
-      thrower.IsStrictThrower = true;
       thrower.Strict = true;
+      thrower.isStrictThrower = true;
       hide(thrower, 'Realm');
       return new Accessor(thrower);
     }

@@ -166,7 +166,7 @@ var debug = (function(exports){
               accessor = prop[1] || prop[3];
 
           if (!this.accessors[key]) {
-            if (this.subject.IsProto) {
+            if (this.subject.isProto) {
               this.accessors[key] = new MirrorPrototypeAccessor(this.subject, accessor, key);
             } else {
               this.accessors[key] = new MirrorAccessor(this.subject, accessor, key);
@@ -579,10 +579,13 @@ var debug = (function(exports){
         return !!this.subject.Strict;
       },
       function isClass(){
-        return !!this.subject.IsClass;
+        return !!this.subject.isClass;
       },
       function isConstructor(){
-        return !!this.subject.IsConstructor || this.subject.constructCount > 0;
+        return !!this.subject.isConstructor || this.subject.constructCount > 0;
+      },
+      function isGenerator(){
+        return !!this.subject.isGenerator;
       },
       function ownAttrs(props){
         var strict = this.isStrict();
@@ -905,7 +908,7 @@ var debug = (function(exports){
         this.cooldown = timestamp;
         if (this.cooldown)
         if (this.accessor.Get) {
-          if (this.accessor.Get.IsStrictThrower) {
+          if (this.accessor.Get.isStrictThrower) {
             var subject = this.accessor.Get;
             this.refresh = function(){ return this }
           } else {
