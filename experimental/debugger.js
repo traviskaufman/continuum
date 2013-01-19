@@ -61,6 +61,9 @@ var DebuggerDebuggeeWouldRun = Debugger.DebuggeeWouldRun = function DebuggeeWoul
   }
 };
 
+function debuggeeWouldRun(reason){
+  return new AbruptCompletion(new DebuggerDebuggeeWouldRun(reason));
+}
 
 var DebuggerFrame = Debugger.Frame = function Frame(context){
   this.subject = context;
@@ -146,9 +149,6 @@ define(Debugger.Script.prototype, [
   }
 ]);
 
-function debuggerWouldRun(reason){
-  return new AbruptCompletion(new DebuggerDebuggeeWouldRun(reason));
-}
 
 var DebuggerObject = Debugger.Object = function Object(debugger, obj){
   this.debugger = debugger;
@@ -158,52 +158,52 @@ var DebuggerObject = Debugger.Object = function Object(debugger, obj){
 define(Debugger.Object.prototype, [
   function getProperty(name){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // this needs to manually walk inheritance checking for accessors and proxies
   },
   function setProperty(name, value){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // this needs to manually walk inheritance checking for accessors and proxies
   },
   function getOwnPropertyDescriptor(name){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
   },
   function getOwnPropertyNames(){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
   },
   function defineProperty(name, attributes){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // TODO: need a "system realm"
   },
   function defineProperties(properties){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // TODO: need a "system realm"
   },
   function deleteProperty(name){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
   },
   function seal(){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // TODO: need a "system realm"
   },
   function freeze(){
     if (this.subject.Proxy) {
-      return debuggerWouldRun('proxy');
+      return debuggeeWouldRun('proxy');
     }
     // TODO: need a "system realm"
   },
