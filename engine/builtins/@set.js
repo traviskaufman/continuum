@@ -35,6 +35,18 @@ import {
 } from '@@operations';
 
 import {
+  $$MapClear,
+  $$MapDelete,
+  $$MapGet,
+  $$MapHas,
+  $$MapInitialization,
+  $$MapNext,
+  $$MapSet,
+  $$MapSigil,
+  $$MapSize
+} from '@@collections';
+
+import {
   Map
 } from '@map';
 
@@ -45,8 +57,6 @@ import {
 import {
   hasOwn
 } from '@reflect';
-
-
 
 function ensureSet(o, name){
   const type = typeof o;
@@ -72,7 +82,7 @@ class SetIterator extends Iterator {
 
   constructor(set){
     this.@data = ensureSet(ToObject(set), 'SetIterator');
-    this.@key  = $__MapSigil();
+    this.@key  = $$MapSigil();
   }
 
   next(){
@@ -84,7 +94,7 @@ class SetIterator extends Iterator {
       throw $$Exception('called_on_incompatible_object', ['SetIterator.prototype.next']);
     }
 
-    const next = $__MapNext(this.@data, this.@key);
+    const next = $$MapNext(this.@data, this.@key);
     if (!next) {
       throw StopIteration;
     }
@@ -110,34 +120,34 @@ export class Set {
     if (iterable !== undefined) {
       iterable = ToObject(iterable);
       for (let [key, value] of iterable) {
-        $__MapSet(data, value, true);
+        $$MapSet(data, value, true);
       }
     }
   }
 
   get size(){
     if (this && $$Has(this, 'SetData')) {
-      return $__MapSize($$Get(this, 'SetData'));
+      return $$MapSize($$Get(this, 'SetData'));
     }
     return 0;
   }
 
   clear(){
-    $__MapClear(ensureSet(this, 'clear'));
+    $$MapClear(ensureSet(this, 'clear'));
     return this;
   }
 
   add(value){
-    $__MapSet(ensureSet(this, 'add'), value, value);
+    $$MapSet(ensureSet(this, 'add'), value, value);
     return this;
   }
 
   has(value){
-    return $__MapHas(ensureSet(this, 'has'), value);
+    return $$MapHas(ensureSet(this, 'has'), value);
   }
 
   delete(value){
-    return $__MapDelete(ensureSet(this, 'delete'), value);
+    return $$MapDelete(ensureSet(this, 'delete'), value);
   }
 
   values(){
@@ -161,7 +171,7 @@ define(SetPrototype, @@iterator, SetPrototype.values);
 
 
 function setAdd(set, value){
-  $__MapSet(ensureSet(set, '@set.add'), value, value);
+  $$MapSet(ensureSet(set, '@set.add'), value, value);
   return set;
 }
 
@@ -169,7 +179,7 @@ builtinFunction(setAdd);
 
 
 function setClear(set){
-  $__MapClear(ensureSet(set, '@set.clear'));
+  $$MapClear(ensureSet(set, '@set.clear'));
   return set;
 }
 
@@ -177,21 +187,21 @@ builtinFunction(setClear);
 
 
 function setDelete(set, value){
-  return $__MapDelete(ensureSet(set, '@set.delete'), value);
+  return $$MapDelete(ensureSet(set, '@set.delete'), value);
 }
 
 builtinFunction(setDelete);
 
 
 function setHas(set, value){
-  return $__MapHas(ensureSet(set, '@set.has'), value);
+  return $$MapHas(ensureSet(set, '@set.has'), value);
 }
 
 builtinFunction(setHas);
 
 
 function setSize(set){
-  return $__MapSize(ensureMap(set, '@set.size'));
+  return $$MapSize(ensureMap(set, '@set.size'));
 }
 
 builtinFunction(setSize);

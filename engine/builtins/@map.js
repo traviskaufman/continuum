@@ -37,6 +37,18 @@ import {
 } from '@@operations';
 
 import {
+  $$MapClear,
+  $$MapDelete,
+  $$MapGet,
+  $$MapHas,
+  $$MapInitialization,
+  $$MapNext,
+  $$MapSet,
+  $$MapSigil,
+  $$MapSize
+} from '@@collections';
+
+import {
   Iterator
 } from '@iter';
 
@@ -61,7 +73,7 @@ class MapIterator extends Iterator {
 
   constructor(map, kind){
     this.@map = ToObject(map);
-    this.@key = $__MapSigil();
+    this.@key = $$MapSigil();
     this.@kind = kind;
   }
 
@@ -75,7 +87,7 @@ class MapIterator extends Iterator {
     }
 
     var kind = this.@kind,
-        item = $__MapNext(this.@map, this.@key);
+        item = $$MapNext(this.@map, this.@key);
 
     if (!item) {
       throw StopIteration;
@@ -101,35 +113,35 @@ export class Map {
       return new Map(iterable);
     }
 
-    $__MapInitialization(this, iterable);
+    $$MapInitialization(this, iterable);
   }
 
   get size(){
     if (this && $$Has(this, 'MapData')) {
-      return $__MapSize(this);
+      return $$MapSize(this);
     }
     return 0;
   }
 
   clear(){
     ensureMap(this, 'clear');
-    $__MapClear(this, key);
+    $$MapClear(this, key);
     return this;
   }
 
   delete(key){
     ensureMap(this, 'delete');
-    return $__MapDelete(this, key);
+    return $$MapDelete(this, key);
   }
 
   get(key){
     ensureMap(this, 'get');
-    return $__MapGet(this, key);
+    return $$MapGet(this, key);
   }
 
   has(key){
     ensureMap(this, 'has');
-    return $__MapHas(this, key);
+    return $$MapHas(this, key);
   }
 
   entries(){
@@ -144,7 +156,7 @@ export class Map {
 
   set(key, value){
     ensureMap(this, 'set');
-    $__MapSet(this, key, value);
+    $$MapSet(this, key, value);
     return this;
   }
 
@@ -171,7 +183,7 @@ define(MapPrototype, @@iterator, MapPrototype.entries);
 
 function mapClear(map){
   ensureMap(map, '@map.clear');
-  $__MapClear(map);
+  $$MapClear(map);
   return map;
 }
 
@@ -180,7 +192,7 @@ builtinFunction(mapClear);
 
 function mapDelete(map, key){
   ensureMap(map, '@map.delete');
-  return $__MapDelete(map, key);
+  return $$MapDelete(map, key);
 }
 
 builtinFunction(mapDelete);
@@ -188,7 +200,7 @@ builtinFunction(mapDelete);
 
 function mapGet(map, key){
   ensureMap(map, '@map.get');
-  return $__MapGet(map, key);
+  return $$MapGet(map, key);
 }
 
 builtinFunction(mapGet);
@@ -196,7 +208,7 @@ builtinFunction(mapGet);
 
 function mapHas(map, key){
   ensureMap(map, '@map.has');
-  return $__MapHas(map, key);
+  return $$MapHas(map, key);
 }
 
 builtinFunction(mapHas);
@@ -212,7 +224,7 @@ builtinFunction(mapIterate);
 
 function mapSet(map, key, value){
   ensureMap(map, '@map.set');
-  $__MapSet(map, key, value);
+  $$MapSet(map, key, value);
   return map;
 }
 
@@ -221,7 +233,7 @@ builtinFunction(mapSet);
 
 function mapSize(map){
   ensureMap(map, '@map.size');
-  return $__MapSize(map);
+  return $$MapSize(map);
 }
 
 builtinFunction(mapSize);

@@ -8,6 +8,7 @@ import {
 } from '@@types';
 
 import {
+  builtinClass,
   builtinFunction,
   define,
   hasBrand
@@ -158,6 +159,8 @@ export class Loader {
     return obj;
   }
 }
+
+builtinClass(Loader);
 
 
 // TODO feedback: Module needs an optional? name/mrl parameter

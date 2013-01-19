@@ -1905,9 +1905,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$ThrowException('invalid_regexp', [pattern+'']);
         }
         return new $RegExp(result);
-      },
-      _MapInitialization: CollectionInitializer(MapData, 'Map'),
-      _WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap'),
+      }
     });
 
     function deliverChangeRecordsAndReportErrors(){
@@ -1941,6 +1939,49 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       ]);
     })(new Hash);
+
+    internalModules.set('@@collections', {
+      $$MapClear: function(_, args){
+        return args[0].MapData.clear();
+      },
+      $$MapDelete: function(_, args){
+        return args[0].MapData.remove(args[1]);
+      },
+      $$MapGet: function(_, args){
+        return args[0].MapData.get(args[1]);
+      },
+      $$MapHas: function(_, args){
+        return args[0].MapData.has(args[1]);
+      },
+      $$MapInitialization: CollectionInitializer(MapData, 'Map'),
+      $$MapNext: function(_, args){
+        var result = args[0].MapData.after(args[1]);
+        return result instanceof Array ? new $Array(result) : result;
+      },
+      $$MapSet: function(_, args){
+        return args[0].MapData.set(args[1], args[2]);
+      },
+      $$MapSigil: function(){
+        return collections.MapData.sigil;
+      },
+      $$MapSize: function(_, args){
+        var data = args[0].MapData;
+        return data ? data.size : 0;
+      },
+      $$WeakMapGet: function(_, args){
+        return args[0].WeakMapData.get(args[1]);
+      },
+      $$WeakMapDelete: function(_, args){
+        return args[0].WeakMapData.remove(args[1]);
+      },
+      $$WeakMapHas: function(_, args){
+        return args[0].WeakMapData.has(args[1]);
+      },
+      $$WeakMapSet: function(_, args){
+        return args[0].WeakMapData.set(args[1], args[2]);
+      },
+      $$WeakMapInitialization: CollectionInitializer(WeakMapData, 'WeakMap')
+    });
 
 
     void function(){

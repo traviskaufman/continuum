@@ -31,6 +31,14 @@ import {
   Type
 } from '@@types';
 
+import {
+  $$WeakMapGet,
+  $$WeakMapDelete,
+  $$WeakMapHas,
+  $$WeakMapSet,
+  $$WeakMapInitialization
+} from '@@collections';
+
 
 function ensureWeakMap(o, p, name){
   if (Type(o) !== 'Object' || !$$Has(o, 'WeakMapData')) {
@@ -41,7 +49,6 @@ function ensureWeakMap(o, p, name){
     throw $$Exception('invalid_weakmap_key', []);
   }
 }
-
 internalFunction(ensureWeakMap);
 
 
@@ -51,27 +58,27 @@ export class WeakMap {
       return new WeakMap(iterable);
     }
 
-    $__WeakMapInitialization(this, iterable);
+    $$WeakMapInitialization(this, iterable);
   }
 
   delete(key){
     ensureWeakMap(this, key, 'delete');
-    return $__WeakMapDelete(this, key);
+    return $$WeakMapDelete(this, key);
   }
 
   get(key){
     ensureWeakMap(this, key, 'get');
-    return $__WeakMapGet(this, key);
+    return $$WeakMapGet(this, key);
   }
 
   has(key){
     ensureWeakMap(this, key, 'has');
-    $__WeakMapHas(this, key);
+    $$WeakMapHas(this, key);
   }
 
   set(key, value){
     ensureWeakMap(this, key, 'set');
-    $__WeakMapSet(this, key, value);
+    $$WeakMapSet(this, key, value);
     return this;
   }
 }
@@ -93,7 +100,7 @@ const WeakMapPrototype = WeakMap.prototype;
 
 function weakmapDelete(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.delete');
-  return $__WeakMapDelete(weakmap, key);
+  return $$WeakMapDelete(weakmap, key);
 }
 
 builtinFunction(weakmapDelete);
@@ -101,7 +108,7 @@ builtinFunction(weakmapDelete);
 
 function weakmapGet(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.get');
-  return $__WeakMapGet(weakmap, key);
+  return $$WeakMapGet(weakmap, key);
 }
 
 builtinFunction(weakmapGet);
@@ -109,7 +116,7 @@ builtinFunction(weakmapGet);
 
 function weakmapHas(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.has');
-  return $__WeakMapHas(weakmap, key);
+  return $$WeakMapHas(weakmap, key);
 }
 
 builtinFunction(weakmapHas);
@@ -117,7 +124,7 @@ builtinFunction(weakmapHas);
 
 function weakmapSet(weakmap, key, value){
   ensureWeakMap(weakmap, key, '@weakmap.set');
-  $__WeakMapSet(weakmap, key, value);
+  $$WeakMapSet(weakmap, key, value);
   return weakmap;
 }
 

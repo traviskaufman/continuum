@@ -396,43 +396,6 @@ var natives = (function(module){
 
       return $$ThrowException('invalid_json', source);
     },
-    _MapSigil: function(){
-      return collections.MapData.sigil;
-    },
-    _MapSize: function(obj, args){
-      return args[0].MapData ? args[0].MapData.size : 0;
-    },
-    _MapClear: function(obj, args){
-      return args[0].MapData.clear();
-    },
-    _MapGet: function(obj, args){
-      return args[0].MapData.get(args[1]);
-    },
-    _MapSet: function(obj, args){
-      return args[0].MapData.set(args[1], args[2]);
-    },
-    _MapDelete: function(obj, args){
-      return args[0].MapData.remove(args[1]);
-    },
-    _MapHas: function(obj, args){
-      return args[0].MapData.has(args[1]);
-    },
-    _MapNext: function(obj, args){
-      var result = args[0].MapData.after(args[1]);
-      return result instanceof Array ? new $Array(result) : result;
-    },
-    _WeakMapGet: function(obj, args){
-      return args[0].WeakMapData.get(args[1]);
-    },
-    _WeakMapSet: function(obj, args){
-      return args[0].WeakMapData.set(args[1], args[2]);
-    },
-    _WeakMapDelete: function(obj, args){
-      return args[0].WeakMapData.remove(args[1]);
-    },
-    _WeakMapHas: function(obj, args){
-      return args[0].WeakMapData.has(args[1]);
-    },
     _Signal: function(obj, args){
       var realm = require('./runtime').realm;
       realm.emit.apply(realm, args);
