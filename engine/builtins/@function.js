@@ -16,7 +16,7 @@ import {
 } from '@@utilities';
 
 import {
-  $$Get
+  $$Get,
   $$Invoke
 } from '@@internals';
 
