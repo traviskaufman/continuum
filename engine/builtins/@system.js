@@ -21,6 +21,7 @@ import {
   $$Fetch,
   $$Get,
   $$GetIntrinsic,
+  $$Resolve,
   $$Set,
   $$SetIntrinsic,
   $$ToModule
