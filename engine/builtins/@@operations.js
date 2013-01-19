@@ -26,6 +26,7 @@ import {
   $$AssertIsECMAScriptValue,
   $$AssertWontThrow,
   $$Invoke,
+  $$CallerName,
   $$CreateObject,
   $$CreateInternalObject,
   $$CurrentRealm,
@@ -421,7 +422,7 @@ export function DefinePropertyOrThrow(O, P, desc){
 
   const success = $$Invoke(O, 'DefineOwnProperty', P, desc);
   if (!success) {
-    throw $$Exception('redefine_disallowed', [P]);
+    throw $$Exception('redefine_disallowed', [$$CallerName(), P]);
   }
 
   return success;
@@ -438,7 +439,20 @@ export function DeletePropertyOrThrow(O, P){
 
   const success = $$Invoke(O, 'Delete', P); // TODO: rename to DeleteProperty
   if (!success) {
-    throw $$Exception('strict_delete_property', [P, Type(O)]);
+    throw $$Exception('delete_disallowed', [$$CallerName(), P]);
+  }
+  return success;
+}
+
+
+// non-spec function
+export function PutPropertyOrThrow(O, P, value){
+  $$Assert(Type(O) === 'Object');
+  $$Assert(IsPropertyKey(P) === true);
+
+  const success = $$Invoke(O, 'Put', P, value);
+  if (!success) {
+    throw $$Exception('redefine_disallowed', [$$CallerName(), P]);
   }
   return success;
 }
