@@ -4,25 +4,29 @@ const NaN       = +'NaN',
       undefined = void 0;
 
 // standard functions
-import { escape,
-         decodeURI,
-         decodeURIComponent,
-         encodeURI,
-         encodeURIComponent,
-         eval,
-         isFinite,
-         isNaN,
-         parseFloat,
-         parseInt,
-         unescape } from '@globals';
+import {
+  escape,
+  decodeURI,
+  decodeURIComponent,
+  encodeURI,
+  encodeURIComponent,
+  eval,
+  isFinite,
+  isNaN,
+  parseFloat,
+  parseInt,
+  unescape
+} from '@globals';
 
 
-import { clearImmediate,
-         clearInterval,
-         clearTimeout,
-         setImmediate,
-         setInterval,
-         setTimeout } from '@timers';
+import {
+  clearImmediate,
+  clearInterval,
+  clearTimeout,
+  setImmediate,
+  setInterval,
+  setTimeout
+} from '@timers';
 
 // standard types
 import { Array    } from '@array';
@@ -40,34 +44,38 @@ import { WeakMap  } from '@weakmap';
 
 
 // standard errors
-import { Error,
-         EvalError,
-         RangeError,
-         ReferenceError,
-         SyntaxError,
-         TypeError,
-         URIError } from '@error';
+import {
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError
+} from '@error';
 
-import { ArrayBuffer,
-         DataView,
-         Float32Array,
-         Float64Array,
-         Int16Array,
-         Int32Array,
-         Int8Array,
-         Uint16Array,
-         Uint32Array,
-         Uint8Array } from '@typed-arrays';
+import {
+  ArrayBuffer,
+  DataView,
+  Float32Array,
+  Float64Array,
+  Int16Array,
+  Int32Array,
+  Int8Array,
+  Uint16Array,
+  Uint32Array,
+  Uint8Array
+} from '@typed-arrays';
 
 
 // standard pseudo-modules
-import { JSON     } from '@json';
-import { Math     } from '@math';
+import { JSON } from '@json';
+import { Math } from '@math';
 
-import { Symbol   } from '@symbol';
+import { Symbol } from '@symbol';
 import { Iterator } from '@iter';
 
-import { console  } from '@console';
+import { console } from '@console';
 
 
 const StopIteration = $__StopIteration;
