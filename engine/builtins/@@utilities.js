@@ -41,25 +41,43 @@ export function zeroPad(number, places = 2){
   return num;
 }
 
+internalFunction(zeroPad);
+
+
 export function abs(x){
   return x < 0 ? -x : x;
 }
+
+internalFunction(abs);
+
 
 export function floor(x){
   return x >> 0;
 }
 
+internalFunction(floor);
+
+
 export function sign(x){
   return x < 0 ? -1 : 1;
 }
+
+internalFunction(sign);
+
 
 export function isZeroOrInfinite(x){
   return x === 0 || x === POSITIVE_INFINITY || x === NEGATIVE_INFINITY;
 }
 
+internalFunction(isZeroOrInfinite);
+
+
 export function isNaN(x){
   return x !== x;
 }
+
+internalFunction(isNaN);
+
 
 export function isFinite(value){
   return typeof value === 'number'
@@ -67,6 +85,9 @@ export function isFinite(value){
       && value < POSITIVE_INFINITY
       && value > NEGATIVE_INFINITY;
 }
+
+internalFunction(isFinite);
+
 
 export function isInteger(value) {
   return typeof value === 'number'
@@ -76,6 +97,9 @@ export function isInteger(value) {
       && value | 0 === value;
 }
 
+internalFunction(isInteger);
+
+
 export function hasBrand(obj, brand){
   if (obj == null) {
     return false;
@@ -83,44 +107,73 @@ export function hasBrand(obj, brand){
   return $$Get(obj, 'BuiltinBrand') === brand;
 }
 
+internalFunction(hasBrand);
+
+
 const emptyList = $$Get([], 'array');
 
 export function call(func, receiver, args){
   return $$Invoke(func, 'Call', receiver, args ? $$Get(args, 'array') : emptyList);
 }
 
+internalFunction(call);
+
+
 export function construct(func, args){
   return $$Invoke(func, 'Construct', args ? $$Get(args, 'array') : emptyList);
 }
+
+internalFunction(construct);
 
 
 export function enumerate(obj, inherited, onlyEnumerable){
   return $$CreateObject('Array', $$Invoke(obj, 'Enumerate', inherited, onlyEnumerable));
 }
 
+internalFunction(enumerate);
+
+
 export function deleteProperty(obj, key){
   return $$Invoke(obj, 'remove', key);
 }
+
+internalFunction(deleteProperty);
+
 
 export function update(obj, key, attr){
   return $$Invoke(obj, 'update', key, attr);
 }
 
+internalFunction(update);
+
+
 export function define(obj, key, value, attr){
   return $$Invoke(obj, 'define', key, value, attr);
 }
+
+internalFunction(define);
+
 
 export function query(obj, key){
   return $$Invoke(obj, 'query', key);
 }
 
+internalFunction(query);
+
+
 export function get(obj, key){
   return $$Invoke(obj, 'get', key);
 }
 
+internalFunction(get);
+
+
 export function set(obj, key, value){
   return $$Invoke(obj, 'set', key, value);
 }
+
+internalFunction(set);
+
 
 export function builtinFunction(func){
   $$Set(func, 'BuiltinFunction', true);
@@ -130,6 +183,9 @@ export function builtinFunction(func){
   define(func, 'arguments', null, 0);
 }
 
+internalFunction(builtinFunction);
+
+
 export function internalFunction(func){
   $$Set(func, 'InternalFunction', true);
   $$Set(func, 'Strict', false);
@@ -137,6 +193,9 @@ export function internalFunction(func){
   deleteProperty(func, 'caller');
   deleteProperty(func, 'arguments');
 }
+
+internalFunction(internalFunction);
+
 
 export function extend(obj, properties){
   const keys = enumerate(properties, false, false);
@@ -163,6 +222,9 @@ export function extend(obj, properties){
   }
 }
 
+internalFunction(extend);
+
+
 export function extendInternal(internal, properties){
   const keys = enumerate(properties, false, false);
 
@@ -176,9 +238,15 @@ export function extendInternal(internal, properties){
   return internal;
 }
 
+internalFunction(extendInternal);
+
+
 export function createInternal(proto, properties){
   return extendInternal($$CreateInternalObject(proto), properties);
 }
+
+internalFunction(createInternal);
+
 
 export function hideEverything(o){
   const type = typeof o;
@@ -205,6 +273,9 @@ export function hideEverything(o){
   return o;
 }
 
+internalFunction(hideEverything);
+
+
 export function builtinClass(Ctor, brand){
   $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
   $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
@@ -216,16 +287,20 @@ export function builtinClass(Ctor, brand){
   define(Ctor, 'arguments', null, FROZEN);
 
   if (Ctor.name !== 'Symbol') {
-    $$Set(Ctor.prototype, 'BuiltinBrand', brand || 'Builtin'+Ctor.name);
-    define(Ctor.prototype, @@toStringTag, Ctor.name);
+    setBrand(Ctor.prototype, brand || `Builtin${Ctor.name}`);
+    setTag(Ctor.prototype, Ctor.name);
     hideEverything(Ctor);
   }
 }
+
+internalFunction(builtinClass);
 
 
 export function isInitializing(obj, internal){
   return obj != null && $$Has(obj, internal) && $$Get(obj, internal) === undefined;
 }
+
+internalFunction(isInitializing);
 
 
 
@@ -233,9 +308,14 @@ export function listFrom(array){
   return $$Get(array, 'array') || $$Get([...array], 'array');
 }
 
+internalFunction(listFrom);
+
+
 export function listOf(...items){
   return $$Get(items, 'array');
 }
+
+internalFunction(listOf);
 
 
 const cache = [];
@@ -265,16 +345,28 @@ export function numbers(start, end){
   return result;
 }
 
+internalFunction(numbers);
+
+
 export function getIntrinsic(name){
   return $$GetIntrinsic($$CurrentRealm(), name);
 }
+
+internalFunction(getIntrinsic);
+
+
+export function setBrand(obj, brand){
+  $$Set(obj, 'BuiltinBrand', brand);
+}
+
+internalFunction(setBrand);
+
 
 export function setTag(obj, tag){
   define(obj, toStringTag, tag);
 }
 
-
-
+internalFunction(setTag);
 
 
 export function ensureObject(o, name){
@@ -335,4 +427,3 @@ export function ensureProto(proto){
 }
 
 internalFunction(ensureProto);
-
