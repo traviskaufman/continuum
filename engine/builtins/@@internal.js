@@ -1,11 +1,6 @@
 private @@toStringTag  = $__getWellKnownSymbol('toStringTag'),
         @@iterator     = $__getWellKnownSymbol('iterator'),
-        @@create       = $__getWellKnownSymbol('create'),
-        @@BooleanValue = $__getWellKnownSymbol('BooleanValue'),
-        @@StringValue  = $__getWellKnownSymbol('StringValue'),
-        @@NumberValue  = $__getWellKnownSymbol('NumberValue'),
-        @@DateValue    = $__getWellKnownSymbol('DateValue'),
-        @@BuiltinBrand = $__getWellKnownSymbol('BuiltinBrand');
+        @@create       = $__getWellKnownSymbol('create');
 
 const StopIteration = $__StopIteration,
       HIDDEN   = 6,
@@ -191,22 +186,3 @@ function ensureProto(proto){
 }
 
 internalFunction(ensureProto);
-
-
-function PutPropertyOrThrow(object, key, value, name){
-  if (!$__Put(object, key, value)) {
-    throw $__Exception('put_property_or_throw', [name, key]);
-  }
-}
-
-internalFunction(PutPropertyOrThrow);
-
-
-function DeletePropertyOrThrow(object, key, name){
-  if (!$__Delete(object, key)) {
-    throw $__Exception('delete_property_or_throw', [name, key]);
-  }
-}
-
-internalFunction(DeletePropertyOrThrow);
-
