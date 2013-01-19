@@ -60,3 +60,5 @@ export class Iterator {
 }
 
 builtinClass(Iterator);
+
+export const StopIteration = $__StopIteration;
