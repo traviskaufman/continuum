@@ -1,6 +1,19 @@
-import { now } from '@date';
-import { Map } from '@map';
-import { Error } from '@error';
+import {
+  now
+} from '@date';
+
+import {
+  Map
+} from '@map';
+
+import {
+  Error
+} from '@error';
+
+import {
+  ToString
+} from '@@operations';
+
 
 const QUIET = $__createUndetectable('quiet');
 
@@ -14,11 +27,11 @@ export class Console {
   }
 
   @write(value, color = '#fff'){
-    this.@output.signal('write', $__ToString(value), $__ToString(color));
+    this.@output.signal('write', ToString(value), ToString(color));
   }
 
   @writeln(value, color = '#fff'){
-    this.@output.signal('write', value + '\n', $__ToString(color));
+    this.@output.signal('write', value + '\n', ToString(color));
   }
 
   assert(expression, ...values){
