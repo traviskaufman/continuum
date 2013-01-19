@@ -1,3 +1,25 @@
+import {
+  $$Exception,
+  $$Get,
+  $$Set
+} from '@@internals';
+
+import {
+  ObjectCreate
+} from '@@types';
+
+import {
+  define,
+  hasBrand,
+  internalFunction
+} from '@@utilities';
+
+import {
+  ToInteger,
+  ToObject,
+  ToInt32,
+  ToUint32
+} from '@@operations';
 
 
 function wrappingClamp(number, min, max){
@@ -11,11 +33,11 @@ internalFunction(wrappingClamp);
 
 
 function createArrayBuffer(nativeBuffer, byteLength){
-  var buffer = $__ObjectCreate(ArrayBufferPrototype);
-  $__define(buffer, 'byteLength', byteLength, 0);
-  $__setInternal(buffer, 'NativeBuffer', nativeBuffer);
-  $__setInternal(buffer, 'ConstructorName', 'ArrayBuffer');
-  $__SetBuiltinBrand(buffer, 'BuiltinArrayBuffer');
+  var buffer = ObjectCreate(ArrayBufferPrototype);
+  define(buffer, 'byteLength', byteLength, 0);
+  $$Set(buffer, 'NativeBuffer', nativeBuffer);
+  $$Set(buffer, 'ConstructorName', 'ArrayBuffer');
+  $$Set(buffer, 'BuiltinBrand', 'BuiltinArrayBuffer');
   return buffer;
 }
 
@@ -24,38 +46,38 @@ internalFunction(createArrayBuffer);
 
 function createTypedArray(Type, buffer, byteOffset, length){
   if (typeof buffer === 'number') {
-    length = $__ToUint32(buffer);
+    length = ToUint32(buffer);
     var byteLength = length * Type.BYTES_PER_ELEMENT;
     byteOffset = 0;
     buffer = new ArrayBuffer(byteLength);
     return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
 
   } else {
-    buffer = $__ToObject(buffer);
+    buffer = ToObject(buffer);
 
-    if ($__GetBuiltinBrand(buffer) === 'BuiltinArrayBuffer') {
-      byteOffset = $__ToUint32(byteOffset);
+    if (hasBrand(buffer, 'BuiltinArrayBuffer')) {
+      byteOffset = ToUint32(byteOffset);
       if (byteOffset % Type.BYTES_PER_ELEMENT) {
-        throw $__Exception('buffer_unaligned_offset', [Type.name]);
+        throw $$Exception('buffer_unaligned_offset', [Type.name]);
       }
 
       var bufferLength = buffer.byteLength,
-          byteLength = length === undefined ? bufferLength - byteOffset : $__ToUint32(length) * Type.BYTES_PER_ELEMENT;
+          byteLength = length === undefined ? bufferLength - byteOffset : ToUint32(length) * Type.BYTES_PER_ELEMENT;
 
       if (byteOffset + byteLength > bufferLength) {
-        throw $__Exception('buffer_out_of_bounds', [Type.name]);
+        throw $$Exception('buffer_out_of_bounds', [Type.name]);
       }
 
       length = byteLength / Type.BYTES_PER_ELEMENT;
 
-      if ($__ToInteger(length) !== length) {
-        throw $__Exception('buffer_unaligned_length', [Type.name]);
+      if (ToInteger(length) !== length) {
+        throw $$Exception('buffer_unaligned_length', [Type.name]);
       }
 
       return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
 
     } else {
-      length = $__ToUint32(buffer.length);
+      length = ToUint32(buffer.length);
       var byteLength = length * Type.BYTES_PER_ELEMENT;
       byteOffset = 0;
       buffer = new ArrayBuffer(length);
@@ -75,17 +97,17 @@ internalFunction(createTypedArray);
 
 
 function set(Type, instance, array, offset){
-  if ($__GetBuiltinBrand(instance) !== 'Builtin'+Type.name) {
-    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);
+  if (!hasBrand(instance, 'Builtin'+Type.name)) {
+    throw $$Exception('called_on_incompatible_object', [Type.name+'.prototype.set']);
   }
 
-  offset = $__ToUint32(offset);
-  array = $__ToObject(array);
-  var srcLength = $__ToUint32(array.length),
+  offset = ToUint32(offset);
+  array = ToObject(array);
+  var srcLength = ToUint32(array.length),
       targetLength = instance.length;
 
   if (srcLength + offset > targetLength) {
-    throw $__Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);
+    throw $$Exception('buffer_out_of_bounds', [Type.name+'.prototype.set']);
   }
 
   var temp = new Type(srcLength),
@@ -104,15 +126,15 @@ function set(Type, instance, array, offset){
 internalFunction(set);
 
 
-function subarray(Type, instance, begin, end){
-  if ($__GetBuiltinBrand(instance) !== 'Builtin'+Type.name) {
-    throw $__Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);
+function subarray(Type, instance, begin, end = instance.length){
+  if (!hasBrand(instance, 'Builtin'+Type.name)) {
+    throw $$Exception('called_on_incompatible_object', [Type.name+'.prototype.subarray']);
   }
 
   var srcLength = instance.length;
 
-  begin = $__ToInt32(begin);
-  end = end === undefined ? srcLength : $__ToInt32(end);
+  begin = ToInt32(begin);
+  end = end === undefined ? srcLength : ToInt32(end);
 
   begin = wrappingClamp(begin, 0, srcLength);
   end = wrappingClamp(end, 0, srcLength);
@@ -129,21 +151,21 @@ internalFunction(subarray);
 
 export class ArrayBuffer {
   constructor(byteLength){
-    byteLength = $__ToUint32(byteLength);
+    byteLength = ToUint32(byteLength);
     return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);
   }
 
   slice(begin = 0, end = this.byteLength){
-    var sourceBuffer = $__ToObject(this),
-        sourceNativeBuffer = $__getInternal(sourceBuffer, 'NativeBuffer');
+    var sourceBuffer = ToObject(this),
+        sourceNativeBuffer = $$Get(sourceBuffer, 'NativeBuffer');
 
     if (!sourceNativeBuffer) {
-      throw $__Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);
+      throw $$Exception('called_on_incompatible_object', ['ArrayBuffer.prototype.slice']);
     }
 
     var byteLength = sourceBuffer.byteLength;
-    begin = wrappingClamp($__ToInt32(begin), 0, byteLength);
-    end = wrappingClamp($__ToInt32(end), 0, byteLength);
+    begin = wrappingClamp(ToInt32(begin), 0, byteLength);
+    end = wrappingClamp(ToInt32(end), 0, byteLength);
 
     return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);
   }
@@ -156,23 +178,23 @@ private @get, @set;
 
 export class DataView {
   constructor(buffer, byteOffset = 0, byteLength = buffer.byteLength - byteOffset){
-    buffer = $__ToObject(buffer);
-    if ($__GetBuiltinBrand(buffer) !== 'BuiltinArrayBuffer') {
-      throw $__Exception('bad_argument', ['DataView', 'ArrayBuffer']);
+    buffer = ToObject(buffer);
+    if (!hasBrand(buffer, 'BuiltinArrayBuffer')) {
+      throw $$Exception('bad_argument', ['DataView', 'ArrayBuffer']);
     }
 
-    byteOffset = $__ToUint32(byteOffset);
-    byteLength = $__ToUint32(byteLength);
+    byteOffset = ToUint32(byteOffset);
+    byteLength = ToUint32(byteLength);
 
     if (byteOffset + byteLength > buffer.byteLength) {
-      throw $__Exception('buffer_out_of_bounds', ['DataView']);
+      throw $$Exception('buffer_out_of_bounds', ['DataView']);
     }
 
-    $__define(this, 'byteLength', byteLength, 1);
-    $__define(this, 'byteOffset', byteOffset, 1);
-    $__define(this, 'buffer', buffer, 1);
-    $__setInternal(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));
-    $__SetBuiltinBrand(this, 'BuiltinDataView');
+    define(this, 'byteLength', byteLength, 1);
+    define(this, 'byteOffset', byteOffset, 1);
+    define(this, 'buffer', buffer, 1);
+    $$Set(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));
+    $$Set(this, 'BuiltinBrand', 'BuiltinDataView');
   }
   getUint8(byteOffset){
     return this.@get('Uint8', byteOffset);
@@ -243,7 +265,7 @@ export class Float64Array {
 }
 
 builtinClass(Float64Array);
-$__define(Float64Array, 'BYTES_PER_ELEMENT', 8, FROZEN);
+define(Float64Array, 'BYTES_PER_ELEMENT', 8, FROZEN);
 
 
 export class Float32Array {
@@ -259,7 +281,7 @@ export class Float32Array {
 }
 
 builtinClass(Float32Array);
-$__define(Float32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Float32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
 
 
 export class Int32Array {
@@ -275,7 +297,7 @@ export class Int32Array {
 }
 
 builtinClass(Int32Array);
-$__define(Int32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Int32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
 
 
 export class Int16Array {
@@ -291,7 +313,7 @@ export class Int16Array {
 }
 
 builtinClass(Int16Array);
-$__define(Int16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
+define(Int16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
 
 
 export class Int8Array {
@@ -307,7 +329,7 @@ export class Int8Array {
 }
 
 builtinClass(Int8Array);
-$__define(Int8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
+define(Int8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
 
 
 export class Uint32Array {
@@ -323,7 +345,7 @@ export class Uint32Array {
 }
 
 builtinClass(Uint32Array);
-$__define(Uint32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Uint32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
 
 
 export class Uint16Array {
@@ -339,7 +361,7 @@ export class Uint16Array {
 }
 
 builtinClass(Uint16Array);
-$__define(Uint16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
+define(Uint16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
 
 
 export class Uint8Array {
@@ -355,4 +377,4 @@ export class Uint8Array {
 }
 
 builtinClass(Uint8Array);
-$__define(Uint8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
+define(Uint8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
