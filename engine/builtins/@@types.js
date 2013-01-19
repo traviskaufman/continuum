@@ -312,11 +312,6 @@ function defineNormal(obj, key, value){
   return result;
 }
 
-function isMissing(Desc, field){
-  return $$Get(Desc, field) === MISSING;
-}
-
-
 // ################################
 // # 8.2.5.1 IsAccessorDescriptor #
 // ################################
