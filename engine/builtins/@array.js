@@ -1,7 +1,12 @@
 import {
+  @@create     : create,
   @@toStringTag: toStringTag,
   @@iterator   : iterator
 } from '@@symbols';
+
+import {
+  undefined
+} from '@@constants';
 
 import {
   $$ArgumentCount,
@@ -9,12 +14,13 @@ import {
 } from '@@internals';
 
 import {
-  //builtinClass,
+  builtinClass,
   builtinFunction,
   call,
   define,
   ensureCallback,
   ensureObject,
+  extend,
   hasBrand,
   internalFunction
 } from '@@utilities';
@@ -736,7 +742,7 @@ builtinClass(Array);
 const ArrayPrototype = Array.prototype;
 define(ArrayPrototype, @@iterator, ArrayPrototype.values);
 
-['push', 'reduce', 'reduceRight'].forEach(name => define(ArrayPrototype[name], 'length', 1, FROZEN));
+['push', 'reduce', 'reduceRight'].forEach(name => define(ArrayPrototype[name], 'length', 1, 0));
 
 export function isArray(array){
   return Type(array) === 'Object' ? hasBrand(array, 'BuiltinArray') : false;

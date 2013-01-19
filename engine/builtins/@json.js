@@ -2,6 +2,7 @@ import {
   call,
   extend,
   hasBrand,
+  internalFunction,
   setTag
 } from '@@utilities';
 

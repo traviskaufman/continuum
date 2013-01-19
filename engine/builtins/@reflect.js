@@ -13,7 +13,12 @@ import {
 import {
   builtinClass,
   builtinFunction,
-  call
+  call,
+  ensureArgs,
+  ensureDescriptor,
+  ensureFunction,
+  ensureObject,
+  ensureProto
 } from '@@utilities';
 
 import {

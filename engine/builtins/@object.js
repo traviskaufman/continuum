@@ -5,12 +5,13 @@ import {
 } from '@@operations';
 
 import {
-  //builtinClass,
+  builtinClass,
   builtinFunction,
   ensureFunction,
   ensureObject,
   ensureProto,
   extend,
+  internalFunction,
   query
 } from '@@utilities';
 

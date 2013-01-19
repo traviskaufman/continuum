@@ -9,6 +9,7 @@ import {
 } from '@@types';
 
 import {
+  builtinClass,
   define,
   hasBrand,
   internalFunction
@@ -265,7 +266,7 @@ export class Float64Array {
 }
 
 builtinClass(Float64Array);
-define(Float64Array, 'BYTES_PER_ELEMENT', 8, FROZEN);
+define(Float64Array, 'BYTES_PER_ELEMENT', 8, 0);
 
 
 export class Float32Array {
@@ -281,7 +282,7 @@ export class Float32Array {
 }
 
 builtinClass(Float32Array);
-define(Float32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Float32Array, 'BYTES_PER_ELEMENT', 4, 0);
 
 
 export class Int32Array {
@@ -297,7 +298,7 @@ export class Int32Array {
 }
 
 builtinClass(Int32Array);
-define(Int32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Int32Array, 'BYTES_PER_ELEMENT', 4, 0);
 
 
 export class Int16Array {
@@ -313,7 +314,7 @@ export class Int16Array {
 }
 
 builtinClass(Int16Array);
-define(Int16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
+define(Int16Array, 'BYTES_PER_ELEMENT', 2, 0);
 
 
 export class Int8Array {
@@ -329,7 +330,7 @@ export class Int8Array {
 }
 
 builtinClass(Int8Array);
-define(Int8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
+define(Int8Array, 'BYTES_PER_ELEMENT', 1, 0);
 
 
 export class Uint32Array {
@@ -345,7 +346,7 @@ export class Uint32Array {
 }
 
 builtinClass(Uint32Array);
-define(Uint32Array, 'BYTES_PER_ELEMENT', 4, FROZEN);
+define(Uint32Array, 'BYTES_PER_ELEMENT', 4, 0);
 
 
 export class Uint16Array {
@@ -361,7 +362,7 @@ export class Uint16Array {
 }
 
 builtinClass(Uint16Array);
-define(Uint16Array, 'BYTES_PER_ELEMENT', 2, FROZEN);
+define(Uint16Array, 'BYTES_PER_ELEMENT', 2, 0);
 
 
 export class Uint8Array {
@@ -377,4 +378,4 @@ export class Uint8Array {
 }
 
 builtinClass(Uint8Array);
-define(Uint8Array, 'BYTES_PER_ELEMENT', 1, FROZEN);
+define(Uint8Array, 'BYTES_PER_ELEMENT', 1, 0);

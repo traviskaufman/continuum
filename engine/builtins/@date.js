@@ -35,6 +35,7 @@ import {
 
 import {
   abs,
+  builtinClass,
   call,
   define,
   extend,

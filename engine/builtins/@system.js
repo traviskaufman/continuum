@@ -18,6 +18,7 @@ import {
   $$EvaluateModule,
   $$EvaluateModuleAsync,
   $$Fetch,
+  $$Get,
   $$GetIntrinsic,
   $$Set,
   $$SetIntrinsic,
@@ -200,7 +201,7 @@ export const System = new Loader(null, {
 });
 
 
-const builtins = new Loader(System, { global: this });
+const builtins = new Loader(System);
 builtins.@strict = false;
 
 $$SetIntrinsic($$CurrentRealm(), 'internalLoader', builtins);
@@ -224,7 +225,9 @@ for (let name in builtins.@modules) {
 }
 
 {
-  const global = $$GetIntrinsic('global');
+  const global = $$GetIntrinsic('global'),
+        FROZEN = 0,
+        HIDDEN = 6;
 
   for (let [key, val] of std) {
     define(global, key, val, Type(val) === 'Object' ? HIDDEN : FROZEN);

@@ -9,7 +9,8 @@ import {
 } from '@@operations';
 
 import {
-  //builtinClass,
+  builtinClass,
+  builtinFunction,
   define,
   ensureArgs,
   ensureFunction
@@ -56,7 +57,7 @@ export class Function {
 
 builtinClass(Function);
 
-define(Function.prototype, 'name', '', FROZEN);
+define(Function.prototype, 'name', '', 0);
 
 
 

@@ -585,26 +585,9 @@ export function OrdinaryHasInstance(C, O){
 // ############################################
 
 const protos = {
-  '%ArrayBufferPrototype%' : 'ArrayBufferProto',
-  '%ArrayPrototype%'       : 'ArrayProto',
-  '%BooleanPrototype%'     : '%BooleanPrototype%',
-  '%DataViewPrototype%'    : 'DataViewProto',
-  '%DatePrototype%'        : '%DatePrototype%',
-  '%Float32ArrayPrototype%': 'Float32ArrayProto',
-  '%Float64ArrayPrototype%': 'Float64ArrayProto',
-  '%FunctionPrototype%'    : 'FunctionProto',
-  '%Int16ArrayPrototype%'  : 'Int16ArrayProto',
-  '%Int32ArrayPrototype%'  : 'Int32ArrayProto',
-  '%Int8ArrayPrototype%'   : 'Int8ArrayProto',
-  '%MapPrototype%'         : '%MapPrototype%',
-  '%NumberPrototype%'      : '%NumberPrototype%',
-  '%ObjectPrototype%'      : 'ObjectProto',
-  '%SetPrototype%'         : '%SetPrototype%',
-  '%StringPrototype%'      : '%StringPrototype%',
-  '%Uint16ArrayPrototype%' : 'Uint16ArrayProto',
-  '%Uint32ArrayPrototype%' : 'Uint32ArrayProto',
-  '%Uint8ArrayPrototype%'  : 'Uint8ArrayProto',
-  '%WeakMapPrototype%'     : '%WeakMapPrototype%'
+  '%ArrayPrototype%'   : 'ArrayProto',
+  '%FunctionPrototype%': 'FunctionProto',
+  '%ObjectPrototype%'  : 'ObjectProto'
 };
 
 
@@ -617,7 +600,7 @@ export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto
 
   if (!proto) {
     const realm = $$Has(constructor, 'Realm') ? $$Get(constructor, 'Realm') : $$CurrentRealm();
-    proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto));
+    proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto) || intrinsicDefaultProto);
   }
 
   return ObjectCreate(proto);

@@ -2288,13 +2288,14 @@ var runtime = (function(GLOBAL, exports, undefined){
       MIN_VALUE        : 5e-324,
       NaN              : +'NaN',
       POSITIVE_INFINITY: 1 / 0,
-      NEGATIVE_INFINITY: 1 / -0
+      NEGATIVE_INFINITY: 1 / -0,
+      undefined        : undefined
     });
 
     internalModules.set('@@symbols', symbols);
 
 
-    var mutationScopeInit = new Script('void 0');
+    var mutationScopeInit = new Script('void 0;');
 
     function initialize(realm, Ω, ƒ){
       if (realm.initialized) return Ω();
@@ -2302,11 +2303,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       realm.initialized = true;
       realm.mutationScope = new ExecutionContext(null, realm.globalEnv, realm, mutationScopeInit.bytecode);
 
-      var builtins = require('./builtins'),
-          init = builtins['@@internal'] + '\n\n'+ builtins['@system'];
+      var builtins = require('./builtins');
+      realm.builtins = create(null);
 
       var bootstrapLoader = {
-        modules: {},
         global: realm.global,
         baseURL: '',
         load: {
@@ -2315,11 +2315,11 @@ var runtime = (function(GLOBAL, exports, undefined){
                 callback = args[1],
                 errback  = args[2];
 
-            if (mrl in bootstrapLoader.modules) {
-              callback.Call(undefined, [bootstrapLoader.modules[mrl]]);
+            if (mrl in realm.builtins) {
+              callback.Call(undefined, [realm.builtins[mrl]]);
             } else if (mrl in builtins) {
               resolveModule(bootstrapLoader, builtins[mrl], mrl, function(module){
-                bootstrapLoader.modules[mrl] = module;
+                realm.builtins[mrl] = module;
                 module.loader = bootstrapLoader;
                 module.resolved = mrl;
                 module.mrl = mrl;
@@ -2335,7 +2335,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       };
 
-      resolveModule(bootstrapLoader, init, '@system', Ω, ƒ);
+      resolveModule(bootstrapLoader, builtins['@system'], '@system', Ω, ƒ);
     }
 
     function prepareToRun(bytecode, scope){

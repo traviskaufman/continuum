@@ -22,7 +22,9 @@ import {
   isInitializing
 } from '@@utilities';
 
-
+import {
+  @@create: create
+} from '@@symbols';
 
 export class Boolean {
   constructor(value){

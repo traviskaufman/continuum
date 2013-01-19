@@ -10,6 +10,10 @@ import {
 } from '@@internals';
 
 import {
+  undefined
+} from '@@constants';
+
+import {
   builtinClass,
   call,
   createInternal,
@@ -17,6 +21,7 @@ import {
   extend,
   extendInternal,
   hasBrand,
+  internalFunction,
   isInitializing,
   listFrom,
   listOf,
@@ -47,6 +52,9 @@ import {
   dict
 } from '@dict';
 
+import {
+  @@create: create
+} from '@@symbols';
 
 
 const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/;
@@ -403,7 +411,7 @@ export class String {
 
 builtinClass(String, 'StringWrapper');
 $$Set(String.prototype, 'StringValue', '');
-define(String.prototype, 'length', 0, FROZEN);
+define(String.prototype, 'length', 0, 0);
 
 
 export function fromCharCode(...codeUnits){

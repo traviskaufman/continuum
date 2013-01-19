@@ -7,7 +7,7 @@ import {
 } from '@@operations';
 
 import {
-  //builtinClass,
+  builtinClass,
   builtinFunction,
   hasBrand
 } from '@@utilities';

@@ -16,7 +16,8 @@ import {
   MIN_VALUE,
   NaN,
   POSITIVE_INFINITY,
-  NEGATIVE_INFINITY
+  NEGATIVE_INFINITY,
+  undefined
 } from '@@constants';
 
 import {
@@ -277,8 +278,19 @@ internalFunction(hideEverything);
 
 
 export function builtinClass(Ctor, brand){
-  $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
-  $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
+  const prototype = $$GetIntrinsic(`${Ctor.name}Proto`),
+        isSymbol  = Ctor.name === 'Symbol';
+
+  if (prototype) {
+    if (!isSymbol) {
+      extend(prototype, Ctor.prototype);
+      Ctor.prototype = prototype;
+    }
+  } else {
+    $$SetIntrinsic(`%${Ctor.name}%`, Ctor);
+    $$SetIntrinsic(`%${Ctor.name}Prototype%`, Ctor.prototype);
+  }
+
   $$Set(Ctor, 'BuiltinConstructor', true);
   $$Set(Ctor, 'BuiltinFunction', true);
   update(Ctor, 'prototype', FROZEN);
@@ -286,7 +298,7 @@ export function builtinClass(Ctor, brand){
   define(Ctor, 'caller', null, FROZEN);
   define(Ctor, 'arguments', null, FROZEN);
 
-  if (Ctor.name !== 'Symbol') {
+  if (!isSymbol) {
     setBrand(Ctor.prototype, brand || `Builtin${Ctor.name}`);
     setTag(Ctor.prototype, Ctor.name);
     hideEverything(Ctor);
