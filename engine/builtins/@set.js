@@ -133,21 +133,21 @@ export class Set {
   }
 
   clear(){
-    $$MapClear(ensureSet(this, 'clear'));
+    $$MapClear(ensureSet(this, 'Set.prototype.clear'));
     return this;
   }
 
   add(value){
-    $$MapSet(ensureSet(this, 'add'), value, value);
+    $$MapSet(ensureSet(this, 'Set.prototype.add'), value, value);
     return this;
   }
 
   has(value){
-    return $$MapHas(ensureSet(this, 'has'), value);
+    return $$MapHas(ensureSet(this, 'Set.prototype.has'), value);
   }
 
   delete(value){
-    return $$MapDelete(ensureSet(this, 'delete'), value);
+    return $$MapDelete(ensureSet(this, 'Set.prototype.delete'), value);
   }
 
   values(){

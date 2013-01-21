@@ -1,6 +1,5 @@
 import {
-  @@iterator: iterator,
-  @@create  : create
+  @@create: create
 } from '@@symbols';
 
 import {
@@ -9,7 +8,6 @@ import {
 
 import {
   $$Exception,
-  $$Get,
   $$Has,
   $$Set
 } from '@@internals';
@@ -42,7 +40,7 @@ import {
 
 function ensureWeakMap(o, p, name){
   if (Type(o) !== 'Object' || !$$Has(o, 'WeakMapData')) {
-    throw $$Exception('called_on_incompatible_object', [`WeakMap.prototype.${name}`]);
+    throw $$Exception('called_on_incompatible_object', [name]);
   }
 
   if (Type(p) !== 'Object') {
@@ -62,22 +60,22 @@ export class WeakMap {
   }
 
   delete(key){
-    ensureWeakMap(this, key, 'delete');
+    ensureWeakMap(this, key, 'WeakMap.prototype.delete');
     return $$WeakMapDelete(this, key);
   }
 
   get(key){
-    ensureWeakMap(this, key, 'get');
+    ensureWeakMap(this, key, 'WeakMap.prototype.get');
     return $$WeakMapGet(this, key);
   }
 
   has(key){
-    ensureWeakMap(this, key, 'has');
+    ensureWeakMap(this, key, 'WeakMap.prototype.has');
     $$WeakMapHas(this, key);
   }
 
   set(key, value){
-    ensureWeakMap(this, key, 'set');
+    ensureWeakMap(this, key, 'WeakMap.prototype.set');
     $$WeakMapSet(this, key, value);
     return this;
   }

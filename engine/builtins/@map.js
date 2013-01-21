@@ -59,7 +59,7 @@ import {
 
 function ensureMap(o, name){
   if (Type(o) !== 'Object' || !$$Has(o, 'MapData')) {
-    throw $$Exception('called_on_incompatible_object', ['Map.prototype.'+name]);
+    throw $$Exception('called_on_incompatible_object', [name]);
   }
 }
 
@@ -124,44 +124,44 @@ export class Map {
   }
 
   clear(){
-    ensureMap(this, 'clear');
+    ensureMap(this, 'Map.prototype.clear');
     $$MapClear(this, key);
     return this;
   }
 
   delete(key){
-    ensureMap(this, 'delete');
+    ensureMap(this, 'Map.prototype.delete');
     return $$MapDelete(this, key);
   }
 
   get(key){
-    ensureMap(this, 'get');
+    ensureMap(this, 'Map.prototype.get');
     return $$MapGet(this, key);
   }
 
   has(key){
-    ensureMap(this, 'has');
+    ensureMap(this, 'Map.prototype.has');
     return $$MapHas(this, key);
   }
 
   entries(){
-    ensureMap(this, 'entries');
+    ensureMap(this, 'Map.prototype.entries');
     return new MapIterator(this, 'key+value');
   }
 
   keys(){
-    ensureMap(this, 'keys');
+    ensureMap(this, 'Map.prototype.keys');
     return new MapIterator(this, 'key');
   }
 
   set(key, value){
-    ensureMap(this, 'set');
+    ensureMap(this, 'Map.prototype.set');
     $$MapSet(this, key, value);
     return this;
   }
 
   values(){
-    ensureMap(this, 'values');
+    ensureMap(this, 'Map.prototype.values');
     return new MapIterator(this, 'value');
   }
 }
