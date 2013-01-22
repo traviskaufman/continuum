@@ -24,6 +24,10 @@ import {
   toStringTag
 } from '@@symbols';
 
+import {
+  Type
+} from '@@types';
+
 
 const FROZEN = 0,
       HIDDEN = 6;
