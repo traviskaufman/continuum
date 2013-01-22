@@ -942,10 +942,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       function Delete(key){
         return false;
       },
-      function DefaultValue(){
-        // TODO: remove DefaultValue
-        return '[object Module]';
-      },
       function Keys(){
         return this.keys;
       },

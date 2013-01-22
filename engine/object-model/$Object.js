@@ -550,24 +550,6 @@ var $Object = (function(exports){
       }
 
       return props;
-    },
-    function DefaultValue(hint){
-      var order = hint === 'String' ? ['toString', 'valueOf'] : ['valueOf', 'toString'];
-
-      for (var i=0; i < 2; i++) {
-        var method = this.Get(order[i]);
-        if (method && method.Abrupt) return method;
-
-        if ($$IsCallable(method)) {
-          var value = method.Call(this, []);
-          if (value && value.Abrupt) return value;
-          if (value === null || typeof value !== 'object') {
-            return value;
-          }
-        }
-      }
-
-      return $$ThrowException('cannot_convert_to_primitive', []);
     }
     // function Keys(){},
     // function OwnPropertyKeys(){},

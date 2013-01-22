@@ -118,9 +118,6 @@ var $Symbol = (function(exports){
       },
       function IsSealed(){
         return true;
-      },
-      function DefaultValue(){
-        return '[object Symbol]';
       }
     ]);
 
