@@ -60,7 +60,7 @@ export class WeakMap {
   }
 
   clear(){
-    if (Type(o) !== 'Object' || !$$Has(o, 'WeakMapData')) {
+    if (Type(this) !== 'Object' || !$$Has(this, 'WeakMapData')) {
       throw $$Exception('called_on_incompatible_object', ['WeakMap.prototype.clear']);
     }
 
