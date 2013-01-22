@@ -294,7 +294,9 @@ export function pow(x, y){
   return $$Pow(ToNumber(x), ToNumber(y));
 }
 
-export let random = $__random;
+export function random(){
+  return $$Random();
+}
 
 export function round(x){
   x = ToNumber(x);
