@@ -17,6 +17,26 @@ import {
   $$Set
 } from '@@internals';
 
+import {
+  $$Acos,
+  $$Asin,
+  $$Atan,
+  $$Atan2,
+  $$Cos,
+  $$Exp,
+  $$Log,
+  $$Pow,
+  $$Random,
+  $$Sin,
+  $$Sqrt,
+  $$Tan
+} from '@@math';
+
+import {
+  NaN,
+  NEGATIVE_INFINITY,
+  POSITIVE_INFINITY
+} from '@@constants';
 
 
 export const E       = 2.718281828459045,
@@ -32,8 +52,8 @@ export const E       = 2.718281828459045,
 function isFiniteNonZero(value) {
   return value === value
       && value !== 0
-      && value !== -Infinity
-      && value !== Infinity;
+      && value !== NEGATIVE_INFINITY
+      && value !== POSITIVE_INFINITY;
 }
 
 internalFunction(isFiniteNonZero);
@@ -60,47 +80,47 @@ export function abs(x){
 
 export function acos(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__acos(x) : x;
+  return isFiniteNonZero(x) ? $$Acos(x) : x;
 }
 
 export function acosh(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x - 1)) : x;
+  return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x - 1)) : x;
 }
 
 export function asin(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__asin(x) : x;
+  return isFiniteNonZero(x) ? $$Asin(x) : x;
 }
 
 export function asinh(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x + $__sqrt(x * x + 1)) : x;
+  return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x + 1)) : x;
 }
 
 export function atan(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__atan(x) : x;
+  return isFiniteNonZero(x) ? $$Atan(x) : x;
 }
 
 export function atan2(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__atan2(x) : x;
+  return isFiniteNonZero(x) ? $$Atan2(x) : x;
 }
 
 export function atanh(x) {
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? .5 * $__log((1 + x) / (1 - x)) : x;
+  return isFiniteNonZero(x) ? .5 * $$Log((1 + x) / (1 - x)) : x;
 }
 
 export function ceil(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? x + 1 >> 0 : x;
+  return isFiniteNonZero(x) ? ToInt32(x + 1) : x;
 }
 
 export function cos(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__cos(x) : x;
+  return isFiniteNonZero(x) ? $$Cos(x) : x;
 }
 
 export function cosh(x) {
@@ -110,14 +130,14 @@ export function cosh(x) {
   }
   x = abs(x);
   if (x > 21) {
-    return $__exp(x) / 2;
+    return $$Exp(x) / 2;
   }
-  return ($__exp(x) + $__exp(-x)) / 2;
+  return ($$Exp(x) + $$Exp(-x)) / 2;
 }
 
 export function exp(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__exp(x) : x;
+  return isFiniteNonZero(x) ? $$Exp(x) : x;
 }
 
 export function expm1(x) {
@@ -130,7 +150,7 @@ export function expm1(x) {
       n = 50;
 
   for (var i = 1; i < n; i++) {
-    o += $__pow(x, i) / factorial(i);
+    o += $$Pow(x, i) / factorial(i);
   }
 
   return o;
@@ -138,7 +158,7 @@ export function expm1(x) {
 
 export function floor(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? x >> 0 : x;
+  return isFiniteNonZero(x) ? ToInt32(x) : x;
 }
 
 export function hypot(x, y) {
@@ -150,7 +170,7 @@ export function hypot(x, y) {
   if (!isFiniteNonZero(y)) {
     return y;
   }
-  return $__sqrt(x * x + y * y);
+  return $$Sqrt(x * x + y * y);
 }
 
 export function imul(x, y){
@@ -162,12 +182,12 @@ export function imul(x, y){
 
 export function log(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x) : x;
+  return isFiniteNonZero(x) ? $$Log(x) : x;
 }
 
 export function log10(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x) * LOG10E : x;
+  return isFiniteNonZero(x) ? $$Log(x) * LOG10E : x;
 }
 
 export function log1p(x){
@@ -182,13 +202,13 @@ export function log1p(x){
   if (x <= -1) {
     return -Infinity;
   } else if (x < 0 || x > 1) {
-    return $__log(1 + x);
+    return $$Log(1 + x);
   } else {
     for (var i = 1; i < n; i++) {
       if ((i % 2) === 0) {
-        o -= $__pow(x, i) / i;
+        o -= $$Pow(x, i) / i;
       } else {
-        o += $__pow(x, i) / i;
+        o += $$Pow(x, i) / i;
       }
     }
     return o;
@@ -197,7 +217,7 @@ export function log1p(x){
 
 export function log2(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__log(x) * LOG2E : x;
+  return isFiniteNonZero(x) ? $$Log(x) * LOG2E : x;
 }
 
 export function max(...values){
@@ -271,7 +291,7 @@ export function min(...values){
 set(min, 'length', 2);
 
 export function pow(x, y){
-  return $__pow(ToNumber(x), ToNumber(y));
+  return $$Pow(ToNumber(x), ToNumber(y));
 }
 
 export let random = $__random;
@@ -288,26 +308,26 @@ export function sign(x){
 
 export function sin(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__sin(x) : x;
+  return isFiniteNonZero(x) ? $$Sin(x) : x;
 }
 
 export function sinh(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / 2 : x;
+  return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / 2 : x;
 }
 
 export function sqrt(x, y){
-  return $__sqrt(+x, +y);
+  return $$Sqrt(+x, +y);
 }
 
 export function tan(x){
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? $__tan(x) : x;
+  return isFiniteNonZero(x) ? $$Tan(x) : x;
 }
 
 export function tanh(x) {
   x = ToNumber(x);
-  return isFiniteNonZero(x) ? ($__exp(x) - $__exp(-x)) / ($__exp(x) + $__exp(-x)) : x;
+  return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / ($$Exp(x) + $$Exp(-x)) : x;
 }
 
 export function trunc(x){

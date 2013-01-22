@@ -103,18 +103,6 @@ var natives = (function(module){
     encodeURIComponent: encodeURIComponent,
     escape: escape,
     unescape: unescape,
-    acos: Math.acos,
-    asin: Math.asin,
-    atan: Math.atan,
-    atan2: Math.atan2,
-    cos: Math.acos,
-    exp: Math.exp,
-    log: Math.log,
-    pow: Math.pow,
-    random: Math.random,
-    sin: Math.sin,
-    sqrt: Math.sqrt,
-    tan: Math.tan,
     _createUndetectable: function(obj, args){
       return new Undetectable(args[0]);
     },

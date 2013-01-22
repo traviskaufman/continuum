@@ -2321,6 +2321,45 @@ var runtime = (function(GLOBAL, exports, undefined){
       });
     }();
 
+    internalModules.set('@@math', {
+      $$Acos: function(_, args){
+        return Math.acos(args[0]);
+      },
+      $$Asin: function(_, args){
+        return Math.asin(args[0]);
+      },
+      $$Atan: function(_, args){
+        return Math.atan(args[0]);
+      },
+      $$Atan2: function(_, args){
+        return Math.atan2(args[0]);
+      },
+      $$Cos: function(_, args){
+        return Math.acos(args[0]);
+      },
+      $$Exp: function(_, args){
+        return Math.exp(args[0]);
+      },
+      $$Log: function(_, args){
+        return Math.log(args[0]);
+      },
+      $$Pow: function(_, args){
+        return Math.pow(args[0], args[1]);
+      },
+      $$Random: function(){
+        return Math.random();
+      },
+      $$Sin: function(_, args){
+        return Math.sin(args[0]);
+      },
+      $$Sqrt: function(_, args){
+        return Math.sqrt(args[0]);
+      },
+      $$Tan: function(_, args){
+        return Math.ta(args[0]);
+      }
+    });
+
     internalModules.set('@@constants', {
       DST_START_MONTH  : natives.get('DST_START_MONTH'),
       DST_START_SUNDAY : natives.get('DST_START_SUNDAY'),
