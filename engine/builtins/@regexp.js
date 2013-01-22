@@ -83,7 +83,7 @@ builtinFunction(exec);
 
 export function test(regexp, string){
   if (hasBrand(regexp, 'BuiltinRegExp')) {
-    return $$RegExpTest(regexp, [ToString(string)]);
+    return $$RegExpTest(regexp, ToString(string));
   }
   throw $$Exception('not_generic', ['@regexp.test']);
 }
