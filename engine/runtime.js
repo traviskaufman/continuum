@@ -1453,40 +1453,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     ]);
 
-
-    natives.add({
-      _isConstruct: function(){
-        return context.isConstruct;
-      },
-      _argumentCount: function(){
-        return context.argumentCount();
-      },
-      _hasArgument: function(obj, args){
-        return context.hasArgument(args[0]);
-      },
-      _callerName: function(){
-        return context.callerName();
-      },
-      _callerIsConstruct: function(){
-        if (context.caller) {
-          return context.caller.isConstruct;
-        }
-        return false;
-      },
-      _callerArgumentCount: function(){
-        if (context.caller) {
-          return context.argumentCount();
-        }
-        return null;
-      },
-      _callerHasArgument: function(obj, args){
-        if (context.caller) {
-          return context.caller.hasArgument(args[0]);
-        }
-        return false;
-      }
-    });
-
     return ExecutionContext;
   })();
 
