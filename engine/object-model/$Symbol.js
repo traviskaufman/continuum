@@ -4,6 +4,7 @@ var $Symbol = (function(exports){
 
   var inherit = objects.inherit,
       define  = objects.define,
+      assign  = objects.assign,
       Hash    = objects.Hash,
       tag     = utility.tag,
       uid     = utility.uid;
@@ -127,34 +128,39 @@ var $Symbol = (function(exports){
   })();
 
   var $WellKnownSymbol = exports.$WellKnownSymbol = (function(){
-    var symbols = exports.wellKnownSymbols = new Hash;
-
     function $WellKnownSymbol(name){
       $Symbol.call(this, '@'+name, true);
     }
 
     inherit($WellKnownSymbol, $Symbol);
 
-
-    function addWellKnownSymbol(name){
-      return symbols[name] = new $WellKnownSymbol(name);
-    }
-
-    exports.addWellKnownSymbol = addWellKnownSymbol;
-
-    addWellKnownSymbol('toStringTag');
-    addWellKnownSymbol('iterator');
-    addWellKnownSymbol('hasInstance');
-    addWellKnownSymbol('create');
-    addWellKnownSymbol('BooleanValue');
-    addWellKnownSymbol('StringValue');
-    addWellKnownSymbol('NumberValue');
-    addWellKnownSymbol('DateValue');
-    addWellKnownSymbol('ToPrimitive');
-
     return $WellKnownSymbol;
   })();
 
+  exports.wellKnownSymbols = assign(new Hash, {
+    create     : new $WellKnownSymbol('create'),
+    hasInstance: new $WellKnownSymbol('hasInstance'),
+    iterator   : new $WellKnownSymbol('iterator'),
+    ToPrimitive: new $WellKnownSymbol('ToPrimitive'),
+    toStringTag: new $WellKnownSymbol('toStringTag')
+  });
+
+  var $InternalSymbol = exports.$InternalSymbol = (function(){
+    function $InternalSymbol(name){
+      $Symbol.call(this, '@'+name, false);
+    }
+
+    inherit($InternalSymbol, $Symbol);
+
+    return $InternalSymbol;
+  })();
+
+  exports.internalSymbols = assign(new Hash, {
+    BooleanValue: new $InternalSymbol('BooleanValue'),
+    DateValue   : new $InternalSymbol('DateValue'),
+    NumberValue : new $InternalSymbol('NumberValue'),
+    StringValue : new $InternalSymbol('StringValue')
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});
