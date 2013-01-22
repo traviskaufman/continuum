@@ -95,9 +95,6 @@ var natives = (function(module){
     ToUint32: operators.$$ToUint32,
     ToUint16: operators.$$ToUint16,
     CheckObjectCoercible: operations.$$CheckObjectCoercible,
-    GetNotifier: operations.$$GetNotifier,
-    EnqueueChangeRecord: operations.$$EnqueueChangeRecord,
-    DeliverChangeRecords: operations.$$DeliverChangeRecords,
     parseInt: parseInt,
     parseFloat: parseFloat,
     decodeURI: decodeURI,
@@ -283,9 +280,6 @@ var natives = (function(module){
     Exception: function(type, args){
       return $$MakeException(type, $$CreateListFromArray(args));
     },
-    _getWellKnownSymbol: function(_, args){
-      return wellKnownSymbols[args[0]];
-    },
     _createNil: function(){
       return new $Nil;
     },
@@ -401,12 +395,6 @@ var natives = (function(module){
       realm.emit.apply(realm, args);
     },
     DateParse: Date.parse || function(){ return NaN },
-    AddObserver: function(data, callback){
-      data.set(callback, callback);
-    },
-    RemoveObserver: function(data, callback){
-      data.remove(callback);
-    },
     readFile: function(path, callback){
       require('fs').readFile(path, 'utf8', function(err, file){
         callback.Call(undefined, [file]);

@@ -10,6 +10,7 @@ import {
   ensureFunction,
   ensureObject,
   ensureProto,
+  enumerate,
   extend,
   internalFunction,
   query
@@ -21,10 +22,14 @@ import {
 } from '@@types';
 
 import {
+  $$AddObserver,
+  $$DeliverChangeRecords,
   $$Exception,
+  $$GetIntrinsic,
+  $$GetNotifier,
   $$Has,
   $$Invoke,
-  $$GetIntrinsic,
+  $$RemoveObserver,
   $$SetIntrinsic
 } from '@@internals';
 
@@ -87,7 +92,7 @@ export function assign(target, source){
   ensureObject(target, 'Object.assign');
   source = ToObject(source);
 
-  for (let [i, key] of $__Enumerate(source, false, true)) {
+  for (let [i, key] of enumerate(source, false, true)) {
     const prop = source[key];
     if (typeof prop === 'function' && $$Has(prop, 'HomeObject')) {
       // TODO
@@ -137,7 +142,7 @@ export function defineProperties(object, properties){
 
 export function freeze(object){
   ensureObject(object, 'Object.freeze');
-  const props = $__Enumerate(object, false, false);
+  const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
     const desc = $__GetOwnProperty(object, props[i]);
@@ -154,8 +159,6 @@ export function freeze(object){
   return object;
 }
 
-$__freeze = freeze;
-
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
   return $__GetOwnProperty(object, ToPropertyKey(key));
@@ -163,7 +166,7 @@ export function getOwnPropertyDescriptor(object, key){
 
 export function getOwnPropertyNames(object){
   ensureObject(object, 'Object.getOwnPropertyNames');
-  return $__Enumerate(object, false, false);
+  return enumerate(object, false, false);
 }
 
 export function getPropertyDescriptor(object, key){
@@ -173,7 +176,7 @@ export function getPropertyDescriptor(object, key){
 
 export function getPropertyNames(object){
   ensureObject(object, 'Object.getPropertyNames');
-  return $__Enumerate(object, true, false);
+  return enumerate(object, true, false);
 }
 
 export function getPrototypeOf(object){
@@ -200,7 +203,7 @@ export function isFrozen(object){
     return false;
   }
 
-  const props = $__Enumerate(object, false, false);
+  const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
     const desc = $__GetOwnProperty(object, props[i]);
@@ -218,7 +221,7 @@ export function isSealed(object){
     return false;
   }
 
-  const props = $__Enumerate(object, false, false);
+  const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
     const desc = $__GetOwnProperty(object, props[i]);
@@ -232,7 +235,7 @@ export function isSealed(object){
 
 export function keys(object){
   ensureObject(object, 'Object.keys');
-  return $__Enumerate(object, false, true);
+  return enumerate(object, false, true);
 }
 
 export function preventExtensions(object){
@@ -245,7 +248,7 @@ export function seal(object){
   ensureObject(object, 'Object.seal');
 
   const desc = { configurable: false },
-        props = $__Enumerate(object, false, false);
+        props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
     $__DefineOwnProperty(object, props[i], desc);
@@ -257,8 +260,9 @@ export function seal(object){
 
 
 function getObservers(object){
-  return $$GetInternal($__GetNotifier(object), 'ChangeObservers');
+  return $$GetInternal($$GetNotifier(object), 'ChangeObservers');
 }
+
 
 internalFunction(getObservers);
 
@@ -269,26 +273,26 @@ export function observe(object, callback){
 
   }
 
-  $__AddObserver(getObservers(object), callback);
-  $__AddObserver($$GetIntrinsic('ObserverCallbacks'), callback);
+  $$AddObserver(getObservers(object), callback);
+  $$AddObserver($$GetIntrinsic('ObserverCallbacks'), callback);
   return object;
 }
 
 export function unobserve(object, callback){
   ensureObject(object, 'Object.unobserve');
   ensureFunction(callback, 'Object.unobserve');
-  $__RemoveObserver(getObservers(object), callback);
+  $$RemoveObserver(getObservers(object), callback);
   return object;
 }
 
 export function deliverChangeRecords(callback){
   ensureFunction(callback, 'Object.deliverChangeRecords');
-  $__DeliverChangeRecords(callback);
+  $$DeliverChangeRecords(callback);
 }
 
 export function getNotifier(object){
   ensureObject(object, 'Object.getNotifier');
-  return isFrozen(object) ? null : $__GetNotifier(object);
+  return isFrozen(object) ? null : $$GetNotifier(object);
 }
 
 

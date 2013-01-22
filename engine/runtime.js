@@ -1966,6 +1966,12 @@ var runtime = (function(GLOBAL, exports, undefined){
       var now = Date.now || function(){ return +new Date };
 
       internalModules.set('@@internals', {
+        $$AddObserver: function(_, args){
+          var data     = args[0],
+              callback = args[1];
+
+          data.set(callback, callback);
+        },
         $$ArgumentCount: function(){
           return context.argumentCount();
         },
@@ -1973,24 +1979,28 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (args[0] === true) {
             return true;
           }
+
           return $$ThrowException('assertion_failed', ['$$Assert']);
         },
         $$AssertIsInternalArray: function(_, args){
           if (args[0] instanceof Array) {
             return true;
           }
+
           return $$ThrowException('assertion_failed', ['$$AssertIsInternalArray']);
         },
         $$AssertIsECMAScriptValue: function(_, args){
           if (typeof args[0] !== 'object' || args[0] === null && args[0].DefineOwnProperty) {
             return true;
           }
+
           return $$ThrowException('assertion_failed', ['$$AssertIsECMAScriptValue:']);
         },
         $$AssertWontThrow: function(_, args){
           if (!args[0] || !args[0].Abrupt) {
             return true;
           }
+
           return $$ThrowException('assertion_failed', ['$$AssertWontThrow']);
         },
         $$Call: function(_, args){
@@ -2010,12 +2020,14 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (context.caller) {
             return context.argumentCount();
           }
+
           return null;
         },
         $$CallerHasArgument: function(_, args){
           if (context.caller) {
             return context.caller.hasArgument(args[0]);
           }
+
           return false;
         },
         $$CallerName: function(){
@@ -2025,10 +2037,12 @@ var runtime = (function(GLOBAL, exports, undefined){
           if (context.caller) {
             return context.caller.isConstruct;
           }
+
           return false;
         },
         $$ClearImmediate: function(_, args){
           var id = args[0];
+
           var func = timers[id];
 
           if (func) {
@@ -2050,17 +2064,26 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$CreateArray: function(_, args){
           var array = new $Array(args[1]);
+
           if (args[0] !== realm) {
             array.Realm = args[0];
             array.Prototype = args[0].intrinsics['%ArrayPrototype%'];
           }
+
           return array;
         },
         $$CreateInternalObject: function(_, args){
-          return create(args[0] || null);
+          var prototype = args[0];
+
+          return create(prototype || null);
         },
         $$CurrentRealm: function(){
           return realm;
+        },
+        $$DeliverChangeRecords: function(_, args){
+          var callback = args[0];
+
+          return operations.$$DeliverChangeRecords(callback);
         },
         $$Enumerate: function(_, args){
           return new $Array(properties(args[0]));
@@ -2140,6 +2163,19 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$GetIntrinsic: function(_, args){
           return realm.intrinsics[args[0]];
         },
+        $$GetNotifier: function(_, args){
+          var obj = args[0];
+
+          var notifier = obj.Notifier;
+
+          if (!notifier) {
+            notifier = obj.Notifier = new $Object(intrinsics.NotifierProto);
+            notifier.Target = obj;
+            notifier.ChangeObservers = new MapData;
+          }
+
+          return notifier;
+        },
         $$HasArgument: function(_, args){
           return context.hasArgument(args[0]);
         },
@@ -2147,8 +2183,8 @@ var runtime = (function(GLOBAL, exports, undefined){
           return args[1] in args[0];
         },
         $$Invoke: function(_, args){
-          var obj  = args[0],
-              key  = args[1];
+          var obj = args[0],
+              key = args[1];
 
           if (obj[key]) {
             switch (args.length) {
@@ -2160,6 +2196,7 @@ var runtime = (function(GLOBAL, exports, undefined){
               default: return obj[key].apply(obj, args.slice(2));
             }
           }
+
           return $$ThrowException('unknown_internal_function', [key]);
         },
         $$IsConstruct: function(){
@@ -2181,6 +2218,12 @@ var runtime = (function(GLOBAL, exports, undefined){
             return array;
           }
           return null;
+        },
+        $$RemoveObserver: function(_, args){
+          var data     = args[0],
+              callback = args[1];
+
+          data.remove(callback);
         },
         $$Resolve: (function(){
           if (require('path')) {
