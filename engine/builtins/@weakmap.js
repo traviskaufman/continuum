@@ -59,6 +59,15 @@ export class WeakMap {
     $$WeakMapInitialization(this, iterable);
   }
 
+  clear(){
+    if (Type(o) !== 'Object' || !$$Has(o, 'WeakMapData')) {
+      throw $$Exception('called_on_incompatible_object', ['WeakMap.prototype.clear']);
+    }
+
+    $$WeakMapInitialization(this);
+    return this;
+  }
+
   delete(key){
     ensureWeakMap(this, key, 'WeakMap.prototype.delete');
     return $$WeakMapDelete(this, key);
