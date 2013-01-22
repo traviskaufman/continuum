@@ -104,6 +104,16 @@ builtinClass(WeakMap);
 const WeakMapPrototype = WeakMap.prototype;
 
 
+function weakmapClear(weakmap, key){
+  if (Type(weakmap) !== 'Object' || !$$Has(weakmap, 'WeakMapData')) {
+    throw $$Exception('called_on_incompatible_object', ['@weakmap.clear']);
+  }
+
+  $$WeakMapInitialization(weakmap);
+  return weakmap;
+}
+
+builtinFunction(weakmapDelete);
 
 function weakmapDelete(weakmap, key){
   ensureWeakMap(weakmap, key, '@weakmap.delete');
@@ -138,7 +148,8 @@ function weakmapSet(weakmap, key, value){
 builtinFunction(weakmapSet);
 
 
-export const get     = weakmapGet,
-           //delete  = weakmapDelete, TODO: fix exporting reserved names
-             has     = weakmapHas,
-             set     = weakmapSet;
+export const clear  = weakmapClear,
+           //delete = weakmapDelete, TODO: fix exporting reserved names
+             get    = weakmapGet,
+             has    = weakmapHas,
+             set    = weakmapSet;
