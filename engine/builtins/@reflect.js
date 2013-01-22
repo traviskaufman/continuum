@@ -14,11 +14,13 @@ import {
   builtinClass,
   builtinFunction,
   call,
+  deleteProperty,
   ensureArgs,
   ensureDescriptor,
   ensureFunction,
   ensureObject,
-  ensureProto
+  ensureProto,
+  _enumerate: enumerate
 } from '@@utilities';
 
 import {
@@ -37,7 +39,7 @@ export class Proxy {
 
 builtinClass(Proxy);
 
-$__delete(Proxy, 'prototype');
+deleteProperty(Proxy, 'prototype');
 
 const normal = { writable: true,
                  enumerable: true,
@@ -45,47 +47,47 @@ const normal = { writable: true,
 
 export class Handler {
   getOwnPropertyDescriptor(target, propertyKey){
-    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
+    //throw $$Exception('missing_fundamental_trap', ['getOwnPropertyDescriptor']);
     return getOwnPropertyDescriptor(target, propertyKey);
   }
 
   getOwnPropertyNames(target){
-    //throw $__Exception('missing_fundamental_trap', ['getOwnPropertyNames']);
+    //throw $$Exception('missing_fundamental_trap', ['getOwnPropertyNames']);
     return getOwnPropertyNames(target);
   }
 
   getPrototypeOf(target){
-    //throw $__Exception('missing_fundamental_trap', ['getPrototypeOf']);
+    //throw $$Exception('missing_fundamental_trap', ['getPrototypeOf']);
     return getPrototypeOf(target);
   }
 
   setPrototypeOf(target, proto){
-    //throw $__Exception('missing_fundamental_trap', ['setPrototypeOf']);
+    //throw $$Exception('missing_fundamental_trap', ['setPrototypeOf']);
     return setPrototypeOf(target, proto);
   }
 
   defineProperty(target, propertyKey, desc){
-    //throw $__Exception('missing_fundamental_trap', ['defineProperty']);
+    //throw $$Exception('missing_fundamental_trap', ['defineProperty']);
     return defineProperty(target, propertyKey, desc);
   }
 
   deleteProperty(target, propertyKey){
-    //throw $__Exception('missing_fundamental_trap', ['deleteProperty']);
+    //throw $$Exception('missing_fundamental_trap', ['deleteProperty']);
     return deleteProperty(target, propertyKey);
   }
 
   preventExtensions(target){
-    //throw $__Exception('missing_fundamental_trap', ['preventExtensions']);
+    //throw $$Exception('missing_fundamental_trap', ['preventExtensions']);
     return preventExtensions(target);
   }
 
   isExtensible(target){
-    //throw $__Exception('missing_fundamental_trap', ['isExtensible']);
+    //throw $$Exception('missing_fundamental_trap', ['isExtensible']);
     return isExtensible(target);
   }
 
   apply(target, thisArg, args){
-    //throw $__Exception('missing_fundamental_trap', ['apply']);
+    //throw $$Exception('missing_fundamental_trap', ['apply']);
     return apply(target, thisArg, args);
   }
 
@@ -198,7 +200,7 @@ export class Handler {
       } else if (receiver === target) {
         $__DefineOwnProperty(receiver, propertyKey, { value: value });
         return true;
-      } else if (!$__IsExtensible(receiver)) {
+      } else if (!$$Invoke(receiver, 'IsExtensible')) {
         return false;
       }
       normal.value = value;
@@ -304,7 +306,7 @@ builtinFunction(deleteProperty);
 
 
 export function enumerate(target){
-  return $__Enumerate(ToObject(target), true, true);
+  return _enumerate(ToObject(target), true, true);
 }
 
 builtinFunction(enumerate);
@@ -315,7 +317,7 @@ export function freeze(target){
     return false;
   }
 
-  const props = $__Enumerate(target, false, false),
+  const props = _enumerate(target, false, false),
         len   = props.length;
 
   letsuccess = true;
@@ -356,7 +358,7 @@ builtinFunction(getOwnPropertyDescriptor);
 
 export function getOwnPropertyNames(target){
   ensureObject(target, '@reflect.getOwnPropertyNames');
-  return $__Enumerate(target, false, false);
+  return _enumerate(target, false, false);
 }
 
 builtinFunction(getOwnPropertyNames);
@@ -405,7 +407,7 @@ export function isFrozen(target){
     return false;
   }
 
-  const props = $__Enumerate(target, false, false);
+  const props = _enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
     const desc = $__GetOwnProperty(target, props[i]);
@@ -427,7 +429,7 @@ export function isSealed(target){
     return false;
   }
 
-  const props = $__Enumerate(target, false, false);
+  const props = _enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
     const desc = $__GetOwnProperty(target, props[i]);
@@ -452,7 +454,7 @@ builtinFunction(isExtensible);
 
 export function keys(target){
   ensureObject(target, '@reflect.keys');
-  return $__Enumerate(target, false, true);
+  return _enumerate(target, false, true);
 }
 
 builtinFunction(keys);
@@ -475,7 +477,7 @@ export function seal(target){
     return success;
   }
 
-  const props = $__Enumerate(target, false, false),
+  const props = _enumerate(target, false, false),
         len   = props.length,
         desc  = { configurable: false };
 
