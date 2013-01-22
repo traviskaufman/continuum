@@ -2,6 +2,7 @@ import {
   $$Invoke,
   $$CreateInternalObject,
   $$CreateObject,
+  $$Exception,
   $$Get,
   $$GetIntrinsic,
   $$Has,
