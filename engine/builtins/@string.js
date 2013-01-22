@@ -10,6 +10,10 @@ import {
 } from '@@internals';
 
 import {
+  $$RegExpExec
+} from '@@regexp';
+
+import {
   undefined
 } from '@@constants';
 
@@ -36,13 +40,16 @@ import {
 } from '@@operations';
 
 import {
+  @@create: create
+} from '@@symbols';
+
+import {
   MAX_INTEGER
 } from '@number';
 
 import {
   RegExp
 } from '@regexp';
-
 
 import {
   Array
@@ -51,11 +58,6 @@ import {
 import {
   dict
 } from '@dict';
-
-import {
-  @@create: create
-} from '@@symbols';
-
 
 const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/;
 
@@ -109,7 +111,7 @@ function stringMatch(string, regexp){
   }
 
   if (!regexp.global) {
-    return $__RegExpExec(regexp, string);
+    return $$RegExpExec(regexp, string);
   }
 
   const array = [];
@@ -120,7 +122,7 @@ function stringMatch(string, regexp){
   regexp.lastIndex = 0;
 
   while (lastMatch) {
-    const result = $__RegExpExec(regexp, string);
+    const result = $$RegExpExec(regexp, string);
     if (result === null) {
       lastMatch = false;
     } else {

@@ -1853,20 +1853,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       _SymbolCreate: function(obj, args){
         return new $Symbol(args[0], args[1]);
-      },
-      _RegExpCreate: function(obj, args){
-        var pattern = args[0],
-            flags   = args[1];
-
-        if (typeof pattern === 'object') {
-          pattern = pattern.PrimitiveValue;
-        }
-        try {
-          var result = new RegExp(pattern, flags);
-        } catch (e) {
-          return $$ThrowException('invalid_regexp', [pattern+'']);
-        }
-        return new $RegExp(result);
       }
     });
 
@@ -2357,6 +2343,51 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       $$Tan: function(_, args){
         return Math.ta(args[0]);
+      }
+    });
+
+    internalModules.set('@@regexp', {
+      $$RegExpCreate: function(obj, args){
+        var pattern = args[0],
+            flags   = args[1];
+
+        if (typeof pattern === 'object') {
+          pattern = pattern.PrimitiveValue;
+        }
+
+        try {
+          var result = new RegExp(pattern, flags);
+        } catch (e) {
+          return $$ThrowException('invalid_regexp', [pattern+'']);
+        }
+
+        return new $RegExp(result);
+      },
+      $$RegExpExec: function(_, args){
+        var regexp = args[0],
+            string = args[1];
+
+        var result = regexp.PrimitiveValue.exec(string);
+
+        if (result) {
+          var array = new $Array(result);
+          array.set('index', result.index);
+          array.set('input', string);
+          return array;
+        }
+
+        return result;
+      },
+      $$RegExpTest: function(_, args){
+        var regexp = args[0],
+            string = args[1];
+
+        return regexp.PrimitiveValue.test(string);
+      },
+      $$RegExpToString: function(_, args){
+        var regexp = args[0];
+
+        return regexp.PrimitiveValue.toString();
       }
     });
 

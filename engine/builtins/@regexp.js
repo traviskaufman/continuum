@@ -13,13 +13,21 @@ import {
 } from '@@utilities';
 
 import {
-  $$Exception
+  $$Exception,
+  $$IsConstruct
 } from '@@internals';
+
+import {
+  $$RegExpCreate,
+  $$RegExpExec,
+  $$RegExpTest,
+  $$RegExpToString
+} from '@@regexp';
 
 
 export class RegExp {
   constructor(pattern, flags){
-    if ($__isConstruct()) {
+    if ($$IsConstruct()) {
       if (pattern === undefined) {
         pattern = '';
       } else if (hasBrand(pattern, 'BuiltinRegExp')) {
@@ -32,12 +40,12 @@ export class RegExp {
     } else if (flags === undefined && hasBrand(pattern, 'BuiltinRegExp')) {
       return pattern;
     }
-    return $__RegExpCreate(pattern, flags);
+    return $$RegExpCreate(pattern, flags);
   }
 
   exec(string){
     if (hasBrand(this, 'BuiltinRegExp')) {
-      return $__RegExpExec(this, ToString(string));
+      return $$RegExpExec(this, ToString(string));
     }
 
     throw $$Exception('not_generic', ['RegExp.prototype.exec']);
@@ -45,7 +53,7 @@ export class RegExp {
 
   test(string){
     if (hasBrand(this, 'BuiltinRegExp')) {
-      return $__RegExpTest(this, ToString(string));
+      return $$RegExpTest(this, ToString(string));
     }
 
     throw $$Exception('not_generic', ['RegExp.prototype.test']);
@@ -53,7 +61,7 @@ export class RegExp {
 
   toString(){
     if (hasBrand(this, 'BuiltinRegExp')) {
-      return $__RegExpToString(this);
+      return $$RegExpToString(this);
     }
 
     throw $$Exception('not_generic', ['RegExp.prototype.toString']);
@@ -65,7 +73,7 @@ builtinClass(RegExp);
 
 export function exec(regexp, string){
   if (hasBrand(regexp, 'BuiltinRegExp')) {
-    return $__RegExpExec(regexp, ToString(string));
+    return $$RegExpExec(regexp, ToString(string));
   }
   throw $$Exception('not_generic', ['@regexp.exec']);
 }
@@ -75,7 +83,7 @@ builtinFunction(exec);
 
 export function test(regexp, string){
   if (hasBrand(regexp, 'BuiltinRegExp')) {
-    return $__RegExpTest(regexp, [ToString(string)]);
+    return $$RegExpTest(regexp, [ToString(string)]);
   }
   throw $$Exception('not_generic', ['@regexp.test']);
 }

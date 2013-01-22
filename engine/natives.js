@@ -290,22 +290,6 @@ var natives = (function(module){
     _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _RegExpToString: function(obj, args){
-      return ''+args[0].PrimitiveValue;
-    },
-    _RegExpExec: function(obj, args){
-      var result = args[0].PrimitiveValue.exec(args[1]);
-      if (result) {
-        var array = new $Array(result);
-        array.set('index', result.index);
-        array.set('input', args[1]);
-        return array;
-      }
-      return result;
-    },
-    _RegExpTest: function(obj, args){
-      return args[0].PrimitiveValue.test(args[1]);
-    },
     _CallBuiltin: function(obj, args){
       var object  = args[0],
           prop    = args[1],
