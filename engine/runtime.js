@@ -2426,7 +2426,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         return string.search(regexp);
       },
-      $$StringSlice: function(str, start, end){
+      $$StringSlice: function(_, args){
         var string = args[0],
             start  = args[1],
             end    = args[2];
@@ -2440,6 +2440,74 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     });
 
+    internalModules.set('@@json', {
+      $$JSONParse: (function(){
+        var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
+
+        return function(_, args){
+          var source  = args[0],
+              reviver = args[1];
+
+          function walk(holder, key){
+            var value = holder.get(key);
+
+            if (value && typeof value === 'object') {
+              value.each(function(prop){
+                if (prop[2] & 1) {
+                  v = walk(prop[1], prop[0]);
+                  if (v !== undefined) {
+                    prop[1] = v;
+                  } else {
+                    value.remove(prop[0]);
+                  }
+                }
+              });
+            }
+
+            return reviver.Call(holder, [key, value]);
+          }
+
+          cx.lastIndex = 0;
+
+          if (cx.test(source)) {
+            source = source.replace(cx, function(a){
+              return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+            });
+          }
+
+          var test = source.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                           .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                           .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
+
+          if (/^[\],:{}\s]*$/.test(test)) {
+            var json    = realm.evaluate('('+source+')'),
+                wrapper = new $Object;
+
+            wrapper.set('', json);
+            return $$IsCallable(reviver) ? walk(wrapper, '') : json;
+          }
+
+          return $$ThrowException('invalid_json', source);
+        };
+      })(),
+      $$JSONQuote: (function(){
+        var escapable = /[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+            meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
+
+        function escaper(a) {
+          var c = meta[a];
+          return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }
+
+        return function(_, args){
+          var string = args[0]
+
+          escapable.lastIndex = 0;
+
+          return '"'+string.replace(escapable, escaper)+'"';
+        };
+      })()
+    });
 
     internalModules.set('@@constants', {
       DST_START_MONTH  : natives.get('DST_START_MONTH'),

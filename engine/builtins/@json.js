@@ -1,5 +1,16 @@
 import {
+  $$JSONParse,
+  $$JSONQuote
+} from '@@json';
+
+import {
+  $$StringReplace,
+  $$StringSlice
+} from '@@string';
+
+import {
   call,
+  enumerate,
   extend,
   hasBrand,
   internalFunction,
@@ -20,7 +31,6 @@ import {
 import {
   Type
 } from '@@types';
-
 import {
   add,
   has,
@@ -50,7 +60,7 @@ function J(value){
       partial[i] = prop === undefined ? 'null' : prop;
     }
   } else {
-    const keys  = PropertyList || $__Enumerate(value, false, true),
+    const keys  = PropertyList || enumerate(value, false, true),
           colon = gap ? ': ' : ':';
 
     brackets = ['{', '}'];
@@ -58,7 +68,7 @@ function J(value){
     for (var i=0, len=keys.length; i < len; i++) {
       const prop = Str(keys[i], value);
       if (prop !== undefined) {
-        partial.push($__Quote(keys[i]) + colon + prop);
+        partial.push($$JSONQuote(keys[i]) + colon + prop);
       }
     }
   }
@@ -115,7 +125,7 @@ function Str(key, holder){
 
   const type = Type(value);
   if (type === 'String') {
-    return $__Quote(value);
+    return $$JSONQuote(value);
   } else if (type === 'Number') {
     return isNaN(value) || value === Infinity || value === -Infinity ? 'null' : ToString(value);
   } else if (type === 'Object') {
@@ -124,6 +134,7 @@ function Str(key, holder){
 }
 
 internalFunction(Str);
+
 
 export function stringify(value, replacer, space){
   ReplacerFunction = undefined;
@@ -166,7 +177,7 @@ export function stringify(value, replacer, space){
   }
 
   if (Type(space) === 'String') {
-    gap = $__StringSlice(space, 0, 10);
+    gap = $$StringSlice(space, 0, 10);
   } else if (Type(space) === 'Number') {
     space |= 0;
     space = space > 10 ? 10 : space < 1 ? 0 : space
@@ -179,7 +190,7 @@ export function stringify(value, replacer, space){
 }
 
 export function parse(source, reviver){
-  return $__JSONParse(source, reviver);
+  return $$JSONParse(source, reviver);
 }
 
 

@@ -33,8 +33,7 @@ var natives = (function(module){
       $$CreateListFromArray     = operations.$$CreateListFromArray,
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords;
 
-  var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-      Hooked = new Hash,
+  var Hooked = new Hash,
       timers = {},
       nativeCode = ['function ', '() { [native code] }'];
 
@@ -290,56 +289,6 @@ var natives = (function(module){
     _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _CallBuiltin: function(obj, args){
-      var object  = args[0],
-          prop    = args[1],
-          arglist = args[2];
-
-      if (arglist) {
-        return object[prop].apply(object, $$CreateListFromArray(arglist));
-      }
-      return object[prop]();
-    },
-    JSONParse: function parse(source, reviver){
-      function walk(holder, key){
-        var value = holder.get(key);
-        if (value && typeof value === 'object') {
-          value.each(function(prop){
-            if (prop[2] & 1) {
-              v = walk(prop[1], prop[0]);
-              if (v !== undefined) {
-                prop[1] = v;
-              } else {
-                value.remove(prop[0]);
-              }
-            }
-          });
-        }
-        return reviver.Call(holder, [key, value]);
-      }
-
-      source = $$ToString(source);
-      cx.lastIndex = 0;
-
-      if (cx.test(source)) {
-        source = source.replace(cx, function(a){
-          return '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-        });
-      }
-
-      var test = source.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
-                       .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
-                       .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
-
-      if (/^[\],:{}\s]*$/.test(test)) {
-        var json = require('./runtime').realm.evaluate('('+source+')'),
-            wrapper = new $Object;
-        wrapper.set('', json);
-        return $$IsCallable(reviver) ? walk(wrapper, '') : json;
-      }
-
-      return $$ThrowException('invalid_json', source);
-    },
     _Signal: function(obj, args){
       var realm = require('./runtime').realm;
       realm.emit.apply(realm, args);
@@ -354,22 +303,7 @@ var natives = (function(module){
                     : function(){ return location.origin + location.pathname }
   });
 
-  void function(){
-    var escapable = /[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
-        meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
 
-    function escaper(a) {
-      var c = meta[a];
-      return typeof c === 'string' ? c : '\\u'+('0000' + a.charCodeAt(0).toString(16)).slice(-4);
-    }
-
-    natives.add({
-      Quote: function(string){
-        escapable.lastIndex = 0;
-        return '"'+string.replace(escapable, escaper)+'"';
-      }
-    });
-  }();
 
 
   void function(){
