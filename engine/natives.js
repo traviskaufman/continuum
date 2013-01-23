@@ -300,28 +300,6 @@ var natives = (function(module){
       }
       return object[prop]();
     },
-    _CodeUnit: function(obj, args){
-      return args[0].charCodeAt(0);
-    },
-    StringReplace: function(str, search, replace){
-      if (typeof search !== 'string') {
-        search = search.getPrimitiveValue();
-      }
-      return str.replace(search, replace);
-    },
-    StringSplit: function(str, separator, limit){
-      if (typeof separator !== 'string') {
-        separator = separator.getPrimitiveValue();
-      }
-      return new $Array(str.split(separator, limit));
-    },
-    StringSearch: function(str, regexp){
-      return str.search(regexp);
-    },
-    StringSlice: function(str, start, end){
-      return end === undefined ? str.slice(start) : str.slice(start, end);
-    },
-    FromCharCode: String.fromCharCode,
     JSONParse: function parse(source, reviver){
       function walk(holder, key){
         var value = holder.get(key);

@@ -2391,6 +2391,56 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     });
 
+
+    internalModules.set('@@string', {
+      $$StringFromCharCode: function(_, args){
+        var charcode = args[0];
+
+        return String.fromCharCode(charcode);
+      },
+      $$StringReplace: function(_, args){
+        var string  = args[0],
+            search  = args[1],
+            replace = args[2];
+
+        if (search && search.StringValue) {
+          search = search.StringValue;
+        }
+
+        return string.replace(search, replace);
+      },
+      $$StringSplit: function(_, args){
+        var string = args[0],
+            sep    = args[1],
+            limit  = args[2];
+
+        if (sep && sep.StringValue) {
+          sep = sep.StringValue;
+        }
+
+        return new $Array(str.split(sep, limit));
+      },
+      $$StringSearch: function(_, args){
+        var string = args[0],
+            regexp = args[1];
+
+        return string.search(regexp);
+      },
+      $$StringSlice: function(str, start, end){
+        var string = args[0],
+            start  = args[1],
+            end    = args[2];
+
+        return end === undefined ? string.slice(start) : string.slice(start, end);
+      },
+      $$StringToCharCode: function(_, args){
+        var string = args[0];
+
+        return string.charCodeAt(0);
+      }
+    });
+
+
     internalModules.set('@@constants', {
       DST_START_MONTH  : natives.get('DST_START_MONTH'),
       DST_START_SUNDAY : natives.get('DST_START_SUNDAY'),

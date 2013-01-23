@@ -14,6 +14,15 @@ import {
 } from '@@regexp';
 
 import {
+  $$StringFromCharCode,
+  $$StringReplace,
+  $$StringSplit,
+  $$StringSearch,
+  $$StringSlice,
+  $$StringToCharCode
+} from '@@string';
+
+import {
   undefined
 } from '@@constants';
 
@@ -36,6 +45,7 @@ import {
   OrdinaryCreateFromConstructor,
   ToInteger,
   ToString,
+  ToUint16,
   ToUint32
 } from '@@operations';
 
@@ -63,9 +73,10 @@ const trimmer = /^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/;
 
 
 function ensureCoercible(target, method){
-  if (target === null || target === undefined) {
-    throw $$Exception('object_not_coercible', ['String.prototype.'+method, target]);
+  if (target == null) {
+    throw $$Exception('object_not_coercible', [`String.prototype.${method}`, target]);
   }
+
   return ToString(target);
 }
 
@@ -73,9 +84,9 @@ internalFunction(ensureCoercible);
 
 
 function ToHTML(tag, content, attrName, attrVal){
-  const attr = attrName === undefined ? '' : ' '+attrName+'="'+$__StringReplace(ToString(attrVal), '"', '&quot;')+'"';
+  const attr = attrName === undefined ? '' : ` ${attrName}="${$$StringReplace(ToString(attrVal), '"', '&quot;')}"`;
 
-  return '<'+tag+attr+'>'+content+'</'+tag+'>';
+  return `<${tag}${attr}>${content}</${tag}>`;
 }
 
 internalFunction(ToHTML);
@@ -220,7 +231,7 @@ export class String {
 
     position = ToInteger(position);
 
-    return position < 0 || position >= string.length ? NaN : $__CodeUnit(string[position]);
+    return position < 0 || position >= string.length ? NaN : $$StringToCharCode(string[position]);
   }
 
   concat(...args){
@@ -303,7 +314,7 @@ export class String {
         search = ToString(search);
       }
 
-      return $__StringReplace(string, search, replace);
+      return $$StringReplace(string, search, replace);
     }
   }
 
@@ -314,7 +325,7 @@ export class String {
       regexp = new RegExp(regexp);
     }
 
-    return $__StringSearch(string, regexp);
+    return $$StringSearch(string, regexp);
   }
 
   slice(start = 0, end = this.length){
@@ -332,7 +343,7 @@ export class String {
     limit = ToInteger(limit);
     separator = hasBrand(separator, 'BuiltinRegExp') ? separator : ToString(separator);
 
-    return $__StringSplit(string, separator, limit);
+    return $$StringSplit(string, separator, limit);
   }
 
   substr(start = 0, length = Infinity){
@@ -390,6 +401,7 @@ export class String {
     } else if (hasBrand(this, 'StringWrapper')) {
       return $$Get(this, 'StringValue');
     }
+
     throw $$Exception('not_generic', ['String.prototype.toString']);
   }
 
@@ -398,7 +410,7 @@ export class String {
   }
 
   trim(){
-    return $__StringReplace(ensureCoercible(this, 'trim'), trimmer, '');
+    return $$StringReplace(ensureCoercible(this, 'trim'), trimmer, '');
   }
 
   valueOf(){
@@ -407,7 +419,8 @@ export class String {
     } else if (hasBrand(this, 'StringWrapper')) {
       return $$Get(this, 'StringValue');
     }
-    throw $$Exception('not_generic', ['String.prototype.toString']);
+
+    throw $$Exception('not_generic', ['String.prototype.valueOf']);
   }
 }
 
@@ -421,7 +434,7 @@ export function fromCharCode(...codeUnits){
   let result = '';
 
   for (var i=0; i < length; i++) {
-    result += $__FromCharCode($__ToUint16(codeUnits[i]));
+    result += $$StringFromCharCode(ToUint16(codeUnits[i]));
   }
 
   return result;
@@ -481,12 +494,13 @@ const StringIndexDescriptor = createInternal(null, {
 });
 
 const GetOwnProperty = $$Get(String.prototype, 'GetOwnProperty'),
-      Enumerate      = $$Get(String.prototype, 'Enumerate'),
-      describe       = $$Get(String.prototype, 'describe'),
-      get            = $$Get(String.prototype, 'get'),
-      has            = $$Get(String.prototype, 'has'),
-      query          = $$Get(String.prototype, 'query'),
-      each           = $$Get(String.prototype, 'each');
+      Enumerate      = $$Get(String.prototype, 'Enumerate');
+
+const describe = $$Get(String.prototype, 'describe'),
+      get      = $$Get(String.prototype, 'get'),
+      has      = $$Get(String.prototype, 'has'),
+      query    = $$Get(String.prototype, 'query'),
+      each     = $$Get(String.prototype, 'each');
 
 const internalMethods = {
   GetOwnProperty(P){
