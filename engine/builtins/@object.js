@@ -1,4 +1,8 @@
 import {
+  @@toStringTag: toStringTag
+} from '@@symbols';
+
+import {
   ToBoolean,
   ToObject,
   ToPropertyKey
@@ -32,10 +36,6 @@ import {
   $$RemoveObserver,
   $$SetIntrinsic
 } from '@@internals';
-
-import {
-  toStringTag: @@toStringTag
-} from '@@symbols'
 
 import {
   hasOwn
@@ -75,7 +75,7 @@ export class Object {
     } else if (this === null) {
       return '[object Null]';
     }
-    return '[object ' + ToObject(this).@@toStringTag + ']';
+    return `[object ${this.@@toStringTag}]`;
   }
 
   valueOf(){
