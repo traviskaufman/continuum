@@ -248,7 +248,8 @@ internalFunction(extendInternal);
 
 
 export function createInternal(proto, properties){
-  return extendInternal($$CreateInternalObject(proto), properties);
+  const internal = $$CreateInternalObject(proto);
+  return properties ? extendInternal(internal, properties) : internal;
 }
 
 internalFunction(createInternal);

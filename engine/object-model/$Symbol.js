@@ -156,7 +156,8 @@ var $Symbol = (function(exports){
     BooleanValue: new $InternalSymbol('BooleanValue'),
     DateValue   : new $InternalSymbol('DateValue'),
     NumberValue : new $InternalSymbol('NumberValue'),
-    StringValue : new $InternalSymbol('StringValue')
+    StringValue : new $InternalSymbol('StringValue'),
+    MISSING     : new $InternalSymbol('MISSING')
   });
 
   return exports;

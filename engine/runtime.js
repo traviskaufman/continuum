@@ -14,6 +14,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       operations       = require('./object-model/operations'),
       descriptors      = require('./object-model/descriptors'),
       symbols          = require('./object-model/$Symbol').wellKnownSymbols,
+      internalSymbols  = require('./object-model/$Symbol').internalSymbols,
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
@@ -2527,6 +2528,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
     internalModules.set('@@symbols', symbols);
+    internalModules.set('@@internal-symbols', internalSymbols);
 
 
     var mutationScopeInit = new Script('void 0;');

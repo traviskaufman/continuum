@@ -14,8 +14,10 @@ import {
   $$Set
 } from '@@internals';
 
+import {
+  MISSING
+} from '@@internal-symbols';
 
-const MISSING = $$CreateInternalObject();
 
 const ENUMERABLE   = 0x1,
       CONFIGURABLE = 0x2,
