@@ -54,7 +54,10 @@ import {
   DST_END_MONTH,
   DST_END_SUNDAY,
   DST_END_OFFSET,
-  LOCAL_TZ,
+  LOCAL_TZ
+} from '@@date';
+
+import {
   NaN
 } from '@@constants';
 

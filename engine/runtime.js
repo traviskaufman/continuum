@@ -315,7 +315,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     proto.isClassProto = true;
 
     each(methods, function(method){
-      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
+      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.Code);
     });
 
     return ctor;
@@ -324,7 +324,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ## $$InstantiateFunctionDeclaration
 
   function $$InstantiateFunctionDeclaration(decl, env){
-    var code = decl.code,
+    var code = decl.Code,
         $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
@@ -441,7 +441,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Strict = !!strict;
       this.Realm = realm;
       this.Scope = scope;
-      this.code = code;
+      this.Code = code;
       tag(code);
       if (holder !== undefined) {
         this.HomeObject = holder;
@@ -497,9 +497,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         var caller = context ? context.callee : null;
 
         if (ctx) {
-          ExecutionContext.call(ctx, ctx.caller, local, realm, this.code, this, args, isConstruct);
+          ExecutionContext.call(ctx, ctx.caller, local, realm, this.Code, this, args, isConstruct);
         } else {
-          ctx = new ExecutionContext(context, local, realm, this.code, this, args, isConstruct);
+          ctx = new ExecutionContext(context, local, realm, this.Code, this, args, isConstruct);
         }
 
         if (this.define && !this.Strict) {
@@ -610,7 +610,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var local = new FunctionEnv(receiver, this);
         }
 
-        var ctx = new ExecutionContext(context, local, this.Realm, this.code, this, args, isConstruct);
+        var ctx = new ExecutionContext(context, local, this.Realm, this.Code, this, args, isConstruct);
         return new $Generator(this.Realm, local, ctx);
       }
     ]);
@@ -641,7 +641,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Object.call(this);
       this.Realm = realm;
       this.Scope = scope;
-      this.code = ctx.code;
+      this.Code = ctx.Code;
       this.ExecutionContext = ctx;
       this.State = 'newborn';
 
@@ -687,7 +687,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return $$ThrowException('generator_closed', 'throw');
         } else if (this.State === 'newborn') {
           this.State = 'closed';
-          this.code = null;
+          this.Code = null;
           return new AbruptCompletion('throw', value);
         }
 
@@ -701,7 +701,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           return;
         } else if (state === 'newborn') {
           this.State = 'closed';
-          this.code = null;
+          this.Code = null;
           return;
         }
 
@@ -1193,7 +1193,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     function ExecutionContext(caller, local, realm, code, func, args, isConstruct){
       this.caller = caller;
       this.Realm = realm;
-      this.code = code;
+      this.Code = code;
       this.LexicalEnvironment = local;
       this.VariableEnvironment = local;
       this.strict = code.flags.strict;
@@ -1246,7 +1246,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       function run(){
         var f = this.cmds[this.ip];
 
-        if (!this.Realm.quiet && !this.code.natives || this.Realm.debugBuiltins) {
+        if (!this.Realm.quiet && !this.Code.natives || this.Realm.debugBuiltins) {
           this.history || (this.history = []);
 
           while (f) {
@@ -1410,7 +1410,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
         var lex = origin,
-            strict = this.callee ? this.callee.Strict : this.code.flags.strict;
+            strict = this.callee ? this.callee.Strict : this.Code.flags.strict;
 
         do {
           if (lex.HasBinding(name)) {
@@ -1800,7 +1800,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var script = new Script({
             scope: 'eval',
             natives: false,
-            strict: context.callee ? context.callee.Strict : context.code.flags.strict,
+            strict: context.callee ? context.callee.Strict : context.Code.flags.strict,
             source: code
           });
 
@@ -2510,21 +2510,58 @@ var runtime = (function(GLOBAL, exports, undefined){
       })()
     });
 
+    void function(){
+      var month = 2592000000;
+
+      function nearest(current, compare){
+        current = new Date(current);
+
+        for (var step = month; step > 0; step = Math.floor(step / 3)) {
+          if (compare !== current.getTimezoneOffset()) {
+            while (compare !== current.getTimezoneOffset()) {
+              current = new Date(current.getTime() + step);
+            }
+            current = new Date(current.getTime() - step);
+          }
+        }
+
+        while (compare !== current.getTimezoneOffset()) {
+          current = new Date(current.getTime() + 1);
+        }
+
+        return current;
+      }
+
+      var jun = new Date(2000, 5, 20, 0, 0, 0, 0).getTimezoneOffset(),
+          dec = new Date(2000, 11, 20, 0, 0, 0, 0).getTimezoneOffset();
+
+      if (jun > dec) {
+        var DST_START = nearest(dec, jun),
+            DST_END   = nearest(jun, dec);
+      } else {
+        var DST_START = nearest(jun, dec),
+            DST_END   = nearest(dec, jun);
+      }
+
+      internalModules.set('@@date', {
+        LOCAL_TZ        : new Date().getTimezoneOffset() / -60,
+        DST_START_MONTH : DST_START.getMonth(),
+        DST_START_SUNDAY: DST_START.getDate() > 15,
+        DST_START_OFFSET: DST_START.getHours() * 3600000 + DST_START.getMinutes() * 60000,
+        DST_END_MONTH   : DST_END.getMonth(),
+        DST_END_SUNDAY  : DST_END.getDate() > 15,
+        DST_END_OFFSET  : DST_END.getHours() * 3600000 + DST_END.getMinutes() * 60000
+      });
+    }();
+
     internalModules.set('@@constants', {
-      DST_START_MONTH  : natives.get('DST_START_MONTH'),
-      DST_START_SUNDAY : natives.get('DST_START_SUNDAY'),
-      DST_START_OFFSET : natives.get('DST_START_OFFSET'),
-      DST_END_MONTH    : natives.get('DST_END_MONTH'),
-      DST_END_SUNDAY   : natives.get('DST_END_SUNDAY'),
-      DST_END_OFFSET   : natives.get('DST_END_OFFSET'),
-      LOCAL_TZ         : natives.get('LOCAL_TZ'),
       MAX_INTEGER      : 9007199254740992,
       MAX_VALUE        : 1.7976931348623157e+308,
       MIN_VALUE        : 5e-324,
       NaN              : +'NaN',
       POSITIVE_INFINITY: 1 / 0,
       NEGATIVE_INFINITY: 1 / -0,
-      undefined        : undefined
+      undefined        : void 0
     });
 
     internalModules.set('@@symbols', symbols);
@@ -2670,12 +2707,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
 
         each(code.imports, function(imported){
-          if (imported.code) {
+          if (imported.Code) {
             var sandbox = createSandbox(global, loader);
 
-            runScript(sandbox, { bytecode: imported.code }, function(){
-              var module = new $Module(sandbox.globalEnv, imported.code.exportedNames);
-              module.mrl = imported.code.name;
+            runScript(sandbox, { bytecode: imported.Code }, function(){
+              var module = new $Module(sandbox.globalEnv, imported.Code.exportedNames);
+              module.mrl = imported.Code.name;
               callback.Call(null, [module]);
             }, function(err){
               errback.Call(null, [err]);

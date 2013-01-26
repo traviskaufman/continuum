@@ -304,53 +304,5 @@ var natives = (function(module){
   });
 
 
-
-
-  void function(){
-    var month = 2592000000;
-
-    function nearest(current, compare){
-      current = new Date(current);
-      for (var step = month; step > 0; step = Math.floor(step / 3)) {
-        if (compare !== current.getTimezoneOffset()) {
-          while (compare !== current.getTimezoneOffset()) {
-            current = new Date(current.getTime() + step);
-          }
-          current = new Date(current.getTime() - step);
-        }
-      }
-
-      while (compare !== current.getTimezoneOffset()) {
-        current = new Date(current.getTime() + 1);
-      }
-
-      return current;
-    }
-
-    var jun = new Date(2000, 5, 20, 0, 0, 0, 0).getTimezoneOffset(),
-        dec = new Date(2000, 11, 20, 0, 0, 0, 0).getTimezoneOffset();
-
-    if (jun > dec) {
-      var DST_START = nearest(dec, jun),
-          DST_END   = nearest(jun, dec);
-    } else {
-      var DST_START = nearest(jun, dec),
-          DST_END   = nearest(dec, jun);
-    }
-
-    natives.add({
-      LOCAL_TZ        : new Date().getTimezoneOffset() / -60,
-      DST_START       : +DST_START,
-      DST_START_MONTH : DST_START.getMonth(),
-      DST_START_SUNDAY: DST_START.getDate() > 15,
-      DST_START_OFFSET: DST_START.getHours() * 3600000 + DST_START.getMinutes() * 60000,
-      DST_END         : +DST_END,
-      DST_END_MONTH   : DST_END.getMonth(),
-      DST_END_SUNDAY  : DST_END.getDate() > 15,
-      DST_END_OFFSET  : DST_END.getHours() * 3600000 + DST_END.getMinutes() * 60000
-    });
-  }();
-
-
   return module.exports = natives;
 })(typeof module !== 'undefined' ? module : {});
