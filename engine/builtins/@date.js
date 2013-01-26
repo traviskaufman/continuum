@@ -596,7 +596,7 @@ export class Date {
 
     // 15.9.3 The Date Constructor
     const argc = $$ArgumentCount();
-    let date;
+    let value;
 
     if (argc > 1) {
       // 15.9.3.1 new Date (year, month [, date [, hours [, minutes [, seconds [, ms ] ] ] ] ] )
@@ -611,17 +611,18 @@ export class Date {
       const yInt = ToInteger(y),
             yr   = !isNaN(y) && 0 <= yInt && yInt <= 99 ? y + 1900 : y;
 
-      date = TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
+
+      value = TimeClip(ToUTC(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))));
     } else if (argc === 1) {
       // 15.9.3.2 new Date (value)
       year = ToPrimitive(year);
-      date = TimeClip(typeof year === 'string' ? parse(year) : year)
+      value = TimeClip(typeof year === 'string' ? parse(year) : year)
     } else {
       // 15.9.3.3 new Date ( )
-      date = $$Now();
+      value = $$Now();
     }
 
-    $$Set(this, 'DateValue', date);
+    $$Set(this, 'DateValue', value);
   }
 
   // ########################################
