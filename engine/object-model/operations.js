@@ -155,7 +155,7 @@ var operations = (function(exports){
 
     var name = $$ToPropertyKey(prop);
     if (name && name.Abrupt) return name;
-    return new Reference(base, name, context.callee ? context.callee.Strict : context.code.flags.strict);
+    return new Reference(base, name, context.callee ? context.callee.Strict : context.Code.flags.strict);
   }
 
   exports.$$Element = $$Element;
@@ -177,7 +177,7 @@ var operations = (function(exports){
     var key = $$ToPropertyKey(prop);
     if (key && key.Abrupt) return key;
 
-    var ref = new Reference(baseValue, key, context.callee ? context.callee.Strict : context.code.flags.strict);
+    var ref = new Reference(baseValue, key, context.callee ? context.callee.Strict : context.Code.flags.strict);
     ref.thisValue = env.GetThisBinding();
     return ref;
   }
@@ -206,7 +206,7 @@ var operations = (function(exports){
 
 
   function $$IdentifierResolution(context, name) {
-    return $$GetIdentifierReference(context.LexicalEnvironment, name, context.callee ? context.callee.Strict : context.code.flags.strict);
+    return $$GetIdentifierReference(context.LexicalEnvironment, name, context.callee ? context.callee.Strict : context.Code.flags.strict);
   }
 
   exports.$$IdentifierResolution = $$IdentifierResolution;

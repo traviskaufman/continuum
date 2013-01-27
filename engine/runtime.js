@@ -315,7 +315,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     proto.isClassProto = true;
 
     each(methods, function(method){
-      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.Code);
+      $$PropertyDefinitionEvaluation(method.kind, proto, getKey(method.name), method.code);
     });
 
     return ctor;
@@ -324,7 +324,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   // ## $$InstantiateFunctionDeclaration
 
   function $$InstantiateFunctionDeclaration(decl, env){
-    var code = decl.Code,
+    var code = decl.code,
         $F = code.flags.generator ? $GeneratorFunction : $Function,
         func = new $F('normal', decl.id.name, code.params, code, env, code.flags.strict);
 
@@ -1787,9 +1787,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     natives.add({
-      wrapper: function(_, args){
-        var func = args[0];
-      },
       _eval: (function(){
         function builtinEval(obj, args, direct){
           var code = args[0];
@@ -2707,12 +2704,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
 
         each(code.imports, function(imported){
-          if (imported.Code) {
+          if (imported.code) {
             var sandbox = createSandbox(global, loader);
 
-            runScript(sandbox, { bytecode: imported.Code }, function(){
-              var module = new $Module(sandbox.globalEnv, imported.Code.exportedNames);
-              module.mrl = imported.Code.name;
+            runScript(sandbox, { bytecode: imported.code }, function(){
+              var module = new $Module(sandbox.globalEnv, imported.code.exportedNames);
+              module.mrl = imported.code.name;
               callback.Call(null, [module]);
             }, function(err){
               errback.Call(null, [err]);

@@ -79,7 +79,7 @@ var thunk = (function(exports){
   function unwind(context){
     var error = context.error;
 
-    for (var i = 0, entry; entry = context.code.unwinders[i]; i++) {
+    for (var i = 0, entry; entry = context.Code.unwinders[i]; i++) {
       if (entry.begin <= context.ip && context.ip <= entry.end) {
         if (entry.type === 'scope') {
           context.stacktrace || (context.stacktrace = []);
@@ -101,7 +101,7 @@ var thunk = (function(exports){
 
 
     if (error && error.value && error.value.set && error.value.BuiltinBrand !== 'StopIteration') {
-      var code  = context.code,
+      var code  = context.Code,
           range = code.ops[context.ip].range,
           loc   = code.ops[context.ip].loc,
           err   = error.value;
@@ -178,12 +178,12 @@ var thunk = (function(exports){
   }
 
   function ARGUMENTS(context){
-    if (context.callee ? context.callee.Strict : context.code.flags.strict) {
+    if (context.callee ? context.callee.Strict : context.Code.flags.strict) {
       var args = context.args;
       context.stack[context.sp++] = context.createArguments(args);
       context.stack[context.sp++] = args;
     } else {
-      var params = context.code.params.boundNames,
+      var params = context.Code.params.boundNames,
           env    = context.LexicalEnvironment,
           args   = context.args,
           func   = context.callee;
@@ -259,7 +259,7 @@ var thunk = (function(exports){
 
     var receiver = context.resolveReceiver(ref);
 
-    if (tail && func.code && !func.generator) {
+    if (tail && func.Code && !func.generator) {
       func.prepare(receiver, args, context);
       return context.cmds[context.ip];
     } else {
@@ -330,7 +330,7 @@ var thunk = (function(exports){
   }
 
   function CONST(context){
-    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
+    context.initializeBinding(context.Code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
     return context.cmds[++context.ip];
   }
 
@@ -412,7 +412,7 @@ var thunk = (function(exports){
         receiver = context.stack[--context.sp];
 
     if (func && func.Call && func.Call.isBuiltinEval) {
-      if (context.callee ? context.callee.Strict : context.code.flags.strict) {
+      if (context.callee ? context.callee.Strict : context.Code.flags.strict) {
         var scope = context.cloneScope();
       }
       var result = func.Call(null, args, true);
@@ -640,7 +640,7 @@ var thunk = (function(exports){
   }
 
   function LET(context){
-    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
+    context.initializeBinding(context.Code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], true);
     return context.cmds[++context.ip];
   }
 
@@ -691,7 +691,7 @@ var thunk = (function(exports){
       return unwind;
     }
 
-    var status = context.defineMethod(kind, obj, key, context.code);
+    var status = context.defineMethod(kind, obj, key, context.Code);
 
     if (status && status.Abrupt) {
       context.error = status;
@@ -720,11 +720,11 @@ var thunk = (function(exports){
   }
 
   function NATIVE_REF(context){
-    if (!context.code.natives) {
+    if (!context.Code.natives) {
       context.error = 'invalid native reference';
       return unwind;
     }
-    context.stack[context.sp++] = context.Realm.natives.reference(context.code.lookup(context.ops[context.ip][0]), false);
+    context.stack[context.sp++] = context.Realm.natives.reference(context.Code.lookup(context.ops[context.ip][0]), false);
     return context.cmds[++context.ip];
   }
 
@@ -820,14 +820,14 @@ var thunk = (function(exports){
   }
 
   function REF(context){
-    var ident = context.code.lookup(context.ops[context.ip][0]);
+    var ident = context.Code.lookup(context.ops[context.ip][0]);
     context.stack[context.sp++] = context.getReference(ident);
     return context.cmds[++context.ip];
   }
 
 
   function REFSYMBOL(context){
-    var symbol = context.code.lookup(context.ops[context.ip][0]);
+    var symbol = context.Code.lookup(context.ops[context.ip][0]);
     context.stack[context.sp++] = context.getSymbol(symbol);
     return context.cmds[++context.ip];
   }
@@ -851,7 +851,7 @@ var thunk = (function(exports){
     context.completion = context.stack[--context.sp];
     context.ip++;
 
-    if (context.code.flags.generator) {
+    if (context.Code.flags.generator) {
       context.currentGenerator.ExecutionContext = context;
       context.currentGenerator.State = 'closed';
       context.error = new AbruptCompletion('throw', context.Realm.intrinsics.StopIteration);
@@ -944,7 +944,7 @@ var thunk = (function(exports){
 
 
   function STRING(context){
-    context.stack[context.sp++] = context.code.lookup(context.ops[context.ip][0]);
+    context.stack[context.sp++] = context.Code.lookup(context.ops[context.ip][0]);
     return context.cmds[++context.ip];
   }
 
@@ -1081,7 +1081,7 @@ var thunk = (function(exports){
   }
 
   function VAR(context){
-    context.initializeBinding(context.code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], false);
+    context.initializeBinding(context.Code.lookup(context.ops[context.ip][0]), context.stack[--context.sp], false);
     return context.cmds[++context.ip];
   }
 
