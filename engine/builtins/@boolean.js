@@ -43,10 +43,12 @@ export class Boolean {
   constructor(value){
     value = ToBoolean(value);
 
+    // 15.6.1.1 Boolean (value)
     if (!isInitializing(this, 'BooleanValue')) {
       return value;
     }
 
+    // 15.6.2.1 new Boolean (value)
     $$Set(this, 'BooleanValue', value);
   }
 
