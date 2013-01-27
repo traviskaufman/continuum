@@ -191,6 +191,9 @@ var errors = (function(errors, messages, exports){
     no_setter_in_callback          : ["Cannot set property ", "$0", " of ", "$1", " which has only a getter"]
   },
   RangeError: {
+    invalid_radix                  : ["Radix must be a number between 2 and 36"],
+    invalid_fraction               : ["Fraction must be a number between 0 and 20"],
+    invalid_precision              : ["Precision must be a number between 1 and 21"],
     invalid_array_length           : ["Invalid array length"],
     invalid_repeat_count           : ["Invalid repeat count"],
     stack_overflow                 : ["Maximum call stack size exceeded"],
