@@ -49,9 +49,9 @@ const global = getGlobal();
 // ##########################################################
 
 export class Function {
-  // ###############################################
-  // ### 15.3.4.1 Function.prototype.constructor ###
-  // ###############################################
+  // ###########################################
+  // # 15.3.4.1 Function.prototype.constructor #
+  // ###########################################
   constructor(...args){
     const argCount = args.length;
 
@@ -80,9 +80,9 @@ export class Function {
     return $$EvaluateInGlobal(`(function anonymous(${paramText}) {${bodyText}})`, global);
   }
 
-  // ############################################
-  // ### 15.3.4.2 Function.prototype.toString ###
-  // ############################################
+  // ########################################
+  // # 15.3.4.2 Function.prototype.toString #
+  // ########################################
   toString(){
     ensureFunction(this, 'Function.prototype.toString');
 
@@ -107,40 +107,40 @@ export class Function {
     return $$StringSlice($$Get(code, 'source'), $$Get(range, '0'), $$Get(range, '1'));
   }
 
-  // #########################################
-  // ### 15.3.4.3 Function.prototype.apply ###
-  // #########################################
+  // #####################################
+  // # 15.3.4.3 Function.prototype.apply #
+  // #####################################
   apply(thisArg, argArray){
     ensureFunction(this, 'Function.prototype.apply');
     return $$Invoke(this, 'Call', thisArg, listFrom(ensureArgs(argArray)));
   }
 
-  // ########################################
-  // ### 15.3.4.4 Function.prototype.call ###
-  // ########################################
+  // ####################################
+  // # 15.3.4.4 Function.prototype.call #
+  // ####################################
   call(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.call');
     return $$Invoke(this, 'Call', thisArg, listFrom(args));
   }
 
-  // ########################################
-  // ### 15.3.4.5 Function.prototype.bind ###
-  // ########################################
+  // ####################################
+  // # 15.3.4.5 Function.prototype.bind #
+  // ####################################
   bind(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.bind');
     return BoundFunctionCreate(this, thisArg, listFrom(args));
   }
 
-  // ############################################
-  // ### 15.3.4.6 Function.prototype.@@create ###
-  // ############################################
+  // ########################################
+  // # 15.3.4.6 Function.prototype.@@create #
+  // ########################################
   @@create(){
     return OrdinaryCreateFromConstructor(this, '%ObjectPrototype%');
   }
 
-  // #################################################
-  // ### 15.3.4.7 Function.prototype.@@hasInstance ###
-  // #################################################
+  // #############################################
+  // # 15.3.4.7 Function.prototype.@@hasInstance #
+  // #############################################
   @@hasInstance(V){
     return OrdinaryHasInstance(this, V);
   }
