@@ -15,6 +15,10 @@ import {
 } from '@@operations';
 
 import {
+  BoundFunctionCreate
+} from '@@types';
+
+import {
   builtinClass,
   builtinFunction,
   define,
@@ -26,7 +30,6 @@ import {
 } from '@@utilities';
 
 import {
-  $$BoundFunctionCreate,
   $$EvaluateInGlobal,
   $$Get,
   $$Has,
@@ -125,7 +128,7 @@ export class Function {
   // ########################################
   bind(thisArg, ...args){
     ensureFunction(this, 'Function.prototype.bind');
-    return $$BoundFunctionCreate(this, thisArg, listFrom(args));
+    return BoundFunctionCreate(this, thisArg, listFrom(args));
   }
 
   // ############################################
@@ -158,17 +161,17 @@ export function apply(func, thisArg, args){
 builtinFunction(apply);
 
 
-export function bind(func, thisArg, ...args){
-  ensureFunction(func, '@function.bind');
-  return $BoundFunctionCreate(func, thisArg, listFrom(args));
-}
-
-builtinFunction(bind);
-
-
 export function call(func, thisArg, ...args){
   ensureFunction(func, '@function.call');
   return $$Invoke(func, 'Call', thisArg, listFrom(args));
 }
 
 builtinFunction(call);
+
+
+export function bind(func, thisArg, ...args){
+  ensureFunction(func, '@function.bind');
+  return BoundFunctionCreate(func, thisArg, listFrom(args));
+}
+
+builtinFunction(bind);

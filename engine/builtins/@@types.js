@@ -5,6 +5,7 @@
 
 import {
   $$ArgumentCount,
+  $$BoundFunctionCreate,
   $$CreateObject,
   $$CreateInternalObject,
   $$CurrentRealm,
@@ -446,18 +447,31 @@ export function CompletePropertyDescriptor(Desc, LikeDesc = descriptorDefaults){
 }
 
 
+// ##########################################
+// # 8.3.18 ObjectCreate Abstract Operation #
+// ##########################################
+
 export function ObjectCreate(proto){
   if (!$$ArgumentCount()) {
-    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');
+    proto = $$GetIntrinsic('%ObjectPrototype%');
   }
   return $$CreateObject('Object', proto);
 }
 
 
-// ###########################################
-// # 11.2.2.3 ArrayCreate Abstract Operation #
-// ###########################################
+// ##########################################
+// # 8.4.2.3 ArrayCreate Abstract Operation #
+// ##########################################
 
 export function ArrayCreate(length){
   return $$CreateArray($$CurrentRealm(), length);
+}
+
+
+// ##################################################
+// # 8.4.1.3 BoundFunctionCreate Abstract Operation #
+// ##################################################
+
+export function BoundFunctionCreate(targetFunction, boundThis, boundArgs){
+  return $$BoundFunctionCreate(targetFunction, boundThis, boundArgs);
 }
