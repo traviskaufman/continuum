@@ -445,3 +445,10 @@ export function ensureProto(proto){
 }
 
 internalFunction(ensureProto);
+
+
+export function getGlobal(){
+  return $$Get($$CurrentRealm(), 'global');
+}
+
+internalFunction(getGlobal);
