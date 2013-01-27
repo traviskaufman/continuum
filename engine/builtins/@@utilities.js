@@ -2,6 +2,7 @@ import {
   $$Invoke,
   $$CreateInternalObject,
   $$CreateObject,
+  $$CurrentRealm,
   $$Exception,
   $$Get,
   $$GetIntrinsic,
