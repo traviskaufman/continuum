@@ -152,7 +152,7 @@ define(Function.prototype, 'name', '', 0);
 
 export function apply(func, thisArg, args){
   ensureFunction(func, '@function.apply');
-  return $$Invoke(func, 'Call', thisArg, $$Get(ensureArgs(args), 'array'));
+  return $$Invoke(func, 'Call', thisArg, listFrom(ensureArgs(args)));
 }
 
 builtinFunction(apply);
@@ -160,7 +160,7 @@ builtinFunction(apply);
 
 export function bind(func, thisArg, ...args){
   ensureFunction(func, '@function.bind');
-  return $BoundFunctionCreate(func, thisArg, args);
+  return $BoundFunctionCreate(func, thisArg, listFrom(args));
 }
 
 builtinFunction(bind);
@@ -168,7 +168,7 @@ builtinFunction(bind);
 
 export function call(func, thisArg, ...args){
   ensureFunction(func, '@function.call');
-  return $$Invoke(func, 'Call', thisArg, $$Get(args, 'array'));
+  return $$Invoke(func, 'Call', thisArg, listFrom(args));
 }
 
 builtinFunction(call);
