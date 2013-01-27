@@ -72,9 +72,9 @@ export class Function {
       bodyText = ToString(args[index]);
     }
 
-    bodyText = '{\n' + bodyText + '\n}';
+    bodyText = '\n' + bodyText + '\n';
 
-    return $$EvaluateInGlobal(`(function anonymous(${paramText}) ${bodyText})`, global);
+    return $$EvaluateInGlobal(`(function anonymous(${paramText}) {${bodyText}})`, global);
   }
 
   // ############################################
