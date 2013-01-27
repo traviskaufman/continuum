@@ -26,7 +26,7 @@ import {
 } from '@@utilities';
 
 import {
-  $BoundFunctionCreate,
+  $$BoundFunctionCreate,
   $$EvaluateInGlobal,
   $$Get,
   $$Has,
