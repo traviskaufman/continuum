@@ -61,13 +61,13 @@ export class Function {
     } else if (argCount === 1) {
       bodyText = ToString(args[0]);
       paramText = '';
-    } else if (argCount > 1) {
-      let index = 1;
+    } else {
+      let index = 0;
 
       paramText = ToString(args[0]);
-      do {
+      while (++index < argCount - 1) {
         paramText += ',' + ToString(args[index]);
-      } while (++index < argCount - 1)
+      }
 
       bodyText = ToString(args[index]);
     }
