@@ -178,6 +178,8 @@ var environments = (function(exports, undefined){
       this.bindings = object;
       this.outer = outer || null;
       this.cache = new Hash;
+      object.env = this;
+      hide(object, 'env');
       tag(this);
     }
 
@@ -272,12 +274,8 @@ var environments = (function(exports, undefined){
 
   exports.GlobalEnvironmentRecord = (function(){
     function GlobalEnvironmentRecord(global){
-      this.thisValue = this.bindings = global;
-      this.outer = null;
-      this.cache = new Hash;
-      global.env = this;
-      hide(global, 'env');
-      tag(this);
+      ObjectEnvironmentRecord.call(this, global);
+      this.thisValue = global;
     }
 
     inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {

@@ -1818,28 +1818,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         builtinEval.isBuiltinEval = true;
         return builtinEval;
       })(),
-      _FunctionCreate: function(obj, args){
-        var body = args.pop();
-
-        var script = new Script({
-          scope: 'global',
-          natives: false,
-          source: '(function anonymous('+args.join(', ')+') {\n'+body+'\n})'
-        });
-
-        if (script.error) {
-          return script.error;
-        }
-
-        var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
-        ExecutionContext.push(ctx);
-        var func = ctx.run();
-        ctx === context && ExecutionContext.pop();
-        return func;
-      },
-      _BoundFunctionCreate: function(obj, args){
-        return new $BoundFunction(args[0], args[1], $$CreateListFromArray(args[2]));
-      },
       _ErrorCreate: function(obj, args){
         return new $Error(args[0], undefined, args[1]);
       },
@@ -1949,6 +1927,25 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       var now = Date.now || function(){ return +new Date };
 
+      function evaluate(src, env, realm){
+        var script = new Script({
+          scope: 'global',
+          natives: false,
+          source: src
+        });
+
+        if (script.error) {
+          return script.error;
+        }
+
+        var ctx = new ExecutionContext(context, env, realm, script.bytecode);
+        ExecutionContext.push(ctx);
+        var result = ctx.run();
+        ctx === context && ExecutionContext.pop();
+
+        return result;
+      }
+
       internalModules.set('@@internals', {
         $$AddObserver: function(_, args){
           var data     = args[0],
@@ -1986,6 +1983,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           return $$ThrowException('assertion_failed', ['$$AssertWontThrow']);
+        },
+        $$BoundFunctionCreate: function(_, args){
+          var func     = args[0],
+              thisArg  = args[1],
+              argArray = args[2];
+
+          return new $BoundFunction(func, thisArg, argArray);
         },
         $$Call: function(_, args){
           var func = args[0].Call ? args[0].call : args[0];
@@ -2087,6 +2091,20 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
 
           return new $Array(props);
+        },
+        $$EvaluateInScope: function(_, args){
+          var code = args[0],
+              obj  = args[1];
+
+          var targetRealm = obj.Realm || realm;
+
+          return evaluate(code, new ObjectEnv(obj, targetRealm.global), targetRealm);
+        },
+        $$EvaluateInGlobal: function(_, args){
+          var code   = args[0],
+              global = args[1];
+
+          return evaluate(code, global.env, global.Realm);
         },
         $$EvaluateModule: function(_, args){
           var loader = args[0],

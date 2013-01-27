@@ -34,8 +34,7 @@ var natives = (function(module){
       $$DeliverAllChangeRecords = operations.$$DeliverAllChangeRecords;
 
   var Hooked = new Hash,
-      timers = {},
-      nativeCode = ['function ', '() { [native code] }'];
+      timers = {};
 
 
   var natives = (function(){
@@ -242,49 +241,11 @@ var natives = (function(module){
     _hasInternal: function(obj, args){
       return args[1] in args[0];
     },
-    _GetIntrinsic: function(obj, args){
-      return require('./runtime').intrinsics[args[0]];
-    },
-    _SetIntrinsic: function(obj, args){
-      require('./runtime').intrinsics[args[0]] = args[1];
-    },
-    _IsConstructor: function(obj, args){
-      return !!(args[0] && args[0].Construct);
-    },
-    _Type: function(obj, args){
-      if (args[0] === null) {
-        return 'Null';
-      }
-      switch (typeof args[0]) {
-        case 'undefined': return 'Undefined';
-        case 'function':
-        case 'object':    return 'Object';
-        case 'string':    return 'String';
-        case 'number':    return 'Number';
-        case 'boolean':   return 'Boolean';
-      }
-    },
     Exception: function(type, args){
       return $$MakeException(type, $$CreateListFromArray(args));
     },
     _createNil: function(){
       return new $Nil;
-    },
-    _FunctionToString: function(obj, args){
-      obj = args[0];
-      if (obj.Proxy) {
-        obj = obj.ProxyTarget;
-      }
-      var code = obj.code;
-      if (obj.BuiltinFunction || !code) {
-        var name = obj.get('name');
-        if (name && typeof name !== 'string' && name.BuiltinBrand === 'BuiltinSymbol') {
-          name = '@' + name.Name;
-        }
-        return nativeCode[0] + name + nativeCode[1];
-      } else {
-        return code.source.slice(code.range[0], code.range[1]);
-      }
     },
     _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
