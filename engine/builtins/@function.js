@@ -92,7 +92,7 @@ export class Function {
       let name = obj.name;
 
       if (hasBrand(name, 'BuiltinSymbol')) {
-        name = '@' + $$Get(name, 'Name');
+        name = `@${$$Get(name, 'Name')}`;
       }
 
       return `function ${name}() { [native code] }`;
