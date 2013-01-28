@@ -39,6 +39,10 @@ import {
 } from '@@symbols';
 
 import {
+  undefined
+} from '@@constants';
+
+import {
   parseFloat,
   parseInt
 } from '@globals';
@@ -89,7 +93,6 @@ export class Number {
     return $$NumberToString(ensureNumber(this), radix);
   }
 
-
   // ############################################
   // # 15.7.4.3 Number.prototype.toLocaleString #
   // ############################################
@@ -130,7 +133,6 @@ export class Number {
 
     return $$Invoke(x, 'toExponential', f);
   }
-
 
   // #########################################
   // # 15.7.4.6 Number.prototype.toPrecision #
