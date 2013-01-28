@@ -504,13 +504,17 @@ export const Math = {
     return sign(x) * $$Pow(abs(x), 1 / 3);
   },
 
-  imul(x, y){
-    x = ToUint32(x);
-    y = ToUint32(y);
+  imul(x, y) {
+    const xlo = loword(x),
+          ylo = loword(y);
 
-    return ToInt32((x * y) & 0xffffffff);
+    return xlo * ylo + (((hiword(x) * ylo + hiword(y) * xlo) << 16) >>> 0);
   }
 };
+
+const loword = x => x & 0xffff,
+      hiword = x => x >>> 16 & 0xffff;
+
 
 $$Set(Math, 'BuiltinBrand', 'BuiltinMath');
 setTag(Math, 'Math');
