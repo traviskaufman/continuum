@@ -174,6 +174,7 @@ var objects = (function(exports){
 
   exports.isExtensible = isES5 ? Object.isExtensible : function isExtensible(){ return true };
 
+
   function enumerate(o){
     var out = [], i = 0;
     for (out[i++] in o);
@@ -207,7 +208,7 @@ var objects = (function(exports){
               var name = fname(f);
             } else if (typeof f === 'string' && typeof p[i+1] !== 'function' || !fname(p[i+1])) {
               var name = f;
-              f = p[i+1];
+              f = p[i + 1];
             }
             if (name) {
               hidden.value = f;
@@ -348,7 +349,7 @@ var objects = (function(exports){
     Ctor.prototype = create(Super.prototype);
     define(Ctor.prototype, 'constructor', Ctor);
     properties && define(Ctor.prototype, properties);
-    methods    && define(Ctor.prototype, methods);
+    methods && define(Ctor.prototype, methods);
     return Ctor;
   }
 

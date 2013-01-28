@@ -52,11 +52,11 @@ var traversal = (function(exports){
       return out;
     }
 
-    var queue = new Queue,
-        tag = uid(),
+    var queue  = new Queue,
+        tag    = uid(),
         tagged = [],
-        list = hidden ? ownProperties : ownKeys,
-        out = enqueue(o);
+        list   = hidden ? ownProperties : ownKeys,
+        out    = enqueue(o);
 
     while (queue.length) {
       recurse.apply(this, queue.shift());
@@ -73,19 +73,21 @@ var traversal = (function(exports){
   var walk = exports.walk = (function(){
     if (typeof Set !== 'undefined' && typeof Set.prototype.add === 'function') {
       return function walk(root, callback){
-        var stack = [[root]],
-            sp = 1,
+        var stack   = [[root]],
+            sp      = 1,
             branded = new Set;
 
         do {
           var node = stack[--sp],
               keys = ownKeys(node),
-              len = keys.length;
+              len  = keys.length;
 
           for (var i=0; i < len; i++) {
             var item = node[keys[i]];
+
             if (item && typeof item === 'object' && !branded.has(item)) {
               branded.add(item);
+
               var result = callback(item, node);
               if (result === RECURSE) {
                 stack[sp++] = item;
@@ -99,22 +101,24 @@ var traversal = (function(exports){
     }
 
     return function walk(root, callback){
-      var stack = [[root]],
+      var stack   = [[root]],
           branded = [],
-          sp = 1,
-          brandedCount = 0,
-          tag = uid();
+          count   = 0,
+          sp      = 1,
+          tag     = uid();
 
       do {
         var node = stack[--sp],
             keys = ownKeys(node),
-            len = keys.length;
+            len  = keys.length;
 
         for (var i=0; i < len; i++) {
           var item = node[keys[i]];
+
           if (item && typeof item === 'object' && !_hasOwn.call(item, tag)) {
             item[tag] = true;
-            branded[brandedCount++] = item;
+            branded[count++] = item;
+
             var result = callback(item, node);
             if (result === RECURSE) {
               stack[sp++] = item;
@@ -126,8 +130,8 @@ var traversal = (function(exports){
         }
       } while (sp)
 
-      while (brandedCount--) {
-        delete branded[brandedCount][tag];
+      while (count--) {
+        delete branded[count][tag];
       }
     };
   })();
@@ -141,7 +145,6 @@ var traversal = (function(exports){
       var parts = toArray(arguments);
 
       for (var i=0; i < parts.length; i++) {
-
         if (typeof parts[i] === 'function') {
           return function(o){
             for (var i=0; i < parts.length; i++) {
@@ -170,6 +173,7 @@ var traversal = (function(exports){
 
     function collector(o){
       var handlers = new Hash;
+
       for (var k in o) {
         if (o[k] instanceof Array) {
           handlers[k] = path(o[k]);
@@ -185,6 +189,7 @@ var traversal = (function(exports){
 
         function walker(node){
           if ('length' in node) return RECURSE;
+
           var handler = handlers[node.type];
 
           if (handler === true) {
@@ -218,6 +223,7 @@ var traversal = (function(exports){
   var Visitor = exports.Visitor = (function(){
     function VisitorHandlers(handlers){
       var self = this;
+
       if (handlers instanceof Array) {
         each(handlers, function(handler){
           self[fname(handler)] = handler;
@@ -233,6 +239,7 @@ var traversal = (function(exports){
 
     function VisitorState(dispatcher, handlers, root){
       var stack = this.stack = [[root]];
+
       this.dispatcher = dispatcher;
       this.handlers = handlers;
       this.branded = [];
@@ -264,9 +271,10 @@ var traversal = (function(exports){
             each(node.slice().reverse(), this.context.push);
           } else  {
             var type = this.dispatcher(node);
-            if (type === CONTINUE) return;
 
-            if (type in this.handlers) {
+            if (type === CONTINUE) {
+              return;
+            } else if (type in this.handlers) {
               var result = this.handlers[type].call(this.context, node);
             } else if (this.handlers.__noSuchHandler__) {
               var result = this.handlers.__noSuchHandler__.call(this.context, node);
@@ -286,22 +294,14 @@ var traversal = (function(exports){
 
 
     function Visitor(dispatcher, handlers){
-      if (handlers instanceof VisitorHandlers) {
-        this.handlers = handlers;
-      } else {
-        this.handlers = new VisitorHandlers(handlers);
-      }
-      this.dispatcher = dispatcher
+      this.handlers = handlers instanceof VisitorHandlers ? handlers : new VisitorHandlers(handlers);
+      this.dispatcher = dispatcher;
     }
 
 
     define(Visitor.prototype, [
       function visit(root){
-        if (root instanceof VisitorState) {
-          var visitor = root;
-        } else {
-          var visitor = new VisitorState(this.dispatcher, this.handlers, root);
-        }
+        var visitor = root instanceof VisitorState ? root : new VisitorState(this.dispatcher, this.handlers, root);
 
         try {
           while (visitor.stack.length) {
@@ -310,12 +310,17 @@ var traversal = (function(exports){
           visitor.cleanup();
         } catch (e) {
           if (e !== StopIteration) throw e;
+
           var self = this;
-          var _resume = function(){
+
+          function _resume(){
             _resume = function(){};
             return self.visit(visitor);
           }
-          return function resume(){ return _resume() };
+
+          return function resume(){
+            return _resume();
+          };
         }
       }
     ]);
@@ -347,6 +352,7 @@ var traversal = (function(exports){
     }
 
     var result = object instanceof Array ? [] : {};
+
     each(object, function(value, key){
       if (value && typeof value.toJSON === 'function') {
         value = value.toJSON(key);
