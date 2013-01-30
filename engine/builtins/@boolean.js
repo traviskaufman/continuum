@@ -56,10 +56,10 @@ export class Boolean {
   // # 15.6.4.2 Boolean.prototype.toString #
   // #######################################
   toString(){
-    if (typeof this === 'boolean') {
+    if (Type(this) === 'Boolean') {
       return this;
     } else if (hasBrand(this, 'BooleanWrapper')) {
-      return $$Get(this, 'BooleanValue');
+      return $$Get(this, 'BooleanValue') ? 'true' : 'false';
     }
 
     throw $$Exception('not_generic', ['Boolean.prototype.toString']);
@@ -69,7 +69,7 @@ export class Boolean {
   // # 15.6.4.3 Boolean.prototype.valueOf #
   // ######################################
   valueOf(){
-    if (typeof this === 'boolean') {
+    if (Type(this) === 'Boolean') {
       return this;
     } else if (hasBrand(this, 'BooleanWrapper')) {
       return $$Get(this, 'BooleanValue');
