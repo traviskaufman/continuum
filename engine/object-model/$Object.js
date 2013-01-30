@@ -7,7 +7,8 @@ var $Object = (function(exports){
       operations   = require('./operations'),
       PropertyList = require('../lib/PropertyList'),
       utility      = require('../lib/utility'),
-      symbols      = require('./$Symbol').wellKnownSymbols;
+      symbols      = require('./$Symbol').wellKnownSymbols,
+      engine       = require('../engine').engine;
 
   var inherit = objects.inherit,
       define  = objects.define,
@@ -608,12 +609,10 @@ var $Object = (function(exports){
 
   var realm, intrinsics;
 
-  define($Object, [
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});

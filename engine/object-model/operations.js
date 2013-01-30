@@ -8,7 +8,8 @@ var operations = (function(exports){
       errors       = require('../errors'),
       constants    = require('../constants'),
       Nil          = require('./$Nil'),
-      MapData      = require('./collections').MapData;
+      MapData      = require('./collections').MapData,
+      engine       = require('../engine').engine;
 
   var isFalsey               = Nil.isFalsey,
       isNullish              = Nil.isNullish,
@@ -572,10 +573,10 @@ var operations = (function(exports){
 
   var realm, intrinsics;
 
-  exports.changeRealm = function changeRealm(newRealm){
-    realm = newRealm;
-    intrinsics = realm ? realm.intrinsics : undefined;
-  };
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});

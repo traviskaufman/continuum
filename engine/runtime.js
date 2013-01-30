@@ -24,9 +24,10 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Proxy           = require('./object-model/$Proxy'),
       $TypedArray      = require('./object-model/$TypedArray'),
       natives          = require('./natives'),
+      thunk            = require('./thunk'),
+      engine           = require('./engine').engine,
       Emitter          = require('./lib/Emitter'),
       PropertyList     = require('./lib/PropertyList'),
-      thunk            = require('./thunk'),
       Stack            = require('./lib/Stack');
 
 
@@ -477,7 +478,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function prepare(receiver, args, ctx, isConstruct){
         if (realm !== this.Realm) {
-          activate(this.Realm);
+          engine.changeRealm(this.Realm);
         }
 
         if (this.ThisMode === 'lexical') {
@@ -594,7 +595,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     }, [
       function Call(receiver, args, isConstruct){
         if (realm !== this.Realm) {
-          activate(this.Realm);
+          engine.changeRealm(this.Realm);
         }
         if (this.ThisMode === 'lexical') {
           var local = new DeclarativeEnv(this.Scope);
@@ -1213,7 +1214,7 @@ var runtime = (function(GLOBAL, exports, undefined){
     define(ExecutionContext, [
       function push(newContext){
         context = newContext;
-        context.Realm.active || activate(context.Realm);
+        context.Realm.active || engine.changeRealm(context.Realm);
       },
       function pop(){
         if (context) {
@@ -1547,11 +1548,11 @@ var runtime = (function(GLOBAL, exports, undefined){
       this.Realm = realm;
       realm.natives = this;
       realm.intrinsics = this.bindings;
-      activate(realm);
+      engine.changeRealm(realm);
       intrinsics.Genesis = new $Object(null);
       intrinsics.Genesis.HiddenPrototype = true;
       intrinsics.ObjectProto = new $Object(intrinsics.Genesis);
-      intrinsics.global = global = operators.global = realm.global = new $Object(intrinsics.ObjectProto);
+      intrinsics.global = global = engine.activeGlobal = realm.global = new $Object(intrinsics.ObjectProto);
       intrinsics.global.BuiltinBrand = 'GlobalObject';
       realm.globalEnv = new GlobalEnv(intrinsics.global);
       realm.globalEnv.Realm = realm;
@@ -1618,13 +1619,13 @@ var runtime = (function(GLOBAL, exports, undefined){
 
         if (realm !== this.Realm) {
           var activeRealm = realm;
-          activate(this.Realm);
+          engine.changeRealm(this.Realm);
         }
 
         this.bindings[options.name] = new $NativeFunction(options);
 
         if (activeRealm) {
-          activate(activeRealm);
+          engine.changeRealm(activeRealm);
         }
       }
     ]);
@@ -2260,9 +2261,11 @@ var runtime = (function(GLOBAL, exports, undefined){
           };
         })(),
         $$Set: function(_, args){
-          var val = args[2];
+          var obj = args[0],
+              key = args[1],
+              val = args[2];
 
-          if (val && val.Call) {
+          if (typeof val === 'function') {
             val = wrapFunction(val);
           }
 
@@ -2863,10 +2866,8 @@ var runtime = (function(GLOBAL, exports, undefined){
 
 
     function Realm(oncomplete){
-      var self = this;
-
       Emitter.call(this);
-      realms.push(this);
+
       this.active        = false;
       this.quiet         = false;
       this.initialized   = false;
@@ -2905,9 +2906,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       });
 
+      var self = this;
+      engine.addRealm(this);
+
       function init(){
         initialize(self, function(){
-          deactivate(self);
           self.scripts = [];
           self.state = 'idle';
           self.emit('ready');
@@ -2980,7 +2983,7 @@ var runtime = (function(GLOBAL, exports, undefined){
         return this;
       },
       function evaluate(subject){
-        activate(this);
+        engine.changeRealm(this);
         var script = new Script(subject);
 
         if (script.error) {
@@ -3027,56 +3030,25 @@ var runtime = (function(GLOBAL, exports, undefined){
   })();
 
 
-  var realms = [],
-      realmStack = [],
-      realm = null,
+  var realm = null,
       global = null,
       context = null,
       intrinsics = null;
 
-  function activate(target){
-    if (realm !== target) {
-      if (realm) {
-        realm.active = false;
-        realm.emit('deactivate');
-      }
-      realmStack.push(realm);
-      exports.realm = realm = target;
-      exports.global = global = operators.global = target.global;
-      exports.intrinsics = intrinsics = target.intrinsics;
-      target.active = true;
-      $Object.changeRealm(target);
-      $Array.changeRealm(target);
-      //$String.changeRealm(target);
-      $StrictArguments.changeRealm(target);
-      operations.changeRealm(target);
-      target.emit('activate');
-    }
-  }
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    global = engine.activeGlobal;
+    intrinsics = engine.activeIntrinsics;
+  });
 
-  function deactivate(target){
-    if (realm === target && realmStack.length) {
-      target.active = false;
-      realm = realmStack.pop();
-      target.emit('dectivate');
-    }
-  }
+  engine.on('context-change', function(){
+    context = engine.activeContext;
+  });
 
 
   exports.Realm = Realm;
   exports.Script = Script;
   exports.$NativeFunction = $NativeFunction;
-
-  exports.activeRealm = function activeRealm(){
-    if (!realm && realms.length) {
-      activate(realms[realms.length - 1]);
-    }
-    return realm;
-  };
-
-  exports.activeContext = function activeContext(){
-    return context;
-  };
 
   return exports;
 })((0,eval)('this'), typeof module !== 'undefined' ? module.exports : {});

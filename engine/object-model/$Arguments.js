@@ -4,7 +4,8 @@ var $Arguments = (function(exports){
       errors      = require('../errors'),
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
-      $Object     = require('./$Object').$Object;
+      $Object     = require('./$Object').$Object,
+      engine      = require('../engine').engine;
 
   var Hash    = objects.Hash,
       inherit = objects.inherit,
@@ -137,12 +138,10 @@ var $Arguments = (function(exports){
 
   var realm, intrinsics;
 
-  define($StrictArguments, [
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});

@@ -3,7 +3,8 @@ var operators = (function(exports){
   var constants        = require('../constants'),
       Nil              = require('./$Nil'),
       symbols          = require('./$Symbol').wellKnownSymbols,
-      $$ThrowException = require('../errors').$$ThrowException;
+      $$ThrowException = require('../errors').$$ThrowException,
+      engine           = require('../engine').engine;
 
   var hasInstanceSymbol  = symbols.hasInstance,
       createSymbol       = symbols.create,
@@ -76,7 +77,9 @@ var operators = (function(exports){
       if (v.strict) {
         return $$ThrowException('not_defined', [v.name, base]);
       }
-      return exports.global.Put(v.name, w, false);
+
+      var global = engine.activeGlobal;
+      return global ? global.Put(v.name, w, false) : false;
     }
 
     if (typeof base !== 'object') {

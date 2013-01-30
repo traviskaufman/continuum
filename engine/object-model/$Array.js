@@ -6,7 +6,8 @@ var $Array = (function(exports){
       operators    = require('./operators'),
       operations   = require('./operations'),
       PropertyList = require('../lib/PropertyList'),
-      $Object      = require('./$Object').$Object;
+      $Object      = require('./$Object').$Object,
+      engine       = require('../engine').engine;
 
   var inherit          = objects.inherit,
       define           = objects.define,
@@ -324,12 +325,11 @@ var $Array = (function(exports){
 
   var realm, intrinsics;
 
-  define($Array, [
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
+
 
   return exports;
 })(typeof module !== 'undefined' ? exports : {});

@@ -31,6 +31,7 @@ require('./builder')
   '../engine/lib/PropertyList.js',
   '../engine/lib/buffers.js',
 
+  '../engine/engine.js',
   '../engine/constants.js',
   '../engine/errors.js',
   '../engine/assembler.js',

@@ -1,4 +1,4 @@
-var index = (function(exports){
+var index = (function(module){
   "use strict";
   var objects   = require('./lib/objects'),
       iteration = require('./lib/iteration'),
@@ -6,7 +6,8 @@ var index = (function(exports){
       assembler = require('./assembler'),
       debug     = require('./debug'),
       constants = require('./constants'),
-      errors    = require('./errors');
+      errors    = require('./errors'),
+      engine    = module.exports = require('./engine').engine;
 
   var assign           = objects.assign,
       assignAll        = objects.assignAll,
@@ -46,8 +47,7 @@ var index = (function(exports){
     }
   };
 
-
-  assign(exports, [
+  assign(engine, [
     runtime.parse,
     function createRealm(listener){
       return new Realm(listener);
@@ -292,7 +292,7 @@ var index = (function(exports){
   }
 
 
-  define(exports, {
+  define(engine, {
     Assembler : assembler.Assembler,
     Code      : assembler.Code,
     Realm     : Realm,
@@ -324,6 +324,6 @@ var index = (function(exports){
     debug: debug
   });
 
-  return exports;
-})(typeof module !== 'undefined' ? module.exports : {});
+  return engine;
+})(typeof module !== 'undefined' ? module : {});
 

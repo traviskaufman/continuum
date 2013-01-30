@@ -5,7 +5,8 @@ var $TypedArray = (function(module){
       $Array           = require('./$Array').$Array,
       $Object          = require('./$Object').$Object,
       $$ThrowException = require('../errors').$$ThrowException,
-      DataDescriptor   = require('./descriptors').DataDescriptor;
+      DataDescriptor   = require('./descriptors').DataDescriptor,
+      engine           = require('../engine').engine;
 
   var inherit     = objects.inherit,
       define      = objects.define,
@@ -262,12 +263,10 @@ var $TypedArray = (function(module){
 
   var realm, intrinsics;
 
-  define($TypedArray, [
-    function changeRealm(newRealm){
-      realm = newRealm;
-      intrinsics = realm ? realm.intrinsics : undefined;
-    }
-  ]);
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
 
   return module.exports = $TypedArray;
 })(typeof module !== 'undefined' ? module : {});
