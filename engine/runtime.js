@@ -2434,7 +2434,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           sep = sep.StringValue;
         }
 
-        return new $Array(str.split(sep, limit));
+        return new $Array(string.split(sep, limit));
       },
       $$StringSearch: function(_, args){
         var string = args[0],
