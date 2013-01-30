@@ -5938,6 +5938,7 @@ exports.objects = (function(exports){
 
   exports.isExtensible = isES5 ? Object.isExtensible : function isExtensible(){ return true };
 
+
   function enumerate(o){
     var out = [], i = 0;
     for (out[i++] in o);
@@ -5971,7 +5972,7 @@ exports.objects = (function(exports){
               var name = fname(f);
             } else if (typeof f === 'string' && typeof p[i+1] !== 'function' || !fname(p[i+1])) {
               var name = f;
-              f = p[i+1];
+              f = p[i + 1];
             }
             if (name) {
               hidden.value = f;
@@ -6112,7 +6113,7 @@ exports.objects = (function(exports){
     Ctor.prototype = create(Super.prototype);
     define(Ctor.prototype, 'constructor', Ctor);
     properties && define(Ctor.prototype, properties);
-    methods    && define(Ctor.prototype, methods);
+    methods && define(Ctor.prototype, methods);
     return Ctor;
   }
 
@@ -6675,11 +6676,11 @@ exports.traversal = (function(exports){
       return out;
     }
 
-    var queue = new Queue,
-        tag = uid(),
+    var queue  = new Queue,
+        tag    = uid(),
         tagged = [],
-        list = hidden ? ownProperties : ownKeys,
-        out = enqueue(o);
+        list   = hidden ? ownProperties : ownKeys,
+        out    = enqueue(o);
 
     while (queue.length) {
       recurse.apply(this, queue.shift());
@@ -6696,19 +6697,21 @@ exports.traversal = (function(exports){
   var walk = exports.walk = (function(){
     if (typeof Set !== 'undefined' && typeof Set.prototype.add === 'function') {
       return function walk(root, callback){
-        var stack = [[root]],
-            sp = 1,
+        var stack   = [[root]],
+            sp      = 1,
             branded = new Set;
 
         do {
           var node = stack[--sp],
               keys = ownKeys(node),
-              len = keys.length;
+              len  = keys.length;
 
           for (var i=0; i < len; i++) {
             var item = node[keys[i]];
+
             if (item && typeof item === 'object' && !branded.has(item)) {
               branded.add(item);
+
               var result = callback(item, node);
               if (result === RECURSE) {
                 stack[sp++] = item;
@@ -6722,22 +6725,24 @@ exports.traversal = (function(exports){
     }
 
     return function walk(root, callback){
-      var stack = [[root]],
+      var stack   = [[root]],
           branded = [],
-          sp = 1,
-          brandedCount = 0,
-          tag = uid();
+          count   = 0,
+          sp      = 1,
+          tag     = uid();
 
       do {
         var node = stack[--sp],
             keys = ownKeys(node),
-            len = keys.length;
+            len  = keys.length;
 
         for (var i=0; i < len; i++) {
           var item = node[keys[i]];
+
           if (item && typeof item === 'object' && !_hasOwn.call(item, tag)) {
             item[tag] = true;
-            branded[brandedCount++] = item;
+            branded[count++] = item;
+
             var result = callback(item, node);
             if (result === RECURSE) {
               stack[sp++] = item;
@@ -6749,8 +6754,8 @@ exports.traversal = (function(exports){
         }
       } while (sp)
 
-      while (brandedCount--) {
-        delete branded[brandedCount][tag];
+      while (count--) {
+        delete branded[count][tag];
       }
     };
   })();
@@ -6764,7 +6769,6 @@ exports.traversal = (function(exports){
       var parts = toArray(arguments);
 
       for (var i=0; i < parts.length; i++) {
-
         if (typeof parts[i] === 'function') {
           return function(o){
             for (var i=0; i < parts.length; i++) {
@@ -6793,6 +6797,7 @@ exports.traversal = (function(exports){
 
     function collector(o){
       var handlers = new Hash;
+
       for (var k in o) {
         if (o[k] instanceof Array) {
           handlers[k] = path(o[k]);
@@ -6808,6 +6813,7 @@ exports.traversal = (function(exports){
 
         function walker(node){
           if ('length' in node) return RECURSE;
+
           var handler = handlers[node.type];
 
           if (handler === true) {
@@ -6841,6 +6847,7 @@ exports.traversal = (function(exports){
   var Visitor = exports.Visitor = (function(){
     function VisitorHandlers(handlers){
       var self = this;
+
       if (handlers instanceof Array) {
         each(handlers, function(handler){
           self[fname(handler)] = handler;
@@ -6856,6 +6863,7 @@ exports.traversal = (function(exports){
 
     function VisitorState(dispatcher, handlers, root){
       var stack = this.stack = [[root]];
+
       this.dispatcher = dispatcher;
       this.handlers = handlers;
       this.branded = [];
@@ -6887,9 +6895,10 @@ exports.traversal = (function(exports){
             each(node.slice().reverse(), this.context.push);
           } else  {
             var type = this.dispatcher(node);
-            if (type === CONTINUE) return;
 
-            if (type in this.handlers) {
+            if (type === CONTINUE) {
+              return;
+            } else if (type in this.handlers) {
               var result = this.handlers[type].call(this.context, node);
             } else if (this.handlers.__noSuchHandler__) {
               var result = this.handlers.__noSuchHandler__.call(this.context, node);
@@ -6909,22 +6918,14 @@ exports.traversal = (function(exports){
 
 
     function Visitor(dispatcher, handlers){
-      if (handlers instanceof VisitorHandlers) {
-        this.handlers = handlers;
-      } else {
-        this.handlers = new VisitorHandlers(handlers);
-      }
-      this.dispatcher = dispatcher
+      this.handlers = handlers instanceof VisitorHandlers ? handlers : new VisitorHandlers(handlers);
+      this.dispatcher = dispatcher;
     }
 
 
     define(Visitor.prototype, [
       function visit(root){
-        if (root instanceof VisitorState) {
-          var visitor = root;
-        } else {
-          var visitor = new VisitorState(this.dispatcher, this.handlers, root);
-        }
+        var visitor = root instanceof VisitorState ? root : new VisitorState(this.dispatcher, this.handlers, root);
 
         try {
           while (visitor.stack.length) {
@@ -6933,12 +6934,17 @@ exports.traversal = (function(exports){
           visitor.cleanup();
         } catch (e) {
           if (e !== StopIteration) throw e;
+
           var self = this;
-          var _resume = function(){
+
+          function _resume(){
             _resume = function(){};
             return self.visit(visitor);
           }
-          return function resume(){ return _resume() };
+
+          return function resume(){
+            return _resume();
+          };
         }
       }
     ]);
@@ -6970,6 +6976,7 @@ exports.traversal = (function(exports){
     }
 
     var result = object instanceof Array ? [] : {};
+
     each(object, function(value, key){
       if (value && typeof value.toJSON === 'function') {
         value = value.toJSON(key);
@@ -7079,167 +7086,203 @@ exports.LinkedList = (function(module){
       StopIteration = iteration.StopIteration;
 
 
-  function LinkedListIterator(list){
-    this.item = list.sentinel;
-    this.sentinel = list.sentinel;
-  }
-
-  inherit(LinkedListIterator, Iterator, [
-    function next(){
-      this.item = this.item.next;
-      if (this.item === this.sentinel) {
-        throw StopIteration;
-      }
-      return this.item.data;
+  var LinkedListIterator = (function(){
+    function LinkedListIterator(list){
+      this.item = list.sentinel;
+      this.sentinel = list.sentinel;
     }
-  ]);
+
+    inherit(LinkedListIterator, Iterator, [
+      function next(){
+        this.item = this.item.next;
+        if (this.item === this.sentinel) {
+          throw StopIteration;
+        }
+
+        return this.item.data;
+      }
+    ]);
+
+    return LinkedListIterator;
+  })();
 
 
-  function Item(data){
-    this.data = data;
-  }
+  var Item = (function(){
+    function Item(data){
+      this.data = data;
+    }
 
-  define(Item.prototype, [
-    function link(item){
-      item.next = this;
-      return item;
-    },
-    function unlink(){
-      var next = this.next;
-      this.next = next.next;
-      next.next = null;
-      return this;
-    },
-    function clear(){
-      var data = this.data;
-      this.data = undefined;
+    define(Item.prototype, [
+      function link(item){
+        item.next = this;
+
+        return item;
+      },
+      function unlink(){
+        var next = this.next;
+
+        this.next = next.next;
+        next.next = null;
+
+        return this;
+      },
+      function clear(){
+        var data = this.data;
+
+        this.data = undefined;
+        this.next = null;
+
+        return data;
+      }
+    ]);
+
+    return Item;
+  })();
+
+
+  var Sentinel = (function(){
+    function Sentinel(){
       this.next = null;
-      return data;
-    }
-  ]);
-
-  function Sentinel(){
-    this.next = null;
-  }
-
-  inherit(Sentinel, Item, [
-    function unlink(){
-      return this;
-    },
-    function clear(){}
-  ]);
-
-  function find(list, value){
-    if (list.lastFind && list.lastFind.next.data === value) {
-      return list.lastFind;
     }
 
-    var item = list.tail,
-        i = 0;
+    inherit(Sentinel, Item, [
+      function unlink(){
+        return this;
+      },
+      function clear(){}
+    ]);
 
-    while ((item = item.next) !== list.sentinel) {
-      if (item.next.data === value) {
-        return list.lastFind = item;
+    return Sentinel;
+  })()
+
+  return module.exports = (function(){
+    function find(list, value){
+      if (list.lastFind && list.lastFind.next.data === value) {
+        return list.lastFind;
+      }
+
+      var item = list.tail;
+
+      while ((item = item.next) !== list.sentinel) {
+        if (item.next.data === value) {
+          return list.lastFind = item;
+        }
       }
     }
-  }
 
-  function LinkedList(){
-    var sentinel = new Sentinel;
-    this.size = 0;
-    define(this, {
-      sentinel: sentinel,
-      tail: sentinel,
-      lastFind: null
-    });
-  }
+    function LinkedList(){
+      var sentinel = new Sentinel;
 
-  define(LinkedList.prototype, [
-    function push(value){
-      this.tail = this.tail.link(new Item(value));
-      return ++this.size;
-    },
-    function pop() {
-      var tail = this.tail,
-          data = tail.data;
-      this.tail = tail.next;
-      tail.next = null;
-      tail.data = undefined;
-      return data;
-    },
-    function insert(value, before){
-      var item = find(this, before);
-      if (item) {
-        var inserted = new Item(value);
-        inserted.next = item.next;
-        item.next = inserted;
-        return ++this.size;
-      }
-      return false;
-    },
-    function remove(value){
-      var item = find(this, value);
-      if (item) {
-        item.unlink();
-        return --this.size;
-      }
-      return false;
-    },
-    function replace(value, replacement){
-      var item = find(this, value);
-      if (item) {
-        var replacer = new Item(replacement);
-        replacer.next = item.next.next;
-        item.next.next = null;
-        item.next = replacer;
-        return true;
-      }
-      return false;
-    },
-    function has(value) {
-      return !!find(this, value);
-    },
-    function items(){
-      var item = this.tail,
-          array = [];
-
-      while (item !== this.sentinel) {
-        array.push(item.data);
-        item = item.next;
-      }
-
-      return array;
-    },
-    function clear(){
-      var next,
-          item = this.tail;
-
-      while (item !== this.sentinel) {
-        next = item.next;
-        item.clear();
-        item = next;
-      }
-
-      this.tail = this.sentinel;
       this.size = 0;
-      return this;
-    },
-    function clone(){
-      var items = this.items(),
-          list = new LinkedList,
-          i = items.length;
-
-      while (i--) {
-        list.push(items[i]);
-      }
-      return list;
-    },
-    function __iterator__(){
-      return new LinkedListIterator(this);
+      define(this, {
+        sentinel: sentinel,
+        tail    : sentinel,
+        lastFind: null
+      });
     }
-  ]);
 
-  return module.exports = LinkedList;
+    define(LinkedList.prototype, [
+      function push(value){
+        this.tail = this.tail.link(new Item(value));
+
+        return ++this.size;
+      },
+      function pop() {
+        var tail = this.tail,
+            data = tail.data;
+
+        this.tail = tail.next;
+        tail.next = null;
+        tail.data = undefined;
+
+        return data;
+      },
+      function insert(value, before){
+        var item = find(this, before);
+
+        if (item) {
+          var inserted = new Item(value);
+
+          inserted.next = item.next;
+          item.next = inserted;
+
+          return ++this.size;
+        }
+
+        return false;
+      },
+      function remove(value){
+        var item = find(this, value);
+
+        if (item) {
+          item.unlink();
+
+          return --this.size;
+        }
+
+        return false;
+      },
+      function replace(value, replacement){
+        var item = find(this, value);
+
+        if (item) {
+          var replacer = new Item(replacement);
+
+          replacer.next = item.next.next;
+          item.next.next = null;
+          item.next = replacer;
+          return true;
+        }
+
+        return false;
+      },
+      function has(value) {
+        return !!find(this, value);
+      },
+      function items(){
+        var item = this.tail,
+            array = [];
+
+        while (item !== this.sentinel) {
+          array.push(item.data);
+          item = item.next;
+        }
+
+        return array;
+      },
+      function clear(){
+        var next,
+            item = this.tail;
+
+        while (item !== this.sentinel) {
+          next = item.next;
+          item.clear();
+          item = next;
+        }
+
+        this.tail = this.sentinel;
+        this.size = 0;
+
+        return this;
+      },
+      function clone(){
+        var items = this.items(),
+            list  = new LinkedList,
+            index = items.length;
+
+        while (index--) {
+          list.push(items[index]);
+        }
+
+        return list;
+      },
+      function __iterator__(){
+        return new LinkedListIterator(this);
+      }
+    ]);
+
+    return LinkedList;
+  })();
 })(typeof module !== 'undefined' ? module : {});
 
 
@@ -19763,7 +19806,7 @@ exports.runtime = (function(GLOBAL, exports, undefined){
           sep = sep.StringValue;
         }
 
-        return new $Array(str.split(sep, limit));
+        return new $Array(string.split(sep, limit));
       },
       $$StringSearch: function(_, args){
         var string = args[0],
@@ -22333,7 +22376,7 @@ exports.builtins["@json"] = "import {\n  $$JSONParse,\n  $$JSONQuote\n} from '@@
 
 exports.builtins["@map"] = "import {\n  @@iterator: iterator,\n  @@create  : create\n} from '@@symbols';\n\nimport {\n  undefined\n} from '@@constants';\n\nimport {\n  $$Exception,\n  $$Get,\n  $$Has,\n  $$Set\n} from '@@internals';\n\n\nimport {\n  builtinClass,\n  builtinFunction,\n  define,\n  extend,\n  hasBrand,\n  internalFunction,\n  isInitializing\n} from '@@utilities';\n\nimport {\n  ObjectCreate,\n  Type\n} from '@@types';\n\nimport {\n  OrdinaryCreateFromConstructor,\n  ToObject,\n  ToString\n} from '@@operations';\n\nimport {\n  $$MapClear,\n  $$MapDelete,\n  $$MapGet,\n  $$MapHas,\n  $$MapInitialization,\n  $$MapNext,\n  $$MapSet,\n  $$MapSigil,\n  $$MapSize\n} from '@@collections';\n\nimport {\n  Iterator\n} from '@iter';\n\nimport {\n  hasOwn\n} from '@reflect';\n\n\nfunction ensureMap(o, name){\n  if (Type(o) !== 'Object' || !$$Has(o, 'MapData')) {\n    throw $$Exception('called_on_incompatible_object', [name]);\n  }\n}\n\ninternalFunction(ensureMap);\n\n\nclass MapIterator extends Iterator {\n  private @map,  // Map\n          @key,  // MapNextKey\n          @kind; // MapIterationKind\n\n  constructor(map, kind){\n    this.@map = ToObject(map);\n    this.@key = $$MapSigil();\n    this.@kind = kind;\n  }\n\n  next(){\n    if (Type(this) !== 'Object') {\n      throw $$Exception('called_on_non_object', ['MapIterator.prototype.next']);\n    }\n\n    if (!(hasOwn(this, @map) && hasOwn(this, @key) && hasOwn(this, @kind))) {\n      throw $$Exception('called_on_incompatible_object', ['MapIterator.prototype.next']);\n    }\n\n    var kind = this.@kind,\n        item = $$MapNext(this.@map, this.@key);\n\n    if (!item) {\n      throw StopIteration;\n    }\n\n    this.@key = item[0];\n\n    if (kind === 'key+value') {\n      return item;\n    } else if (kind === 'key') {\n      return item[0];\n    }\n    return item[1];\n  }\n}\n\nbuiltinClass(MapIterator);\n\n\nexport class Map {\n  constructor(iterable){\n    if (!isInitializing(this, 'MapData')) {\n      return new Map(iterable);\n    }\n\n    $$MapInitialization(this, iterable);\n  }\n\n  get size(){\n    if (this && $$Has(this, 'MapData')) {\n      return $$MapSize(this);\n    }\n    return 0;\n  }\n\n  clear(){\n    ensureMap(this, 'Map.prototype.clear');\n    $$MapClear(this, key);\n    return this;\n  }\n\n  delete(key){\n    ensureMap(this, 'Map.prototype.delete');\n    return $$MapDelete(this, key);\n  }\n\n  get(key){\n    ensureMap(this, 'Map.prototype.get');\n    return $$MapGet(this, key);\n  }\n\n  has(key){\n    ensureMap(this, 'Map.prototype.has');\n    return $$MapHas(this, key);\n  }\n\n  entries(){\n    ensureMap(this, 'Map.prototype.entries');\n    return new MapIterator(this, 'key+value');\n  }\n\n  keys(){\n    ensureMap(this, 'Map.prototype.keys');\n    return new MapIterator(this, 'key');\n  }\n\n  set(key, value){\n    ensureMap(this, 'Map.prototype.set');\n    $$MapSet(this, key, value);\n    return this;\n  }\n\n  values(){\n    ensureMap(this, 'Map.prototype.values');\n    return new MapIterator(this, 'value');\n  }\n}\n\nextend(Map, {\n  @@create(){\n    const obj = OrdinaryCreateFromConstructor(this, '%MapPrototype%');\n    $$Set(obj, 'MapData', undefined);\n    $$Set(obj, 'BuiltinBrand', 'BuiltinMap');\n    return obj;\n  }\n});\n\nbuiltinClass(Map);\nconst MapPrototype = Map.prototype;\ndefine(MapPrototype, @@iterator, MapPrototype.entries);\n\n\n\nfunction mapClear(map){\n  ensureMap(map, '@map.clear');\n  $$MapClear(map);\n  return map;\n}\n\nbuiltinFunction(mapClear);\n\n\nfunction mapDelete(map, key){\n  ensureMap(map, '@map.delete');\n  return $$MapDelete(map, key);\n}\n\nbuiltinFunction(mapDelete);\n\n\nfunction mapGet(map, key){\n  ensureMap(map, '@map.get');\n  return $$MapGet(map, key);\n}\n\nbuiltinFunction(mapGet);\n\n\nfunction mapHas(map, key){\n  ensureMap(map, '@map.has');\n  return $$MapHas(map, key);\n}\n\nbuiltinFunction(mapHas);\n\n\nfunction mapIterate(map, kind){\n  ensureMap(map, '@map.iterate');\n  return new MapIterator(map, kind === undefined ? 'key+value' : ToString(kind));\n}\n\nbuiltinFunction(mapIterate);\n\n\nfunction mapSet(map, key, value){\n  ensureMap(map, '@map.set');\n  $$MapSet(map, key, value);\n  return map;\n}\n\nbuiltinFunction(mapSet);\n\n\nfunction mapSize(map){\n  ensureMap(map, '@map.size');\n  return $$MapSize(map);\n}\n\nbuiltinFunction(mapSize);\n\n\nexport const clear   = mapClear,\n           //delete  = mapDelete, TODO: fix exporting reserved names\n             get     = mapGet,\n             has     = mapHas,\n             iterate = mapIterate,\n             set     = mapSet,\n             size    = mapSize;\n";
 
-exports.builtins["@math"] = "// ################################\n// ##### 15.8 The Math Object #####\n// ################################\n\n\nimport {\n  ToInt32,\n  ToNumber,\n  ToUint32\n} from '@@operations';\n\nimport {\n  builtinFunction,\n  define,\n  hideEverything,\n  internalFunction,\n  set,\n  setTag,\n  update\n} from '@@utilities';\n\nimport {\n  $$Set\n} from '@@internals';\n\nimport {\n  $$Acos,\n  $$Asin,\n  $$Atan,\n  $$Atan2,\n  $$Cos,\n  $$Exp,\n  $$Log,\n  $$Pow,\n  $$Random,\n  $$Sin,\n  $$Sqrt,\n  $$Tan\n} from '@@math';\n\nimport {\n  NaN,\n  NEGATIVE_INFINITY,\n  POSITIVE_INFINITY\n} from '@@constants';\n\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== NEGATIVE_INFINITY\n      && value !== POSITIVE_INFINITY;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  let i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport const Math = {\n  // ##################################################\n  // ### 15.8.1 Value Properties of the Math Object ###\n  // ##################################################\n\n  // ###################\n  // # 15.8.1.1 Math.E #\n  // ###################\n  E: 2.7182818284590452354,\n\n  // ######################\n  // # 15.8.1.2 Math.LN10 #\n  // ######################\n  LN10: 2.302585092994046,\n\n  // #####################\n  // # 15.8.1.3 Math.LN2 #\n  // #####################\n  LN2: 0.6931471805599453,\n\n  // #######################\n  // # 15.8.1.4 Math.LOG2E #\n  // #######################\n  LOG2E: 1.4426950408889634,\n\n  // ########################\n  // # 15.8.1.5 Math.LOG10E #\n  // ########################\n  LOG10E: 0.4342944819032518,\n\n  // ####################\n  // # 15.8.1.6 Math.PI #\n  // ####################\n  PI: 3.1415926535897932,\n\n  // #########################\n  // # 15.8.1.7 Math.SQRT1_2 #\n  // #########################\n  SQRT1_2: 0.7071067811865476,\n\n  // #######################\n  // # 15.8.1.8 Math.SQRT2 #\n  // #######################\n  SQRT2: 1.4142135623730951,\n\n\n  // #####################################################\n  // ### 15.8.2 Function Properties of the Math Object ###\n  // #####################################################\n\n\n  // #####################\n  // # 15.8.2.1 Math.abs #\n  // #####################\n  abs(x){\n    x = ToNumber(x);\n\n    return x === 0 ? 0 : x < 0 ? -x : x;\n  },\n\n  // ######################\n  // # 15.8.2.2 Math.acos #\n  // ######################\n  acos(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Acos(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.3 Math.asin #\n  // ######################\n  asin(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Asin(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.4 Math.atan #\n  // ######################\n  atan(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Atan(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.5 Math.atan2 #\n  // #######################\n  atan2(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Atan2(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.6 Math.ceil #\n  // ######################\n  ceil(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ToInt32(x + 1) : x;\n  },\n\n  // #####################\n  // # 15.8.2.7 Math.cos #\n  // #####################\n  cos(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Cos(x) : x;\n  },\n\n  // #####################\n  // # 15.8.2.8 Math.exp #\n  // #####################\n  exp(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Exp(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.9 Math.floor #\n  // #######################\n  floor(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ToInt32(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.10 Math.log #\n  // ######################\n  log(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.11 Math.max #\n  // ######################\n  max(...values){\n    const count = values.length;\n\n    if (count === 0) {\n      return -Infinity;\n    } else if (count === 1) {\n      return ToNumber(values[0]);\n    } else if (count === 2) {\n      const x = ToNumber(values[0]),\n            y = ToNumber(values[1]);\n\n      if (x !== x || y !== y) {\n        return NaN;\n      }\n      return x > y ? x : y;\n    } else {\n      let index   = count,\n          maximum = -Infinity;\n\n      while (index--) {\n        const current = ToNumber(values[index]);\n\n        if (current !== current) {\n          return NaN;\n        } else if (current > maximum) {\n          maximum = current;\n        }\n      }\n\n      return maximum;\n    }\n  },\n\n  // ######################\n  // # 15.8.2.12 Math.min #\n  // ######################\n  min(...values){\n    const count = values.length;\n\n    if (count === 0) {\n      return Infinity;\n    } else if (count === 1) {\n      return ToNumber(values[0]);\n    } else if (count === 2) {\n      const x = ToNumber(values[0]),\n            y = ToNumber(values[1]);\n\n      if (x !== x || y !== y) {\n        return NaN;\n      }\n      return x < y ? x : y;\n    } else {\n      let index   = count,\n          minimum = Infinity;\n\n      while (index--) {\n        const current = ToNumber(values[index]);\n\n        if (current !== current) {\n          return NaN;\n        } else if (current < minimum) {\n          minimum = current;\n        }\n      }\n\n      return minimum;\n    }\n  },\n\n  // ######################\n  // # 15.8.2.13 Math.pow #\n  // ######################\n  pow(x, y){\n    return $$Pow(ToNumber(x), ToNumber(y));\n  },\n\n  // #########################\n  // # 15.8.2.14 Math.random #\n  // #########################\n  random(){\n    return $$Random();\n  },\n\n  // ########################\n  // # 15.8.2.15 Math.round #\n  // ########################\n  round(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? x + .5 | 0 : x;\n  },\n\n  // ######################\n  // # 15.8.2.16 Math.sin #\n  // ######################\n  sin(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Sin(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.17 Math.sqrt #\n  // #######################\n  sqrt(x){\n    return $$Sqrt(ToNumber(x));\n  },\n\n  // ######################\n  // # 15.8.2.18 Math.tan #\n  // ######################\n  tan(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Tan(x) : x;\n  },\n\n  // ########################\n  // # 15.8.2.19 Math.log10 #\n  // ########################\n  log10(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) * LOG10E : x;\n  },\n\n  // #######################\n  // # 15.8.2.20 Math.log2 #\n  // #######################\n  log2(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) * LOG2E : x;\n  },\n\n  // ########################\n  // # 15.8.2.21 Math.log1p #\n  // ########################\n  log1p(x){\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    if (x <= -1) {\n      return -Infinity;\n    } else if (x < 0 || x > 1) {\n      return $$Log(1 + x);\n    }\n\n    let o = 0,\n        n = 50;\n\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $$Pow(x, i) / i;\n      } else {\n        o += $$Pow(x, i) / i;\n      }\n    }\n\n    return o;\n  },\n\n  // ########################\n  // # 15.8.2.22 Math.expm1 #\n  // ########################\n  expm1(x) {\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    let o = 0,\n        n = 50;\n\n    for (var i = 1; i < n; i++) {\n      o += $$Pow(x, i) / factorial(i);\n    }\n\n    return o;\n  },\n\n  // #######################\n  // # 15.8.2.23 Math.cosh #\n  // #######################\n  cosh(x) {\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    x = abs(x);\n\n    return x > 21 ? $$Exp(x) / 2 : ($$Exp(x) + $$Exp(-x)) / 2;\n  },\n\n  // #######################\n  // # 15.8.2.24 Math.sinh #\n  // #######################\n  sinh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / 2 : x;\n  },\n\n  // #######################\n  // # 15.8.2.25 Math.tanh #\n  // #######################\n  tanh(x) {\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / ($$Exp(x) + $$Exp(-x)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.26 Math.acosh #\n  // ########################\n  acosh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x - 1)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.27 Math.asinh #\n  // ########################\n  asinh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x + 1)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.28 Math.atanh #\n  // ########################\n  atanh(x) {\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? .5 * $$Log((1 + x) / (1 - x)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.29 Math.hypot #\n  // ########################\n  hypot(value1, value2, value3 = 0) {\n    const x = ToNumber(value1),\n          y = ToNumber(value2),\n          z = ToNumber(value3);\n\n    if (x === POSITIVE_INFINITY || y === POSITIVE_INFINITY || z === POSITIVE_INFINITY) {\n      return POSITIVE_INFINITY;\n    } else if (x === NEGATIVE_INFINITY || y === NEGATIVE_INFINITY || z === NEGATIVE_INFINITY) {\n      return POSITIVE_INFINITY;\n    } else if (isNaN(x) || isNaN(y) || isNaN(z)) {\n      return NaN;\n    } else if (x === 0 && y === 0 && z === 0) {\n      return 0;\n    }\n\n    return $$Sqrt(x * x + y * y + z * z);\n  },\n\n  // ########################\n  // # 15.8.2.30 Math.trunc #\n  // ########################\n  trunc(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ~~x : x;\n  },\n\n  // #######################\n  // # 15.8.2.31 Math.sign #\n  // #######################\n  sign(x){\n    x = ToNumber(x);\n\n    return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n  },\n\n  // #######################\n  // # 15.8.2.31 Math.cbrt #\n  // #######################\n  cbrt(x){\n    x = ToNumber(x);\n\n    return sign(x) * $$Pow(abs(x), 1 / 3);\n  },\n\n  imul(x, y){\n    x = ToUint32(x);\n    y = ToUint32(y);\n\n    return ToInt32((x * y) & 0xffffffff);\n  }\n};\n\n$$Set(Math, 'BuiltinBrand', 'BuiltinMath');\nsetTag(Math, 'Math');\nset(Math.max, 'length', 2);\nset(Math.min, 'length', 2);\nhideEverything(Math);\n\n\nexport const E       = Math.E,\n             LN10    = Math.LN10,\n             LN2     = Math.LN2,\n             LOG2E   = Math.LOG2E,\n             LOG10E  = Math.LOG10E,\n             PI      = Math.PI,\n             SQRT1_2 = Math.SQRT1_2,\n             SQRT2   = Math.SQRT2,\n             abs     = Math.abs,\n             acos    = Math.acos,\n             acosh   = Math.acosh,\n             asin    = Math.asin,\n             asinh   = Math.asinh,\n             atan    = Math.atan,\n             atan2   = Math.atan2,\n             atanh   = Math.atanh,\n             ceil    = Math.ceil,\n             cbrt    = Math.cbrt,\n             cos     = Math.cos,\n             cosh    = Math.cosh,\n             exp     = Math.exp,\n             expm1   = Math.expm1,\n             floor   = Math.floor,\n             hypot   = Math.hypot,\n             imul    = Math.imul,\n             log     = Math.log,\n             log10   = Math.log10,\n             log1p   = Math.log1p,\n             log2    = Math.log2,\n             max     = Math.max,\n             min     = Math.min,\n             pow     = Math.pow,\n             random  = Math.random,\n             round   = Math.round,\n             sign    = Math.sign,\n             sin     = Math.sin,\n             sinh    = Math.sinh,\n             sqrt    = Math.sqrt,\n             tan     = Math.tan,\n             tanh    = Math.tanh,\n             trunc   = Math.trunc;\n";
+exports.builtins["@math"] = "// ################################\n// ##### 15.8 The Math Object #####\n// ################################\n\n\nimport {\n  ToInt32,\n  ToNumber,\n  ToUint32\n} from '@@operations';\n\nimport {\n  builtinFunction,\n  define,\n  hideEverything,\n  internalFunction,\n  set,\n  setTag,\n  update\n} from '@@utilities';\n\nimport {\n  $$Set\n} from '@@internals';\n\nimport {\n  $$Acos,\n  $$Asin,\n  $$Atan,\n  $$Atan2,\n  $$Cos,\n  $$Exp,\n  $$Log,\n  $$Pow,\n  $$Random,\n  $$Sin,\n  $$Sqrt,\n  $$Tan\n} from '@@math';\n\nimport {\n  NaN,\n  NEGATIVE_INFINITY,\n  POSITIVE_INFINITY\n} from '@@constants';\n\n\n\nfunction isFiniteNonZero(value) {\n  return value === value\n      && value !== 0\n      && value !== NEGATIVE_INFINITY\n      && value !== POSITIVE_INFINITY;\n}\n\ninternalFunction(isFiniteNonZero);\n\n\nfunction factorial(x){\n  let i = 2,\n      n = 1;\n\n  while (i <= x) {\n    n *= i++;\n  }\n\n  return n;\n}\n\ninternalFunction(factorial);\n\n\nexport const Math = {\n  // ##################################################\n  // ### 15.8.1 Value Properties of the Math Object ###\n  // ##################################################\n\n  // ###################\n  // # 15.8.1.1 Math.E #\n  // ###################\n  E: 2.7182818284590452354,\n\n  // ######################\n  // # 15.8.1.2 Math.LN10 #\n  // ######################\n  LN10: 2.302585092994046,\n\n  // #####################\n  // # 15.8.1.3 Math.LN2 #\n  // #####################\n  LN2: 0.6931471805599453,\n\n  // #######################\n  // # 15.8.1.4 Math.LOG2E #\n  // #######################\n  LOG2E: 1.4426950408889634,\n\n  // ########################\n  // # 15.8.1.5 Math.LOG10E #\n  // ########################\n  LOG10E: 0.4342944819032518,\n\n  // ####################\n  // # 15.8.1.6 Math.PI #\n  // ####################\n  PI: 3.1415926535897932,\n\n  // #########################\n  // # 15.8.1.7 Math.SQRT1_2 #\n  // #########################\n  SQRT1_2: 0.7071067811865476,\n\n  // #######################\n  // # 15.8.1.8 Math.SQRT2 #\n  // #######################\n  SQRT2: 1.4142135623730951,\n\n\n  // #####################################################\n  // ### 15.8.2 Function Properties of the Math Object ###\n  // #####################################################\n\n\n  // #####################\n  // # 15.8.2.1 Math.abs #\n  // #####################\n  abs(x){\n    x = ToNumber(x);\n\n    return x === 0 ? 0 : x < 0 ? -x : x;\n  },\n\n  // ######################\n  // # 15.8.2.2 Math.acos #\n  // ######################\n  acos(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Acos(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.3 Math.asin #\n  // ######################\n  asin(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Asin(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.4 Math.atan #\n  // ######################\n  atan(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Atan(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.5 Math.atan2 #\n  // #######################\n  atan2(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Atan2(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.6 Math.ceil #\n  // ######################\n  ceil(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ToInt32(x + 1) : x;\n  },\n\n  // #####################\n  // # 15.8.2.7 Math.cos #\n  // #####################\n  cos(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Cos(x) : x;\n  },\n\n  // #####################\n  // # 15.8.2.8 Math.exp #\n  // #####################\n  exp(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Exp(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.9 Math.floor #\n  // #######################\n  floor(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ToInt32(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.10 Math.log #\n  // ######################\n  log(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) : x;\n  },\n\n  // ######################\n  // # 15.8.2.11 Math.max #\n  // ######################\n  max(...values){\n    const count = values.length;\n\n    if (count === 0) {\n      return -Infinity;\n    } else if (count === 1) {\n      return ToNumber(values[0]);\n    } else if (count === 2) {\n      const x = ToNumber(values[0]),\n            y = ToNumber(values[1]);\n\n      if (x !== x || y !== y) {\n        return NaN;\n      }\n      return x > y ? x : y;\n    } else {\n      let index   = count,\n          maximum = -Infinity;\n\n      while (index--) {\n        const current = ToNumber(values[index]);\n\n        if (current !== current) {\n          return NaN;\n        } else if (current > maximum) {\n          maximum = current;\n        }\n      }\n\n      return maximum;\n    }\n  },\n\n  // ######################\n  // # 15.8.2.12 Math.min #\n  // ######################\n  min(...values){\n    const count = values.length;\n\n    if (count === 0) {\n      return Infinity;\n    } else if (count === 1) {\n      return ToNumber(values[0]);\n    } else if (count === 2) {\n      const x = ToNumber(values[0]),\n            y = ToNumber(values[1]);\n\n      if (x !== x || y !== y) {\n        return NaN;\n      }\n      return x < y ? x : y;\n    } else {\n      let index   = count,\n          minimum = Infinity;\n\n      while (index--) {\n        const current = ToNumber(values[index]);\n\n        if (current !== current) {\n          return NaN;\n        } else if (current < minimum) {\n          minimum = current;\n        }\n      }\n\n      return minimum;\n    }\n  },\n\n  // ######################\n  // # 15.8.2.13 Math.pow #\n  // ######################\n  pow(x, y){\n    return $$Pow(ToNumber(x), ToNumber(y));\n  },\n\n  // #########################\n  // # 15.8.2.14 Math.random #\n  // #########################\n  random(){\n    return $$Random();\n  },\n\n  // ########################\n  // # 15.8.2.15 Math.round #\n  // ########################\n  round(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? x + .5 | 0 : x;\n  },\n\n  // ######################\n  // # 15.8.2.16 Math.sin #\n  // ######################\n  sin(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Sin(x) : x;\n  },\n\n  // #######################\n  // # 15.8.2.17 Math.sqrt #\n  // #######################\n  sqrt(x){\n    return $$Sqrt(ToNumber(x));\n  },\n\n  // ######################\n  // # 15.8.2.18 Math.tan #\n  // ######################\n  tan(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Tan(x) : x;\n  },\n\n  // ########################\n  // # 15.8.2.19 Math.log10 #\n  // ########################\n  log10(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) * LOG10E : x;\n  },\n\n  // #######################\n  // # 15.8.2.20 Math.log2 #\n  // #######################\n  log2(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x) * LOG2E : x;\n  },\n\n  // ########################\n  // # 15.8.2.21 Math.log1p #\n  // ########################\n  log1p(x){\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    if (x <= -1) {\n      return -Infinity;\n    } else if (x < 0 || x > 1) {\n      return $$Log(1 + x);\n    }\n\n    let o = 0,\n        n = 50;\n\n    for (var i = 1; i < n; i++) {\n      if ((i % 2) === 0) {\n        o -= $$Pow(x, i) / i;\n      } else {\n        o += $$Pow(x, i) / i;\n      }\n    }\n\n    return o;\n  },\n\n  // ########################\n  // # 15.8.2.22 Math.expm1 #\n  // ########################\n  expm1(x) {\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    let o = 0,\n        n = 50;\n\n    for (var i = 1; i < n; i++) {\n      o += $$Pow(x, i) / factorial(i);\n    }\n\n    return o;\n  },\n\n  // #######################\n  // # 15.8.2.23 Math.cosh #\n  // #######################\n  cosh(x) {\n    x = ToNumber(x);\n    if (!isFiniteNonZero(x)) {\n      return x;\n    }\n\n    x = abs(x);\n\n    return x > 21 ? $$Exp(x) / 2 : ($$Exp(x) + $$Exp(-x)) / 2;\n  },\n\n  // #######################\n  // # 15.8.2.24 Math.sinh #\n  // #######################\n  sinh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / 2 : x;\n  },\n\n  // #######################\n  // # 15.8.2.25 Math.tanh #\n  // #######################\n  tanh(x) {\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ($$Exp(x) - $$Exp(-x)) / ($$Exp(x) + $$Exp(-x)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.26 Math.acosh #\n  // ########################\n  acosh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x - 1)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.27 Math.asinh #\n  // ########################\n  asinh(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? $$Log(x + $$Sqrt(x * x + 1)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.28 Math.atanh #\n  // ########################\n  atanh(x) {\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? .5 * $$Log((1 + x) / (1 - x)) : x;\n  },\n\n  // ########################\n  // # 15.8.2.29 Math.hypot #\n  // ########################\n  hypot(value1, value2, value3 = 0) {\n    const x = ToNumber(value1),\n          y = ToNumber(value2),\n          z = ToNumber(value3);\n\n    if (x === POSITIVE_INFINITY || y === POSITIVE_INFINITY || z === POSITIVE_INFINITY) {\n      return POSITIVE_INFINITY;\n    } else if (x === NEGATIVE_INFINITY || y === NEGATIVE_INFINITY || z === NEGATIVE_INFINITY) {\n      return POSITIVE_INFINITY;\n    } else if (isNaN(x) || isNaN(y) || isNaN(z)) {\n      return NaN;\n    } else if (x === 0 && y === 0 && z === 0) {\n      return 0;\n    }\n\n    return $$Sqrt(x * x + y * y + z * z);\n  },\n\n  // ########################\n  // # 15.8.2.30 Math.trunc #\n  // ########################\n  trunc(x){\n    x = ToNumber(x);\n\n    return isFiniteNonZero(x) ? ~~x : x;\n  },\n\n  // #######################\n  // # 15.8.2.31 Math.sign #\n  // #######################\n  sign(x){\n    x = ToNumber(x);\n\n    return x === 0 || x !== x ? x : x < 0 ? -1 : 1;\n  },\n\n  // #######################\n  // # 15.8.2.31 Math.cbrt #\n  // #######################\n  cbrt(x){\n    x = ToNumber(x);\n\n    return sign(x) * $$Pow(abs(x), 1 / 3);\n  },\n\n  imul(x, y) {\n    const xlo = loword(x),\n          ylo = loword(y);\n\n    return xlo * ylo + (((hiword(x) * ylo + hiword(y) * xlo) << 16) >>> 0);\n  }\n};\n\nconst loword = x => x & 0xffff,\n      hiword = x => x >>> 16 & 0xffff;\n\n\n$$Set(Math, 'BuiltinBrand', 'BuiltinMath');\nsetTag(Math, 'Math');\nset(Math.max, 'length', 2);\nset(Math.min, 'length', 2);\nhideEverything(Math);\n\n\nexport const E       = Math.E,\n             LN10    = Math.LN10,\n             LN2     = Math.LN2,\n             LOG2E   = Math.LOG2E,\n             LOG10E  = Math.LOG10E,\n             PI      = Math.PI,\n             SQRT1_2 = Math.SQRT1_2,\n             SQRT2   = Math.SQRT2,\n             abs     = Math.abs,\n             acos    = Math.acos,\n             acosh   = Math.acosh,\n             asin    = Math.asin,\n             asinh   = Math.asinh,\n             atan    = Math.atan,\n             atan2   = Math.atan2,\n             atanh   = Math.atanh,\n             ceil    = Math.ceil,\n             cbrt    = Math.cbrt,\n             cos     = Math.cos,\n             cosh    = Math.cosh,\n             exp     = Math.exp,\n             expm1   = Math.expm1,\n             floor   = Math.floor,\n             hypot   = Math.hypot,\n             imul    = Math.imul,\n             log     = Math.log,\n             log10   = Math.log10,\n             log1p   = Math.log1p,\n             log2    = Math.log2,\n             max     = Math.max,\n             min     = Math.min,\n             pow     = Math.pow,\n             random  = Math.random,\n             round   = Math.round,\n             sign    = Math.sign,\n             sin     = Math.sin,\n             sinh    = Math.sinh,\n             sqrt    = Math.sqrt,\n             tan     = Math.tan,\n             tanh    = Math.tanh,\n             trunc   = Math.trunc;\n";
 
 exports.builtins["@number"] = "// ###############################\n// ##### 15.7 Number Objects #####\n// ###############################\n\n\nimport {\n  $$ArgumentCount,\n  $$CallerName,\n  $$Exception,\n  $$Get,\n  $$Invoke,\n  $$NumberToString,\n  $$Set\n} from '@@internals';\n\nimport {\n  OrdinaryCreateFromConstructor,\n  ToInteger,\n  ToNumber,\n  ToUint32\n} from '@@operations';\n\nimport {\n  Type\n} from '@@types';\n\nimport {\n  builtinClass,\n  define,\n  extend,\n  floor,\n  hasBrand,\n  internalFunction,\n  isInitializing\n} from '@@utilities';\n\nimport {\n  @@create: create\n} from '@@symbols';\n\nimport {\n  undefined\n} from '@@constants';\n\nimport {\n  parseFloat,\n  parseInt\n} from '@globals';\n\n\nfunction ensureNumber(o){\n  if (Type(o) === 'Number') {\n    return o;\n  } else if (hasBrand(o, 'NumberWrapper')) {\n    return $$Get(o, 'NumberValue');\n  }\n\n  throw $$Exception('not_generic', [`Number.prototype.${$$CallerName()}`]);\n}\n\ninternalFunction(ensureNumber);\n\n\n// ########################################################\n// ### 15.7.4 Properties of the Number Prototype Object ###\n// ########################################################\n\nexport class Number {\n  // #########################################\n  // # 15.7.4.1 Number.prototype.constructor #\n  // #########################################\n  constructor(value){\n    value = $$ArgumentCount() ? ToNumber(value) : 0;\n\n    // 15.7.1.1 Number ( [ value ] )\n    if (!isInitializing(this, 'NumberValue')) {\n      return value;\n    }\n\n    // 15.7.2.1 new Number ( [ value ] )\n    $$Set(this, 'NumberValue', value);\n  }\n\n  // ######################################\n  // # 15.7.4.2 Number.prototype.toString #\n  // ######################################\n  toString(radix = 10){\n    radix = ToInteger(radix);\n    if (radix < 2 || radix > 36) {\n      throw $$Exception('invalid_radix', []);\n    }\n\n    return $$NumberToString(ensureNumber(this), radix);\n  }\n\n  // ############################################\n  // # 15.7.4.3 Number.prototype.toLocaleString #\n  // ############################################\n  toLocaleString(){\n    return $$Invoke(ensureNumber(this), 'toLocaleString');\n  }\n\n  // #####################################\n  // # 15.7.4.4 Number.prototype.valueOf #\n  // #####################################\n  valueOf(){\n    return ensureNumber(this);\n  }\n\n  // #####################################\n  // # 15.7.4.5 Number.prototype.toFixed #\n  // #####################################\n  toFixed(fractionDigits){\n    const f = ToInteger(fractionDigits);\n\n    if (f < 0 || f > 20) {\n      throw $$Exception('invalid_fraction');\n    }\n\n    return $$Invoke(ensureNumber(this), 'toFixed', f);\n  }\n\n  // ###########################################\n  // # 15.7.4.6 Number.prototype.toExponential #\n  // ###########################################\n  toExponential(fractionDigits){\n    const x = ensureNumber(this),\n          f = ToInteger(fractionDigits);\n\n    if (fractionDigits !== undefined && f < 0 || f > 20) {\n      throw $$Exception('invalid_fraction');\n    }\n\n    return $$Invoke(x, 'toExponential', f);\n  }\n\n  // #########################################\n  // # 15.7.4.6 Number.prototype.toPrecision #\n  // #########################################\n  toPrecision(precision){\n    const x = ensureNumber(this),\n          p = ToInteger(precision);\n\n    if (isNaN(x)) {\n      return 'NaN';\n    } else if (x === NEGATIVE_INFINITY) {\n      return '-Infinity';\n    } else if (x === POSITIVE_INFINITY) {\n      return 'Infinity';\n    }\n\n    if (p < 1 || p > 21) {\n      throw $$Exception('invalid_precision');\n    }\n\n    return $$Invoke(x, 'toPrecision', p);\n  }\n\n  // #################################\n  // # 15.7.4.8 Number.prototype.clz #\n  // #################################\n  clz(){\n    const x = ensureNumber(this);\n    let n = ToUint32(x);\n\n    if (n === 0) {\n      return 32;\n    }\n\n    n = n < 0 ? floor(n + 1) : floor(n);\n    n -= floor(n / 0x100000000) * 0x100000000;\n    return 32 - $$NumberToString(n, 2).length;\n  }\n}\n\nbuiltinClass(Number, 'NumberWrapper');\n$$Set(Number.prototype, 'NumberValue', 0);\n\n\n\n// ###################################################\n// ### 15.7.3 Properties of the Number Constructor ###\n// ###################################################\n\nextend(Number, {\n  // #############################\n  // # 15.7.3.2 Number.MAX_VALUE #\n  // #############################\n  MAX_VALUE: 1.7976931348623157e+308,\n\n  // #############################\n  // # 15.7.3.3 Number.MIN_VALUE #\n  // #############################\n  MIN_VALUE: 5e-324,\n\n  // #######################\n  // # 15.7.3.4 Number.NaN #\n  // #######################\n  NaN: +'NaN',\n\n  // #####################################\n  // # 15.7.3.5 Number.NEGATIVE_INFINITY #\n  // #####################################\n  NEGATIVE_INFINITY: 1 / -0,\n\n  // #####################################\n  // # 15.7.3.6 Number.POSITIVE_INFINITY #\n  // #####################################\n  POSITIVE_INFINITY: 1 / 0,\n\n  // ###########################\n  // # 15.7.3.7 Number.EPSILON #\n  // ###########################\n  EPSILON: 2.220446049250313e-16,\n\n  // ###############################\n  // # 15.7.3.8 Number.MAX_INTEGER #\n  // ###############################\n  MAX_INTEGER: 9007199254740992,\n\n  // ############################\n  // # 15.7.3.9 Number.parseInt #\n  // ############################\n  parseInt,\n\n  // ###############################\n  // # 15.7.3.10 Number.parseFloat #\n  // ###############################\n  parseFloat,\n\n  // ##########################\n  // # 15.7.3.11 Number.isNaN #\n  // ##########################\n  isNaN(number){\n    return number !== number;\n  },\n\n  // #############################\n  // # 15.7.3.12 Number.isFinite #\n  // #############################\n  isFinite(number){\n    return Type(number) === 'Number'\n        && number === number\n        && number !== POSITIVE_INFINITY\n        && number !== NEGATIVE_INFINITY;\n  },\n\n  // ##############################\n  // # 15.7.3.13 Number.isInteger #\n  // ##############################\n  isInteger(number) {\n    return Type(number) === 'Number' && ToInteger(number) === number;\n  },\n\n  // ##########################\n  // # 15.7.3.14 Number.toInt #\n  // ##########################\n  toInt(number){\n    return ToInteger(number);\n  },\n\n  // #############################\n  // # 15.7.3.15 Number.@@create #\n  // #############################\n  @@create(){\n    const obj = OrdinaryCreateFromConstructor(this, '%NumberPrototype%');\n    $$Set(obj, 'BuiltinBrand', 'NumberWrapper');\n    $$Set(obj, 'NumberValue', undefined);\n    return obj;\n  }\n});\n\n\nexport const MAX_VALUE         = Number.MAX_VALUE,\n             MIN_VALUE         = Number.MIN_VALUE,\n             NaN               = Number.NaN,\n             NEGATIVE_INFINITY = Number.NEGATIVE_INFINITY,\n             POSITIVE_INFINITY = Number.POSITIVE_INFINITY,\n             EPSILON           = Number.EPSILON,\n             MAX_INTEGER       = Number.MAX_INTEGER,\n             parseInt          = Number.parseInt,\n             parseFloat        = Number.parseFloat,\n             isNaN             = Number.isNaN,\n             isFinite          = Number.isFinite,\n             isInteger         = Number.isInteger,\n             toInt             = Number.toInt;\n";
 
