@@ -24,6 +24,10 @@ import {
   Type
 } from '@@types';
 
+import {
+  undefined
+} from '@constants';
+
 const E = 0x1,
       C = 0x2,
       W = 0x4,
@@ -46,14 +50,17 @@ const E = 0x1,
 // ### 11.1 Ordinary Object Internal Methods and Internal Data Properties ###
 // ##########################################################################
 
-const OrdinaryObject = $$CreateInternalObject();
+const OrdinaryObject = $$CreateInternalObject(null);
+$$Set(OrdinaryObject, '_type', 'Object');
+$$Set(OrdinaryObject, 'Extensible', true);
+$$Set(OrdinaryObject, 'Prototype', undefined);
 
 
 // #############################
 // # 11.1.1 [[GetInheritance]] #
 // #############################
 
-$$Set(OrdinaryObject, function GetInheritance(){
+$$Set(OrdinaryObject, 'GetInheritance', function(){
   return $$Get(this, 'Prototype');
 });
 
@@ -62,7 +69,7 @@ $$Set(OrdinaryObject, function GetInheritance(){
 // # 11.1.2 [[SetInheritance]] #
 // #############################
 
-$$Set(OrdinaryObject, function SetInheritance(V){
+$$Set(OrdinaryObject, 'SetInheritance', function(V){
   $$Assert(Type(V) === 'Object' || Type(V) === 'Null');
 
   if (!$$Get(this, 'Extensible')) {
@@ -78,7 +85,7 @@ $$Set(OrdinaryObject, function SetInheritance(V){
 // # 11.1.3 [[IsExtensible]] #
 // ###########################
 
-$$Set(OrdinaryObject, function IsExtensible(){
+$$Set(OrdinaryObject, 'IsExtensible', function(){
   return $$Get(this, 'Extensible');
 });
 
@@ -87,7 +94,7 @@ $$Set(OrdinaryObject, function IsExtensible(){
 // # 11.1.4 [[PreventExtensions]] #
 // ################################
 
-$$Set(OrdinaryObject, function PreventExtensions(){
+$$Set(OrdinaryObject, 'PreventExtensions', function(){
   $$Set(this, 'Extensible', false);
 });
 
@@ -96,7 +103,7 @@ $$Set(OrdinaryObject, function PreventExtensions(){
 // # 11.1.5 [[HasOwnProperty]] #
 // #############################
 
-$$Set(OrdinaryObject, function HasOwnProperty(P){
+$$Set(OrdinaryObject, 'HasOwnProperty', function(P){
   $$Assert(IsPropertyKey(P));
   return $$HasProperty(this, P);
 });
@@ -106,7 +113,7 @@ $$Set(OrdinaryObject, function HasOwnProperty(P){
 // # 11.1.6 [[GetOwnProperty]] #
 // #############################
 
-$$Set(OrdinaryObject, function GetOwnProperty(P){
+$$Set(OrdinaryObject, 'GetOwnProperty', function(P){
   $$Assert(IsPropertyKey(P));
   return OrdinaryGetOwnProperty(this, P);
 });
@@ -136,7 +143,7 @@ export function OrdinaryGetOwnProperty(O, P){
 // # 11.1.7 [[DefineOwnProperty]] #
 // ################################
 
-$$Set(OrdinaryObject, function DefineOwnProperty(P, Desc){;
+$$Set(OrdinaryObject, 'DefineOwnProperty', function(P, Desc){;
   return OrdinaryDefineOwnProperty(this, P, Desc);
 });
 
@@ -318,7 +325,7 @@ export function ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, curre
 
 export function ObjectCreate(proto){
   if (!$$ArgumentCount()) {
-    proto = $$GetIntrinsic($$CurrentRealm(), 'ObjectPrototype');
+    proto = $$GetIntrinsic('%ObjectPrototype%');
   }
   return $$CreateObject('Object', proto);
 }
