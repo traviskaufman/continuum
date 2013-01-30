@@ -42,7 +42,7 @@ import {
 } from '@reflect';
 
 
-export class Object {
+export class Object extends null {
   constructor(value){
     return value == null ? {} : ToObject(value);
   }
