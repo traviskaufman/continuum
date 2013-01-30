@@ -456,7 +456,7 @@ var operations = (function(exports){
   function $$GetNotifier(object){
     var notifier = object.Notifier;
     if (!notifier) {
-      notifier = object.Notifier = new $Object(intrinsics.NotifierProto);
+      notifier = object.Notifier = new $Object(intrinsics['%NotifierPrototype%']);
       notifier.Target = object;
       notifier.ChangeObservers = new MapData;
     }
@@ -514,13 +514,6 @@ var operations = (function(exports){
 
 
 
-  var protos = {
-    '%ArrayPrototype%'   : 'ArrayProto',
-    '%FunctionPrototype%': 'FunctionProto',
-    '%ObjectPrototype%'  : 'ObjectProto'
-  };
-
-
   function $$OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
     if ($$Type(constructor) !== 'Object') {
       return $$ThrowException('construct_non_constructor', [$$Type(constructor)]);
@@ -528,7 +521,7 @@ var operations = (function(exports){
 
     var proto = constructor.Get('prototype');
     if ($$Type(proto) !== 'Object') {
-      proto = (constructor.Realm || realm).intrinsics[protos[intrinsicDefaultProto] || intrinsicDefaultProto];
+      proto = (constructor.Realm || realm).intrinsics[intrinsicDefaultProto];
     }
 
     return new $Object(proto);

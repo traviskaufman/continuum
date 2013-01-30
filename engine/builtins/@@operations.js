@@ -584,12 +584,6 @@ export function OrdinaryHasInstance(C, O){
 // ### 9.3.13 OrdinaryCreateFromConstructor ###
 // ############################################
 
-const protos = {
-  '%ArrayPrototype%'   : 'ArrayProto',
-  '%FunctionPrototype%': 'FunctionProto',
-  '%ObjectPrototype%'  : 'ObjectProto'
-};
-
 
 export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto){
   if (Type(constructor) !== 'Object') {
@@ -600,7 +594,7 @@ export function OrdinaryCreateFromConstructor(constructor, intrinsicDefaultProto
 
   if (!proto) {
     const realm = $$Has(constructor, 'Realm') ? $$Get(constructor, 'Realm') : $$CurrentRealm();
-    proto = $$GetIntrinsic(realm, Get(protos, intrinsicDefaultProto) || intrinsicDefaultProto);
+    proto = $$GetIntrinsic(realm, intrinsicDefaultProto);
   }
 
   return ObjectCreate(proto);

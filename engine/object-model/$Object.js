@@ -277,7 +277,7 @@ var $Object = (function(exports){
 
   function $Object(proto){
     if (proto === undefined) {
-      proto = intrinsics.ObjectProto;
+      proto = intrinsics['%ObjectPrototype%'];
     }
     this.Realm = realm;
     this.Prototype = proto;

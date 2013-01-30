@@ -258,19 +258,19 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   function $$ClassDefinitionEvaluation(name, superclass, constructorCode, methods, symbolsDeclarations){
     if (superclass === undefined) {
-      var superproto = intrinsics.ObjectProto,
-          superctor = intrinsics.FunctionProto;
+      var superproto = intrinsics['%ObjectPrototype%'],
+          superctor = intrinsics['%FunctionPrototype%'];
     } else {
       if (superclass && superclass.Abrupt) return superclass;
 
       if (superclass === null) {
         superproto = null;
-        superctor = intrinsics.FunctionProto;
+        superctor = intrinsics['%FunctionPrototype%'];
       } else if (typeof superclass !== 'object') {
         return $$ThrowException('non_object_superclass');
       } else if (!('Construct' in superclass)) {
         superproto = superclass;
-        superctor = intrinsics.FunctionProto;
+        superctor = intrinsics['%FunctionPrototype%'];
       } else {
         superproto = superclass.Get('prototype');
         if (superproto && superproto.Abrupt) return superproto;
@@ -433,7 +433,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $Function = (function(){
     function $Function(kind, name, params, code, scope, strict, proto, holder, method){
       if (proto === undefined) {
-        proto = intrinsics.FunctionProto;
+        proto = intrinsics['%FunctionPrototype%'];
       }
 
       $Object.call(this, proto);
@@ -551,7 +551,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var $BoundFunction = (function(){
     function $BoundFunction(target, boundThis, boundArgs){
-      $Object.call(this, intrinsics.FunctionProto);
+      $Object.call(this, intrinsics['%FunctionPrototype%']);
       this.BoundTargetFunction = target;
       this.BoundThis = boundThis;
       this.BoundArgs = boundArgs;
@@ -1034,11 +1034,11 @@ var runtime = (function(GLOBAL, exports, undefined){
           call: options,
           name: fname(options),
           length: options.length,
-          proto: intrinsics.FunctionProto
+          proto: intrinsics['%FunctionPrototype%']
         };
       }
       if (options.proto === undefined) {
-        options.proto = intrinsics.FunctionProto;
+        options.proto = intrinsics['%FunctionPrototype%'];
       }
       $Object.call(this, options.proto);
 
@@ -1092,7 +1092,7 @@ var runtime = (function(GLOBAL, exports, undefined){
   var $InternalFunction = (function(){
     function $InternalFunction(options){
       if (intrinsics) {
-        this.Prototype = intrinsics.FunctionProto;
+        this.Prototype = intrinsics['%FunctionPrototype%'];
       } else {
         this.Prototype = null;
       }
@@ -1525,7 +1525,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     function $$CreateThrowTypeError(realm){
       var thrower = create($NativeFunction.prototype);
-      $Object.call(thrower, realm.intrinsics.FunctionProto);
+      $Object.call(thrower, realm.intrinsics['%FunctionPrototype%']);
       thrower.call = function(){
         return $$ThrowException('strict_poison_pill');
       };
@@ -1551,46 +1551,45 @@ var runtime = (function(GLOBAL, exports, undefined){
       engine.changeRealm(realm);
       intrinsics.Genesis = new $Object(null);
       intrinsics.Genesis.HiddenPrototype = true;
-      intrinsics.ObjectProto = new $Object(intrinsics.Genesis);
-      intrinsics.global = global = engine.activeGlobal = realm.global = new $Object(intrinsics.ObjectProto);
+      intrinsics['%ObjectPrototype%'] = new $Object(intrinsics.Genesis);
+      intrinsics.global = global = engine.activeGlobal = realm.global = new $Object(intrinsics['%ObjectPrototype%']);
       intrinsics.global.BuiltinBrand = 'GlobalObject';
       realm.globalEnv = new GlobalEnv(intrinsics.global);
       realm.globalEnv.Realm = realm;
 
       for (var k in $builtins) {
-        var prototype = intrinsics[k + 'Proto'] = create($builtins[k].prototype);
-        $Object.call(prototype, intrinsics.ObjectProto);
+        var prototype = intrinsics['%'+k+'Prototype%'] = create($builtins[k].prototype);
+        $Object.call(prototype, intrinsics['%ObjectPrototype%']);
         if (k in primitives) {
           prototype.PrimitiveValue = primitives[k];
         }
       }
 
-
       for (var i=0; i < 6; i++) {
-        var prototype = intrinsics[$errors[i] + 'Proto'] = create($Error.prototype);
-        $Object.call(prototype, intrinsics.ErrorProto);
+        var prototype = intrinsics['%'+$errors[i] + 'Prototype%'] = create($Error.prototype);
+        $Object.call(prototype, intrinsics['%ErrorPrototype%']);
         prototype.define('name', $errors[i], _CW);
       }
 
-      intrinsics.StopIteration = new $Object(intrinsics.ObjectProto);
+      intrinsics.StopIteration = new $Object(intrinsics['%ObjectPrototype%']);
       intrinsics.StopIteration.BuiltinBrand = 'StopIteration';
 
-      intrinsics.FunctionProto.FormalParameters = [];
-      intrinsics.FunctionProto.Call = FunctionPrototypeCall;
-      intrinsics.FunctionProto.BuiltinBrand = 'BuiltinFunction';
-      intrinsics.FunctionProto.Scope = realm.globalEnv;
-      intrinsics.FunctionProto.Realm = realm;
+      intrinsics['%FunctionPrototype%'].FormalParameters = [];
+      intrinsics['%FunctionPrototype%'].Call = FunctionPrototypeCall;
+      intrinsics['%FunctionPrototype%'].BuiltinBrand = 'BuiltinFunction';
+      intrinsics['%FunctionPrototype%'].Scope = realm.globalEnv;
+      intrinsics['%FunctionPrototype%'].Realm = realm;
       intrinsics.ThrowTypeError = $$CreateThrowTypeError(realm);
 
-      intrinsics.ArrayProto.array = [];
-      intrinsics.ArrayProto.length = ['length', 0, __W];
+      intrinsics['%ArrayPrototype%'].array = [];
+      intrinsics['%ArrayPrototype%'].length = ['length', 0, __W];
 
-      intrinsics.ErrorProto.define('name', 'Error', _CW);
-      intrinsics.ErrorProto.define('message', '', _CW);
+      intrinsics['%ErrorPrototype%'].define('name', 'Error', _CW);
+      intrinsics['%ErrorPrototype%'].define('message', '', _CW);
 
       intrinsics.ObserverCallbacks = new MapData;
-      intrinsics.NotifierProto = new $Object(intrinsics.ObjectProto);
-      intrinsics.NotifierProto.define('notify', new $NativeFunction(notify), _CW);
+      intrinsics['%NotifierPrototype%'] = new $Object(intrinsics['%ObjectPrototype%']);
+      intrinsics['%NotifierPrototype%'].define('notify', new $NativeFunction(notify), _CW);
     }
 
     inherit(Intrinsics, DeclarativeEnv, {
@@ -2172,7 +2171,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           var notifier = obj.Notifier;
 
           if (!notifier) {
-            notifier = obj.Notifier = new $Object(intrinsics.NotifierProto);
+            notifier = obj.Notifier = new $Object(intrinsics['%NotifierPrototype%']);
             notifier.Target = obj;
             notifier.ChangeObservers = new MapData;
           }
@@ -2879,7 +2878,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       new Intrinsics(this);
 
-      hide(intrinsics.FunctionProto, 'Scope');
+      hide(intrinsics['%FunctionPrototype%'], 'Scope');
       hide(this, 'intrinsics');
       hide(this, 'natives');
       hide(this, 'templates');

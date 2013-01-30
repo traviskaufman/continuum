@@ -26,7 +26,7 @@ var $Array = (function(exports){
   var DefineOwn = $Object.prototype.DefineOwnProperty;
 
   function $Array(array){
-    this.Prototype = intrinsics.ArrayProto;
+    this.Prototype = intrinsics['%ArrayPrototype%'];
     this.Realm = realm;
     this.properties = new PropertyList;
     this.storage = new Hash;

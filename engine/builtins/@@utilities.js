@@ -285,7 +285,7 @@ internalFunction(hideEverything);
 
 
 export function builtinClass(Ctor, brand){
-  const prototype = $$GetIntrinsic(`${Ctor.name}Proto`),
+  const prototype = $$GetIntrinsic(`%${Ctor.name}Prototype%`),
         isSymbol  = Ctor.name === 'Symbol';
 
   if (prototype) {
