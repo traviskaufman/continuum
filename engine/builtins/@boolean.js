@@ -57,7 +57,7 @@ export class Boolean {
   // #######################################
   toString(){
     if (Type(this) === 'Boolean') {
-      return this;
+      return this ? 'true' : 'false';
     } else if (hasBrand(this, 'BooleanWrapper')) {
       return $$Get(this, 'BooleanValue') ? 'true' : 'false';
     }
