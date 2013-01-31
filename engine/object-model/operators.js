@@ -118,29 +118,22 @@ var operators = (function(exports){
 
 
   function $$ToObject(argument){
-    var $Object = require('./$Object').$Object,
-        runtime = require('../runtime');
+    switch (typeof argument) {
+      case 'undefined':
+        return $$ThrowException('undefined_to_object', []);
+      case 'object':
+        return argument === null ? $$ThrowException('null_to_object', []) : argument;
+      case 'boolean':
+        var name = '%Boolean%';
+        break;
+      case 'number':
+        var name = '%Number%';
+        break;
+      case 'string':
+        var name = '%String%';
+    }
 
-    $$ToObject = function _$$ToObject(argument){
-      switch (typeof argument) {
-        case 'undefined':
-          return $$ThrowException('undefined_to_object', []);
-        case 'object':
-          return argument === null ? $$ThrowException('null_to_object', []) : argument;
-        case 'boolean':
-          var name = '%Boolean%';
-          break;
-        case 'number':
-          var name = '%Number%';
-          break;
-        case 'string':
-          var name = '%String%';
-      }
-
-      return runtime.intrinsics[name].Construct([argument]);
-    };
-
-    return $$ToObject(argument);
+    return intrinsics[name].Construct([argument]);
   }
 
   exports.$$ToObject = $$ToObject;
@@ -746,6 +739,13 @@ var operators = (function(exports){
   }
   exports.BinaryOperation = BinaryOperation;
 
+
+  var realm, intrinsics;
+
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
+  });
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
