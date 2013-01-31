@@ -14,13 +14,16 @@ import {
   builtinClass,
   builtinFunction,
   call,
+  createDescriptor,
+  defineOwnProperty,
   deleteProperty,
   ensureArgs,
   ensureDescriptor,
   ensureFunction,
   ensureObject,
   ensureProto,
-  _enumerate: enumerate
+  _enumerate: enumerate,
+  getOwnProperty
 } from '@@utilities';
 
 import {
@@ -41,9 +44,11 @@ builtinClass(Proxy);
 
 deleteProperty(Proxy, 'prototype');
 
-const normal = { writable: true,
-                 enumerable: true,
-                 configurable: true };
+const normal = createDescriptor();
+normal.writable = true;
+normal.enumerable = true;
+normal.configurable = true;
+
 
 export class Handler {
   getOwnPropertyDescriptor(target, propertyKey){
@@ -198,24 +203,24 @@ export class Handler {
       } else if (ownDesc.writable === false) {
         return false;
       } else if (receiver === target) {
-        $__DefineOwnProperty(receiver, propertyKey, { value: value });
+        defineOwnProperty(receiver, propertyKey, { value: value });
         return true;
       } else if (!$$Invoke(receiver, 'IsExtensible')) {
         return false;
       }
       normal.value = value;
-      $__DefineOwnProperty(receiver, propertyKey, normal);
+      defineOwnProperty(receiver, propertyKey, normal);
       normal.value = undefined;
       return true;
     }
 
     const proto = $$Invoke(target, 'GetInheritance');
     if (proto === null) {
-      if (!$__IsExtensible(receiver)) {
+      if (!$$Invoke(receiver, 'IsExtensible')) {
         return false;
       }
       normal.value = value;
-      $__DefineOwnProperty(receiver, propertyKey, normal);
+      defineOwnProperty(receiver, propertyKey, normal);
       normal.value = undefined;
       return true;
     }
@@ -291,7 +296,7 @@ builtinFunction(construct);
 export function defineProperty(target, propertyKey, attributes){
   ensureObject(target, '@reflect.defineProperty');
   ensureDescriptor(attributes);
-  return $__DefineOwnProperty(target, ToPropertyKey(propertyKey), attributes);
+  return defineOwnProperty(target, ToPropertyKey(propertyKey), attributes);
 }
 
 builtinFunction(defineProperty);
@@ -299,7 +304,7 @@ builtinFunction(defineProperty);
 
 export function deleteProperty(target, propertyKey){
   ensureObject(target, '@reflect.deleteProperty');
-  return $__Delete(target, ToPropertyKey(propertyKey), false);
+  return $$Invoke(target, 'Delete', ToPropertyKey(propertyKey), false);
 }
 
 builtinFunction(deleteProperty);
@@ -323,7 +328,7 @@ export function freeze(target){
   letsuccess = true;
 
   for (var i = 0; i < len; i++) {
-    const desc = $__GetOwnProperty(target, props[i]),
+    const desc = getOwnProperty(target, props[i]),
           attrs = 'writable' in desc || 'value' in desc
             ? { configurable: false, writable: false }
             : desc !== undefined
@@ -331,7 +336,7 @@ export function freeze(target){
               : null;
 
     if (attrs !== null) {
-      success = success && $__DefineOwnProperty(target, props[i], attrs);
+      success = success && defineOwnProperty(target, props[i], attrs);
     }
   }
 
@@ -342,7 +347,7 @@ builtinFunction(freeze);
 
 
 export function get(target, propertyKey, receiver = target){
-  return $__GetP(ToObject(target), ToPropertyKey(propertyKey), ToObject(receiver));
+  return $$Invoke(ToObject(target), 'GetP', ToPropertyKey(propertyKey), ToObject(receiver));
 }
 
 builtinFunction(get);
@@ -350,7 +355,7 @@ builtinFunction(get);
 
 export function getOwnPropertyDescriptor(target, propertyKey){
   ensureObject(target, '@reflect.getOwnPropertyDescriptor');
-  return $__GetOwnProperty(target, ToPropertyKey(propertyKey));
+  return getOwnProperty(target, ToPropertyKey(propertyKey));
 }
 
 builtinFunction(getOwnPropertyDescriptor);
@@ -410,7 +415,7 @@ export function isFrozen(target){
   const props = _enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
-    const desc = $__GetOwnProperty(target, props[i]);
+    const desc = getOwnProperty(target, props[i]);
     if (desc && desc.configurable || 'writable' in desc && desc.writable) {
       return false;
     }
@@ -432,7 +437,7 @@ export function isSealed(target){
   const props = _enumerate(target, false, false);
 
   for (var i=0; i < props.length; i++) {
-    const desc = $__GetOwnProperty(target, props[i]);
+    const desc = getOwnProperty(target, props[i]);
     if (desc && desc.configurable) {
       return false;
     }
@@ -482,7 +487,7 @@ export function seal(target){
         desc  = { configurable: false };
 
   for (var i = 0; i < len; i++) {
-    success = success && $__DefineOwnProperty(target, props[i], desc);
+    success = success && defineOwnProperty(target, props[i], desc);
   }
 
   return success;
@@ -492,7 +497,7 @@ builtinFunction(seal);
 
 
 export function set(target, propertyKey, value, receiver = target){
-  return $__SetP(ToObject(target), ToPropertyKey(propertyKey), value, ToObject(receiver));
+  return $$Invoke(ToObject(target), 'SetP', ToPropertyKey(propertyKey), value, ToObject(receiver));
 }
 
 builtinFunction(set);
