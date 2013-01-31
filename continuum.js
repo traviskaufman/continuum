@@ -13486,6 +13486,50 @@ exports.environments = (function(exports, undefined){
   })();
 
 
+  // #################################
+  // ### FunctionEnvironmentRecord ###
+  // #################################
+
+  exports.FunctionEnvironmentRecord = (function(){
+    function FunctionEnvironmentRecord(receiver, method){
+      this.outer = method.Scope;
+      this.bindings = new Hash;
+      this.consts = new Hash;
+      this.deletables = new Hash;
+      this.cache = new Hash;
+      this.thisValue = receiver;
+      this.HomeObject = method.HomeObject;
+      this.MethodName = method.MethodName;
+      tag(this);
+    }
+
+    inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
+      HomeObject: undefined,
+      MethodName: undefined,
+      thisValue: undefined,
+      type: 'FunctionEnv'
+    }, [
+      function HasThisBinding(){
+        return true;
+      },
+      function HasSuperBinding(){
+        return this.HomeObject !== undefined;
+      },
+      function GetThisBinding(){
+        return this.thisValue;
+      },
+      function GetSuperBase(){
+        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
+      },
+      function GetMethodName() {
+        return this.MethodName;
+      }
+    ]);
+
+    return FunctionEnvironmentRecord;
+  })();
+
+
   // ###############################
   // ### ObjectEnvironmentRecord ###
   // ###############################
@@ -13541,50 +13585,6 @@ exports.environments = (function(exports, undefined){
   })();
 
 
-  // #################################
-  // ### FunctionEnvironmentRecord ###
-  // #################################
-
-  exports.FunctionEnvironmentRecord = (function(){
-    function FunctionEnvironmentRecord(receiver, method){
-      this.outer = method.Scope;
-      this.bindings = new Hash;
-      this.consts = new Hash;
-      this.deletables = new Hash;
-      this.cache = new Hash;
-      this.thisValue = receiver;
-      this.HomeObject = method.HomeObject;
-      this.MethodName = method.MethodName;
-      tag(this);
-    }
-
-    inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
-      HomeObject: undefined,
-      MethodName: undefined,
-      thisValue: undefined,
-      type: 'FunctionEnv'
-    }, [
-      function HasThisBinding(){
-        return true;
-      },
-      function HasSuperBinding(){
-        return this.HomeObject !== undefined;
-      },
-      function GetThisBinding(){
-        return this.thisValue;
-      },
-      function GetSuperBase(){
-        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
-      },
-      function GetMethodName() {
-        return this.MethodName;
-      }
-    ]);
-
-    return FunctionEnvironmentRecord;
-  })();
-
-
   // ###############################
   // ### GlobalEnvironmentRecord ###
   // ###############################
@@ -13593,16 +13593,49 @@ exports.environments = (function(exports, undefined){
     function GlobalEnvironmentRecord(global){
       ObjectEnvironmentRecord.call(this, global);
       this.thisValue = global;
+      this.imports = new Hash;
+      this.importedNames = [];
     }
 
     inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {
       outer: null,
       type: 'GlobalEnv'
     }, [
+      function EnumerateBindings(){
+        return this.bindings.Enumerate(false, false).concat(this.importedNames);
+      },
+      function HasBinding(name){
+        return name in this.imports || this.bindings.HasProperty(name);
+      },
+      function GetBindingValue(name, strict){
+        if (name in this.imports) {
+          return this.imports[name].Get(name);
+        } else if (this.bindings.HasProperty(name)) {
+          return this.bindings.Get(name);
+        } else if (strict) {
+          return $$ThrowException('not_defined', name);
+        }
+      },
+      function SetMutableBinding(name, value, strict){
+        if (name in this.imports) {
+          return this.imports[name].Put(name, value, strict);
+        }
+
+        return this.bindings.Put(name, value, strict);
+      },
       function GetThisBinding(){
         return this.bindings;
       },
       function HasThisBinding(){
+        return true;
+      },
+      function SetModuleBinding(name, module){
+        if (name in this.imports) {
+          // TODO duplicate import error
+        }
+
+        this.importedNames.push(name);
+        this.imports[name] = module;
         return true;
       },
       function inspect(){
@@ -20250,7 +20283,23 @@ exports.runtime = (function(GLOBAL, exports, undefined){
               errback.Call(null, [err]);
             });
           } else if (imported.origin instanceof Array) {
+            var env = realm.globalEnv,
+                mod;
 
+            each(imported.orgin, function(path){
+              mod = env.GetBindingValue(path);
+              if (!(mod instanceof $Module)) {
+                // TODO throw
+              }
+
+              env = mod.object.env || mod.object.Realm.globalEnv;
+              if (!env) {
+                // TODO throw
+              }
+            });
+
+
+            callback.Call(null, [mod]);
           } else if (internalModules.has(imported.origin)) {
             callback.Call(null, [internalModules.get(imported.origin)]);
           } else {
@@ -20301,18 +20350,20 @@ exports.runtime = (function(GLOBAL, exports, undefined){
             each(imported.specifiers, function(path, name){
               if (name === '*') {
                 return module.each(function(prop){
-                  scope.SetMutableBinding(prop[0], module.Get(prop[0]));
+                  scope.SetModuleBinding(prop[0], module);
                 });
               }
 
               var obj = module;
-              each(path, function(part){
+              for (var i=0; i < path.length - 1; i++) {
                 obj = obj.Get(part);
-              });
+              }
 
               if (name[0] !== '@') {
-                return scope.SetMutableBinding(name, obj);
+                return scope.SetModuleBinding(path[i], obj);
               }
+
+              obj = obj.Get(path[i]);
 
               if (name[1] === '@' && !(obj instanceof $WellKnownSymbol)) {
                 ƒ($$MakeException('unknown_wellknown_symbol', [name]));
@@ -21813,22 +21864,13 @@ exports.debug = (function(exports){
         return this.global.query(key);
       },
       function describe(key){
-        return this.global.describe(key);
-      },
-      function getDescriptor(key){
-        return this.global.getDescriptor(key);
+        return this.global.describe(key) || MirrorScope.prototype.describe.call(this, key);
       },
       function getOwnDescriptor(key){
-        return this.global.getOwnDescriptor(key);
-      },
-      function inheritedAttrs(){
-        return this.global.inheritedAttrs();
-      },
-      function ownAttrs(props){
-        return this.global.ownAttrs(props);
+        return this.global.getOwnDescriptor(key) || MirrorScope.prototype.getOwnDescriptor.call(this, key);
       },
       function list(hidden, own){
-        return this.global.list(hidden, own);
+        return this.global.list(hidden, true).concat(this.subject.importedNames);
       }
     ]);
 
