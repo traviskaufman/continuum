@@ -83,24 +83,6 @@ var natives = (function(module){
   }
 
   natives.add({
-    ToObject: operators.$$ToObject,
-    ToString: operators.$$ToString,
-    ToNumber: operators.$$ToNumber,
-    ToBoolean: operators.$$ToBoolean,
-    ToPropertyKey: operators.$$ToPropertyKey,
-    ToInteger: operators.$$ToInteger,
-    ToInt32: operators.$$ToInt32,
-    ToUint32: operators.$$ToUint32,
-    ToUint16: operators.$$ToUint16,
-    CheckObjectCoercible: operations.$$CheckObjectCoercible,
-    parseInt: parseInt,
-    parseFloat: parseFloat,
-    decodeURI: decodeURI,
-    decodeURIComponent: decodeURIComponent,
-    encodeURI: encodeURI,
-    encodeURIComponent: encodeURIComponent,
-    escape: escape,
-    unescape: unescape,
     _createUndetectable: function(obj, args){
       return new Undetectable(args[0]);
     },

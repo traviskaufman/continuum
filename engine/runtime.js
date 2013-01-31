@@ -1831,6 +1831,17 @@ var runtime = (function(GLOBAL, exports, undefined){
       }
     }
 
+    internalModules.set('@@globals', {
+      $$ParseInt: parseInt,
+      $$ParseFloat: parseFloat,
+      $$DecodeURI: decodeURI,
+      $$DecodeURIComponent: decodeURIComponent,
+      $$EncodeURI: encodeURI,
+      $$EncodeURIComponent: encodeURIComponent,
+      $$Escape: escape,
+      $$Unescape: unescape
+    });
+
     internalModules.set('@@collections', {
       $$MapClear: function(_, args){
         return args[0].MapData.clear();

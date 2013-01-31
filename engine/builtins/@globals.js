@@ -17,40 +17,51 @@ import {
   ToString
 } from '@@operations';
 
+import {
+  $$DecodeURI,
+  $$DecodeURIComponent,
+  $$EncodeURI,
+  $$EncodeURIComponent,
+  $$Escape,
+  $$ParseFloat,
+  $$ParseInt,
+  $$Unescape
+} from '@@globals';
+
 setTag($$GetIntrinsic('global'), 'global');
 setTag($$GetIntrinsic('StopIteration'), 'StopIteration');
 
 
 export function decodeURI(value){
-  return $__decodeURI(ToString(value));
+  return $$DecodeURI(ToString(value));
 }
 
 builtinFunction(decodeURI);
 
 
 export function decodeURIComponent(value){
-  return $__decodeURIComponent(ToString(value));
+  return $$DecodeURIComponent(ToString(value));
 }
 
 builtinFunction(decodeURIComponent);
 
 
 export function encodeURI(value){
-  return $__encodeURI(ToString(value));
+  return $$EncodeURI(ToString(value));
 }
 
 builtinFunction(encodeURI);
 
 
 export function encodeURIComponent(value){
-  return $__encodeURIComponent(ToString(value));
+  return $$EncodeURIComponent(ToString(value));
 }
 
 builtinFunction(encodeURIComponent);
 
 
 export function escape(value){
-  return $__escape(ToString(value));
+  return $$Escape(ToString(value));
 }
 
 builtinFunction(escape);
@@ -76,21 +87,21 @@ builtinFunction(isNaN);
 
 
 export function parseFloat(value){
-  return $__parseFloat(ToPrimitive(value));
+  return $$ParseFloat(ToPrimitive(value));
 }
 
 builtinFunction(parseFloat);
 
 
 export function parseInt(value, radix){
-  return $__parseInt(ToPrimitive(value), +radix);
+  return $$ParseInt(ToPrimitive(value), ToNumber(radix));
 }
 
 builtinFunction(parseInt);
 
 
 export function unescape(value){
-  return $__unescape(ToString(value));
+  return $$Unescape(ToString(value));
 }
 
 builtinFunction(unescape);
