@@ -4,7 +4,8 @@ var debug = (function(exports){
       iteration = require('./lib/iteration'),
       utility   = require('./lib/utility'),
       constants = require('./constants'),
-      runtime   = require('./runtime');
+      runtime   = require('./runtime'),
+      engine    = require('./engine').engine;
 
   var isObject   = objects.isObject,
       inherit    = objects.inherit,
@@ -17,8 +18,7 @@ var debug = (function(exports){
       Hash       = objects.Hash,
       each       = iteration.each,
       quotes     = utility.quotes,
-      uid        = utility.uid,
-      realm      = runtime.activeRealm;
+      uid        = utility.uid;
 
   var ENUMERABLE   = 0x01,
       CONFIGURABLE = 0x02,
@@ -39,6 +39,14 @@ var debug = (function(exports){
   }
 
   var now = Date.now || function now(){ return +new Date };
+
+  function realm(){
+    if (!engine.activeRealm && engine.realms.length) {
+      engine.changeRealm(engine.realms[0]);
+    }
+
+    return engine.activeRealm;
+  }
 
 
   function Mirror(){}
