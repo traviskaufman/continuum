@@ -106,36 +106,6 @@ var natives = (function(module){
     _SetBuiltinBrand: function(obj, args){
       args[0].BuiltinBrand = args[1];
     },
-    _TypedArrayCreate: function(obj, args){
-      return new $TypedArray(args[0], args[1], args[2], args[3]);
-    },
-    _NativeBufferCreate: function(obj, args){
-      return new ArrayBuffer(args[0]);
-    },
-    NativeDataViewCreate: function(buffer){
-      return new DataView(buffer.NativeBuffer);
-    },
-    NativeBufferSlice: function(buffer, begin, end){
-      return buffer.slice(begin, end);
-    },
-    _DataViewSet: function(obj, args){
-      var offset = args[1] >>> 0;
-
-      if (offset >= obj.ByteLength) {
-        return $$ThrowException('buffer_out_of_bounds')
-      }
-
-      return obj.View['set'+args[0]](offset, args[2], !!args[3]);
-    },
-    _DataViewGet: function(obj, args){
-      var offset = args[1] >>> 0;
-
-      if (offset >= obj.ByteLength) {
-        return $$ThrowException('buffer_out_of_bounds')
-      }
-
-      return obj.View['get'+args[0]](offset, !!args[2]);
-    },
     _GetInheritance: function(obj, args){
       obj = args[0];
       do {
