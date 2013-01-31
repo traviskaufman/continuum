@@ -38,6 +38,8 @@ import {
   isInitializing,
   listFrom,
   listOf,
+  min,
+  max,
   numbers
 } from '@@utilities';
 
@@ -153,7 +155,6 @@ function stringMatch(string, regexp){
 internalFunction(stringMatch);
 
 
-
 export class String {
   constructor(value){
     value = $$ArgumentCount() ? ToString(value) : '';
@@ -242,6 +243,30 @@ export class String {
     }
 
     return string;
+  }
+
+  contains(searchString, position = undefined){
+    const s = ensureCoercible(this, 'contains');
+
+    return stringIndexOf(s, searchString, position) !== -1;
+  }
+
+  endsWith(searchString, endPosition = undefined){
+    const s            = ensureCoercible(this, 'endsWith'),
+          searchStr    = ToString(searchstring),
+          len          = s.length,
+          pos          = endPosition === undefined ? len : ToInteger(endPosition),
+          end          = min(max(pos, 0), len),
+          searchLength = searchString.length,
+          start        = end - searchLength;
+
+    if (start < 0) {
+      return false;
+    }
+
+    const index = stringIndexOf(s, searchString, start);
+
+    return index === start;
   }
 
   indexOf(searchString, position = 0){
@@ -346,39 +371,45 @@ export class String {
     return $$StringSplit(string, separator, limit);
   }
 
+  startsWith(searchString, position = 0) {
+    const searchStr    = ToString(searchString),
+          s            = ensureCoercible(this, 'startsWith'),
+          pos          = ToInteger(position),
+          len          = s.length,
+          start        = min(max(pos, 0), len),
+          searchLength = searchString.length;
+
+    if (searchLength + start > len) {
+      return false;
+    }
+
+    const index = stringIndexOf(s, searchString, start);
+
+    return index === start;
+  }
+
   substr(start = 0, length = Infinity){
     const string = ensureCoercible(this, 'substr'),
           chars  = string.length;
 
     start = ToInteger(start);
-    length = ToInteger(length);
 
     if (start < 0) {
-      start += chars;
-      if (start < 0) start = 0;
-    }
-    if (length < 0) {
-      length = 0;
-    }
-    if (length > chars - start) {
-      length = chars - start;
+      start = min(start + chars, 0);
     }
 
-    return length <= 0 ? '' : $$Invoke(string, 'slice', start, start + length);
+    const len = min(max(ToInteger(length), 0), chars - start);
+
+    return len === 0 ? '' : $$Invoke(string, 'slice', start, start + len);
   }
 
   substring(start = 0, end = this.length){
-    const string = ensureCoercible(this, 'substring'),
-          len    = string.length;
-
-    start = ToInteger(start);
-    end = ToInteger(end);
-
-    start = start > 0 ? start < len ? start : len : 0;
-    end = end > 0 ? end < len ? end : len : 0;
-
-    const from = start < end ? start : end,
-          to = start > end ? start : end;
+    const string   = ensureCoercible(this, 'substring'),
+          len      = string.length,
+          startInt = min(max(ToInteger(start), 0), len),
+          endInt   = min(max(ToInteger(end), 0), len),
+          from     = min(start, end),
+          to       = max(start, end);
 
     return $$Invoke(string, 'slice', from, to);
   }
