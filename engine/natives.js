@@ -202,10 +202,6 @@ var natives = (function(module){
     _NumberToString: function(obj, args){
       return args[0].toString(args[1]);
     },
-    _Signal: function(obj, args){
-      var realm = require('./runtime').realm;
-      realm.emit.apply(realm, args);
-    },
     DateParse: Date.parse || function(){ return NaN },
     readFile: function(path, callback){
       require('fs').readFile(path, 'utf8', function(err, file){

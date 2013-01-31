@@ -14,6 +14,10 @@ import {
   ToString
 } from '@@operations';
 
+import {
+  $$Signal
+} from '@@internals';
+
 
 const QUIET = $__createUndetectable('quiet');
 
@@ -136,4 +140,4 @@ export class Console {
 }
 
 
-export const console = new Console({ signal: $__Signal });
+export const console = new Console({ signal: $$Signal });
