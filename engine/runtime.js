@@ -2828,7 +2828,23 @@ var runtime = (function(GLOBAL, exports, undefined){
               errback.Call(null, [err]);
             });
           } else if (imported.origin instanceof Array) {
+            var env = realm.globalEnv,
+                mod;
 
+            each(imported.orgin, function(path){
+              mod = env.GetBindingValue(path);
+              if (!(mod instanceof $Module)) {
+                // TODO throw
+              }
+
+              env = mod.object.env || mod.object.Realm.globalEnv;
+              if (!env) {
+                // TODO throw
+              }
+            });
+
+
+            callback.Call(null, [mod]);
           } else if (internalModules.has(imported.origin)) {
             callback.Call(null, [internalModules.get(imported.origin)]);
           } else {
@@ -2879,18 +2895,20 @@ var runtime = (function(GLOBAL, exports, undefined){
             each(imported.specifiers, function(path, name){
               if (name === '*') {
                 return module.each(function(prop){
-                  scope.SetMutableBinding(prop[0], module.Get(prop[0]));
+                  scope.SetModuleBinding(prop[0], module);
                 });
               }
 
               var obj = module;
-              each(path, function(part){
+              for (var i=0; i < path.length - 1; i++) {
                 obj = obj.Get(part);
-              });
+              }
 
               if (name[0] !== '@') {
-                return scope.SetMutableBinding(name, obj);
+                return scope.SetModuleBinding(path[i], obj);
               }
+
+              obj = obj.Get(path[i]);
 
               if (name[1] === '@' && !(obj instanceof $WellKnownSymbol)) {
                 ƒ($$MakeException('unknown_wellknown_symbol', [name]));

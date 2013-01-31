@@ -169,6 +169,50 @@ var environments = (function(exports, undefined){
   })();
 
 
+  // #################################
+  // ### FunctionEnvironmentRecord ###
+  // #################################
+
+  exports.FunctionEnvironmentRecord = (function(){
+    function FunctionEnvironmentRecord(receiver, method){
+      this.outer = method.Scope;
+      this.bindings = new Hash;
+      this.consts = new Hash;
+      this.deletables = new Hash;
+      this.cache = new Hash;
+      this.thisValue = receiver;
+      this.HomeObject = method.HomeObject;
+      this.MethodName = method.MethodName;
+      tag(this);
+    }
+
+    inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
+      HomeObject: undefined,
+      MethodName: undefined,
+      thisValue: undefined,
+      type: 'FunctionEnv'
+    }, [
+      function HasThisBinding(){
+        return true;
+      },
+      function HasSuperBinding(){
+        return this.HomeObject !== undefined;
+      },
+      function GetThisBinding(){
+        return this.thisValue;
+      },
+      function GetSuperBase(){
+        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
+      },
+      function GetMethodName() {
+        return this.MethodName;
+      }
+    ]);
+
+    return FunctionEnvironmentRecord;
+  })();
+
+
   // ###############################
   // ### ObjectEnvironmentRecord ###
   // ###############################
@@ -224,50 +268,6 @@ var environments = (function(exports, undefined){
   })();
 
 
-  // #################################
-  // ### FunctionEnvironmentRecord ###
-  // #################################
-
-  exports.FunctionEnvironmentRecord = (function(){
-    function FunctionEnvironmentRecord(receiver, method){
-      this.outer = method.Scope;
-      this.bindings = new Hash;
-      this.consts = new Hash;
-      this.deletables = new Hash;
-      this.cache = new Hash;
-      this.thisValue = receiver;
-      this.HomeObject = method.HomeObject;
-      this.MethodName = method.MethodName;
-      tag(this);
-    }
-
-    inherit(FunctionEnvironmentRecord, DeclarativeEnvironmentRecord, {
-      HomeObject: undefined,
-      MethodName: undefined,
-      thisValue: undefined,
-      type: 'FunctionEnv'
-    }, [
-      function HasThisBinding(){
-        return true;
-      },
-      function HasSuperBinding(){
-        return this.HomeObject !== undefined;
-      },
-      function GetThisBinding(){
-        return this.thisValue;
-      },
-      function GetSuperBase(){
-        return this.HomeObject ? this.HomeObject.GetInheritance() : undefined;
-      },
-      function GetMethodName() {
-        return this.MethodName;
-      }
-    ]);
-
-    return FunctionEnvironmentRecord;
-  })();
-
-
   // ###############################
   // ### GlobalEnvironmentRecord ###
   // ###############################
@@ -276,16 +276,49 @@ var environments = (function(exports, undefined){
     function GlobalEnvironmentRecord(global){
       ObjectEnvironmentRecord.call(this, global);
       this.thisValue = global;
+      this.imports = new Hash;
+      this.importedNames = [];
     }
 
     inherit(GlobalEnvironmentRecord, ObjectEnvironmentRecord, {
       outer: null,
       type: 'GlobalEnv'
     }, [
+      function EnumerateBindings(){
+        return this.bindings.Enumerate(false, false).concat(this.importedNames);
+      },
+      function HasBinding(name){
+        return name in this.imports || this.bindings.HasProperty(name);
+      },
+      function GetBindingValue(name, strict){
+        if (name in this.imports) {
+          return this.imports[name].Get(name);
+        } else if (this.bindings.HasProperty(name)) {
+          return this.bindings.Get(name);
+        } else if (strict) {
+          return $$ThrowException('not_defined', name);
+        }
+      },
+      function SetMutableBinding(name, value, strict){
+        if (name in this.imports) {
+          return this.imports[name].Put(name, value, strict);
+        }
+
+        return this.bindings.Put(name, value, strict);
+      },
       function GetThisBinding(){
         return this.bindings;
       },
       function HasThisBinding(){
+        return true;
+      },
+      function SetModuleBinding(name, module){
+        if (name in this.imports) {
+          // TODO duplicate import error
+        }
+
+        this.importedNames.push(name);
+        this.imports[name] = module;
         return true;
       },
       function inspect(){
