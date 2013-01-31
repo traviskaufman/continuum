@@ -24,8 +24,8 @@ function transformer(files, callback){
 
 
 function minify(src){
-  var parse    = require('esprima').parse;
-      generate = require('escodegen').generate;
+  var parse    = require('esprima').parse,
+      generate = require('escodegen').generate,
       esmangle = require('esmangle'),
       mangle   = esmangle.mangle,
       optimize = esmangle.optimize,
@@ -132,6 +132,7 @@ Builder.prototype = {
       try {
         src = minify(src);
       } catch (e) {
+        console.log(e);
         console.warn('You tried to make the minified version but likely are missing the'+
                      ' super duper custom things needed to make it, skipping minification');
       }
