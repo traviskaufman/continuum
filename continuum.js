@@ -9265,6 +9265,8 @@ exports.assembler = (function(exports){
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
       REST             = new StandardOpCode(1, 'REST'),
       RETURN           = new StandardOpCode(0, 'RETURN'),
+      RETURN_CHECK     = new StandardOpCode(0, 'RETURN_CHECK'),
+      RETURN_FINALLY   = new StandardOpCode(0, 'RETURN_FINALLY'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
       SCOPE_CLONE      = new StandardOpCode(0, 'SCOPE_CLONE'),
@@ -11191,7 +11193,7 @@ exports.assembler = (function(exports){
       UNDEFINED();
     }
 
-    RETURN();
+    context.code.inFinally ? RETURN_FINALLY() : RETURN();
   }
 
   function SequenceExpression(node){
@@ -11343,7 +11345,7 @@ exports.assembler = (function(exports){
     isWrapped(node.block);
 
     if (node.finalizer) {
-      PUSH_FINALLY();
+      context.code.inFinally = true;
     }
     var begin = current();
 
@@ -11363,10 +11365,10 @@ exports.assembler = (function(exports){
     each(handlers, adjust)
 
     if (node.finalizer) {
-      POP_FINALLY();
-      context.code.unwinders.push(new Unwinder('finally', begin, current()));
+      context.code.inFinally = false;
       isntWrapped(node.finalizer);
       recurse(node.finalizer);
+      RETURN_CHECK();
     }
   }
 
@@ -17121,6 +17123,20 @@ exports.thunk = (function(exports){
     return false;
   }
 
+  function RETURN_CHECK(context){
+    if (context.returning) {
+      return false;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function RETURN_FINALLY(context){
+    RETURN(context);
+    context.returning = true;
+    return context.cmds[++context.ip];
+  }
+
   function ROTATE(context){
     var buffer = [],
         item   = context.stack[--context.sp],
@@ -17376,8 +17392,8 @@ exports.thunk = (function(exports){
     FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
     LOG, LOOP, MEMBER, METHOD, MOVE, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
-    REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    REF, REFSYMBOL, REGEXP, REST, RETURN, RETURN_CHECK, RETURN_FINALLY, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD,
+    SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
   exports.instructions = function instructions(ops){
