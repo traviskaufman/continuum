@@ -2059,7 +2059,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           return new $Array(props);
         },
-        $$Eval: (function(){
+        $$CreateEval: function(_, args){
           function builtinEval(_, args, direct){
             var code = args[0];
 
@@ -2088,8 +2088,12 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           builtinEval.isBuiltinEval = true;
 
-          return builtinEval;
-        })(),
+          return new $InternalFunction({
+            name: 'eval',
+            length: 1,
+            call: builtinEval
+          });
+        },
         $$EvaluateInScope: function(_, args){
           var code = args[0],
               obj  = args[1];
