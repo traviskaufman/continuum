@@ -189,10 +189,16 @@ export function getOwnProperty(obj, key){
 
 internalFunction(getOwnProperty);
 
+export function createDescriptor(){
+  return $$WrapDescriptor($$CreateInternalObject());
+}
+
+internalFunction(createDescriptor);
+
 
 export function defineOwnProperty(obj, key, desc){
   if (!$$Has(desc, 'descriptor')) {
-    const wrapped = $$WrapDescriptor($$CreateInternalObject());
+    const wrapped = createDescriptor();
 
     if ('configurable' in desc) {
       wrapped.configurable = desc.configurable;
