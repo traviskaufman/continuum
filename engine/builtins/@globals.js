@@ -1,6 +1,6 @@
 import {
   $$CreateEval,
-  $$GetUnwrapped,
+  $$Get,
   $$GetIntrinsic,
   $$Set
 } from '@@internals';
@@ -66,8 +66,9 @@ export function escape(value){
 
 builtinFunction(escape);
 
+
 export const eval = $$CreateEval();
-//builtinFunction(eval);
+$$Set(eval, 'FormalParameters', $$Get(function eval(x){}, 'FormalParameters'));
 
 
 export function isFinite(number){
