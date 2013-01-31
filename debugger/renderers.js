@@ -564,14 +564,14 @@ var FunctionBranch = (function(){
 
 var GlobalBranch = (function(){
   function GlobalBranch(mirror){
-    Branch.call(this, mirror);
+    Branch.call(this, introspect(mirror.subject.env));
   }
 
   creator(GlobalBranch);
   inherit(GlobalBranch, Branch, [
     function initTree(){
       Branch.prototype.initTree.call(this);
-      if (this.mirror.subject.env.outer) {
+      if (this.mirror.subject.outer) {
         this.tree.batchAppend(new Env(this.mirror));
       }
     }

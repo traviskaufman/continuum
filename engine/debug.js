@@ -1260,22 +1260,13 @@ var debug = (function(exports){
         return this.global.query(key);
       },
       function describe(key){
-        return this.global.describe(key);
-      },
-      function getDescriptor(key){
-        return this.global.getDescriptor(key);
+        return this.global.describe(key) || MirrorScope.prototype.describe.call(this, key);
       },
       function getOwnDescriptor(key){
-        return this.global.getOwnDescriptor(key);
-      },
-      function inheritedAttrs(){
-        return this.global.inheritedAttrs();
-      },
-      function ownAttrs(props){
-        return this.global.ownAttrs(props);
+        return this.global.getOwnDescriptor(key) || MirrorScope.prototype.getOwnDescriptor.call(this, key);
       },
       function list(hidden, own){
-        return this.global.list(hidden, own);
+        return this.global.list(hidden, true).concat(this.subject.importedNames);
       }
     ]);
 
