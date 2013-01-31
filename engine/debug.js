@@ -1149,11 +1149,11 @@ var debug = (function(exports){
       isEnumerable: always(true),
       isAccessor: always(false)
     }, [
-      function outer(){
-        return introspect(this.subject.outer);
-      },
       function isAccessor(key){
         return this.getPrototype().isAccessor(key) || false;
+      },
+      function getOuter(){
+        return introspect(this.subject.outer);
       },
       function getPrototype(){
         return introspect(this.subject.outer);
@@ -1241,6 +1241,9 @@ var debug = (function(exports){
 
     inherit(MirrorGlobalScope, MirrorScope, {
     }, [
+      function getPrototype(){
+        return this.global.getPrototype();
+      },
       function isExtensible(){
         return this.global.isExtensible();
       },

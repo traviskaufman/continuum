@@ -167,7 +167,7 @@ function createSpecialProperty(label, classname, method){
 var Scope = createSpecialProperty('[[scope]]', 'FunctionScope', 'getScope'),
     Proto = createSpecialProperty('[[proto]]', 'Proto', 'getPrototype'),
     Env   = createSpecialProperty('[[env]]', 'Env', 'getEnvironment'),
-    Outer = createSpecialProperty('[[outer]]', 'Outer', 'getPrototype');
+    Outer = createSpecialProperty('[[outer]]', 'Outer', 'getOuter');
 
 
 var Label = (function(){
@@ -571,9 +571,7 @@ var GlobalBranch = (function(){
   inherit(GlobalBranch, Branch, [
     function initTree(){
       Branch.prototype.initTree.call(this);
-      if (this.mirror.subject.outer) {
-        this.tree.batchAppend(new Env(this.mirror));
-      }
+      this.tree.batchAppend(new Outer(this.mirror));
     }
   ]);
 
