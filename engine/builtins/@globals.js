@@ -1,4 +1,5 @@
 import {
+  $$Eval,
   $$Get,
   $$GetIntrinsic,
   $$Set
@@ -57,8 +58,8 @@ builtinFunction(escape);
 
 export function eval(source){}
 builtinFunction(eval);
-$$Set(eval, 'Call', $$Get($__eval, 'Call'));
-$$Set(eval, 'Construct', $$Get($__eval, 'Construct'));
+$$Set(eval, 'Call', $$Get($$Eval, 'Call'));
+$$Set(eval, 'Construct', $$Get($$Eval, 'Construct'));
 
 
 export function isFinite(number){
