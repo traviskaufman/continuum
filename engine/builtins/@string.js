@@ -102,13 +102,11 @@ function stringIndexOf(string, search, position){
         maxLen    = len - searchLen;
 
   let index = min(max(pos, 0), len);
+  let offset = 0;
 
-  while (index < maxLen) {
-    let offset = 0;
-    while (offset < searchLen && searchStr[offset] === string[index + offset]) {
-      if (offset++ === searchLen - 1) {
-        return index;
-      }
+  while (offset < searchLen && index < maxLen && searchStr[offset++] === string[index++]) {
+    if (offset === searchLen) {
+      return index;
     }
   }
 
@@ -253,7 +251,7 @@ export class String {
 
   endsWith(searchString, endPosition = undefined){
     const s            = ensureCoercible(this, 'endsWith'),
-          searchStr    = ToString(searchstring),
+          searchStr    = ToString(searchString),
           len          = s.length,
           pos          = endPosition === undefined ? len : ToInteger(endPosition),
           end          = min(max(pos, 0), len),
