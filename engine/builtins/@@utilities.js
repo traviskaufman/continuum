@@ -141,6 +141,13 @@ export function enumerate(obj, inherited, onlyEnumerable){
 internalFunction(enumerate);
 
 
+export function ownKeys(obj){
+  return $$CreateObject('Array', $$Invoke(obj, 'OwnPropertyKeys'));
+}
+
+internalFunction(enumerate);
+
+
 export function deleteProperty(obj, key){
   return $$Invoke(obj, 'remove', key);
 }
