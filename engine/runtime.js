@@ -1817,8 +1817,12 @@ var runtime = (function(GLOBAL, exports, undefined){
         return f._wrapper;
       }
 
-      f._wrapper = function(){ return f.Call(this, arguments) };
+      f._wrapper = function(){
+        return f.Call(this, arguments);
+      };
+
       f._wrapper._wraps = f;
+
       return f._wrapper;
     }
 
@@ -2316,7 +2320,7 @@ var runtime = (function(GLOBAL, exports, undefined){
               key = args[1],
               val = args[2];
 
-          if (typeof val === 'function') {
+          if (val && val.Call) {
             val = wrapFunction(val);
           }
 
@@ -2365,6 +2369,9 @@ var runtime = (function(GLOBAL, exports, undefined){
         },
         $$SetIntrinsic: function(_, args){
           realm.intrinsics[args[0]] = args[1];
+        },
+        $$Signal: function(_, args){
+          realm.emit.apply(realm, args);
         },
         $$StringToNumber: function(_, args){
           return +args[0];
