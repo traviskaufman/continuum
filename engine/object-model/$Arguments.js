@@ -5,7 +5,8 @@ var $Arguments = (function(exports){
       descriptors = require('./descriptors'),
       operations  = require('./operations'),
       $Object     = require('./$Object').$Object,
-      engine      = require('../engine').engine;
+      engine      = require('../engine').engine,
+      toStringTag = require('./$Symbol').wellKnownSymbols.toStringTag;
 
   var Hash    = objects.Hash,
       inherit = objects.inherit,
@@ -24,6 +25,7 @@ var $Arguments = (function(exports){
   var $Arguments = exports.$Arguments = (function(){
     function $Arguments(length){
       $Object.call(this);
+      this.define(toStringTag, 'Arguments');
       this.define('length', length, _CW);
     }
 
