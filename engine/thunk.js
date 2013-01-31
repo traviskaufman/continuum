@@ -861,6 +861,20 @@ var thunk = (function(exports){
     return false;
   }
 
+  function RETURN_CHECK(context){
+    if (context.returning) {
+      return false;
+    }
+
+    return context.cmds[++context.ip];
+  }
+
+  function RETURN_FINALLY(context){
+    RETURN(context);
+    context.returning = true;
+    return context.cmds[++context.ip];
+  }
+
   function ROTATE(context){
     var buffer = [],
         item   = context.stack[--context.sp],
@@ -1116,8 +1130,8 @@ var thunk = (function(exports){
     FLIP, FUNCTION, GET, GET_GLOBAL, HAS_BINDING, HAS_GLOBAL, INC, INDEX, INTERNAL_MEMBER, ITERATE, JUMP,
     JEQ_NULL, JEQ_UNDEFINED, JFALSE, JLT, JLTE, JGT, JGTE, JNEQ_NULL, JNEQ_UNDEFINED, JTRUE, LET, LITERAL,
     LOG, LOOP, MEMBER, METHOD, MOVE, NATIVE_CALL, NATIVE_REF, OBJECT, OR, POP, POPN, PROPERTY, PROTO, PUT, PUT_GLOBAL,
-    REF, REFSYMBOL, REGEXP, REST, RETURN, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD, SPREAD_ARG,
-    SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
+    REF, REFSYMBOL, REGEXP, REST, RETURN, RETURN_CHECK, RETURN_FINALLY, ROTATE, SAVE, SCOPE_CLONE, SCOPE_POP, SCOPE_PUSH, SPREAD,
+    SPREAD_ARG, SPREAD_ARRAY, STRING, SUPER_ELEMENT, SUPER_MEMBER, SWAP, SYMBOL, TEMPLATE, THIS, THROW, TO_OBJECT,
     UNARY, UNDEFINED, UPDATE, VAR, WITH, YIELD];
 
   exports.instructions = function instructions(ops){

@@ -189,6 +189,8 @@ var assembler = (function(exports){
       REGEXP           = new StandardOpCode(1, 'REGEXP'),
       REST             = new StandardOpCode(1, 'REST'),
       RETURN           = new StandardOpCode(0, 'RETURN'),
+      RETURN_CHECK     = new StandardOpCode(0, 'RETURN_CHECK'),
+      RETURN_FINALLY   = new StandardOpCode(0, 'RETURN_FINALLY'),
       ROTATE           = new StandardOpCode(1, 'ROTATE'),
       SAVE             = new StandardOpCode(0, 'SAVE'),
       SCOPE_CLONE      = new StandardOpCode(0, 'SCOPE_CLONE'),
@@ -2115,7 +2117,7 @@ var assembler = (function(exports){
       UNDEFINED();
     }
 
-    RETURN();
+    context.code.inFinally ? RETURN_FINALLY() : RETURN();
   }
 
   function SequenceExpression(node){
@@ -2267,7 +2269,7 @@ var assembler = (function(exports){
     isWrapped(node.block);
 
     if (node.finalizer) {
-      PUSH_FINALLY();
+      context.code.inFinally = true;
     }
     var begin = current();
 
@@ -2287,10 +2289,10 @@ var assembler = (function(exports){
     each(handlers, adjust)
 
     if (node.finalizer) {
-      POP_FINALLY();
-      context.code.unwinders.push(new Unwinder('finally', begin, current()));
+      context.code.inFinally = false;
       isntWrapped(node.finalizer);
       recurse(node.finalizer);
+      RETURN_CHECK();
     }
   }
 
