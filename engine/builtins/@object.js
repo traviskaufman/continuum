@@ -11,11 +11,14 @@ import {
 import {
   builtinClass,
   builtinFunction,
+  ensureDescriptor,
   ensureFunction,
   ensureObject,
   ensureProto,
   enumerate,
   extend,
+  getOwnProperty,
+  defineOwnProperty,
   internalFunction,
   query
 } from '@@utilities';
@@ -34,7 +37,8 @@ import {
   $$Has,
   $$Invoke,
   $$RemoveObserver,
-  $$SetIntrinsic
+  $$SetIntrinsic,
+  $$WrapDescriptor
 } from '@@internals';
 
 import {
@@ -113,7 +117,7 @@ export function create(proto, properties){
     for (var key in properties) {
       const desc = properties[key];
       ensureDescriptor(desc);
-      $__DefineOwnProperty(object, key, desc);
+      defineOwnProperty(object, key, desc);
     }
   }
 
@@ -123,7 +127,7 @@ export function create(proto, properties){
 export function defineProperty(object, key, property){
   ensureObject(object, 'Object.defineProperty');
   ensureDescriptor(property);
-  $__DefineOwnProperty(object, ToPropertyKey(key), property);
+  defineOwnProperty(object, ToPropertyKey(key), property);
   return object;
 }
 
@@ -134,7 +138,7 @@ export function defineProperties(object, properties){
   for (var key in properties) {
     const desc = properties[key];
     ensureDescriptor(desc);
-    $__DefineOwnProperty(object, key, desc);
+    defineOwnProperty(object, key, desc);
   }
 
   return object;
@@ -145,13 +149,13 @@ export function freeze(object){
   const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    const desc = $__GetOwnProperty(object, props[i]);
+    const desc = getOwnProperty(object, props[i]);
     if (desc.configurable) {
       desc.configurable = false;
       if ('writable' in desc) {
         desc.writable = false;
       }
-      $__DefineOwnProperty(object, props[i], desc);
+      defineOwnProperty(object, props[i], desc);
     }
   }
 
@@ -159,9 +163,10 @@ export function freeze(object){
   return object;
 }
 
+
 export function getOwnPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getOwnPropertyDescriptor');
-  return $__GetOwnProperty(object, ToPropertyKey(key));
+  return getOwnProperty(object, ToPropertyKey(key));
 }
 
 export function getOwnPropertyNames(object){
@@ -171,7 +176,7 @@ export function getOwnPropertyNames(object){
 
 export function getPropertyDescriptor(object, key){
   ensureObject(object, 'Object.getPropertyDescriptor');
-  return $__GetProperty(object, ToPropertyKey(key));
+  return $$WrapDescriptor($$Invoke(object, 'GetProperty', ToPropertyKey(key)));
 }
 
 export function getPropertyNames(object){
@@ -206,7 +211,7 @@ export function isFrozen(object){
   const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    const desc = $__GetOwnProperty(object, props[i]);
+    const desc = getOwnProperty(object, props[i]);
     if (desc && desc.configurable || 'writable' in desc && desc.writable) {
       return false;
     }
@@ -224,7 +229,7 @@ export function isSealed(object){
   const props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    const desc = $__GetOwnProperty(object, props[i]);
+    const desc = getOwnProperty(object, props[i]);
     if (desc && desc.configurable) {
       return false;
     }
@@ -251,7 +256,7 @@ export function seal(object){
         props = enumerate(object, false, false);
 
   for (var i=0; i < props.length; i++) {
-    $__DefineOwnProperty(object, props[i], desc);
+    defineOwnProperty(object, props[i], desc);
   }
 
   $$Invoke(object, 'PreventExtensions');
