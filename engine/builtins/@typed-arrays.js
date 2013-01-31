@@ -22,6 +22,14 @@ import {
   ToUint32
 } from '@@operations';
 
+import {
+  $$DataViewGet,
+  $$DataViewSet,
+  $$NativeBufferCreate,
+  $$NativeBufferSlice,
+  $$NativeDataViewCreate,
+  $$TypedArrayCreate
+} from '@@typed-arrays';
 
 function wrappingClamp(number, min, max){
   if (number < min) {
@@ -31,7 +39,6 @@ function wrappingClamp(number, min, max){
 }
 
 internalFunction(wrappingClamp);
-
 
 function createArrayBuffer(nativeBuffer, byteLength){
   var buffer = ObjectCreate(ArrayBufferPrototype);
@@ -51,7 +58,7 @@ function createTypedArray(Type, buffer, byteOffset, length){
     var byteLength = length * Type.BYTES_PER_ELEMENT;
     byteOffset = 0;
     buffer = new ArrayBuffer(byteLength);
-    return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+    return $$TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
 
   } else {
     buffer = ToObject(buffer);
@@ -75,7 +82,7 @@ function createTypedArray(Type, buffer, byteOffset, length){
         throw $$Exception('buffer_unaligned_length', [Type.name]);
       }
 
-      return $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+      return $$TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
 
     } else {
       length = ToUint32(buffer.length);
@@ -83,7 +90,7 @@ function createTypedArray(Type, buffer, byteOffset, length){
       byteOffset = 0;
       buffer = new ArrayBuffer(length);
 
-      var typedArray = $__TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
+      var typedArray = $$TypedArrayCreate(Type.name, buffer, byteLength, byteOffset);
 
       for (var i=0; i < length; i++) {
         typedArray[i] = buffer[i];
@@ -153,7 +160,7 @@ internalFunction(subarray);
 export class ArrayBuffer {
   constructor(byteLength){
     byteLength = ToUint32(byteLength);
-    return createArrayBuffer($__NativeBufferCreate(byteLength), byteLength);
+    return createArrayBuffer($$NativeBufferCreate(byteLength), byteLength);
   }
 
   slice(begin = 0, end = this.byteLength){
@@ -168,7 +175,7 @@ export class ArrayBuffer {
     begin = wrappingClamp(ToInt32(begin), 0, byteLength);
     end = wrappingClamp(ToInt32(end), 0, byteLength);
 
-    return createArrayBuffer($__NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);
+    return createArrayBuffer($$NativeBufferSlice(sourceNativeBuffer, begin, end), end - begin);
   }
 }
 
@@ -194,62 +201,78 @@ export class DataView {
     define(this, 'byteLength', byteLength, 1);
     define(this, 'byteOffset', byteOffset, 1);
     define(this, 'buffer', buffer, 1);
-    $$Set(this, 'View', $__NativeDataViewCreate(buffer, byteOffset, byteLength));
+    $$Set(this, 'View', $$NativeDataViewCreate(buffer, byteOffset, byteLength));
     $$Set(this, 'BuiltinBrand', 'BuiltinDataView');
   }
+
   getUint8(byteOffset){
     return this.@get('Uint8', byteOffset);
   }
+
   getUint16(byteOffset, littleEndian){
     return this.@get('Uint16', byteOffset, littleEndian);
   }
+
   getUint32(byteOffset, littleEndian){
     return this.@get('Uint32', byteOffset, littleEndian);
   }
+
   getInt8(byteOffset){
     return this.@get('Int8', byteOffset);
   }
+
   getInt16(byteOffset, littleEndian){
     return this.@get('Int16', byteOffset, littleEndian);
   }
+
   getInt32(byteOffset, littleEndian){
     return this.@get('Int32', byteOffset, littleEndian);
   }
+
   getFloat32(byteOffset, littleEndian){
     return this.@get('Float32', byteOffset, littleEndian);
   }
+
   getFloat64(byteOffset, littleEndian){
     return this.@get('Float64', byteOffset, littleEndian);
   }
+
   setUint8(byteOffset, value){
     return this.@set('Uint8', byteOffset, value);
   }
+
   setUint16(byteOffset, value, littleEndian){
     return this.@set('Uint16', byteOffset, value, littleEndian);
   }
+
   setUint32(byteOffset, value, littleEndian){
     return this.@set('Uint32', byteOffset, value, littleEndian);
   }
+
   setInt8(byteOffset, value){
     return this.@set('Int8', byteOffset, value);
   }
+
   setInt16(byteOffset, value, littleEndian){
     return this.@set('Int16', byteOffset, value, littleEndian);
   }
+
   setInt32(byteOffset, value, littleEndian){
     return this.@set('Int32', byteOffset, value, littleEndian);
   }
+
   setFloat32(byteOffset, value, littleEndian){
     return this.@set('Float32', byteOffset, value, littleEndian);
   }
+
   setFloat64(byteOffset, value, littleEndian){
     return this.@set('Float64', byteOffset, value, littleEndian);
   }
 }
 
 builtinClass(DataView);
-DataView.prototype.@get = $__DataViewGet
-DataView.prototype.@set = $__DataViewSet
+DataView.prototype.@get = $$DataViewGet
+DataView.prototype.@set = $$DataViewSet
 
 
 
@@ -257,9 +280,11 @@ export class Float64Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Float64Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Float64Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Float64Array, this, begin, end);
   }
@@ -273,9 +298,11 @@ export class Float32Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Float32Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Float32Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Float32Array, this, begin, end);
   }
@@ -289,9 +316,11 @@ export class Int32Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Int32Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Int32Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Int32Array, this, begin, end);
   }
@@ -305,9 +334,11 @@ export class Int16Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Int16Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Int16Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Int16Array, this, begin, end);
   }
@@ -321,9 +352,11 @@ export class Int8Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Int8Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Int8Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Int8Array, this, begin, end);
   }
@@ -337,9 +370,11 @@ export class Uint32Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Uint32Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Uint32Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Uint32Array, this, begin, end);
   }
@@ -353,9 +388,11 @@ export class Uint16Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Uint16Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Uint16Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Uint16Array, this, begin, end);
   }
@@ -369,9 +406,11 @@ export class Uint8Array {
   constructor(buffer, byteOffset, length) {
     return createTypedArray(Uint8Array, buffer, byteOffset, length);
   }
+
   set(array, offset) {
     return set(Uint8Array, this, array, offset);
   }
+
   subarray(begin, end) {
     return subarray(Uint8Array, this, begin, end);
   }

@@ -1886,6 +1886,45 @@ var runtime = (function(GLOBAL, exports, undefined){
     });
 
 
+    internalModules.set('@@typed-arrays', {
+      $$DataViewGet: function(obj, args){
+        var offset = args[1] >>> 0;
+
+        if (offset >= obj.ByteLength) {
+          return $$ThrowException('buffer_out_of_bounds')
+        }
+
+        return obj.View['get'+args[0]](offset, !!args[2]);
+      },
+      $$DataViewSet: function(obj, args){
+        var offset = args[1] >>> 0;
+
+        if (offset >= obj.ByteLength) {
+          return $$ThrowException('buffer_out_of_bounds')
+        }
+
+        return obj.View['set'+args[0]](offset, args[2], !!args[3]);
+      },
+      $$NativeBufferCreate: function(_, args){
+        return new ArrayBuffer(args[0]);
+      },
+      $$NativeBufferSlice: function(_, args){
+        var buffer = args[0],
+            begin  = args[1],
+            end    = args[2];
+
+        return buffer.slice(begin, end);
+      },
+      $$NativeDataViewCreate: function(_, args){
+        var buffer = args[0];
+
+        return new DataView(buffer.NativeBuffer);
+      },
+      $$TypedArrayCreate: function(_, args){
+        return new $TypedArray(args[0], args[1], args[2], args[3]);
+      }
+    });
+
     void function(){
       var objectTypes = {
         Array   : $Array,
