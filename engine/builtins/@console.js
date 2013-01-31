@@ -15,11 +15,12 @@ import {
 } from '@@operations';
 
 import {
+  $$CreateUndetectable,
   $$Signal
 } from '@@internals';
 
 
-const QUIET = $__createUndetectable('quiet');
+const QUIET = $$CreateUndetectable('quiet');
 
 
 export class Console {

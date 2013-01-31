@@ -21,6 +21,7 @@ import {
   $$Fetch,
   $$Get,
   $$GetIntrinsic,
+  $$ReadFile,
   $$Resolve,
   $$Set,
   $$SetIntrinsic,
@@ -186,7 +187,7 @@ export const System = new Loader(null, {
   global: $$GetIntrinsic('global'),
   baseURL: '',
   fetch(relURL, baseURL, request, resolved) {
-    const fetcher = resolved[0] === '@' ? $$Fetch : $__readFile;
+    const fetcher = resolved[0] === '@' ? $$Fetch : $$ReadFile;
 
     fetcher(resolved, src => {
       if (typeof src === 'string') {

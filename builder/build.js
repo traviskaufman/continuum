@@ -50,7 +50,6 @@ require('./builder')
   '../engine/object-model/$Proxy.js',
   '../engine/object-model/$TypedArray.js',
 
-  '../engine/natives.js',
   '../engine/thunk.js',
   '../engine/runtime.js',
   '../engine/debug.js',

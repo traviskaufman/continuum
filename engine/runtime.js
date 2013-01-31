@@ -24,13 +24,16 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Array           = require('./object-model/$Array').$Array,
       $Proxy           = require('./object-model/$Proxy'),
       $TypedArray      = require('./object-model/$TypedArray'),
-      natives          = require('./natives'),
+      Nil              = require('./object-model/$Nil'),
       thunk            = require('./thunk'),
       engine           = require('./engine').engine,
       Emitter          = require('./lib/Emitter'),
       PropertyList     = require('./lib/PropertyList'),
       Stack            = require('./lib/Stack');
 
+  var $Nil             = Nil.$Nil,
+      Undetectable     = Nil.Undetectable,
+      isUndetectable   = Nil.isUndetectable;
 
   var Hash           = objects.Hash,
       create         = objects.create,
@@ -1568,10 +1571,8 @@ var runtime = (function(GLOBAL, exports, undefined){
     };
 
     function Intrinsics(realm){
-      DeclarativeEnv.call(this, null);
       this.Realm = realm;
-      realm.natives = this;
-      realm.intrinsics = this.bindings;
+      realm.intrinsics = this.bindings = new Hash;
       engine.changeRealm(realm);
       intrinsics.Genesis = new $Object(null);
       intrinsics.Genesis.HiddenPrototype = true;
@@ -2068,50 +2069,18 @@ var runtime = (function(GLOBAL, exports, undefined){
             timers[id] = null;
           }
         },
-        $$CreateObject: function(_, args){
-          return new objectTypes[args[0]](args[1], args[2]);
-        },
         $$CreateArray: function(_, args){
-          var array = new $Array(args[1]);
+          var targetRealm = args[0],
+              array       = args[1];
 
-          if (args[0] !== realm) {
-            array.Realm = args[0];
-            array.Prototype = args[0].intrinsics['%ArrayPrototype%'];
+          var $array = new $Array(array);
+
+          if (targetRealm !== realm) {
+            $array.Realm = targetRealm;
+            $array.Prototype = targetRealm.intrinsics['%ArrayPrototype%'];
           }
 
-          return array;
-        },
-        $$CreateInternalObject: function(_, args){
-          var prototype = args[0];
-
-          return create(prototype || null);
-        },
-        $$CurrentRealm: function(){
-          return realm;
-        },
-        $$DeliverChangeRecords: function(_, args){
-          var callback = args[0];
-
-          return operations.$$DeliverChangeRecords(callback);
-        },
-        $$Enumerate: function(_, args){
-          return new $Array(properties(args[0]));
-        },
-        $$EnumerateAll: function(_, args){
-          var obj   = args[0],
-              seen  = new Hash,
-              props = [];
-
-          while (obj instanceof $Object) {
-            each(properties(obj), function(prop){
-              if (!(prop in seen)) {
-                seen[prop] = props.push(prop);
-              }
-            });
-            obj = getPrototypeOf(obj);
-          }
-
-          return new $Array(props);
+          return $array;
         },
         $$CreateEval: function(_, args){
           function builtinEval(_, args, direct){
@@ -2147,6 +2116,49 @@ var runtime = (function(GLOBAL, exports, undefined){
             length: 1,
             call: builtinEval
           });
+        },
+        $$CreateInternalObject: function(_, args){
+          var prototype = args[0];
+
+          return create(prototype || null);
+        },
+        $$CreateNil: function(_, args){
+          return new $Nil;
+        },
+        $$CreateObject: function(_, args){
+          return new objectTypes[args[0]](args[1], args[2]);
+        },
+        $$CreateUndetectable: function(_, args){
+          var value = args[0];
+
+          return new Undetectable(value);
+        },
+        $$CurrentRealm: function(){
+          return realm;
+        },
+        $$DeliverChangeRecords: function(_, args){
+          var callback = args[0];
+
+          return operations.$$DeliverChangeRecords(callback);
+        },
+        $$Enumerate: function(_, args){
+          return new $Array(properties(args[0]));
+        },
+        $$EnumerateAll: function(_, args){
+          var obj   = args[0],
+              seen  = new Hash,
+              props = [];
+
+          while (obj instanceof $Object) {
+            each(properties(obj), function(prop){
+              if (!(prop in seen)) {
+                seen[prop] = props.push(prop);
+              }
+            });
+            obj = getPrototypeOf(obj);
+          }
+
+          return new $Array(props);
         },
         $$EvaluateInScope: function(_, args){
           var code = args[0],
@@ -2260,6 +2272,11 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$IsConstruct: function(){
           return context.isConstruct;
         },
+        $$IsUndetectable: function(_, args){
+          var value = args[0];
+
+          return isUndetectable(value);
+        },
         $$Now: now,
         $$NumberToString: function(_, args){
           return args[0].toString(args[1] || 10);
@@ -2267,6 +2284,14 @@ var runtime = (function(GLOBAL, exports, undefined){
         $$ParseDate: Date.parse
           ? function(_, args){ return Date.parse(args[0]) }
           : function(_, args){ return NaN },
+        $$ReadFile: function(_, args){
+          var path     = args[0],
+              callback = args[1];
+
+          require('fs').readFile(path, 'utf8', function(err, file){
+            callback.Call(undefined, [file]);
+          });
+        },
         $$RegExpExec: function(_, args){
           var result = args[0].PrimitiveValue.exec(args[1]);
           if (result) {
@@ -2648,6 +2673,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       undefined        : void 0
     });
 
+
     internalModules.set('@@symbols', symbols);
     internalModules.set('@@internal-symbols', internalSymbols);
 
@@ -2954,23 +2980,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       hide(this, 'initialized');
       hide(this, 'quiet');
       hide(this, 'mutationScope');
-
-      iterate(natives, function(item){
-        var key   = item[0],
-            value = item[1],
-            name  = key[0] === '_' ? key.slice(1) : key;
-
-        if (typeof value === 'function') {
-          intrinsics[name] = new $NativeFunction({
-            unwrapped: key[0] === '_',
-            length   : value.length,
-            name     : name,
-            call     : value
-          });
-        } else {
-          intrinsics[name] = value;
-        }
-      });
 
       var self = this;
       engine.addRealm(this);
