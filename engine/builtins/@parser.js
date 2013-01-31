@@ -1,6 +1,9 @@
+import {
+  $$Parse
+} from '@@parser';
 
 export function parse(src, { loc, range, raw, tokens, comment, source, tolerant } = { source: null }){
-  return $__parse(src, loc, range, raw, tokens, comment, tolerant, source);
+  return $$Parse(src, loc, range, raw, tokens, comment, tolerant, source);
 }
 
 export class Position {

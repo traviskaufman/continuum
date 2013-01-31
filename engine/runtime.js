@@ -1486,6 +1486,29 @@ var runtime = (function(GLOBAL, exports, undefined){
   }
 
 
+  var internalModules = exports.internalModules = (function(modules){
+    return define({}, [
+      function set(name, bindings){
+        modules[name] = new $NativeModule(bindings);
+        modules[name].mrl = name;
+      },
+      function has(name){
+        return name in modules;
+      },
+      function get(name){
+        return modules[name];
+      },
+      function remove(name){
+        if (this.has(name)) {
+          delete modules[name];
+          return true;
+        }
+        return false;
+      }
+    ]);
+  })(new Hash);
+
+
   var Intrinsics = (function(){
     var $errors = ['EvalError', 'RangeError', 'ReferenceError',
                    'SyntaxError', 'TypeError', 'URIError'];
@@ -1679,8 +1702,17 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     exports.parse = parse;
 
-    natives.add({
-      parse: function(src, loc, range, raw, tokens, comment, tolerant, source){
+    internalModules.set('@@parser', {
+      $$Parse: function(_, args){
+        var src      = args[0],
+            loc      = args[1],
+            range    = args[2],
+            raw      = args[3],
+            tokens   = args[4],
+            comment  = args[5],
+            tolerant = args[6],
+            source   = args[7];
+
         var ast = parse(src, source, 'script', {
           loc     : !!loc,
           range   : !!range,
@@ -1690,7 +1722,10 @@ var runtime = (function(GLOBAL, exports, undefined){
           tolerant: !!tolerant
         });
 
-        if (ast.Abrupt) return ast;
+        if (ast.Abrupt) {
+          return ast;
+        }
+
         return fromInternal(ast);
       }
     });
@@ -1787,9 +1822,6 @@ var runtime = (function(GLOBAL, exports, undefined){
       return f._wrapper;
     }
 
-    natives.add({
-    });
-
     function deliverChangeRecordsAndReportErrors(){
       var observerResults = $$DeliverAllChangeRecords();
       if (observerResults && observerResults instanceof Array) {
@@ -1798,29 +1830,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         });
       }
     }
-
-
-    var internalModules = exports.internalModules = (function(modules){
-      return define({}, [
-        function set(name, bindings){
-          modules[name] = new $NativeModule(bindings);
-          modules[name].mrl = name;
-        },
-        function has(name){
-          return name in modules;
-        },
-        function get(name){
-          return modules[name];
-        },
-        function remove(name){
-          if (this.has(name)) {
-            delete modules[name];
-            return true;
-          }
-          return false;
-        }
-      ]);
-    })(new Hash);
 
     internalModules.set('@@collections', {
       $$MapClear: function(_, args){
