@@ -1,26 +1,61 @@
 import {
+  @@create: create
+} from '@@symbols';
+
+
+import {
   $$CreateObject,
-  $$GetIntrinsic
+  $$Get,
+  $$GetIntrinsic,
+  $$Set
 } from '@@internals';
 
 import {
-  builtinClass
+  builtinClass,
+  define,
+  extend,
+  isInitializing
 } from '@@utilities';
 
 import {
+  OrdinaryCreateFromConstructor,
   ToString
 } from '@@operations';
 
+
 const global = $$GetIntrinsic('global');
+
+const HIDDEN = 6;
+
+
+
+function setOrigin(filename = '', origin = null){
+  this.filename = filename;
+  this.origin = origin;
+}
+
+function setCode(loc, code){
+  const start    = $$Get(loc, 'start'),
+        line     = $$Get(start, 'line'),
+        column   = $$Get(start, 'column'),
+        fullLine = code.split('\n')[line - 1];
+
+  this.line = fullLine;
+  this.column = column;
+  this.code = line + '\n' + '-'.repeat(column) + '^';
+}
+
+
 
 export class Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === ErrorPrototype) {
-      return $$CreateObject('Error', 'Error', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new Error(message);
     }
-    this.message = message;
-    return this;
+
+    this.message = ToString(message);
+    $$Set(this, 'setCode', setCode);
+    $$Set(this, 'setOrigin', setOrigin);
   }
 
   toString(){
@@ -28,91 +63,106 @@ export class Error {
   }
 }
 
-builtinClass(Error, 'BuiltinError');
+define(Error.prototype, 'name', 'Error', HIDDEN);
+define(Error.prototype, 'message', '', HIDDEN);
+
+extend(Error, {
+  @@create(){
+    const obj = OrdinaryCreateFromConstructor(this, '%ErrorPrototype%');
+    $$Set(obj, 'setCode', undefined);
+    $$Set(obj, 'setOrigin', undefined);
+    $$Set(obj, 'BuiltinBrand', 'BuiltinError');
+    return obj;
+  }
+});
+
+builtinClass(Error);
+
 
 
 export class EvalError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === EvalErrorPrototype) {
-      return $$CreateObject('Error', 'EvalError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new EvalError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(EvalError, 'BuiltinError');
+builtinClass(EvalError);
+define(EvalError.prototype, 'name', 'EvalError', HIDDEN);
 
 
 export class RangeError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === RangeErrorPrototype) {
-      return $$CreateObject('Error', 'RangeError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new RangeError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(RangeError, 'BuiltinError');
+builtinClass(RangeError);
+define(RangeError.prototype, 'name', 'RangeError', HIDDEN);
 
 
 export class ReferenceError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === ReferenceErrorPrototype) {
-      return $$CreateObject('Error', 'ReferenceError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new ReferenceError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(ReferenceError, 'BuiltinError');
+builtinClass(ReferenceError);
+define(ReferenceError.prototype, 'name', 'ReferenceError', HIDDEN);
+
 
 
 export class SyntaxError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === SyntaxErrorPrototype) {
-      return $$CreateObject('Error', 'SyntaxError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new SyntaxError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(SyntaxError, 'BuiltinError');
+builtinClass(SyntaxError);
+define(SyntaxError.prototype, 'name', 'SyntaxError', HIDDEN);
 
 
 export class TypeError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === TypeErrorPrototype) {
-      return $$CreateObject('Error', 'TypeError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new TypeError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(TypeError, 'BuiltinError');
+builtinClass(TypeError);
+define(TypeError.prototype, 'name', 'TypeError', HIDDEN);
 
 
 export class URIError extends Error {
   constructor(message){
-    message = ToString(message);
-    if (this == null || this === global || this === URIErrorPrototype) {
-      return $$CreateObject('Error', 'URIError', message);
+    if (!isInitializing(this, 'setCode')) {
+      return new URIError(message);
     }
-    this.message = message;
-    return this;
+
+    super(message);
   }
 }
 
-builtinClass(URIError, 'BuiltinError');
+builtinClass(URIError);
+define(URIError.prototype, 'name', 'URIError', HIDDEN);
 
 
 const ErrorPrototype          = Error.prototype,

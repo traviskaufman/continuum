@@ -1518,7 +1518,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
     var $builtins = {
       Array   : $Array,
-      Error   : $Error,
       Function: $Function,
       RegExp  : $RegExp,
       Symbol  : $Symbol
@@ -1590,12 +1589,6 @@ var runtime = (function(GLOBAL, exports, undefined){
         }
       }
 
-      for (var i=0; i < 6; i++) {
-        var prototype = intrinsics['%'+$errors[i] + 'Prototype%'] = create($Error.prototype);
-        $Object.call(prototype, intrinsics['%ErrorPrototype%']);
-        prototype.define('name', $errors[i], _CW);
-      }
-
       intrinsics.StopIteration = new $Object(intrinsics['%ObjectPrototype%']);
       intrinsics.StopIteration.BuiltinBrand = 'StopIteration';
 
@@ -1608,9 +1601,6 @@ var runtime = (function(GLOBAL, exports, undefined){
 
       intrinsics['%ArrayPrototype%'].array = [];
       intrinsics['%ArrayPrototype%'].length = ['length', 0, __W];
-
-      intrinsics['%ErrorPrototype%'].define('name', 'Error', _CW);
-      intrinsics['%ErrorPrototype%'].define('message', '', _CW);
 
       intrinsics.ObserverCallbacks = new MapData;
       intrinsics['%NotifierPrototype%'] = new $Object(intrinsics['%ObjectPrototype%']);
