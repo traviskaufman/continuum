@@ -124,7 +124,7 @@ var $TypedArray = (function(module){
   });
 
   function $TypedArray(type, buffer, byteLength, byteOffset){
-    $Object.call(this, require('../runtime').intrinsics[type+'Proto']);
+    $Object.call(this, intrinsics['%'+type+'Prototype%']);
     this.Buffer = buffer;
     this.ByteOffset = byteOffset;
     this.ByteLength = byteLength;
