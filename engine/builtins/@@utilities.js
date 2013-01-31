@@ -511,3 +511,15 @@ export function getGlobal(){
 }
 
 internalFunction(getGlobal);
+
+export function max(x, y){
+  return x > y ? x : y
+}
+
+internalFunction(getGlobal);
+
+export function min(x, y){
+  return x < y ? x : y;
+}
+
+internalFunction(getGlobal);
