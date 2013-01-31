@@ -6,9 +6,12 @@ import {
   $$CreateUndetectable,
   $$CreateNil,
   $$Get,
-  $$IsUndetectable
+  $$IsUndetectable,
+  $$Signal
 } from '@@internals';
 
+
+export const nil = $$CreateNil();
 
 export function createUndetectable(value){
   return $$CreateUndetectable(value);
@@ -33,4 +36,6 @@ export function isUndetectable(value){
 builtinFunction(isUndetectable);
 
 
-export const nil = $$CreateNil();
+export function signal(type, ...values){
+  $$Signal(type, ...values);
+}

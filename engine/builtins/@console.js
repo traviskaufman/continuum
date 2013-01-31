@@ -14,13 +14,13 @@ import {
   ToString
 } from '@@operations';
 
+
 import {
-  $$CreateUndetectable,
-  $$Signal
-} from '@@internals';
+  createUndetectable,
+  signal
+} from '@continuum';
 
-
-const QUIET = $$CreateUndetectable('quiet');
+const QUIET = createUndetectable('quiet');
 
 
 export class Console {
@@ -141,4 +141,4 @@ export class Console {
 }
 
 
-export const console = new Console({ signal: $$Signal });
+export const console = new Console({ signal: signal });
