@@ -1,6 +1,7 @@
 var $Symbol = (function(exports){
   var objects = require('../lib/objects'),
-      utility = require('../lib/utility');
+      utility = require('../lib/utility'),
+      engine  = require('../engine').engine;
 
   var inherit = objects.inherit,
       define  = objects.define,
@@ -79,7 +80,7 @@ var $Symbol = (function(exports){
       },
       function GetP(receiver, key){
         if (key === 'toString') {
-          return require('../runtime').intrinsics['%ObjProto_toString%'];
+          return intrinsics['%ObjProto_toString%'];
         }
       },
       function SetP(receiver, key, value){
@@ -158,6 +159,14 @@ var $Symbol = (function(exports){
     NumberValue : new $InternalSymbol('NumberValue'),
     StringValue : new $InternalSymbol('StringValue'),
     MISSING     : new $InternalSymbol('MISSING')
+  });
+
+
+  var realm, intrinsics;
+
+  engine.on('realm-change', function(){
+    realm = engine.activeRealm;
+    intrinsics = engine.activeIntrinsics;
   });
 
   return exports;
