@@ -1,4 +1,9 @@
 import {
+  $$CurrentRealm,
+  $$GetIntrinsic
+} from '@@internals';
+
+import {
   builtinClass,
   builtinFunction
 } from '@@utilities';
@@ -61,4 +66,4 @@ export class Iterator {
 
 builtinClass(Iterator);
 
-export const StopIteration = $__StopIteration;
+export const StopIteration = $$GetIntrinsic('StopIteration');

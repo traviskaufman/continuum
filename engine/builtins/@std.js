@@ -1,3 +1,8 @@
+import {
+  $$CurrentRealm,
+  $$GetIntrinsic
+} from '@@internals';
+
 // standard constants
 const NaN       = +'NaN',
       Infinity  = 1 / 0,
@@ -72,13 +77,18 @@ import {
 import { JSON } from '@json';
 import { Math } from '@math';
 
-import { Symbol } from '@symbol';
-import { Iterator } from '@iter';
+import {
+  Symbol
+} from '@symbol';
 
-import { console } from '@console';
+import {
+  Iterator,
+  StopIteration
+} from '@iter';
 
-
-const StopIteration = $__StopIteration;
+import {
+  console
+} from '@console';
 
 
 export Array, Boolean, Date, Function, Map, Number, Object, Proxy, RegExp, Set, String, WeakMap,

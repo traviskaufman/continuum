@@ -101,7 +101,7 @@ function stringIndexOf(string, search, position){
         searchLen = searchStr.length,
         maxLen    = len - searchLen;
 
-  let index = pos > 0 ? pos < len ? pos : len : 0;
+  let index = min(max(pos, 0), len);
 
   while (index < maxLen) {
     let offset = 0;
