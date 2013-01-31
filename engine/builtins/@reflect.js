@@ -27,16 +27,18 @@ import {
 } from '@@utilities';
 
 import {
+  $$CreateObject,
   $$Get,
   $$Invoke
 } from '@@internals';
+
 
 
 export class Proxy {
   constructor(target, handler){
     ensureObject(target, 'Proxy');
     ensureObject(handler, 'Proxy');
-    return $__ProxyCreate(target, handler);
+    return $$CreateObject('Proxy', target, handler);
   }
 }
 
@@ -369,18 +371,21 @@ export function getOwnPropertyNames(target){
 builtinFunction(getOwnPropertyNames);
 
 
-export function ownKeys(target){
-  ensureObject(target, '@reflect.ownKeys');
-  // TODO implement OwnPropertyKeys
-  //return $__OwnPropertyKeys(target, false, false);
+export function ownPropertyKeys(target){
+  ensureObject(target, '@reflect.ownPropertyKeys');
+  return ownKeys(target);
 }
 
 builtinFunction(getOwnPropertyNames);
+
 
 export function getPrototypeOf(target){
   ensureObject(target, '@reflect.getPrototypeOf');
   return $$Invoke(target, 'GetInheritence');
 }
+
+builtinFunction(getPrototypeOf);
+
 
 export function setPrototypeOf(target, proto){
   ensureObject(target, '@reflect.setPrototypeOf');

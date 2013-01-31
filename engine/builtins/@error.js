@@ -1,4 +1,5 @@
 import {
+  $$CreateObject,
   $$GetIntrinsic
 } from '@@internals';
 
@@ -16,14 +17,14 @@ export class Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === ErrorPrototype) {
-      return $__ErrorCreate('Error', message);
+      return $$CreateObject('Error', 'Error', message);
     }
     this.message = message;
     return this;
   }
 
   toString(){
-    return this.name + ': ' + this.message;
+    return `${this.name}: ${this.message}`;
   }
 }
 
@@ -34,7 +35,7 @@ export class EvalError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === EvalErrorPrototype) {
-      return $__ErrorCreate('EvalError', message);
+      return $$CreateObject('Error', 'EvalError', message);
     }
     this.message = message;
     return this;
@@ -48,7 +49,7 @@ export class RangeError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === RangeErrorPrototype) {
-      return $__ErrorCreate('RangeError', message);
+      return $$CreateObject('Error', 'RangeError', message);
     }
     this.message = message;
     return this;
@@ -62,7 +63,7 @@ export class ReferenceError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === ReferenceErrorPrototype) {
-      return $__ErrorCreate('ReferenceError', message);
+      return $$CreateObject('Error', 'ReferenceError', message);
     }
     this.message = message;
     return this;
@@ -76,7 +77,7 @@ export class SyntaxError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === SyntaxErrorPrototype) {
-      return $__ErrorCreate('SyntaxError', message);
+      return $$CreateObject('Error', 'SyntaxError', message);
     }
     this.message = message;
     return this;
@@ -90,7 +91,7 @@ export class TypeError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === TypeErrorPrototype) {
-      return $__ErrorCreate('TypeError', message);
+      return $$CreateObject('Error', 'TypeError', message);
     }
     this.message = message;
     return this;
@@ -104,7 +105,7 @@ export class URIError extends Error {
   constructor(message){
     message = ToString(message);
     if (this == null || this === global || this === URIErrorPrototype) {
-      return $__ErrorCreate('URIError', message);
+      return $$CreateObject('Error', 'URIError', message);
     }
     this.message = message;
     return this;

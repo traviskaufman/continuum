@@ -1788,49 +1788,6 @@ var runtime = (function(GLOBAL, exports, undefined){
     }
 
     natives.add({
-      _eval: (function(){
-        function builtinEval(obj, args, direct){
-          var code = args[0];
-          if (typeof code !== 'string') {
-            return code;
-          }
-
-          var script = new Script({
-            scope: 'eval',
-            natives: false,
-            strict: context.callee ? context.callee.Strict : context.Code.flags.strict,
-            source: code
-          });
-
-          if (script.error) {
-            return script.error;
-          }
-
-          if (direct) {
-            return context.run();
-          }
-
-          var ctx = new ExecutionContext(context, realm.globalEnv, realm, script.bytecode);
-          ExecutionContext.push(ctx);
-          var result = context.run();
-          ctx === context && ExecutionContext.pop();
-          return result;
-        }
-        builtinEval.isBuiltinEval = true;
-        return builtinEval;
-      })(),
-      _ErrorCreate: function(obj, args){
-        return new $Error(args[0], undefined, args[1]);
-      },
-      _ObjectCreate: function(obj, args){
-        return new $Object(args[0] === null ? intrinsics.Genesis : args[0]);
-      },
-      _ProxyCreate: function(obj, args){
-        return new $Proxy(args[0], args[1]);
-      },
-      _SymbolCreate: function(obj, args){
-        return new $Symbol(args[0], args[1]);
-      }
     });
 
     function deliverChangeRecordsAndReportErrors(){
@@ -2049,7 +2006,7 @@ var runtime = (function(GLOBAL, exports, undefined){
           }
         },
         $$CreateObject: function(_, args){
-          return new objectTypes[args[0]](args[1]);
+          return new objectTypes[args[0]](args[1], args[2]);
         },
         $$CreateArray: function(_, args){
           var array = new $Array(args[1]);
@@ -2093,6 +2050,37 @@ var runtime = (function(GLOBAL, exports, undefined){
 
           return new $Array(props);
         },
+        $$Eval: (function(){
+          function builtinEval(_, args, direct){
+            var code = args[0];
+
+            if (typeof code !== 'string') {
+              return code;
+            }
+
+            var script = new Script({
+              scope: 'eval',
+              natives: false,
+              strict: context.callee ? context.callee.Strict : context.strict,
+              source: code
+            });
+
+            if (script.error) {
+              return script.error;
+            }
+
+            var ctx = new ExecutionContext(context, direct ? context.LexicalEnvironment : realm.globalEnv, realm, script.bytecode);
+            ExecutionContext.push(ctx);
+            var result = ctx.run();
+            ctx === context && ExecutionContext.pop();
+
+            return result;
+          }
+
+          builtinEval.isBuiltinEval = true;
+
+          return builtinEval;
+        })(),
         $$EvaluateInScope: function(_, args){
           var code = args[0],
               obj  = args[1];
@@ -2517,7 +2505,8 @@ var runtime = (function(GLOBAL, exports, undefined){
         };
       })(),
       $$JSONQuote: (function(){
-        var escapable = /[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        var escapable = new RegExp('[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4'+
+                                   '\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]', 'g'),
             meta = { '\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\' };
 
         function escaper(a) {

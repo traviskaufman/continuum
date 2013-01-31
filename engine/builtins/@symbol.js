@@ -1,4 +1,5 @@
 import {
+  $$CreateObject,
   $$Exception
 } from '@@internals';
 
@@ -12,7 +13,7 @@ export class Symbol {
     if (name == null) {
       throw $$Exception('unnamed_symbol', []);
     }
-    return $__SymbolCreate(name, !!isPublic);
+    return $$CreateObject('Symbol', name, !!isPublic);
   }
 }
 
