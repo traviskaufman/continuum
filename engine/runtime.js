@@ -18,6 +18,7 @@ var runtime = (function(GLOBAL, exports, undefined){
       $Symbol          = require('./object-model/$Symbol').$Symbol,
       $WellKnownSymbol = require('./object-model/$Symbol').$WellKnownSymbol,
       $Object          = require('./object-model/$Object').$Object,
+      $Descriptor      = require('./object-model/$Descriptor').$Descriptor,
       $StrictArguments = require('./object-model/$Arguments').$StrictArguments,
       $MappedArguments = require('./object-model/$Arguments').$MappedArguments,
       $Array           = require('./object-model/$Array').$Array,
@@ -2321,6 +2322,13 @@ var runtime = (function(GLOBAL, exports, undefined){
           var obj = args[0];
 
           return new $Module(obj, obj.Enumerate(false, false));
+        },
+        $$WrapDescriptor: function(_, args){
+          var descriptor = args[0];
+
+          if (descriptor) {
+            return new $Descriptor(descriptor);
+          }
         }
       });
     }();

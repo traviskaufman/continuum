@@ -9,7 +9,8 @@ import {
   $$Has,
   $$NumberToString,
   $$Set,
-  $$SetIntrinsic
+  $$SetIntrinsic,
+  $$WrapDescriptor
 } from '@@internals';
 
 import {
@@ -180,6 +181,50 @@ export function set(obj, key, value){
 }
 
 internalFunction(set);
+
+
+export function getOwnProperty(obj, key){
+  return $$WrapDescriptor($$Invoke(obj, 'GetOwnProperty', key));
+}
+
+internalFunction(getOwnProperty);
+
+
+export function defineOwnProperty(obj, key, desc){
+  if (!$$Has(desc, 'descriptor')) {
+    const wrapped = $$WrapDescriptor($$CreateInternalObject());
+
+    if ('configurable' in desc) {
+      wrapped.configurable = desc.configurable;
+    }
+
+    if ('enumerable' in desc) {
+      wrapped.enumerable = desc.enumerable;
+    }
+
+    if ('writable' in desc) {
+      wrapped.writable = desc.writable;
+    }
+
+    if ('value' in desc) {
+      wrapped.value = desc.value;
+    }
+
+    if ('get' in desc) {
+      wrapped.get = desc.get;
+    }
+
+    if ('set' in desc) {
+      wrapped.set = desc.set;
+    }
+
+    desc = wrapped;
+  }
+
+  return $$Invoke(obj, 'DefineOwnProperty', key, $$Get(desc, 'descriptor'));
+}
+
+internalFunction(defineOwnProperty);
 
 
 export function builtinFunction(func){

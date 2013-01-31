@@ -44,6 +44,7 @@ require('./builder')
   '../engine/object-model/environments.js',
   '../engine/object-model/operations.js',
   '../engine/object-model/$Object.js',
+  '../engine/object-model/$Descriptor.js',
   '../engine/object-model/$Arguments.js',
   '../engine/object-model/$Array.js',
   '../engine/object-model/$Proxy.js',
