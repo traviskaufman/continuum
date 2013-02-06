@@ -52,6 +52,25 @@ export function zeroPad(number, places = 2){
 internalFunction(zeroPad);
 
 
+function getKey(key){
+  if (typeof key === 'string') {
+    return key;
+  } else if (hasBrand(key, 'BuiltinSymbol')) {
+    return `@${$$Get(key, 'Name')}`;
+  }
+
+  return '';
+}
+
+internalFunction(getKey);
+
+function getName(func){
+  return getKey(get(func, 'name'));
+}
+
+internalFunction(getName);
+
+
 export function abs(x){
   return x < 0 ? -x : x;
 }
@@ -85,6 +104,19 @@ export function isNaN(x){
 }
 
 internalFunction(isNaN);
+
+
+export function max(x, y){
+  return x > y ? x : y
+}
+
+internalFunction(getGlobal);
+
+export function min(x, y){
+  return x < y ? x : y;
+}
+
+internalFunction(getGlobal);
 
 
 export function isFinite(value){
@@ -242,6 +274,7 @@ internalFunction(defineOwnProperty);
 
 export function builtinFunction(func){
   $$Set(func, 'BuiltinFunction', true);
+  $$Set(func, 'BuiltinName', getKey(func.name));
   deleteProperty(func, 'prototype');
   update(func, 'name', 0);
   define(func, 'caller', null, 0);
@@ -314,10 +347,8 @@ export function createInternal(proto, properties){
 internalFunction(createInternal);
 
 
-export function hideEverything(o){
-  const type = typeof o;
-
-  if (type === 'object' ? o === null : type !== 'function') {
+export function hideEverything(o, name){
+  if (Type(o) !== 'Object') {
     return o;
   }
 
@@ -325,15 +356,20 @@ export function hideEverything(o){
   let index = keys.length;
 
   while (index--) {
-    const key   = keys[index],
+    const key   = get(keys, index),
           attrs = query(o, key),
           val   = get(o, key);
 
     update(o, key, typeof val === 'number' ? FROZEN : attrs & ~1);
+
+    if (name && typeof val === 'function') {
+      $$Set(val, 'BuiltinName', `${name}.${getName(val)}`);
+    }
   }
 
-  if (type === 'function') {
-    hideEverything(o.prototype);
+  if (typeof o === 'function') {
+    hideEverything(get(o, 'prototype'), `${getName(o)}.prototype`);
+    $$Set(o, 'BuiltinName', getName(o));
   }
 
   return o;
@@ -366,7 +402,7 @@ export function builtinClass(Ctor, brand){
   if (!isSymbol) {
     setBrand(Ctor.prototype, brand || `Builtin${Ctor.name}`);
     setTag(Ctor.prototype, Ctor.name);
-    hideEverything(Ctor);
+    hideEverything(Ctor, getName(Ctor));
   }
 }
 
@@ -446,9 +482,9 @@ export function setTag(obj, tag){
 internalFunction(setTag);
 
 
-export function ensureObject(o, name){
+export function ensureObject(o){
   if (Type(o) !== 'Object') {
-    throw $$Exception('called_on_non_object', [name]);
+    throw $$Exception('called_on_non_object', [$$CallerName()]);
   }
 }
 
@@ -457,14 +493,14 @@ internalFunction(ensureObject);
 
 export function ensureDescriptor(o){
   if (o === null || typeof o !== 'object') {
-    throw $$Exception('property_desc_object', [Type(o)])
+    throw $$Exception('property_desc_object', [Type(o), $$CallerName()])
   }
 }
 
 internalFunction(ensureDescriptor);
 
 
-export function ensureArgs(o, name){
+export function ensureArgs(o){
   const brand = Type(o) === 'Object' ? $$Get(o, 'BuiltinBrand') : null;
 
   if (brand === 'BuiltinArguments') {
@@ -473,24 +509,24 @@ export function ensureArgs(o, name){
     return o;
   }
 
-  throw $$Exception('apply_wrong_args', []);
+  throw $$Exception('apply_wrong_args', [$$CallerName()]);
 }
 
 internalFunction(ensureArgs);
 
 
-export function ensureFunction(o, name){
+export function ensureFunction(o){
   if (typeof o !== 'function') {
-    throw $$Exception('called_on_non_function', [name]);
+    throw $$Exception('called_on_non_function', [$$CallerName()]);
   }
 }
 
 internalFunction(ensureFunction);
 
 
-export function ensureCallback(o, name){
+export function ensureCallback(o){
   if (typeof o !== 'function') {
-    throw $$Exception('callback_must_be_callable', [name]);
+    throw $$Exception('callback_must_be_callable', [$$CallerName()]);
   }
 }
 
@@ -499,7 +535,7 @@ internalFunction(ensureCallback);
 
 export function ensureProto(proto){
   if (proto !== null && Type(proto) !== 'Object') {
-    throw $$Exception('proto_object_or_null', [])
+    throw $$Exception('proto_object_or_null', [$$CallerName()])
   }
 }
 
@@ -508,18 +544,6 @@ internalFunction(ensureProto);
 
 export function getGlobal(){
   return $$Get($$CurrentRealm(), 'global');
-}
-
-internalFunction(getGlobal);
-
-export function max(x, y){
-  return x > y ? x : y
-}
-
-internalFunction(getGlobal);
-
-export function min(x, y){
-  return x < y ? x : y;
 }
 
 internalFunction(getGlobal);

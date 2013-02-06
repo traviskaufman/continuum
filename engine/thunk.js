@@ -136,9 +136,9 @@ var thunk = (function(exports){
   }
 
 
-  function setOrigin(obj, filename, name){
+  function setOrigin(obj, filename, origin){
     filename && obj.set('filename', filename);
-    name && obj.set('name', name);
+    origin && obj.set('origin', origin);
   }
 
   function setCode(obj, loc, code){

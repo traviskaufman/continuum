@@ -163,12 +163,3 @@ export class URIError extends Error {
 
 builtinClass(URIError);
 define(URIError.prototype, 'name', 'URIError', HIDDEN);
-
-
-const ErrorPrototype          = Error.prototype,
-      EvalErrorPrototype      = EvalError.prototype,
-      RangeErrorPrototype     = RangeError.prototype,
-      ReferenceErrorPrototype = ReferenceError.prototype,
-      SyntaxErrorPrototype    = SyntaxError.prototype,
-      TypeErrorPrototype      = TypeError.prototype,
-      URIErrorPrototype       = URIError.prototype;

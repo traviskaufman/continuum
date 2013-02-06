@@ -1003,7 +1003,7 @@ var runtime = (function(GLOBAL, exports, undefined){
 
   var $Error = (function(){
     function $Error(name, type, message){
-      $Object.call(this, intrinsics[name+'Proto']);
+      $Object.call(this, intrinsics['%'+name+'Prototype%']);
       this.define('message', message, ECW);
       if (type !== undefined) {
         this.define('type', type, _CW);
@@ -1295,9 +1295,15 @@ var runtime = (function(GLOBAL, exports, undefined){
       },
       function callerName(){
         var caller = this.caller && this.caller.callee;
-        if (caller && caller.get) {
-          return caller.get('name');
+
+        if (caller) {
+          if (caller.BuiltinName) {
+            return caller.BuiltinName;
+          } else if (caller.get) {
+            return caller.get('name');
+          }
         }
+
         return '';
       },
       function createBinding(name, immutable){
