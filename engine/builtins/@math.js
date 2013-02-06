@@ -225,9 +225,10 @@ export const Math = {
       const x = ToNumber(values[0]),
             y = ToNumber(values[1]);
 
-      if (x !== x || y !== y) {
+      if (isNaN(x) || isNaN(y)) {
         return NaN;
       }
+
       return x > y ? x : y;
     } else {
       let index   = count,
@@ -508,7 +509,7 @@ export const Math = {
     const xlo = loword(x),
           ylo = loword(y);
 
-    return xlo * ylo + (((hiword(x) * ylo + hiword(y) * xlo) << 16) >>> 0);
+    return xlo * ylo + ToInt32((hiword(x) * ylo + hiword(y) * xlo) << 16);
   }
 };
 
