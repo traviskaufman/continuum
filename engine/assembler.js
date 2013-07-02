@@ -454,7 +454,7 @@ var assembler = (function(exports){
 
 
   var ClassDefinition = (function(){
-    var ctor = require('esprima').parse('class X { constructor(...args){ super(...args) } }').body[0].body.body[0];
+    var ctor = require('../third_party/esprima').parse('class X { constructor(...args){ super(...args) } }').body[0].body.body[0];
 
     function ClassDefinition(node, name){
       var self = this;
