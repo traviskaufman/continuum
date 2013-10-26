@@ -1,6 +1,6 @@
 var runtime = (function(GLOBAL, exports, undefined){
   "use strict";
-  var esprima          = require('../third_party/esprima'),
+  var esprima          = require('esprima'),
       objects          = require('./lib/objects'),
       functions        = require('./lib/functions'),
       iteration        = require('./lib/iteration'),

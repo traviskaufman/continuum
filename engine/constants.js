@@ -100,7 +100,7 @@ var constants = (function(exports){
     ECA: E | C | A
   };
 
-  exports.AST = new Constants(ownKeys(require('../third_party/esprima').Syntax));
+  exports.AST = new Constants(ownKeys(require('esprima').Syntax));
 
   return exports;
 })(typeof module !== 'undefined' ? module.exports : {});
